@@ -1,10 +1,11 @@
-# mdq
+# MDQ Core
 
-MCQs are passe. Enter MDQs. Human- and agent-friendly Markdown Quizzes.
+The open-source engine for MDQ: human- and agent-friendly Markdown Decks &
+Questions.
 No clunky interfaces. No proprietary nonsense. No database.
 Just your own machine and a public secure tunnel.
 
-MDQ turns a markdown file into a live class session: sparse slides, quiz
+MDQ Core turns a markdown file into a live class session: sparse slides, quiz
 questions, polls, open responses, fold-out notes, live embedded demos, answer
 reveals, leaderboards, and printable PDF packets all come from the same deck.
 

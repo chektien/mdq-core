@@ -84,7 +84,7 @@ const SceneIntro: React.FC<{ dur: number }> = ({ dur }) => {
               transform: `translateY(${rise(frame, 28, 18, 18)}px)`,
             }}
           >
-            Markdown quizzes & live presentations
+            Markdown decks, questions & live presentations
           </div>
         </div>
       </Center>

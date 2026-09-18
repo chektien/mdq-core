@@ -162,9 +162,9 @@ export default function App({ runtimeConfig = {} }: { runtimeConfig?: RuntimeCli
       <div className="text-center">
         <h1 className="mb-2 text-4xl font-bold tracking-tight text-white">mdq</h1>
         <p className="mx-auto max-w-3xl text-lg text-zinc-400">
-          MCQs are passe. Enter <span className="font-semibold text-indigo-300">MDQ</span>s.
+          Meet <span className="font-semibold text-indigo-300">MDQ</span>.
           <span className="font-medium text-zinc-200">
-            {" "}Human- and agent-friendly <span className="text-indigo-300">M</span>ark<span className="text-indigo-300">D</span>own <span className="text-indigo-300">Q</span>uizzes.
+            {" "}Human- and agent-friendly <span className="text-indigo-300">M</span>ark<span className="text-indigo-300">D</span>own Decks &amp; <span className="text-indigo-300">Q</span>uestions.
           </span>
           <br />
           <span className="text-zinc-300">No clunky interfaces. No proprietary nonsense. No database.</span>
@@ -172,7 +172,7 @@ export default function App({ runtimeConfig = {} }: { runtimeConfig?: RuntimeCli
           <span className="text-zinc-400">Just your own machine and a public secure tunnel (like Tailscale).</span>
           <br />
           <a
-            href="https://github.com/chektien/mdq"
+            href="https://github.com/chektien/mdq-core"
             target="_blank"
             rel="noreferrer"
             className="inline-flex items-center justify-center gap-1.5 text-zinc-300 transition-colors hover:text-white"
