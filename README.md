@@ -637,6 +637,9 @@ In summary, Docker offers structure, but may be overkill if you are running a si
 
 Related docs:
 
+- Read [`CONTRIBUTING.md`](CONTRIBUTING.md) before submitting changes. It
+  explains the MIT contribution terms, contributor authority, and public-data
+  safeguards.
 - `docs/classquiz-analysis.md`: ClassQuiz codebase summary and MDQ feature roadmap notes
 - Commit code changes under `packages/`, `docs/`, `samples/`, scripts, and config files
 - Keep personal/local files under `data/`
