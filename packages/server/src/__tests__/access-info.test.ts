@@ -16,6 +16,9 @@ jest.mock("child_process", () => ({
 }));
 
 import { execSync } from "child_process";
+import * as fs from "fs";
+import * as os from "os";
+import * as path from "path";
 
 const mockExecSync = execSync as jest.MockedFunction<typeof execSync>;
 
@@ -308,6 +311,17 @@ describe("detectAccessInfo", () => {
     const cached = getCachedAccessInfo();
     expect(cached).not.toBeNull();
     expect(cached!.source).toBe("lan-fallback");
+  });
+
+  it("persists access information inside the configured runtime data directory", async () => {
+    mockExecSync.mockImplementation(() => {
+      throw new Error("no tailscale");
+    });
+    const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "mdq-access-"));
+
+    await detectAccessInfo(3000, [], dataDir);
+
+    expect(fs.existsSync(path.join(dataDir, "access", "current.json"))).toBe(true);
   });
 
   it("generates QR code even when short URL fails", async () => {

@@ -23,6 +23,7 @@ export type RuntimeTheme = "dark" | "light";
 export type RuntimePalette = DeckPalette;
 
 export interface RuntimeConfig {
+  dataDir: string;
   port: number;
   bindHost: string;
   portFallbacks: number;
@@ -39,6 +40,7 @@ export interface RuntimeConfig {
 
 export interface RuntimeConfigLoadOptions {
   rootDir?: string;
+  dataDir?: string;
   env?: NodeJS.ProcessEnv;
 }
 
@@ -139,7 +141,13 @@ function defaultDeckDir(dataDir: string): string {
 export function loadRuntimeConfig(options: RuntimeConfigLoadOptions = {}): RuntimeConfig {
   const rootDir = options.rootDir || path.resolve(__dirname, "../../../");
   const env = options.env || process.env;
-  const dataDir = path.join(rootDir, "data");
+  const configuredDataDir = parseString(env.MDQ_DATA_DIR);
+  const dataDir = path.resolve(
+    options.dataDir
+      ?? (configuredDataDir
+        ? path.resolve(process.cwd(), configuredDataDir)
+        : path.join(rootDir, "data")),
+  );
   const configPath = path.join(dataDir, "config.json");
   const configDir = path.dirname(configPath);
   const fileConfig = readRuntimeConfigFile(configPath);
@@ -151,6 +159,7 @@ export function loadRuntimeConfig(options: RuntimeConfigLoadOptions = {}): Runti
   const configuredQuizDir = parseString(env.QUIZ_DIR) ?? parseString(fileConfig.quizDir);
 
   return {
+    dataDir,
     port: parsePositiveInt(env.PORT) ?? parsePositiveInt(fileConfig.port) ?? DEFAULT_PORT,
     bindHost:
       parseString(env.MDQ_BIND_HOST)

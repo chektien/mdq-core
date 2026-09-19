@@ -23,9 +23,11 @@ const requestedPort = runtimeConfig.port || DEFAULT_PORT;
 const bindHost = runtimeConfig.bindHost || undefined;
 const maxPortFallbacks = runtimeConfig.portFallbacks;
 const instanceId = runtimeConfig.instanceId || randomUUID();
-const dataDir = path.resolve(__dirname, "../../../data");
-const quizDir = runtimeConfig.quizDir || path.resolve(__dirname, "../../../data/decks");
-const clientDist = path.join(__dirname, "../../client/dist");
+const dataDir = runtimeConfig.dataDir;
+const quizDir = runtimeConfig.quizDir;
+const clientDist = process.env.MDQ_CLIENT_DIST
+  ? path.resolve(process.cwd(), process.env.MDQ_CLIENT_DIST)
+  : path.join(__dirname, "../../client/dist");
 const tailscaleDisabled = ["1", "true", "yes", "on"].includes(
   (process.env.MDQ_DISABLE_TAILSCALE || "").trim().toLowerCase(),
 );
@@ -240,7 +242,7 @@ async function onListening(): Promise<void> {
 
   // Detect access info (Tailscale/LAN) on startup
   try {
-    const info = await detectAccessInfo(boundPort);
+    const info = await detectAccessInfo(boundPort, undefined, dataDir);
     let tailscaleHealthVerified = false;
     console.log(`Access URL: ${info.fullUrl} (source: ${info.source})`);
     if (info.shortUrl) {

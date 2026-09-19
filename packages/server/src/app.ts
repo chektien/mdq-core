@@ -194,6 +194,10 @@ export function createApp(quizDirOrOpts?: string | AppOptions) {
     onStateChange = quizDirOrOpts.onStateChange;
     onMessages = quizDirOrOpts.onMessages;
   }
+  const configuredDataDir = process.env.MDQ_DATA_DIR?.trim();
+  if (!dataDir && configuredDataDir) {
+    dataDir = path.resolve(process.cwd(), configuredDataDir);
+  }
   const resolvedInstanceId = (instanceId || process.env.MDQ_INSTANCE_ID || "").trim() || `pid-${process.pid}`;
   const imagesDir = dataDir ? path.join(dataDir, "images") : undefined;
   const videosDir = dataDir ? path.join(dataDir, "videos") : undefined;

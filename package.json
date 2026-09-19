@@ -1,9 +1,38 @@
 {
-  "name": "mdq",
+  "name": "mdq-core",
   "version": "0.3.4-beta",
-  "private": true,
+  "description": "Markdown-first live presentations, questions, polls, and printable packets.",
+  "license": "MIT",
+  "author": "Chek Tien Tan",
+  "homepage": "https://github.com/chektien/mdq-core#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/chektien/mdq-core.git"
+  },
+  "bugs": {
+    "url": "https://github.com/chektien/mdq-core/issues"
+  },
+  "keywords": [
+    "markdown",
+    "presentations",
+    "quiz",
+    "classroom",
+    "polls"
+  ],
   "engines": {
     "node": ">=20"
+  },
+  "bin": {
+    "mdq": "bin/mdq.cjs",
+    "mdq-core": "bin/mdq.cjs"
+  },
+  "files": [
+    "bin/",
+    "dist/",
+    "samples/"
+  ],
+  "publishConfig": {
+    "access": "public"
   },
   "workspaces": [
     "packages/*"
@@ -14,6 +43,11 @@
     "try:local": "bash ./scripts/try-mdq.sh --local-only",
     "try:publish": "bash ./scripts/try-mdq.sh --publish",
     "build": "npm run build --workspace=@mdq/shared && npm run build --workspace=@mdq/server && npm run build --workspace=@mdq/client",
+    "build:package": "npm run build && node scripts/build-package.mjs",
+    "package:verify": "npm run build:package && node scripts/verify-package.mjs",
+    "release:npm": "npm publish --tag beta",
+    "prepack": "npm run build:package",
+    "prepublishOnly": "node scripts/check-publish-tag.mjs && npm run package:verify",
     "test": "npm run build --workspace=@mdq/shared && npm run test --workspace=@mdq/server",
     "lint": "eslint packages/*/src --ext .ts,.tsx",
     "typecheck": "tsc --build packages/shared packages/server packages/client",
@@ -32,10 +66,18 @@
     "test:load": "npx jest --testPathPattern load-smoke --forceExit --detectOpenHandles --config packages/server/jest.config.js",
     "classify:local": "npm run build --workspace=@mdq/shared && npm run build --workspace=@mdq/server && node packages/server/dist/classify-local-run.js"
   },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.22.3",
+    "marked": "^12.0.0",
+    "qrcode": "^1.5.4",
+    "socket.io": "^4.8.3"
+  },
   "devDependencies": {
     "@types/node": "^20.11.0",
     "@typescript-eslint/eslint-plugin": "^7.0.0",
     "@typescript-eslint/parser": "^7.0.0",
+    "esbuild": "^0.27.3",
     "eslint": "^8.56.0",
     "playwright": "^1.60.0",
     "socket.io-client": "^4.8.3",
