@@ -1,7 +1,7 @@
 # MDQ Core
 
 The open-source engine for MDQ: human- and agent-friendly Markdown Decks &
-Questions.
+Quizzes.
 No clunky interfaces. No proprietary nonsense. No database.
 Just your own machine and a public secure tunnel.
 
