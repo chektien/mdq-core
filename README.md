@@ -457,6 +457,24 @@ live_interactive: true
 
 Fold-out notes are written as `> Attendee Note:` or `> Presenter Note:` blockquotes. Attendee notes can appear in student and review-facing surfaces; presenter notes stay on authenticated instructor surfaces.
 
+A note can be long enough to read as a short section of a paper. Keep every line
+of it inside the blockquote, and use ordinary Markdown for structure: `###`
+headings, paragraphs, lists, emphasis and inline code. When a note ends with an
+ordered list, that list is shown as the note's references, in smaller type with
+bracketed numbers.
+
+```markdown
+> Attendee Note: **Further reading**
+>
+> ### 1. Why retrieval first
+>
+> Taking a test on material improves long-term retention more than restudying it [1].
+>
+> ### References
+>
+> 1. Henry L. Roediger and Jeffrey D. Karpicke. 2006. Test-Enhanced Learning. *Psychological Science* 17, 3, 249–255. https://doi.org/10.1111/j.1467-9280.2006.01693.x
+```
+
 ### Presenter notes (instructor-only panel)
 
 Presenter notes are authored per item as `> Presenter Note:` blockquotes, with

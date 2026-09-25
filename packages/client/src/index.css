@@ -2412,6 +2412,124 @@ html[data-theme="light"] .mdq-orbit-callout {
   line-height: 1.45;
 }
 
+/* Reading typography for long fold-out notes. The Tailwind reset removes
+   heading sizes, list markers and block spacing, so without these rules a
+   note with sections and a reference list reads as one block. Scoped to the
+   note body; slide content is unchanged. A note's final ordered list reads as
+   its references: smaller type, hanging indent and bracketed numbers. Colours
+   come from the slide tokens, so every theme applies. */
+.foldout-note-body {
+  max-width: 68ch;
+  font-size: 1rem;
+  line-height: 1.6;
+}
+
+.foldout-note-body > * + * {
+  margin-top: 0.75em;
+}
+
+.foldout-note-body > :first-child {
+  margin-top: 0;
+}
+
+.foldout-note-body h1,
+.foldout-note-body h2,
+.foldout-note-body h3,
+.foldout-note-body h4 {
+  margin: 1.5em 0 0.4em;
+  color: var(--mdq-slide-heading);
+  font-weight: 750;
+  line-height: 1.25;
+  letter-spacing: -0.005em;
+}
+
+.foldout-note-body h1,
+.foldout-note-body h2 {
+  font-size: 1.3em;
+}
+
+.foldout-note-body h3 {
+  font-size: 1.12em;
+}
+
+.foldout-note-body h4 {
+  font-size: 1em;
+}
+
+.foldout-note-body h3 + *,
+.foldout-note-body h4 + * {
+  margin-top: 0.35em;
+}
+
+.foldout-note-body strong {
+  color: var(--mdq-slide-heading);
+  font-weight: 700;
+}
+
+.foldout-note-body em {
+  font-style: italic;
+}
+
+.foldout-note-body ul,
+.foldout-note-body ol {
+  padding-left: 1.5em;
+}
+
+.foldout-note-body ul {
+  list-style: disc;
+}
+
+.foldout-note-body ol {
+  list-style: decimal;
+}
+
+.foldout-note-body li + li {
+  margin-top: 0.3em;
+}
+
+.foldout-note-body li::marker {
+  color: var(--mdq-slide-ink-soft);
+}
+
+.foldout-note-body blockquote {
+  padding-left: 0.9em;
+  border-left: 2px solid var(--mdq-slide-rule);
+  font-style: italic;
+}
+
+.foldout-note-body code {
+  padding: 0.05em 0.3em;
+  border-radius: 0.2em;
+  background: var(--mdq-slide-glass);
+  font-size: 0.9em;
+}
+
+.foldout-note-body hr {
+  margin: 1.2em 0;
+  border: 0;
+  border-top: 1px solid var(--mdq-slide-rule);
+}
+
+.foldout-note-body > ol:last-child {
+  padding-left: 2.1em;
+  font-size: 0.88em;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.foldout-note-body > ol:last-child > li {
+  padding-left: 0.2em;
+}
+
+.foldout-note-body > ol:last-child > li + li {
+  margin-top: 0.55em;
+}
+
+.foldout-note-body > ol:last-child > li::marker {
+  content: "[" counter(list-item) "]  ";
+  font-variant-numeric: tabular-nums;
+}
+
 .slide-counter {
   position: absolute;
   right: auto;
