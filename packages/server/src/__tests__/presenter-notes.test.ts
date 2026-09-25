@@ -313,7 +313,7 @@ presenter_notes: true`,
     const app = createApp({ quizDir: dir, presenterNotes: true });
     const res = await request(app).get(`/api/deck/${week}`);
     expect(res.status).toBe(200);
-    expect(Object.keys(res.body).sort()).toEqual(["questionCount", "theme", "title", "week"]);
+    expect(Object.keys(res.body).sort()).toEqual(["palette", "questionCount", "theme", "title", "week"]);
     expect(JSON.stringify(res.body)).not.toContain("presenter");
   });
 });

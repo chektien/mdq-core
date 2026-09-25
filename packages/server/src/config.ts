@@ -13,12 +13,14 @@ interface RuntimeConfigFile {
   quizDir?: unknown;
   instanceId?: unknown;
   theme?: unknown;
+  palette?: unknown;
   autoGenerateStudentIds?: unknown;
   presenterNotes?: unknown;
   presenterNotesDefaultOpen?: unknown;
 }
 
 export type RuntimeTheme = "dark" | "light";
+export type RuntimePalette = "classic" | "gruvbox";
 
 export interface RuntimeConfig {
   port: number;
@@ -27,6 +29,7 @@ export interface RuntimeConfig {
   quizDir: string;
   instanceId: string;
   theme: RuntimeTheme;
+  palette: RuntimePalette;
   autoGenerateStudentIds: boolean;
   presenterNotes: boolean;
   presenterNotesDefaultOpen: boolean;
@@ -82,6 +85,14 @@ function parseString(value: unknown): string | undefined {
 function parseTheme(value: unknown): RuntimeTheme | undefined {
   const normalized = parseString(value)?.toLowerCase();
   if (normalized === "dark" || normalized === "light") {
+    return normalized;
+  }
+  return undefined;
+}
+
+function parsePalette(value: unknown): RuntimePalette | undefined {
+  const normalized = parseString(value)?.toLowerCase();
+  if (normalized === "classic" || normalized === "gruvbox") {
     return normalized;
   }
   return undefined;
@@ -158,6 +169,7 @@ export function loadRuntimeConfig(options: RuntimeConfigLoadOptions = {}): Runti
     quizDir: resolveQuizDir(configDir, configuredDeckDir ?? configuredQuizDir, defaultQuizDir),
     instanceId: parseString(env.MDQ_INSTANCE_ID) ?? parseString(fileConfig.instanceId) ?? "",
     theme: parseTheme(env.MDQ_THEME) ?? parseTheme(fileConfig.theme) ?? "dark",
+    palette: parsePalette(env.MDQ_PALETTE) ?? parsePalette(fileConfig.palette) ?? "classic",
     autoGenerateStudentIds:
       parseBoolean(env.MDQ_AUTO_GENERATE_STUDENT_IDS)
       ?? parseBoolean(fileConfig.autoGenerateStudentIds)

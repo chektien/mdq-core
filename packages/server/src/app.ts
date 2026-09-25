@@ -1,6 +1,6 @@
 import express, { type Request, type Response } from "express";
 import cors from "cors";
-import { API, AccessInfo, DeckTheme, Quiz, Session, SessionState } from "@mdq/shared";
+import { API, AccessInfo, DeckPalette, DeckTheme, Quiz, Session, SessionState } from "@mdq/shared";
 import {
   createSession,
   storeSession,
@@ -39,6 +39,7 @@ export interface AppOptions {
   dataDir?: string;
   instanceId?: string;
   theme?: "dark" | "light";
+  palette?: DeckPalette;
   autoGenerateStudentIds?: boolean;
   presenterNotes?: boolean;
   presenterNotesDefaultOpen?: boolean;
@@ -51,12 +52,17 @@ function resolveDeckTheme(q: Quiz, fallbackTheme: DeckTheme): DeckTheme {
   return q.theme ?? fallbackTheme;
 }
 
-function summarizeQuizForList(q: Quiz, fallbackTheme: DeckTheme) {
+function resolveDeckPalette(q: Quiz, fallbackPalette: DeckPalette): DeckPalette {
+  return q.palette ?? fallbackPalette;
+}
+
+function summarizeQuizForList(q: Quiz, fallbackTheme: DeckTheme, fallbackPalette: DeckPalette) {
   const slideCount = q.questions.filter((question) => question.questionType === "slide").length;
   return {
     week: q.week,
     title: q.title,
     theme: resolveDeckTheme(q, fallbackTheme),
+    palette: resolveDeckPalette(q, fallbackPalette),
     questionCount: q.questions.length,
     liveQuestionCount: q.questions.length - slideCount,
     slideCount,
@@ -123,6 +129,7 @@ export function createApp(quizDirOrOpts?: string | AppOptions) {
   let dataDir: string | undefined;
   let instanceId: string | undefined;
   let theme: "dark" | "light" = "dark";
+  let palette: DeckPalette = "classic";
   let autoGenerateStudentIds = false;
   let presenterNotesEnabled = false;
   let presenterNotesDefaultOpen = false;
@@ -135,6 +142,7 @@ export function createApp(quizDirOrOpts?: string | AppOptions) {
     dataDir = quizDirOrOpts.dataDir;
     instanceId = quizDirOrOpts.instanceId;
     theme = quizDirOrOpts.theme || "dark";
+    palette = quizDirOrOpts.palette || "classic";
     autoGenerateStudentIds = quizDirOrOpts.autoGenerateStudentIds || false;
     presenterNotesEnabled = quizDirOrOpts.presenterNotes || false;
     presenterNotesDefaultOpen = quizDirOrOpts.presenterNotesDefaultOpen || false;
@@ -457,6 +465,7 @@ export function createApp(quizDirOrOpts?: string | AppOptions) {
   app.get("/api/runtime-config", (_req, res) => {
     res.json({
       theme,
+      palette,
       autoGenerateStudentIds,
       presenterNotes: presenterNotesEnabled,
       presenterNotesDefaultOpen,
@@ -512,7 +521,7 @@ export function createApp(quizDirOrOpts?: string | AppOptions) {
     if (validationMessage) {
       return res.status(409).json({ error: validationMessage });
     }
-    const list = [...quizzes.values()].sort(compareDecksForList).map((quiz) => summarizeQuizForList(quiz, theme));
+    const list = [...quizzes.values()].sort(compareDecksForList).map((quiz) => summarizeQuizForList(quiz, theme, palette));
     return res.json(list);
   };
 
@@ -526,7 +535,7 @@ export function createApp(quizDirOrOpts?: string | AppOptions) {
       if (validationMessage) {
         return res.status(409).json({ error: validationMessage });
       }
-      const list = [...quizzes.values()].sort(compareDecksForList).map((quiz) => summarizeQuizForList(quiz, theme));
+      const list = [...quizzes.values()].sort(compareDecksForList).map((quiz) => summarizeQuizForList(quiz, theme, palette));
       return res.json({ loaded, quizzes: list });
     } catch (e) {
       const message = e instanceof Error ? e.message : "Failed to reload decks";
@@ -548,6 +557,7 @@ export function createApp(quizDirOrOpts?: string | AppOptions) {
       week: quiz.week,
       title: quiz.title,
       theme: resolveDeckTheme(quiz, theme),
+      palette: resolveDeckPalette(quiz, palette),
       questionCount: quiz.questions.length,
     });
   };
@@ -609,6 +619,7 @@ export function createApp(quizDirOrOpts?: string | AppOptions) {
       sessionCode: session.sessionCode,
       joinUrl: `/join/${session.sessionCode}`,
       theme: resolveDeckTheme(quiz, theme),
+      palette: resolveDeckPalette(quiz, palette),
       questionHeadings: getQuestionHeadings(quiz),
       questionSummaries: getQuestionSummaries(quiz),
     });
@@ -628,6 +639,7 @@ export function createApp(quizDirOrOpts?: string | AppOptions) {
       state: session.state,
       week: session.week,
       theme: quiz ? resolveDeckTheme(quiz, theme) : theme,
+      palette: quiz ? resolveDeckPalette(quiz, palette) : palette,
     });
   });
 
@@ -652,6 +664,7 @@ export function createApp(quizDirOrOpts?: string | AppOptions) {
         sessionCode: session.sessionCode,
         week: session.week,
         theme: resolveDeckTheme(quiz, theme),
+        palette: resolveDeckPalette(quiz, palette),
         state: session.state,
         currentQuestionIndex: session.currentQuestionIndex,
         questionCount: quiz.questions.length,
@@ -994,6 +1007,7 @@ export function createApp(quizDirOrOpts?: string | AppOptions) {
       sessionCode: session.sessionCode,
       week: session.week,
       theme: resolveDeckTheme(quiz, theme),
+      palette: resolveDeckPalette(quiz, palette),
       state: session.state,
       questionCount: quiz.questions.length,
       questionHeadings: getQuestionHeadings(quiz),

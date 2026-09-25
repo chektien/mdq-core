@@ -22,6 +22,7 @@ describe("loadRuntimeConfig", () => {
     expect(config.quizDir).toBe(path.join(root, "data", "decks"));
     expect(config.instanceId).toBe("");
     expect(config.theme).toBe("dark");
+    expect(config.palette).toBe("classic");
     expect(config.autoGenerateStudentIds).toBe(false);
   });
 
@@ -36,6 +37,7 @@ describe("loadRuntimeConfig", () => {
         deckDir: "./alt-decks",
         instanceId: "room-a",
         theme: "light",
+        palette: "gruvbox",
         autoGenerateStudentIds: true,
       }),
     );
@@ -49,6 +51,7 @@ describe("loadRuntimeConfig", () => {
     expect(config.quizDir).toBe(path.join(root, "data", "alt-decks"));
     expect(config.instanceId).toBe("room-a");
     expect(config.theme).toBe("light");
+    expect(config.palette).toBe("gruvbox");
     expect(config.autoGenerateStudentIds).toBe(true);
   });
 
@@ -56,7 +59,7 @@ describe("loadRuntimeConfig", () => {
     const root = createRoot();
     fs.writeFileSync(
       path.join(root, "data", "config.json"),
-      JSON.stringify({ port: 3100, portFallbacks: 4, deckDir: "./alt-decks", instanceId: "room-a", theme: "light" }),
+      JSON.stringify({ port: 3100, portFallbacks: 4, deckDir: "./alt-decks", instanceId: "room-a", theme: "light", palette: "gruvbox" }),
     );
 
     const config = loadRuntimeConfig({
@@ -68,6 +71,7 @@ describe("loadRuntimeConfig", () => {
         MDQ_DECK_DIR: path.join(root, "custom-decks"),
         MDQ_INSTANCE_ID: "room-b",
         MDQ_THEME: "dark",
+        MDQ_PALETTE: "classic",
         MDQ_AUTO_GENERATE_STUDENT_IDS: "false",
       },
     });
@@ -78,6 +82,7 @@ describe("loadRuntimeConfig", () => {
     expect(config.quizDir).toBe(path.join(root, "custom-decks"));
     expect(config.instanceId).toBe("room-b");
     expect(config.theme).toBe("dark");
+    expect(config.palette).toBe("classic");
     expect(config.autoGenerateStudentIds).toBe(false);
   });
 

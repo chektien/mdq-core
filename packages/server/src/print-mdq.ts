@@ -6,6 +6,7 @@ import * as path from "path";
 import { pathToFileURL } from "url";
 
 type PrintTheme = "dark" | "light";
+type PrintPalette = "classic" | "gruvbox";
 
 interface PrintOptions {
   inputFile: string;
@@ -16,6 +17,8 @@ interface PrintOptions {
   includeAnswers: boolean;
   pageSize: "A4" | "Letter";
   theme: PrintTheme;
+  /** Explicit --palette. When omitted, the deck palette (else classic) is used. */
+  palette?: PrintPalette;
   title?: string;
   htmlOut?: string;
 }
@@ -58,6 +61,7 @@ Options:
   --no-answers         Hide correct answers and feedback. Default.
   --page-size <size>   A4 or Letter. Default: A4.
   --theme <theme>      dark or light. Default: dark.
+  --palette <palette>  classic or gruvbox. Default: the deck's palette, else classic.
   --title <title>      Override the PDF cover title.
   --html <file>        Also write the generated print HTML for debugging.
   -h, --help           Show this help.
@@ -66,6 +70,7 @@ Examples:
   npm run print:pdf -- data/decks/week00.md --theme light --out exports/week00.pdf
   npm run print:pdf -- data/decks/sample-session.md --theme dark --no-foldouts --page-size Letter
   npm run print:pdf -- data/decks/sample-session.md --theme dark --answers --presenter-notes
+  npm run print:pdf -- data/decks/sample-session.md --theme light --palette gruvbox
 `;
 }
 
@@ -86,6 +91,7 @@ function parseArgs(argv: string[]): CliResult {
   let includeAnswers = false;
   let pageSize: PrintOptions["pageSize"] = "A4";
   let theme: PrintTheme = "dark";
+  let palette: PrintPalette | undefined;
   let title: string | undefined;
   let htmlOut: string | undefined;
 
@@ -160,6 +166,16 @@ function parseArgs(argv: string[]): CliResult {
       i++;
       continue;
     }
+    if (arg === "--palette") {
+      const value = readValue(argv, i, arg);
+      const normalized = value.toLowerCase();
+      if (normalized !== "classic" && normalized !== "gruvbox") {
+        throw new Error(`Unsupported palette "${value}". Use classic or gruvbox.`);
+      }
+      palette = normalized;
+      i++;
+      continue;
+    }
     if (arg === "--title") {
       title = readValue(argv, i, arg);
       i++;
@@ -199,6 +215,7 @@ function parseArgs(argv: string[]): CliResult {
       includeAnswers,
       pageSize,
       theme,
+      palette,
       title,
       htmlOut: htmlOut ? path.resolve(htmlOut) : undefined,
     },
@@ -507,7 +524,75 @@ function renderToc(quiz: Quiz): string {
   `;
 }
 
-function renderThemeTokens(theme: PrintTheme): string {
+// Gruvbox follows the morhetz/gruvbox palette (MIT/X11,
+// https://github.com/morhetz/gruvbox) and mirrors the live slide palette in
+// packages/client/src/index.css: the light variant uses a neutral concrete
+// grey instead of Gruvbox's cream, and its green is darkened to #5a6310 so
+// answer text holds 4.5:1 on its tint. Attendee notes and explanations use
+// the orange accent, presenter notes the purple, as on live slides.
+function renderGruvboxTokens(theme: PrintTheme): string {
+  if (theme === "light") {
+    return `
+      --page-bg: #eff0ec;
+      --ink: #282828;
+      --body: #3c3836;
+      --muted: #5f5a55;
+      --line: rgba(60, 56, 54, 0.28);
+      --soft-line: rgba(60, 56, 54, 0.14);
+      --paper: #eff0ec;
+      --wash: #e3e5e0;
+      --option-bg: #eff0ec;
+      --media-bg: #e1e3dd;
+      --accent: #af3a03;
+      --accent-soft: rgba(175, 58, 3, 0.1);
+      --teal: #af3a03;
+      --teal-line: rgba(175, 58, 3, 0.35);
+      --teal-soft: rgba(175, 58, 3, 0.09);
+      --amber: #8f3f71;
+      --amber-line: rgba(143, 63, 113, 0.38);
+      --amber-soft: rgba(143, 63, 113, 0.09);
+      --green: #5a6310;
+      --green-line: rgba(90, 99, 16, 0.45);
+      --green-soft: rgba(90, 99, 16, 0.12);
+      --reference: #5f5a55;
+      --shadow: rgba(40, 40, 40, 0.04);
+    `;
+  }
+
+  return `
+      --page-bg: #282828;
+      --ink: #ebdbb2;
+      --body: #ebdbb2;
+      --muted: #bdae93;
+      --line: rgba(235, 219, 178, 0.32);
+      --soft-line: rgba(235, 219, 178, 0.16);
+      --paper: #32302f;
+      --wash: #3c3836;
+      --option-bg: #32302f;
+      --media-bg: #1d2021;
+      --accent: #fe8019;
+      --accent-soft: rgba(254, 128, 25, 0.16);
+      --teal: #fe8019;
+      --teal-line: rgba(254, 128, 25, 0.42);
+      --teal-soft: rgba(254, 128, 25, 0.12);
+      --amber: #d3869b;
+      --amber-line: rgba(211, 134, 155, 0.42);
+      --amber-soft: rgba(211, 134, 155, 0.12);
+      --green: #b8bb26;
+      --green-line: rgba(184, 187, 38, 0.46);
+      --green-soft: rgba(184, 187, 38, 0.16);
+      --reference: #bdae93;
+      --shadow: rgba(0, 0, 0, 0.18);
+    `;
+}
+
+function printPageBackground(theme: PrintTheme, palette: PrintPalette): string {
+  if (palette === "gruvbox") return theme === "dark" ? "#282828" : "#eff0ec";
+  return theme === "dark" ? "#242423" : "#ffffff";
+}
+
+function renderThemeTokens(theme: PrintTheme, palette: PrintPalette): string {
+  if (palette === "gruvbox") return renderGruvboxTokens(theme);
   if (theme === "light") {
     return `
       --page-bg: #ffffff;
@@ -563,12 +648,12 @@ function renderThemeTokens(theme: PrintTheme): string {
     `;
 }
 
-function renderStyles(pageSize: PrintOptions["pageSize"], theme: PrintTheme): string {
+function renderStyles(pageSize: PrintOptions["pageSize"], theme: PrintTheme, palette: PrintPalette): string {
   const pageRule = pageSize === "Letter" ? "size: Letter;" : "size: A4;";
-  const pageBackground = theme === "dark" ? "#242423" : "#ffffff";
+  const pageBackground = printPageBackground(theme, palette);
   return `
     :root {
-      ${renderThemeTokens(theme)}
+      ${renderThemeTokens(theme, palette)}
     }
 
     @page {
@@ -1084,7 +1169,7 @@ function buildHtml(quiz: Quiz, options: PrintOptions): string {
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>${escapeHtml(title)}</title>
-  <style>${renderStyles(options.pageSize, options.theme)}</style>
+  <style>${renderStyles(options.pageSize, options.theme, options.palette ?? quiz.palette ?? "classic")}</style>
 </head>
 <body>
   <main>

@@ -79,6 +79,8 @@ export interface StudentRejectedPayload {
 
 export type QuestionType = "multiple_choice" | "poll" | "open_response" | "slide";
 export type DeckTheme = "dark" | "light";
+/** Slide color palette, chosen independently of the light/dark theme. */
+export type DeckPalette = "classic" | "gruvbox";
 
 export interface FoldoutNote {
   id: string;
@@ -319,6 +321,8 @@ export interface Quiz {
   title: string;
   /** Optional per-deck color theme. The runtime theme remains the fallback. */
   theme?: DeckTheme;
+  /** Optional per-deck slide palette. The runtime palette remains the fallback. */
+  palette?: DeckPalette;
   /** Optional per-deck override. `false` disables globally enabled presenter notes. */
   presenterNotes?: boolean;
   /** Optional per-deck override for the panel's initial expanded state. */

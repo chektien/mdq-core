@@ -22,6 +22,7 @@ import type {
   SlideLiveEmbed,
   SlideVideo,
   SlideReference,
+  DeckPalette,
   DeckTheme,
 } from "@mdq/shared";
 import { SocketEvents } from "@mdq/shared";
@@ -36,6 +37,7 @@ interface StoredSession {
   sessionToken: string;
   sessionWeek?: string;
   sessionTheme?: DeckTheme;
+  sessionPalette?: DeckPalette;
 }
 
 function appendAnsweredQuestion(current: number[], questionIndex: number): number[] {
@@ -55,7 +57,11 @@ function loadStoredSession(): StoredSession | null {
 function saveStoredSession(data: StoredSession) {
   const existing = loadStoredSession();
   const retainedMetadata = existing?.sessionId === data.sessionId
-    ? { sessionWeek: existing.sessionWeek, sessionTheme: existing.sessionTheme }
+    ? {
+      sessionWeek: existing.sessionWeek,
+      sessionTheme: existing.sessionTheme,
+      sessionPalette: existing.sessionPalette,
+    }
     : {};
   localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...retainedMetadata, ...data }));
 }

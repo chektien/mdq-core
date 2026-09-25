@@ -4,6 +4,7 @@
   "deckDir": "./decks",
   "instanceId": "classroom-imac",
   "theme": "dark",
+  "palette": "classic",
   "autoGenerateStudentIds": false,
   "presenterNotes": false,
   "presenterNotesDefaultOpen": false
