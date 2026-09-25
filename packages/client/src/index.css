@@ -3327,6 +3327,63 @@ html[data-theme="light"] .mdq-orbit-callout {
   overflow-wrap: normal;
   word-break: normal;
 }
+
+/* Markdown tables: paper-style rules (strong above and below, thin under the
+   header), tabular numbers and Markdown column alignment. The table scrolls
+   sideways on narrow screens instead of squeezing cells. Colours come from
+   the slide tokens, so every theme applies. */
+.quiz-html table {
+  display: block;
+  width: max-content;
+  max-width: 100%;
+  margin: 0.9em 0;
+  overflow-x: auto;
+  border-collapse: collapse;
+  border-top: 2px solid var(--mdq-slide-ink-soft);
+  border-bottom: 2px solid var(--mdq-slide-ink-soft);
+  font-size: 0.92em;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.35;
+}
+
+.quiz-html th,
+.quiz-html td {
+  padding: 0.45em 0.9em;
+  text-align: left;
+  vertical-align: top;
+  overflow-wrap: normal;
+  word-break: normal;
+}
+
+.quiz-html th:first-child,
+.quiz-html td:first-child {
+  padding-left: 0;
+}
+
+.quiz-html th:last-child,
+.quiz-html td:last-child {
+  padding-right: 0;
+}
+
+.quiz-html th {
+  border-bottom: 1px solid var(--mdq-slide-ink-soft);
+  color: var(--mdq-slide-heading);
+  font-weight: 700;
+}
+
+.quiz-html tbody tr + tr td {
+  border-top: 1px solid var(--mdq-slide-rule);
+}
+
+.quiz-html th[align="center"],
+.quiz-html td[align="center"] {
+  text-align: center;
+}
+
+.quiz-html th[align="right"],
+.quiz-html td[align="right"] {
+  text-align: right;
+}
 .quiz-html strong { color: #fff; font-weight: 600; }
 .quiz-html img,
 .quiz-embedded-image {
