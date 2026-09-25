@@ -549,6 +549,11 @@ Slide images and references:
 - Supported reference labels are `Reference`, `References`, `Source`, `Sources`, `Image Source`, `Image Sources`, `Image Credit`, `Image Credits`, `Credit`, and `Credits`.
 - Reference values may include markdown links and are rendered in the bottom-right of the slide surface.
 
+Tables:
+
+- Slides and fold-out notes accept standard Markdown tables. Colons in the separator row set column alignment, which suits numbers: `| --- | :---: | ---: |` gives left, centre and right.
+- Tables take their colours from the deck theme and scroll sideways on narrow screens rather than squeezing their columns.
+
 Poll example:
 
 ```markdown
