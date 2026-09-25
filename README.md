@@ -125,13 +125,15 @@ ID.
 
 Optional local runtime settings live in `data/config.json` (copy from
 `data/config.example.json`). The tracked example includes `theme`, which accepts
-`dark` or `light`.
+`dark` or `light`, and `palette`, which accepts `classic` (the default) or
+`gruvbox`. `MDQ_PALETTE` overrides the file's `palette`.
 
-Individual decks can override that global fallback in the Markdown preamble:
+Individual decks can override those global fallbacks in the Markdown preamble:
 
 ```markdown
 # My Deck
 theme: light
+palette: gruvbox
 
 ---
 ```
@@ -140,6 +142,14 @@ theme: light
 When it is omitted, every instructor, student, and projector view uses the
 global runtime theme. The PDF export theme remains controlled independently by
 its `--theme` command-line option.
+
+`palette` chooses the slide colours independently of the light/dark theme. It
+accepts `classic` or `gruvbox` (case-insensitive, with optional quotes); any
+other value is a deck parse error. `classic` is MDQ's standard look. `gruvbox`
+applies the [Gruvbox](https://github.com/morhetz/gruvbox) palette in both
+themes. When `palette` is omitted, every instructor, student, and projector view
+uses the global runtime palette. The PDF exporter follows the deck's palette
+unless you pass `--palette`.
 
 Build and run the app:
 
@@ -248,6 +258,7 @@ Tip for classroom privacy and mobility: project a separate presentation view fro
 
 - The deck picker shows each deck summary as separate quiz question and slide counts, for example `(22 questions, 17 slides)`.
 - The live surface uses the configured global presentation theme by default; a deck-level `theme: light` or `theme: dark` preamble setting overrides it for that session.
+- The slide palette works the same way: the configured global `palette` applies by default, and a deck-level `palette: classic` or `palette: gruvbox` preamble setting overrides it for that session.
 - `Prev` and `Next` stay pinned together near the top-left of the live surface so their click targets do not drift when other controls appear or disappear.
 - In live mode, `Next` includes the next item's markdown heading inside the button. In review mode, `Next` stays a plain button.
 - `End Session` remains available from the live controls and opens a confirmation dialog before closing the room. The dialog shows how many quiz questions and slides are left.
@@ -356,6 +367,7 @@ Options:
 - `--no-answers` hides correct answers and feedback. This is the default.
 - `--page-size A4|Letter` chooses the print page size. A4 is the default.
 - `--theme dark|light` chooses the PDF color theme. Dark is the default and recommended for submission packets that should preserve the original deck styling.
+- `--palette classic|gruvbox` chooses the PDF color palette. It defaults to the deck's `palette:` setting, else `classic`.
 - `--title <title>` overrides the cover title.
 - `--html <file>` also writes the generated print HTML for visual debugging.
 
@@ -365,6 +377,7 @@ Examples:
 npm run print:pdf -- data/decks/sample-session.md --theme dark --no-foldouts
 npm run print:pdf -- data/decks/sample-session.md --theme dark --answers --presenter-notes
 npm run print:pdf -- data/decks/week00.md --theme light --page-size Letter --out exports/week00-letter.pdf
+npm run print:pdf -- data/decks/week00.md --theme light --palette gruvbox
 ```
 
 PDF images keep their source aspect ratio. MDQ only scales images down to fit the print layout, so portrait screenshots and wide diagrams are not stretched, cropped, or reframed.

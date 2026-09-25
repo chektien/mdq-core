@@ -18,6 +18,7 @@ Supported keys:
 - `quizDir`: legacy alias for `deckDir`
 - `instanceId`: stable label for this machine or classroom instance
 - `theme`: UI theme, `dark` by default, or set `light` to reuse the optional light palette
+- `palette`: slide colour palette, `classic` by default, or set `gruvbox`. It applies in both themes, a deck's `palette:` preamble line overrides it, and the `MDQ_PALETTE` environment variable overrides the file value
 - `autoGenerateStudentIds`: set `true` to ask students only for their name and generate a hidden student ID automatically
 
 Example:
@@ -29,6 +30,7 @@ Example:
   "deckDir": "./decks",
   "instanceId": "seminar-room-a",
   "theme": "dark",
+  "palette": "classic",
   "autoGenerateStudentIds": false
 }
 ```
