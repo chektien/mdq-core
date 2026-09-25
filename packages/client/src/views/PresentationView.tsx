@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import type { DeckTheme, SessionState } from "@mdq/shared";
+import type { DeckPalette, DeckTheme, SessionState } from "@mdq/shared";
 import InstructorLoginPrompt from "../components/InstructorLoginPrompt";
 import { fetchPresentationSession, type PresentationSessionResponse } from "../hooks/api";
 import { useSocket, type QuestionState, type RevealState } from "../hooks/useSocket";
@@ -15,7 +15,7 @@ import ResponsiveQuizSurface from "../components/ResponsiveQuizSurface";
 import SlideContent, { SlideContentBody } from "../components/SlideContent";
 import SlideBackgroundLayer from "../components/SlideBackgroundLayer";
 import { getQuestionModeText } from "../questionMode";
-import { applyClientTheme } from "../theme";
+import { applyClientPalette, applyClientTheme } from "../theme";
 
 const EMPTY_QUESTION_HEADINGS: string[] = [];
 
@@ -39,11 +39,13 @@ export default function PresentationView({
   loginHref,
   autoGenerateStudentIds = false,
   defaultTheme = "dark",
+  defaultPalette = "classic",
 }: {
   sessionId: string;
   loginHref: string;
   autoGenerateStudentIds?: boolean;
   defaultTheme?: DeckTheme;
+  defaultPalette?: DeckPalette;
 }) {
   const [meta, setMeta] = useState<PresentationSessionResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -53,6 +55,10 @@ export default function PresentationView({
   useEffect(() => {
     applyClientTheme(meta?.theme, defaultTheme);
   }, [defaultTheme, meta?.theme]);
+
+  useEffect(() => {
+    applyClientPalette(meta?.palette, defaultPalette);
+  }, [defaultPalette, meta?.palette]);
 
   useEffect(() => {
     let cancelled = false;

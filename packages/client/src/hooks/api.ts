@@ -1,6 +1,7 @@
 import { API } from "@mdq/shared";
 import type {
   AccessInfo,
+  DeckPalette,
   DeckTheme,
   PresenterNotesResponse,
   QuestionOpenPayload,
@@ -53,6 +54,8 @@ export interface DeckSummary {
   title: string;
   /** Effective theme after applying the runtime fallback. */
   theme: DeckTheme;
+  /** Effective slide palette after applying the runtime fallback. */
+  palette: DeckPalette;
   /** Total live items, including slides. Kept for progress/restore compatibility. */
   questionCount: number;
   /** Interactive quiz/poll/open-response items, excluding slides. */
@@ -72,6 +75,7 @@ export interface CreateSessionResponse {
   sessionCode: string;
   joinUrl: string;
   theme: DeckTheme;
+  palette: DeckPalette;
   questionHeadings: string[];
   questionSummaries: QuestionSummary[];
 }
@@ -81,6 +85,7 @@ export interface SessionRestoreResponse {
   sessionCode: string;
   week: string;
   theme: DeckTheme;
+  palette: DeckPalette;
   state: string;
   currentQuestionIndex: number;
   questionCount: number;
@@ -95,6 +100,7 @@ export interface PresentationSessionResponse {
   sessionCode: string;
   week: string;
   theme: DeckTheme;
+  palette: DeckPalette;
   state: string;
   questionCount: number;
   questionHeadings: string[];
@@ -109,6 +115,7 @@ export interface InstructorSessionStatus {
 
 export interface RuntimeClientConfig {
   theme?: "dark" | "light";
+  palette?: DeckPalette;
   autoGenerateStudentIds?: boolean;
   presenterNotes?: boolean;
   presenterNotesDefaultOpen?: boolean;

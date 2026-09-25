@@ -500,6 +500,92 @@ html[data-theme="light"] .slide-surface::after {
   content: none;
 }
 
+/* ── Slide palettes (deck `palette:` key) ──────────
+   `classic` adds no rules: it is the look defined above. `gruvbox` follows
+   the morhetz/gruvbox palette (MIT/X11, https://github.com/morhetz/gruvbox).
+   The light variant puts Gruvbox's faded accents on a neutral concrete grey
+   instead of Gruvbox's cream, and darkens aqua #427b58 to #35654a so every
+   text and marker colour holds 4.5:1 against both ends of the slide gradient.
+   Dark is the default theme, so the dark variant also applies when
+   data-theme is absent. Selectors out-rank the theme rules by specificity. */
+html[data-palette="gruvbox"]:not([data-theme="light"]) {
+  --mdq-slide-bg: #282828;
+  --mdq-slide-bg-soft: #32302f;
+  --mdq-slide-frame: rgba(235, 219, 178, 0.16);
+  --mdq-slide-heading: #fabd2f;
+  --mdq-slide-ink: #ebdbb2;
+  --mdq-slide-ink-soft: #bdae93;
+  --mdq-slide-eyebrow: #bdae93;
+  --mdq-slide-rule: rgba(235, 219, 178, 0.16);
+  --mdq-slide-accent: #fe8019;
+  --mdq-slide-accent-strong: #fe8019;
+  --mdq-slide-accent-warm: #d3869b;
+  --mdq-slide-accent-cool: #8ec07c;
+  --mdq-slide-blue: #8ec07c;
+  --mdq-slide-scene: #83a598;
+  --mdq-slide-maroon: #d3869b;
+  --mdq-slide-glass: #1d2021;
+  --mdq-slide-glass-strong: #1d2021;
+  --mdq-slide-glass-line: rgba(235, 219, 178, 0.16);
+  --mdq-note-attendee: #fe8019;
+  --mdq-note-attendee-tint: rgba(254, 128, 25, 0.12);
+  --mdq-note-presenter: #d3869b;
+  --mdq-note-presenter-tint: rgba(211, 134, 155, 0.12);
+  --mdq-panel-radius: 0.2rem;
+  background: #282828;
+}
+
+html[data-palette="gruvbox"]:not([data-theme="light"]) body {
+  background: #282828;
+}
+
+html[data-palette="gruvbox"]:not([data-theme="light"]) .slide-surface {
+  background: linear-gradient(180deg, #32302f 0%, #282828 100%);
+}
+
+html[data-palette="gruvbox"]:not([data-theme="light"]) .slide-surface .quiz-html code,
+html[data-palette="gruvbox"]:not([data-theme="light"]) .slide-surface .quiz-html pre {
+  background: #1d2021;
+  color: #ebdbb2;
+}
+
+html[data-palette="gruvbox"][data-theme="light"] {
+  --mdq-slide-bg: #eff0ec;
+  --mdq-slide-bg-soft: #e3e5e0;
+  --mdq-slide-frame: rgba(60, 56, 54, 0.18);
+  --mdq-slide-heading: #282828;
+  --mdq-slide-ink: #3c3836;
+  --mdq-slide-ink-soft: #5f5a55;
+  --mdq-slide-eyebrow: #5f5a55;
+  --mdq-slide-rule: rgba(60, 56, 54, 0.18);
+  --mdq-slide-accent: #af3a03;
+  --mdq-slide-accent-strong: #af3a03;
+  --mdq-slide-accent-warm: #8f3f71;
+  --mdq-slide-accent-cool: #076678;
+  --mdq-slide-blue: #076678;
+  --mdq-slide-scene: #35654a;
+  --mdq-slide-maroon: #8f3f71;
+  --mdq-slide-glass: #e1e3dd;
+  --mdq-slide-glass-strong: #e1e3dd;
+  --mdq-slide-glass-line: rgba(60, 56, 54, 0.18);
+  --mdq-note-attendee: #af3a03;
+  --mdq-note-attendee-tint: rgba(175, 58, 3, 0.09);
+  --mdq-note-presenter: #8f3f71;
+  --mdq-note-presenter-tint: rgba(143, 63, 113, 0.09);
+  --mdq-panel-radius: 0.2rem;
+  background: #eff0ec;
+}
+
+html[data-palette="gruvbox"][data-theme="light"] .slide-surface {
+  background: linear-gradient(180deg, #eff0ec 0%, #e3e5e0 100%);
+}
+
+html[data-palette="gruvbox"][data-theme="light"] .slide-surface .quiz-html code,
+html[data-palette="gruvbox"][data-theme="light"] .slide-surface .quiz-html pre {
+  background: #e1e3dd;
+  color: #3c3836;
+}
+
 /* ── Light-theme media canvas ───────────── */
 html[data-theme="light"] .slide-media-figure {
   border-color: rgba(100, 116, 139, 0.3);

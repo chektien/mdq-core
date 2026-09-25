@@ -131,6 +131,7 @@ describe("REST API", () => {
       expect(res.status).toBe(200);
       expect(res.body).toEqual({
         theme: "light",
+        palette: "classic",
         autoGenerateStudentIds: true,
         presenterNotes: false,
         presenterNotesDefaultOpen: false,

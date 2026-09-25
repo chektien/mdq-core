@@ -11,6 +11,7 @@ import {
   SlideLiveEmbed,
   SlideVideo,
   SlideReference,
+  DeckPalette,
   DeckTheme,
 } from "@mdq/shared";
 import { marked } from "marked";
@@ -60,6 +61,7 @@ export function parseQuizMarkdown(markdown: string, sourceFile: string): ParseRe
 
   const title = extractDeckTitle(markdown);
   const theme = extractDeckThemeMetadata(markdown, sourceFile, errors);
+  const palette = extractDeckPaletteMetadata(markdown, sourceFile, errors);
   const presenterNotes = extractDeckBooleanMetadata(markdown, "presenter_notes", sourceFile, errors);
   const presenterNotesDefaultOpen = extractDeckBooleanMetadata(
     markdown,
@@ -103,6 +105,7 @@ export function parseQuizMarkdown(markdown: string, sourceFile: string): ParseRe
     week,
     title,
     theme,
+    palette,
     presenterNotes,
     presenterNotesDefaultOpen,
     questions,
@@ -185,6 +188,30 @@ function extractDeckThemeMetadata(
       sourceFile,
       -1,
       `Invalid theme: ${match[1].trim()} (expected dark or light)`,
+      lineNumber,
+    ),
+  );
+  return undefined;
+}
+
+function extractDeckPaletteMetadata(
+  markdown: string,
+  sourceFile: string,
+  errors: QuizParseError[],
+): DeckPalette | undefined {
+  const preamble = markdown.split(/^---+\s*$/m, 1)[0] || markdown;
+  const match = preamble.match(/^palette:\s*(.*?)\s*$/im);
+  if (!match) return undefined;
+
+  const value = stripOptionalQuotes(match[1]).toLowerCase();
+  if (value === "classic" || value === "gruvbox") return value;
+
+  const lineNumber = preamble.slice(0, match.index).split("\n").length;
+  errors.push(
+    new QuizParseError(
+      sourceFile,
+      -1,
+      `Invalid palette: ${match[1].trim()} (expected classic or gruvbox)`,
       lineNumber,
     ),
   );

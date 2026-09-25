@@ -177,6 +177,7 @@ const app = createApp({
   dataDir,
   instanceId,
   theme: runtimeConfig.theme,
+  palette: runtimeConfig.palette,
   autoGenerateStudentIds: runtimeConfig.autoGenerateStudentIds,
   presenterNotes: runtimeConfig.presenterNotes,
   presenterNotesDefaultOpen: runtimeConfig.presenterNotesDefaultOpen,

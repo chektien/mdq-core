@@ -21,8 +21,8 @@ import {
   type CreateSessionResponse,
   type SessionRestoreResponse,
 } from "../hooks/api";
-import type { AccessInfo, DeckTheme, FoldoutNote, QuestionType, SessionState } from "@mdq/shared";
-import { applyClientTheme } from "../theme";
+import type { AccessInfo, DeckPalette, DeckTheme, FoldoutNote, QuestionType, SessionState } from "@mdq/shared";
+import { applyClientPalette, applyClientTheme } from "../theme";
 import Timer from "../components/Timer";
 import Leaderboard from "../components/Leaderboard";
 import OpenResponseList from "../components/OpenResponseList";
@@ -125,9 +125,11 @@ function saveInstructorRestore(restore: StoredInstructorRestore): void {
 export default function InstructorView({
   autoGenerateStudentIds = false,
   defaultTheme = "dark",
+  defaultPalette = "classic",
 }: {
   autoGenerateStudentIds?: boolean;
   defaultTheme?: DeckTheme;
+  defaultPalette?: DeckPalette;
 }) {
   // Setup state
   const [decks, setDecks] = useState<DeckSummary[]>([]);
@@ -145,6 +147,7 @@ export default function InstructorView({
   const [questionSummaries, setQuestionSummaries] = useState<QuestionSummary[]>([]);
   const [quizLabel, setQuizLabel] = useState("");
   const [sessionTheme, setSessionTheme] = useState<DeckTheme | undefined>();
+  const [sessionPalette, setSessionPalette] = useState<DeckPalette | undefined>();
   const [restoreNotice, setRestoreNotice] = useState<string | null>(null);
   const [restoredQuestionCache, setRestoredQuestionCache] = useState<Record<number, QuestionState>>({});
   const [restoredRevealCache, setRestoredRevealCache] = useState<Record<number, RevealState>>({});
@@ -218,6 +221,7 @@ export default function InstructorView({
         sessionCode: snapshot.sessionCode,
         joinUrl: `/join/${snapshot.sessionCode}`,
         theme: snapshot.theme,
+        palette: snapshot.palette,
         questionHeadings: snapshot.questionHeadings || [],
         questionSummaries: snapshot.questionSummaries || [],
       };
@@ -229,6 +233,7 @@ export default function InstructorView({
       setQuestionSummaries(snapshot.questionSummaries || []);
       setQuizLabel(formatQuizLabel(snapshot.week));
       setSessionTheme(snapshot.theme);
+      setSessionPalette(snapshot.palette);
       setRestoredQuestionCache(
         Object.fromEntries(
           (snapshot.reviewQuestions || []).map((question) => {
@@ -328,6 +333,7 @@ export default function InstructorView({
       setQuestionSummaries(info.questionSummaries || []);
       setQuizLabel(formatQuizLabel(deck?.week || selectedWeek));
       setSessionTheme(info.theme);
+      setSessionPalette(info.palette);
       setRestoreNotice(null);
       setPhase("lobby");
 
@@ -394,6 +400,7 @@ export default function InstructorView({
     setQuestionSummaries([]);
     setQuizLabel("");
     setSessionTheme(undefined);
+    setSessionPalette(undefined);
     setRestoreNotice(null);
     setErrorMsg(null);
     setPhase("setup");
@@ -404,6 +411,9 @@ export default function InstructorView({
   useEffect(() => {
     applyClientTheme(sessionTheme ?? selectedDeck?.theme, defaultTheme);
   }, [defaultTheme, selectedDeck?.theme, sessionTheme]);
+  useEffect(() => {
+    applyClientPalette(sessionPalette ?? selectedDeck?.palette, defaultPalette);
+  }, [defaultPalette, selectedDeck?.palette, sessionPalette]);
   const filteredDecks = decks.filter((deck) => {
     const query = deckFilter.trim().toLowerCase();
     if (!query) return true;
