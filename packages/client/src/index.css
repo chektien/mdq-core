@@ -549,6 +549,12 @@ html[data-palette="gruvbox"]:not([data-theme="light"]) .slide-surface .quiz-html
   color: #ebdbb2;
 }
 
+/* Bold text: theme.css colours .quiz-html strong per theme, which out-ranks
+   the slide rule, so name the Gruvbox foreground explicitly. */
+html[data-palette="gruvbox"]:not([data-theme="light"]) .slide-surface .quiz-html strong {
+  color: #fbf1c7;
+}
+
 html[data-palette="gruvbox"][data-theme="light"] {
   --mdq-slide-bg: #eff0ec;
   --mdq-slide-bg-soft: #e3e5e0;
@@ -584,6 +590,10 @@ html[data-palette="gruvbox"][data-theme="light"] .slide-surface .quiz-html code,
 html[data-palette="gruvbox"][data-theme="light"] .slide-surface .quiz-html pre {
   background: #e1e3dd;
   color: #3c3836;
+}
+
+html[data-palette="gruvbox"][data-theme="light"] .slide-surface .quiz-html strong {
+  color: #282828;
 }
 
 /* ── Light-theme media canvas ───────────── */

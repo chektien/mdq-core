@@ -174,5 +174,16 @@ describe("client slide palette contract", () => {
       const { background, color } = declarations(body);
       expect(contrast(color, background)).toBeGreaterThanOrEqual(4.5);
     });
+
+    it.each([
+      ["dark", GRUVBOX_DARK],
+      ["light", GRUVBOX_LIGHT],
+    ])("gruvbox %s bold text overrides the theme colour and keeps 4.5:1", (_mode, selector) => {
+      const { color } = declarations(ruleBody(css, `${selector} .slide-surface .quiz-html strong`));
+      const tokens = declarations(ruleBody(css, selector));
+      for (const background of [tokens["--mdq-slide-bg"], tokens["--mdq-slide-bg-soft"]]) {
+        expect(contrast(color, background)).toBeGreaterThanOrEqual(4.5);
+      }
+    });
   });
 });
