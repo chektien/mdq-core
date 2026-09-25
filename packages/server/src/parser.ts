@@ -13,6 +13,8 @@ import {
   SlideReference,
   DeckPalette,
   DeckTheme,
+  dashedSettingKey,
+  normalizeDeckSettingKeys,
 } from "@mdq/shared";
 import { marked } from "marked";
 
@@ -56,7 +58,11 @@ interface QuestionBlock {
  * Parse a markdown quiz file into a Quiz object.
  * Follows PRD Section 8 parsing rules exactly.
  */
-export function parseQuizMarkdown(markdown: string, sourceFile: string): ParseResult {
+export function parseQuizMarkdown(source: string, sourceFile: string): ParseResult {
+  // Setting keys are written with dashes (`time-limit:`); earlier decks used
+  // underscores. Normalising once, without changing any offset, lets the
+  // rules below match one spelling.
+  const markdown = normalizeDeckSettingKeys(source);
   const errors: QuizParseError[] = [];
 
   const title = extractDeckTitle(markdown);
@@ -237,7 +243,7 @@ function extractDeckBooleanMetadata(
     new QuizParseError(
       sourceFile,
       -1,
-      `Invalid ${key}: ${match[1].trim()} (expected true or false)`,
+      `Invalid ${dashedSettingKey(key)}: ${match[1].trim()} (expected true or false)`,
       lineNumber,
     ),
   );
@@ -270,7 +276,7 @@ function parseQuestionBlock(block: string, index: number, sourceFile: string, bl
       throw new QuizParseError(
         sourceFile,
         index,
-        `Invalid time_limit: ${timeLimitMatch[1]} (must be positive)`,
+        `Invalid time-limit: ${timeLimitMatch[1]} (must be positive)`,
         findLineNumber(lines, blockStartLine, (line) => /^time_limit:\s*/i.test(line)),
       );
     }
@@ -295,7 +301,7 @@ function parseQuestionBlock(block: string, index: number, sourceFile: string, bl
     throw new QuizParseError(
       sourceFile,
       index,
-      "slide items must not use time_limit",
+      "slide items must not use time-limit",
       findLineNumber(lines, blockStartLine, (line) => /^time_limit:\s*/i.test(line)),
     );
   }
@@ -305,7 +311,7 @@ function parseQuestionBlock(block: string, index: number, sourceFile: string, bl
     throw new QuizParseError(
       sourceFile,
       index,
-      isSlide ? "slide items must not use multi_select" : "open_response questions must not use multi_select",
+      isSlide ? "slide items must not use multi-select" : "open-response questions must not use multi-select",
       findLineNumber(lines, blockStartLine, (line) => /^multi_select:\s*/i.test(line)),
     );
   }
@@ -324,7 +330,7 @@ function parseQuestionBlock(block: string, index: number, sourceFile: string, bl
     throw new QuizParseError(
       sourceFile,
       index,
-      isSlide ? "slide items must not define answer options" : "open_response questions must not define answer options",
+      isSlide ? "slide items must not define answer options" : "open-response questions must not define answer options",
       blockStartLine + optionLines[0].lineIndex,
     );
   }
@@ -369,7 +375,7 @@ function parseQuestionBlock(block: string, index: number, sourceFile: string, bl
       throw new QuizParseError(
         sourceFile,
         index,
-        "open_response questions must not define correct answers",
+        "open-response questions must not define correct answers",
         findLineNumber(lines, blockStartLine, (line) => /^>\s*Correct\s+Answer/i.test(line)),
       );
     }
@@ -422,7 +428,7 @@ function parseQuestionBlock(block: string, index: number, sourceFile: string, bl
     throw new QuizParseError(
       sourceFile,
       index,
-      "multi_select: false cannot be used with multiple correct answers",
+      "multi-select: false cannot be used with multiple correct answers",
       findLineNumber(lines, blockStartLine, (line) => /^multi_select:\s*/i.test(line)),
     );
   }

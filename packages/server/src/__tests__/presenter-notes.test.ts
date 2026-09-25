@@ -182,7 +182,7 @@ presenter_notes: sometimes`,
       "talk.md",
     );
     expect(result.errors.map((error) => error.detail)).toContain(
-      "Invalid presenter_notes: sometimes (expected true or false)",
+      "Invalid presenter-notes: sometimes (expected true or false)",
     );
   });
 });

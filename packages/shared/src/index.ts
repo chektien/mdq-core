@@ -133,7 +133,7 @@ export interface SlideMedia {
   /**
    * Optional grouping label. Images sharing a group render together under a
    * group heading (e.g. a "BEFORE" cluster next to an "AFTER" result). Set on
-   * a slide with the `media_group: <label>` directive, which applies to every
+   * a slide with the `media-group: <label>` directive, which applies to every
    * image that follows it until the next directive. Generic and deck-agnostic.
    */
   group?: string;
@@ -421,3 +421,5 @@ export const SESSION_CODE_LENGTH = 6;
 export const DEFAULT_PORT = 3000;
 export const TICK_INTERVAL_MS = 1000;
 export const DATA_DIR = "data";
+
+export * from "./setting-keys";

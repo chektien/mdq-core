@@ -16,7 +16,7 @@ type: slide
 
 ## System Check: Session Basics
 
-time_limit: 20
+time-limit: 20
 
 You are testing the quiz platform before class.
 
@@ -34,8 +34,8 @@ D. Browser developer tools
 
 ## System Check: Student Join
 
-time_limit: 25
-multi_select: true
+time-limit: 25
+multi-select: true
 
 A student opens the join link and enters their student ID.
 
@@ -53,8 +53,8 @@ D. The student can see their student ID and optional display name were accepted
 
 ## System Check: Readiness Pulse
 
-time_limit: 20
-question_type: poll
+time-limit: 20
+question-type: poll
 
 The instructor wants a quick pulse check before the final smoke-test step.
 
@@ -71,8 +71,8 @@ D. I am between screens right now
 
 ## System Check: Open Response
 
-time_limit: 25
-question_type: open_response
+time-limit: 25
+question-type: open-response
 
 The instructor wants to confirm that written replies are working before the final smoke-test step.
 
@@ -84,7 +84,7 @@ The instructor wants to confirm that written replies are working before the fina
 
 ## System Check: Image Attachment
 
-time_limit: 25
+time-limit: 25
 
 ![](../images/week00-smoke-diagram.svg)
 

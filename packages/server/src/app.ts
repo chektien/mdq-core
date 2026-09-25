@@ -279,10 +279,10 @@ export function createApp(quizDirOrOpts?: string | AppOptions) {
     if (detail.includes("must not define answer options")) {
       return "This open-ended question still has multiple-choice answer options.";
     }
-    if (detail.includes("must not use multi_select")) {
+    if (/must not use multi[-_]select/.test(detail)) {
       return "This open-ended question is using a multiple-choice setting that does not apply here.";
     }
-    if (detail.startsWith("Unsupported question_type")) {
+    if (detail.startsWith("Unsupported type") || detail.startsWith("Unsupported question_type")) {
       return "This question uses a question type that MDQ does not support.";
     }
     if (detail.startsWith("Correct answer")) {

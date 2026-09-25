@@ -129,9 +129,10 @@ export function resolveSlideBackground(
 
     const paragraphValues = new Map<string, string>();
     for (const line of lines) {
-      const match = line.match(/^(slide_background|slide_background_position|slide_background_size):\s*(.+)$/i);
+      // Dashed (`slide-background:`) or earlier underscored spelling.
+      const match = line.match(/^(slide[-_]background(?:[-_]position|[-_]size)?):\s*(.+)$/i);
       if (!match) return whole;
-      paragraphValues.set(match[1].toLowerCase(), match[2].trim().replace(/^['"]|['"]$/g, ""));
+      paragraphValues.set(match[1].toLowerCase().replace(/-/g, "_"), match[2].trim().replace(/^['"]|['"]$/g, ""));
     }
 
     for (const [key, value] of paragraphValues) values.set(key, value);
