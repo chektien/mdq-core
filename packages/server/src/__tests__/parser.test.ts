@@ -627,7 +627,7 @@ Share one takeaway.
       const result = parseQuizMarkdown(md, "week01.md");
       expect(result.quiz).toBeNull();
       expect(result.errors[0]).toBeInstanceOf(QuizParseError);
-      expect(result.errors[0].message).toContain("open_response questions must not define correct answers");
+      expect(result.errors[0].message).toContain("open-response questions must not define correct answers");
     });
 
     it("rejects multi_select on open_response questions", () => {
@@ -646,7 +646,7 @@ Share one takeaway.
 `;
       const result = parseQuizMarkdown(md, "week01.md");
       expect(result.quiz).toBeNull();
-      expect(result.errors[0].message).toContain("open_response questions must not use multi_select");
+      expect(result.errors[0].message).toContain("open-response questions must not use multi-select");
     });
 
     it("rejects answer options on slide items", () => {
@@ -761,7 +761,7 @@ C. Third
 `;
       const result = parseQuizMarkdown(md, "test.md");
       expect(result.errors).toHaveLength(1);
-      expect(result.errors[0].detail).toContain("multi_select: false");
+      expect(result.errors[0].detail).toContain("multi-select: false");
     });
 
     it("reports missing options", () => {

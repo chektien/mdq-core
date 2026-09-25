@@ -20,7 +20,7 @@ D. Food items only
 
 ## Code Trace: Python Loop Output
 
-time_limit: 45
+time-limit: 45
 
 Consider this Python code:
 

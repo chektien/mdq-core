@@ -20,7 +20,7 @@ D. Disable tests permanently
 
 ## Code Reading: Null Safety Check
 
-time_limit: 40
+time-limit: 40
 
 Look at this TypeScript snippet:
 

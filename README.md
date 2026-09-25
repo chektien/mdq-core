@@ -381,15 +381,17 @@ title: Demo Presentation Session
 
 If the preamble title is omitted, MDQ falls back to the first `# ...` heading for backward compatibility.
 
-Each interactive question supports the existing `time_limit:` metadata plus optional `multi_select:` and `type:` flags. `question_type:` remains accepted as a backward-compatible alias. Question stems, slide bodies, and option text can also include standard markdown images.
+Each interactive question supports the existing `time-limit:` metadata plus optional `multi-select:` and `type:` flags. `question-type:` remains accepted as a backward-compatible alias. Question stems, slide bodies, and option text can also include standard markdown images.
+
+Setting keys are written with dashes, as above (`time-limit:`, `presenter-notes:`, `slide-background:`). Decks written with the earlier underscored spelling (`time_limit:`, `presenter_notes:`) still work, and so does `type: open_response`; the two spellings can be mixed in one deck.
 
 ```markdown
 ---
 
 ## Example Topic: Selection Modes
 
-time_limit: 45
-multi_select: true
+time-limit: 45
+multi-select: true
 
 **Which items belong in the release checklist?**
 
@@ -403,17 +405,17 @@ C. Write a short rollout note
 
 Rules:
 
-- Omit `multi_select:` for backward compatibility. mdq will still treat `> Correct Answers: ...` as multi-select and `> Correct Answer: ...` as single-select.
-- Use `multi_select: true` when you want students to be allowed to pick more than one option for that question.
+- Omit `multi-select:` for backward compatibility. mdq will still treat `> Correct Answers: ...` as multi-select and `> Correct Answer: ...` as single-select.
+- Use `multi-select: true` when you want students to be allowed to pick more than one option for that question.
 - Use `type: poll` when you want a non-scored poll question. Poll questions must not include `> Correct Answer:` or `> Correct Answers:` lines.
-- Poll questions still respect `multi_select:`. Omit it for a single-choice poll, or set `multi_select: true` for a multi-select poll.
-- Use `type: open_response` for a written, non-scored response prompt.
+- Poll questions still respect `multi-select:`. Omit it for a single-choice poll, or set `multi-select: true` for a multi-select poll.
+- Use `type: open-response` for a written, non-scored response prompt.
 - Use `type: slide` for non-interactive slide content. Slides have no timer, answer choices, correct answers, submissions, or leaderboard weight.
 - Add standard markdown images to slide bodies when you want MDQ to arrange media beside the text. Images are scaled proportionately and never cropped or stretched.
-- Use `live_url: https://...` on a slide when you want the instructor/projector surface to embed a live website as the slide itself. Add `live_title_overlay: true` to keep the slide title and body text over the live surface, and keep a normal markdown image in the slide as the static fallback for PDF exports and non-live surfaces.
-- Use `video_card: https://...` on a slide to show a contained, clickable video card instead of a full-slide embed. Add `video_thumbnail: ../images/poster.png` for the poster frame, `video_caption:` for a caption under the card, and `video_label:` for the play badge. The card shows a visible fallback link and opens a modal player (closes with the close control, backdrop, or `Escape`). Unlike presenter notes, the card is audience-safe and appears on the projector.
+- Use `live-url: https://...` on a slide when you want the instructor/projector surface to embed a live website as the slide itself. Add `live-title-overlay: true` to keep the slide title and body text over the live surface, and keep a normal markdown image in the slide as the static fallback for PDF exports and non-live surfaces.
+- Use `video-card: https://...` on a slide to show a contained, clickable video card instead of a full-slide embed. Add `video-thumbnail: ../images/poster.png` for the poster frame, `video-caption:` for a caption under the card, and `video-label:` for the play badge. The card shows a visible fallback link and opens a modal player (closes with the close control, backdrop, or `Escape`). Unlike presenter notes, the card is audience-safe and appears on the projector.
 - Add slide references with blockquote labels such as `> Reference:` or `> Image Source:`. References render as small, grey, right-aligned footer text and links.
-- Do not combine `multi_select: false` with multiple correct answers.
+- Do not combine `multi-select: false` with multiple correct answers.
 - The instructor live `Next` button preview uses the existing `## ...` item heading, including both sides of `Topic: Subtopic` when present.
 
 Slide example:
@@ -424,9 +426,9 @@ Slide example:
 ## Retrieval Practice With Evidence
 
 type: slide
-live_url: https://example.edu/live-demo
-live_title_overlay: true
-live_interactive: true
+live-url: https://example.edu/live-demo
+live-title-overlay: true
+live-interactive: true
 
 - Start with a low-stakes recall prompt.
   > Attendee Note: Retrieval before explanation is the key idea.
@@ -448,7 +450,7 @@ Fold-out notes are written as `> Attendee Note:` or `> Presenter Note:` blockquo
 
 Presenter notes are authored per item as `> Presenter Note:` blockquotes, with
 `> ` continuation lines for wrapped text and bullets. They work on `slide`,
-`poll`, and `open_response` items. On non-slide items you may place the note
+`poll`, and `open-response` items. On non-slide items you may place the note
 after the options and any `> Overall Feedback:` explanation; MDQ associates it
 with the correct item regardless of position. Empty or absent notes render no
 UI.
@@ -493,16 +495,16 @@ Individual decks can narrow those global settings in the Markdown preamble:
 
 ```markdown
 # My talk
-presenter_notes: false
-presenter_notes_default_open: false
+presenter-notes: false
+presenter-notes-default-open: false
 
 ---
 ```
 
-- `presenter_notes: false` disables the panel and prevents note bodies from
+- `presenter-notes: false` disables the panel and prevents note bodies from
   being served for that deck. A deck cannot enable presenter notes when the
   global master switch or instructor authentication is unavailable.
-- `presenter_notes_default_open` overrides the global initial open/closed state
+- `presenter-notes-default-open` overrides the global initial open/closed state
   for that deck when presenter notes are enabled.
 
 The PDF exporter keeps presenter notes hidden by default; pass
@@ -525,8 +527,8 @@ Poll example:
 
 ## Example Topic: Live Poll
 
-question_type: poll
-time_limit: 20
+question-type: poll
+time-limit: 20
 
 **How confident do you feel about today's topic right now?**
 
@@ -543,7 +545,7 @@ Image attachments:
 ```markdown
 ## Example Topic: Image Prompt
 
-time_limit: 35
+time-limit: 35
 
 ![](../images/xr-setup.png)
 

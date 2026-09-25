@@ -1690,7 +1690,7 @@ html[data-theme="light"] .image-expansion-close:focus-visible {
 }
 
 /* ============================================================
-   Grouped slide media (media_group: directive)
+   Grouped slide media (media-group: directive)
    Labelled clusters, e.g. a compact 2x2 BEFORE grid beside a larger AFTER
    result. Generic and deck-agnostic — any slide can group its images.
    ============================================================ */
@@ -2152,7 +2152,7 @@ html[data-theme="light"] .mdq-orbit-callout {
 }
 
 /* Passive full-canvas background for slides opting in with
-   `slide_background:`. The layer is never interactive or expandable. */
+   `slide-background:`. The layer is never interactive or expandable. */
 .slide-surface-has-bg .slide-bg-layer {
   position: absolute;
   inset: 0;
