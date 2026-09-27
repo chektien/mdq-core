@@ -6,15 +6,14 @@ import {
   storeSession,
   getSession,
   getSessionByCode,
-  transitionState,
   StateTransitionError,
   computeLeaderboard,
   getActiveSessions,
   getDistribution,
   getOpenResponses,
-  repairClosedSlideState,
 } from "./session";
 import { parseQuizMarkdown } from "./parser";
+import { apply, EngineCommandError, type Command, type EngineResult } from "./engine";
 import {
   persistSessionOnEnd,
   computeCumulativeLeaderboard,
@@ -45,7 +44,7 @@ export interface AppOptions {
   presenterNotesDefaultOpen?: boolean;
   shortUrlProviders?: ShortUrlProvider[];
   /** Called after a successful REST-driven state transition */
-  onStateChange?: (session: Session, sessionId: string, newState: SessionState, quiz?: Quiz) => void;
+  onStateChange?: (session: Session, sessionId: string, newState: SessionState, quiz?: Quiz, result?: EngineResult) => void;
 }
 
 function resolveDeckTheme(q: Quiz, fallbackTheme: DeckTheme): DeckTheme {
@@ -252,20 +251,6 @@ export function createApp(quizDirOrOpts?: string | AppOptions) {
       }));
   }
 
-  function markQuestionReviewed(session: Session, questionIndex: number): void {
-    if (questionIndex < 0) {
-      return;
-    }
-    if (!session.revealedQuestionIndexes) {
-      session.revealedQuestionIndexes = new Set<number>();
-    }
-    session.revealedQuestionIndexes.add(questionIndex);
-  }
-
-  function isQuestionReviewed(session: Session, questionIndex: number): boolean {
-    return session.revealedQuestionIndexes?.has(questionIndex) === true;
-  }
-
   function describeQuizValidationDetail(detail: string): string {
     if (detail.startsWith("No answer options found")) {
       return "This question has no answer choices, so MDQ cannot run it safely as a quiz question.";
@@ -382,9 +367,9 @@ export function createApp(quizDirOrOpts?: string | AppOptions) {
   }
 
   /** Notify state change if callback is set */
-  function notifyStateChange(session: Session, sessionId: string, quiz?: Quiz): void {
+  function notifyStateChange(session: Session, sessionId: string, quiz?: Quiz, result?: EngineResult): void {
     if (onStateChange) {
-      onStateChange(session, sessionId, session.state, quiz);
+      onStateChange(session, sessionId, session.state, quiz, result);
     }
   }
 
@@ -654,8 +639,10 @@ export function createApp(quizDirOrOpts?: string | AppOptions) {
         return res.status(500).json({ error: "Quiz data not found" });
       }
 
-      if (repairClosedSlideState(session, quiz)) {
-        notifyStateChange(session, req.params.id, quiz);
+      const repaired = apply(session, quiz, { type: "repairClosedSlide" }, Date.now());
+      if (repaired.session.state !== session.state) {
+        Object.assign(session, repaired.session);
+        notifyStateChange(session, req.params.id, quiz, repaired);
         logActivity(`repaired closed slide session=${req.params.id} q=${session.currentQuestionIndex} state=${session.state}`);
       }
 
@@ -689,246 +676,55 @@ export function createApp(quizDirOrOpts?: string | AppOptions) {
     callback(session);
   }
 
-  app.post(API.SESSION_START, requireInstructorAuth, (req, res) => {
-    withSession(req, res, (session) => {
-      try {
-        transitionState(session, "QUESTION_OPEN");
-        session.currentQuestionIndex = 0;
-        session.questionStartedAt = Date.now();
-        const quiz = getQuizForSession(session.week);
-        notifyStateChange(session, req.params.id, quiz);
-        logActivity(`instructor start session=${req.params.id} q=0 state=${session.state}`);
-        res.json({ state: session.state, questionIndex: 0 });
-      } catch (e) {
-        if (e instanceof StateTransitionError) {
-          return res.status(400).json({ error: e.message });
-        }
-        throw e;
-      }
-    });
-  });
-
-  app.post(API.SESSION_PREV, requireInstructorAuth, (req, res) => {
-    withSession(req, res, (session) => {
-      const quiz = getQuizForSession(session.week);
-      if (!quiz) {
-        return res.status(500).json({ error: "Quiz data not found" });
-      }
-      const prevIndex = session.currentQuestionIndex - 1;
-      if (session.state === "LOBBY") {
-        return res.status(400).json({ error: "Start the session before going back." });
-      }
-      if (prevIndex < 0) {
-        return res.status(400).json({ error: "Already at the first item" });
-      }
-
-      const previousQuestion = quiz.questions[prevIndex];
-      const previousQuestionType = getQuestionType(previousQuestion);
-
-      session.state = previousQuestionType === "slide" ? "QUESTION_OPEN" : "REVEAL";
-      session.currentQuestionIndex = prevIndex;
-      if (session.state === "QUESTION_OPEN") {
-        session.questionStartedAt = Date.now();
-      } else {
-        markQuestionReviewed(session, prevIndex);
-      }
-      notifyStateChange(session, req.params.id, quiz);
-      logActivity(`instructor prev session=${req.params.id} q=${prevIndex} state=${session.state}`);
-      res.json({ state: session.state, questionIndex: prevIndex });
-    });
-  });
-
-  app.post(API.SESSION_NEXT, requireInstructorAuth, (req, res) => {
-    withSession(req, res, (session) => {
-      const quiz = getQuizForSession(session.week);
-      if (!quiz) {
-        return res.status(500).json({ error: "Quiz data not found" });
-      }
-      const nextIndex = session.currentQuestionIndex + 1;
-      if (nextIndex >= quiz.questions.length) {
-        return res.status(400).json({ error: "No more questions" });
-      }
-      try {
-        const currentQuestion = quiz.questions[session.currentQuestionIndex];
-        if (session.state === "LOBBY") {
-          return res.status(400).json({ error: "Start the session before advancing." });
-        }
-        if (session.state === "QUESTION_OPEN") {
-          if (getQuestionType(currentQuestion) !== "slide") {
-            return res.status(400).json({ error: "Close and reveal the current question before advancing." });
+  const actions: { path: string; type: Command["type"] }[] = [
+    { path: API.SESSION_START, type: "start" },
+    { path: API.SESSION_PREV, type: "previous" },
+    { path: API.SESSION_NEXT, type: "next" },
+    { path: API.SESSION_CLOSE, type: "close" },
+    { path: API.SESSION_REVEAL, type: "reveal" },
+    { path: API.SESSION_END, type: "end" },
+    { path: API.SESSION_LEADERBOARD_SHOW, type: "leaderboardShow" },
+    { path: API.SESSION_LEADERBOARD_HIDE, type: "leaderboardHide" },
+  ];
+  for (const action of actions) {
+    app.post(action.path, requireInstructorAuth, (req, res) => {
+      withSession(req, res, (current) => {
+        const quiz = getQuizForSession(current.week);
+        if (!quiz) return res.status(500).json({ error: "Quiz data not found" });
+        try {
+          const result = apply(current, quiz, { type: action.type } as Command, Date.now());
+          const session = current;
+          Object.assign(session, result.session);
+          const lockedOnLeaderboard = action.type === "leaderboardHide" && session.state === "LEADERBOARD"
+            && session.currentQuestionIndex >= quiz.questions.length - 1;
+          if (lockedOnLeaderboard) {
+            return res.json({ state: session.state, questionIndex: session.currentQuestionIndex, lockedOnLeaderboard: true });
           }
-        } else {
-          transitionState(session, "QUESTION_OPEN");
-        }
-
-        const nextQuestion = quiz.questions[nextIndex];
-        const nextQuestionType = getQuestionType(nextQuestion);
-        if (nextQuestionType !== "slide" && isQuestionReviewed(session, nextIndex)) {
-          session.state = "REVEAL";
-        }
-
-        session.currentQuestionIndex = nextIndex;
-        if (session.state === "QUESTION_OPEN") {
-          session.questionStartedAt = Date.now();
-        }
-        notifyStateChange(session, req.params.id, quiz);
-        logActivity(`instructor next session=${req.params.id} q=${nextIndex} state=${session.state}`);
-        res.json({ state: session.state, questionIndex: nextIndex });
-      } catch (e) {
-        if (e instanceof StateTransitionError) {
-          return res.status(400).json({ error: e.message });
-        }
-        throw e;
-      }
-    });
-  });
-
-  app.post(API.SESSION_CLOSE, requireInstructorAuth, (req, res) => {
-    withSession(req, res, (session) => {
-      try {
-        const quiz = getQuizForSession(session.week);
-        const currentQuestion = quiz?.questions[session.currentQuestionIndex];
-        if (getQuestionType(currentQuestion) === "slide") {
-          return res.status(400).json({ error: "Slides do not close; advance to the next item." });
-        }
-        transitionState(session, "QUESTION_CLOSED");
-        notifyStateChange(session, req.params.id, quiz);
-        logActivity(`instructor close session=${req.params.id} q=${session.currentQuestionIndex} state=${session.state}`);
-        res.json({ state: session.state, questionIndex: session.currentQuestionIndex });
-      } catch (e) {
-        if (e instanceof StateTransitionError) {
-          return res.status(400).json({ error: e.message });
-        }
-        throw e;
-      }
-    });
-  });
-
-  app.post(API.SESSION_REVEAL, requireInstructorAuth, (req, res) => {
-    withSession(req, res, (session) => {
-      try {
-        const quiz = getQuizForSession(session.week);
-        const currentQuestion = quiz?.questions[session.currentQuestionIndex];
-        if (getQuestionType(currentQuestion) === "slide") {
-          return res.status(400).json({ error: "Slides do not reveal answers; advance to the next item." });
-        }
-        transitionState(session, "REVEAL");
-        markQuestionReviewed(session, session.currentQuestionIndex);
-
-        if (quiz) {
-          try {
-            const revealPersistence = persistSessionProgressOnReveal(session, quiz, dataDir);
-            if (revealPersistence.status === "written" && revealPersistence.csv) {
-              console.log(
-                `[mdq persistence] session=${session.sessionId} code=${session.sessionCode} reveal_q=${revealPersistence.questionIndex + 1} csv_${revealPersistence.csv.action} path=${revealPersistence.csv.filePath} rows=${revealPersistence.csv.rowCount} questions=${revealPersistence.csv.questionCount}`,
-              );
-            } else {
-              console.warn(
-                `[mdq persistence] session=${session.sessionId} code=${session.sessionCode} reveal_q=${revealPersistence.questionIndex + 1} csv_skipped reason=${revealPersistence.reason || "unknown"}`,
-              );
+          storeSession(session);
+          if (action.type === "reveal") {
+            try {
+              const saved = persistSessionProgressOnReveal(session, quiz, dataDir);
+              if (saved.status === "written" && saved.csv) {
+                console.log(`[mdq persistence] session=${session.sessionId} code=${session.sessionCode} reveal_q=${saved.questionIndex + 1} csv_${saved.csv.action} path=${saved.csv.filePath} rows=${saved.csv.rowCount} questions=${saved.csv.questionCount}`);
+              } else {
+                console.warn(`[mdq persistence] session=${session.sessionId} code=${session.sessionCode} reveal_q=${saved.questionIndex + 1} csv_skipped reason=${saved.reason || "unknown"}`);
+              }
+            } catch (e) {
+              console.error(`Failed to persist reveal progress for ${session.sessionId}:`, e);
             }
-          } catch (e) {
-            console.error(`Failed to persist reveal progress for ${session.sessionId}:`, e);
           }
-        } else {
-          console.warn(
-            `[mdq persistence] session=${session.sessionId} code=${session.sessionCode} csv_skipped reason=quiz_not_found week=${session.week}`,
-          );
+          if (action.type === "end") persistSessionOnEnd(session, quiz, dataDir);
+          notifyStateChange(session, req.params.id, quiz, result);
+          logActivity(`instructor ${action.type} session=${req.params.id} q=${session.currentQuestionIndex} state=${session.state}`);
+          if (action.type === "end" || action.type === "leaderboardShow") return res.json({ state: session.state });
+          return res.json({ state: session.state, questionIndex: session.currentQuestionIndex });
+        } catch (e) {
+          if (e instanceof StateTransitionError || e instanceof EngineCommandError) return res.status(400).json({ error: e.message });
+          throw e;
         }
-
-        notifyStateChange(session, req.params.id, quiz);
-        logActivity(`instructor reveal session=${req.params.id} q=${session.currentQuestionIndex} state=${session.state}`);
-        res.json({ state: session.state, questionIndex: session.currentQuestionIndex });
-      } catch (e) {
-        if (e instanceof StateTransitionError) {
-          return res.status(400).json({ error: e.message });
-        }
-        throw e;
-      }
+      });
     });
-  });
-
-  app.post(API.SESSION_END, requireInstructorAuth, (req, res) => {
-    withSession(req, res, (session) => {
-      try {
-        // Allow ending from any live panel state while preserving transition rules.
-        if (session.state === "QUESTION_CLOSED") {
-          transitionState(session, "REVEAL");
-        }
-        if (session.state === "REVEAL") {
-          transitionState(session, "LEADERBOARD");
-        }
-        transitionState(session, "ENDED");
-
-        // Persist session data on end
-        const quiz = getQuizForSession(session.week);
-        if (quiz) {
-          persistSessionOnEnd(session, quiz, dataDir);
-        }
-
-        notifyStateChange(session, req.params.id, quiz);
-        logActivity(`instructor end session=${req.params.id} state=ENDED`);
-        res.json({ state: "ENDED" });
-      } catch (e) {
-        if (e instanceof StateTransitionError) {
-          return res.status(400).json({ error: e.message });
-        }
-        throw e;
-      }
-    });
-  });
-
-  // Show leaderboard (REVEAL -> LEADERBOARD, without ending)
-  app.post(API.SESSION_LEADERBOARD_SHOW, requireInstructorAuth, (req, res) => {
-    withSession(req, res, (session) => {
-      try {
-        if (session.state === "QUESTION_CLOSED") {
-          transitionState(session, "REVEAL");
-        }
-        transitionState(session, "LEADERBOARD");
-        const quiz = getQuizForSession(session.week);
-        notifyStateChange(session, req.params.id, quiz);
-        logActivity(`instructor leaderboard-show session=${req.params.id} q=${session.currentQuestionIndex} state=${session.state}`);
-        res.json({ state: session.state });
-      } catch (e) {
-        if (e instanceof StateTransitionError) {
-          return res.status(400).json({ error: e.message });
-        }
-        throw e;
-      }
-    });
-  });
-
-  // Hide leaderboard (LEADERBOARD -> REVEAL, continue quiz flow)
-  app.post(API.SESSION_LEADERBOARD_HIDE, requireInstructorAuth, (req, res) => {
-    withSession(req, res, (session) => {
-      try {
-        const quiz = getQuizForSession(session.week);
-        if (!quiz) {
-          return res.status(500).json({ error: "Quiz data not found" });
-        }
-
-        const isLastQuestion = session.currentQuestionIndex >= quiz.questions.length - 1;
-        if (isLastQuestion) {
-          return res.json({
-            state: session.state,
-            questionIndex: session.currentQuestionIndex,
-            lockedOnLeaderboard: true,
-          });
-        }
-
-        transitionState(session, "REVEAL");
-        notifyStateChange(session, req.params.id, quiz);
-        logActivity(`instructor leaderboard-hide session=${req.params.id} q=${session.currentQuestionIndex} state=${session.state}`);
-        res.json({ state: session.state, questionIndex: session.currentQuestionIndex });
-      } catch (e) {
-        if (e instanceof StateTransitionError) {
-          return res.status(400).json({ error: e.message });
-        }
-        throw e;
-      }
-    });
-  });
+  }
 
   app.get(API.SESSION_LEADERBOARD, (req, res) => {
     withSession(req, res, (session) => {

@@ -1,654 +1,161 @@
 import { Server as HttpServer } from "http";
 import { Server, Socket } from "socket.io";
-import {
-  SocketEvents,
-  StudentJoinPayload,
-  AnswerSubmitPayload,
-  TICK_INTERVAL_MS,
-  Quiz,
-  FoldoutNote,
-  QuestionOpenPayload,
-} from "@mdq/shared";
-import {
-  getSession,
-  addParticipant,
-  recordSubmission,
-  getDistribution,
-  getSubmissionCount,
-  getAnsweredQuestions,
-  getOpenResponses,
-  transitionState,
-  computeLeaderboard,
-  repairClosedSlideState,
-} from "./session";
-import { Session } from "@mdq/shared";
-import { buildScoredCorrectAnswersMap, getQuestionType, getScoredQuestionCount, isOpenResponseQuestion } from "./scoring";
-import {
-  isInstructorAuthEnabled,
-  getInstructorSessionFromCookie,
-  hasValidInstructorSession,
-} from "./instructor-auth";
+import { v4 as uuidv4 } from "uuid";
+import { SocketEvents, StudentJoinPayload, AnswerSubmitPayload, TICK_INTERVAL_MS, Quiz, Session } from "@mdq/shared";
+import { getSession } from "./session";
+import { apply, type EngineMessage, type EngineResult } from "./engine";
+import { getQuestionType } from "./scoring";
+import { isInstructorAuthEnabled, getInstructorSessionFromCookie, hasValidInstructorSession } from "./instructor-auth";
 
-function logActivity(message: string): void {
-  console.log(`[mdq activity] ${message}`);
-}
-
-/** Active timer handles per session */
 const sessionTimers = new Map<string, NodeJS.Timeout>();
 const tickTimers = new Map<string, NodeJS.Timeout>();
-
-/** Quiz store reference (set by setupSocket) */
 let quizStore: Map<string, Quiz>;
+const sessionRoom = (id: string) => `session:${id}`;
+const logActivity = (message: string) => console.log(`[mdq activity] ${message}`);
 
-/** Clean up timers for a session */
 export function clearSessionTimers(sessionId: string): void {
   const timer = sessionTimers.get(sessionId);
-  if (timer) {
-    clearTimeout(timer);
-    sessionTimers.delete(sessionId);
-  }
+  if (timer) clearTimeout(timer);
+  sessionTimers.delete(sessionId);
   const tick = tickTimers.get(sessionId);
-  if (tick) {
-    clearInterval(tick);
-    tickTimers.delete(sessionId);
-  }
+  if (tick) clearInterval(tick);
+  tickTimers.delete(sessionId);
 }
 
-/** Get the Socket.IO room name for a session */
-function sessionRoom(sessionId: string): string {
-  return `session:${sessionId}`;
-}
-
-function buildPublicNotes(question: Quiz["questions"][number]): FoldoutNote[] | undefined {
-  return question.attendeeNotes && question.attendeeNotes.length > 0
-    ? question.attendeeNotes
-    : undefined;
-}
-
-function buildQuestionOpenPayload(session: Session): QuestionOpenPayload | null {
-  const quiz = quizStore.get(session.week);
-  const question =
-    quiz && session.currentQuestionIndex >= 0
-      ? quiz.questions[session.currentQuestionIndex]
-      : undefined;
-
-  if (!quiz || !question) {
-    return null;
-  }
-
-  return {
-    questionIndex: session.currentQuestionIndex,
-    topic: question.topic,
-    text: question.textHtml,
-    questionType: getQuestionType(question),
-    attendeeNotes: buildPublicNotes(question),
-    slideMedia: question.slideMedia,
-    slideMediaPosition: question.slideMediaPosition,
-    slideMediaOpacity: question.slideMediaOpacity,
-    slideBackground: question.slideBackground,
-    slideLiveEmbed: question.slideLiveEmbed,
-    slideVideo: question.slideVideo,
-    slideReferences: question.slideReferences,
-    options: question.options.map((o) => ({ label: o.label, text: o.textHtml })),
-    allowsMultiple: question.allowsMultiple,
-    isPoll: question.isPoll === true,
-    timeLimitSec: question.timeLimitSec,
-    startedAt: session.questionStartedAt || Date.now(),
-  };
-}
-
-function emitInstructorStateSnapshot(socket: Socket, session: Session): void {
-  socket.emit(SocketEvents.SESSION_STATE, {
-    state: session.state,
-    questionIndex: session.currentQuestionIndex >= 0 ? session.currentQuestionIndex : undefined,
-  });
-
-  const questionOpenPayload = buildQuestionOpenPayload(session);
-  const quiz = quizStore.get(session.week);
-  const question =
-    quiz && session.currentQuestionIndex >= 0
-      ? quiz.questions[session.currentQuestionIndex]
-      : undefined;
-
-  if (session.state === "QUESTION_OPEN" && questionOpenPayload) {
-    socket.emit(SocketEvents.QUESTION_OPEN, questionOpenPayload);
-    if (session.questionStartedAt) {
-      const elapsed = Math.floor((Date.now() - session.questionStartedAt) / 1000);
-      const remaining = Math.max(0, questionOpenPayload.timeLimitSec - elapsed);
-      socket.emit(SocketEvents.QUESTION_TICK, { remainingSec: remaining });
+/** The room is the current recipient for both staff and all messages. */
+export function emitMessages(io: Server, sessionId: string, messages: EngineMessage[], directSocket?: Socket): void {
+  for (const { audience, event, payload } of messages) {
+    if (audience.startsWith("participant:")) {
+      const id = audience.slice("participant:".length);
+      io.to(getSession(sessionId)?.participants.get(id)?.socketId || id).emit(event, payload);
+    } else if (directSocket) {
+      directSocket.emit(event, payload);
+    } else {
+      io.to(sessionRoom(sessionId)).emit(event, payload);
     }
-    socket.emit(SocketEvents.ANSWER_COUNT, {
-      questionIndex: session.currentQuestionIndex,
-      ...getSubmissionCount(session, session.currentQuestionIndex),
-      openResponses: isOpenResponseQuestion(question) ? getOpenResponses(session, session.currentQuestionIndex) : undefined,
-    });
-    return;
-  }
-
-  if (session.state === "QUESTION_CLOSED" && questionOpenPayload) {
-    socket.emit(SocketEvents.QUESTION_OPEN, questionOpenPayload);
-    socket.emit(SocketEvents.QUESTION_CLOSE, {
-      questionIndex: session.currentQuestionIndex,
-    });
-    socket.emit(SocketEvents.RESULTS_DISTRIBUTION, {
-      questionIndex: session.currentQuestionIndex,
-      distribution: getDistribution(session, session.currentQuestionIndex),
-    });
-    socket.emit(SocketEvents.ANSWER_COUNT, {
-      questionIndex: session.currentQuestionIndex,
-      ...getSubmissionCount(session, session.currentQuestionIndex),
-      openResponses: isOpenResponseQuestion(question) ? getOpenResponses(session, session.currentQuestionIndex) : undefined,
-    });
-    return;
-  }
-
-  if (session.state === "REVEAL" && questionOpenPayload && quiz) {
-    const question = quiz.questions[session.currentQuestionIndex];
-    socket.emit(SocketEvents.QUESTION_OPEN, questionOpenPayload);
-    socket.emit(SocketEvents.RESULTS_REVEAL, {
-      questionIndex: session.currentQuestionIndex,
-      questionType: getQuestionType(question),
-      correctOptions: question.correctOptions,
-      explanation: question.explanation,
-      distribution: getDistribution(session, session.currentQuestionIndex),
-      isPoll: question.isPoll === true,
-      openResponses: isOpenResponseQuestion(question) ? getOpenResponses(session, session.currentQuestionIndex) : undefined,
-    });
-    socket.emit(SocketEvents.ANSWER_COUNT, {
-      questionIndex: session.currentQuestionIndex,
-      ...getSubmissionCount(session, session.currentQuestionIndex),
-      openResponses: isOpenResponseQuestion(question) ? getOpenResponses(session, session.currentQuestionIndex) : undefined,
-    });
-    return;
-  }
-
-  if (session.state === "LEADERBOARD" && quiz) {
-    const correctMap = buildScoredCorrectAnswersMap(quiz);
-    const entries = computeLeaderboard(session, correctMap);
-    socket.emit(SocketEvents.LEADERBOARD_UPDATE, {
-      entries,
-      totalQuestions: getScoredQuestionCount(quiz),
-    });
   }
 }
 
-function emitJoinStateSnapshot(socket: Socket, session: Session, isReconnect: boolean): void {
-  const questionOpenPayload = buildQuestionOpenPayload(session);
-  const quiz = quizStore.get(session.week);
-
-  if (!questionOpenPayload || !quiz) {
-    return;
-  }
-
-  const question = quiz.questions[session.currentQuestionIndex];
-
-  if (session.state === "QUESTION_OPEN") {
-    socket.emit(SocketEvents.QUESTION_OPEN, questionOpenPayload);
-    if (session.questionStartedAt) {
-      const elapsed = Math.floor((Date.now() - session.questionStartedAt) / 1000);
-      const remaining = Math.max(0, question.timeLimitSec - elapsed);
-      socket.emit(SocketEvents.QUESTION_TICK, { remainingSec: remaining });
-    }
-    return;
-  }
-
-  if (session.state === "QUESTION_CLOSED") {
-    socket.emit(SocketEvents.QUESTION_OPEN, questionOpenPayload);
-    socket.emit(SocketEvents.QUESTION_CLOSE, {
-      questionIndex: session.currentQuestionIndex,
-    });
-    return;
-  }
-
-  if (session.state === "REVEAL") {
-    // Late joiners who were not previously connected should wait for next question.
-    // Rejoiners get full reveal context so they can recover their previous view.
-    if (!isReconnect) {
-      return;
-    }
-    socket.emit(SocketEvents.QUESTION_OPEN, questionOpenPayload);
-    socket.emit(SocketEvents.RESULTS_REVEAL, {
-      questionIndex: session.currentQuestionIndex,
-      questionType: getQuestionType(question),
-      correctOptions: question.correctOptions,
-      explanation: question.explanation,
-      distribution: getDistribution(session, session.currentQuestionIndex),
-      isPoll: question.isPoll === true,
-      openResponses: isOpenResponseQuestion(question) ? getOpenResponses(session, session.currentQuestionIndex) : undefined,
-    });
-    return;
-  }
-
-  if (session.state === "LEADERBOARD") {
-    const correctMap = buildScoredCorrectAnswersMap(quiz);
-    const entries = computeLeaderboard(session, correctMap);
-    socket.emit(SocketEvents.LEADERBOARD_UPDATE, {
-      entries,
-      totalQuestions: getScoredQuestionCount(quiz),
-    });
-  }
+function applyAndEmit(io: Server, session: Session, quiz: Quiz, command: Parameters<typeof apply>[2], directSocket?: Socket): EngineResult {
+  const result = apply(session, quiz, command, Date.now());
+  Object.assign(session, result.session);
+  emitMessages(io, session.sessionId, result.messages, directSocket);
+  return result;
 }
 
-function broadcastLiveAnswerCount(io: Server, session: Session, sessionId: string): void {
-  if (session.state !== "QUESTION_OPEN" || session.currentQuestionIndex < 0) {
-    return;
-  }
-
-  const quiz = quizStore.get(session.week);
-  const question =
-    quiz && session.currentQuestionIndex >= 0
-      ? quiz.questions[session.currentQuestionIndex]
-      : undefined;
-  const count = getSubmissionCount(session, session.currentQuestionIndex);
-
-  io.to(sessionRoom(sessionId)).emit(SocketEvents.ANSWER_COUNT, {
-    questionIndex: session.currentQuestionIndex,
-    submitted: count.submitted,
-    total: count.total,
-    openResponses: isOpenResponseQuestion(question) ? getOpenResponses(session, session.currentQuestionIndex) : undefined,
-  });
-}
-
-/**
- * Setup Socket.IO on an HTTP server.
- * Handles student:join, answer:submit, reconnection, and timer logic.
- */
 export function setupSocket(httpServer: HttpServer, quizzes: Map<string, Quiz>): Server {
   quizStore = quizzes;
-
-  const io = new Server(httpServer, {
-    cors: { origin: "*", methods: ["GET", "POST"] },
-  });
-
+  const io = new Server(httpServer, { cors: { origin: "*", methods: ["GET", "POST"] } });
   io.on("connection", (socket: Socket) => {
-    // Extract sessionId from auth or handshake query
-    const sessionId = socket.handshake.auth?.sessionId as string
-      || socket.handshake.query?.sessionId as string;
-
+    const sessionId = socket.handshake.auth?.sessionId as string || socket.handshake.query?.sessionId as string;
     if (!sessionId) {
       socket.emit(SocketEvents.STUDENT_REJECTED, { reason: "Missing sessionId" });
       logActivity(`reject socket=${socket.id} reason=missing-session-id`);
-      socket.disconnect();
-      return;
+      socket.disconnect(); return;
     }
-
     const session = getSession(sessionId);
     if (!session) {
       socket.emit(SocketEvents.STUDENT_REJECTED, { reason: "Session not found" });
       logActivity(`reject socket=${socket.id} session=${sessionId} reason=session-not-found`);
-      socket.disconnect();
-      return;
+      socket.disconnect(); return;
     }
-
-    const sessionQuiz = quizStore.get(session.week);
-    if (sessionQuiz && repairClosedSlideState(session, sessionQuiz)) {
-      clearSessionTimers(sessionId);
-      logActivity(`repaired closed slide session=${sessionId} q=${session.currentQuestionIndex} state=${session.state}`);
-      broadcastQuestionOpen(io, session, sessionId, sessionQuiz);
+    const quiz = quizStore.get(session.week);
+    if (quiz) {
+      const repaired = apply(session, quiz, { type: "repairClosedSlide" }, Date.now());
+      if (repaired.session.state !== session.state) {
+        Object.assign(session, repaired.session);
+        clearSessionTimers(sessionId);
+        emitMessages(io, sessionId, repaired.messages);
+        logActivity(`repaired closed slide session=${sessionId} q=${session.currentQuestionIndex} state=${session.state}`);
+      }
     }
-
     if (session.state === "ENDED") {
       socket.emit(SocketEvents.STUDENT_REJECTED, { reason: "Session has ended" });
       logActivity(`reject socket=${socket.id} session=${sessionId} reason=session-ended`);
-      socket.disconnect();
-      return;
+      socket.disconnect(); return;
     }
-
-    // ── Instructor auto-join room ──────────────
-    const role = socket.handshake.auth?.role as string
-      || socket.handshake.query?.role as string;
-
+    const role = socket.handshake.auth?.role as string || socket.handshake.query?.role as string;
     if (role === "instructor" || role === "presentation") {
-      const isInstructor = role === "instructor";
       if (isInstructorAuthEnabled()) {
-        const sessionToken = getInstructorSessionFromCookie(socket.handshake.headers.cookie);
-        if (!sessionToken || !hasValidInstructorSession(sessionToken)) {
+        const token = getInstructorSessionFromCookie(socket.handshake.headers.cookie);
+        if (!token || !hasValidInstructorSession(token)) {
           socket.emit(SocketEvents.STUDENT_REJECTED, { reason: "Instructor login required" });
-          logActivity(`reject ${isInstructor ? "instructor" : "presentation"} socket=${socket.id} session=${sessionId} reason=unauthenticated`);
-          socket.disconnect();
-          return;
+          socket.disconnect(); return;
         }
       }
       socket.join(sessionRoom(sessionId));
-      logActivity(`${isInstructor ? "instructor" : "presentation"} connected session=${sessionId} socket=${socket.id}`);
-
-      // Send current participant list immediately
-      broadcastParticipants(io, session, sessionId);
-      emitInstructorStateSnapshot(socket, session);
-
-      // Track disconnect for read-only display connections
-      socket.on("disconnect", () => {
-        logActivity(`${isInstructor ? "instructor" : "presentation"} disconnected session=${sessionId} socket=${socket.id}`);
-      });
+      if (quiz) emitMessages(io, sessionId, apply(session, quiz, { type: "participants" }, Date.now()).messages);
+      if (quiz) emitMessages(io, sessionId, apply(session, quiz, { type: "snapshot" }, Date.now()).messages, socket);
+      socket.on("disconnect", () => logActivity(`${role} disconnected session=${sessionId} socket=${socket.id}`));
     }
-
-    // ── student:join ──────────────────────────
     socket.on(SocketEvents.STUDENT_JOIN, (payload: StudentJoinPayload) => {
-      try {
-        if (!payload.studentId || payload.studentId.trim().length === 0) {
-          socket.emit(SocketEvents.STUDENT_REJECTED, { reason: "Student ID is required" });
-          return;
-        }
-
-        const { participant, isReconnect } = addParticipant(
-          session,
-          payload.studentId.trim(),
-          socket.id,
-          payload.displayName?.trim(),
-          payload.sessionToken,
-          payload.clientInstanceId,
-        );
-
-        // Join the session room
+      if (!quiz) return;
+      const result = apply(session, quiz, { type: "join", payload, socketId: socket.id, newToken: uuidv4() }, Date.now());
+      Object.assign(session, result.session);
+      if (result.messages.some((m) => m.event === SocketEvents.STUDENT_JOINED)) {
         socket.join(sessionRoom(sessionId));
-
-        // Store studentId on socket data for disconnect handling
-        (socket as Socket & { _studentId?: string; _sessionId?: string })._studentId = participant.studentId;
-        (socket as Socket & { _studentId?: string; _sessionId?: string })._sessionId = sessionId;
-
-        // Send joined acknowledgment
-        const answeredQuestions = getAnsweredQuestions(session, participant.studentId);
-        socket.emit(SocketEvents.STUDENT_JOINED, {
-          participantId: participant.studentId,
-          sessionToken: participant.sessionToken,
-          sessionState: session.state,
-          currentQuestion: session.currentQuestionIndex >= 0 ? session.currentQuestionIndex : undefined,
-          answeredQuestions,
-        });
-
-        // Broadcast updated participant list to instructor
-        broadcastParticipants(io, session, sessionId);
-        broadcastLiveAnswerCount(io, session, sessionId);
-
-        logActivity(
-          `student ${isReconnect ? "rejoined" : "joined"} session=${sessionId} id=${participant.studentId} socket=${socket.id}`,
-        );
-
-        emitJoinStateSnapshot(socket, session, isReconnect);
-
-      } catch (e) {
-        socket.emit(SocketEvents.STUDENT_REJECTED, {
-          reason: e instanceof Error ? e.message : "Join failed",
-        });
-        logActivity(
-          `student rejected session=${sessionId} id=${payload.studentId || "unknown"} socket=${socket.id} reason=${e instanceof Error ? e.message : "join-failed"}`,
-        );
+        (socket as Socket & { _studentId?: string })._studentId = payload.studentId.trim();
       }
+      emitMessages(io, sessionId, result.messages);
     });
-
-    // ── answer:submit ─────────────────────────
     socket.on(SocketEvents.ANSWER_SUBMIT, (payload: AnswerSubmitPayload) => {
+      if (!quiz) return;
       const studentId = (socket as Socket & { _studentId?: string })._studentId;
-      if (!studentId) {
-        socket.emit(SocketEvents.ANSWER_REJECTED, {
-          questionIndex: payload.questionIndex,
-          reason: "Not joined to a session",
-        });
-        return;
-      }
-
-      try {
-        const quiz = quizStore.get(session.week);
-        const question = quiz?.questions[session.currentQuestionIndex];
-        if (!question) {
-          throw new Error(`Question ${session.currentQuestionIndex + 1} not found.`);
-        }
-        if (isOpenResponseQuestion(question)) {
-          if ((payload.selectedOptions?.length || 0) > 0) {
-            throw new Error("Open response questions accept text responses only.");
-          }
-          if (!payload.responseText || payload.responseText.trim().length === 0) {
-            throw new Error("Response text cannot be blank.");
-          }
-        } else {
-          const selectedOptions = payload.selectedOptions || [];
-          if (!question.allowsMultiple && selectedOptions.length > 1) {
-            throw new Error("This question accepts one answer only.");
-          }
-          if (selectedOptions.length === 0) {
-            throw new Error("At least one option must be selected.");
-          }
-        }
-        recordSubmission(session, studentId, payload.questionIndex, {
-          selectedOptions: payload.selectedOptions,
-          responseText: payload.responseText,
-        });
-        socket.emit(SocketEvents.ANSWER_ACCEPTED, { questionIndex: payload.questionIndex });
-
-        // Send updated count to instructor
-        const count = getSubmissionCount(session, payload.questionIndex);
-        io.to(sessionRoom(sessionId)).emit(SocketEvents.ANSWER_COUNT, {
-          questionIndex: payload.questionIndex,
-          submitted: count.submitted,
-          total: count.total,
-          openResponses: isOpenResponseQuestion(question) ? getOpenResponses(session, payload.questionIndex) : undefined,
-        });
-      } catch (e) {
-        socket.emit(SocketEvents.ANSWER_REJECTED, {
-          questionIndex: payload.questionIndex,
-          reason: e instanceof Error ? e.message : "Submission failed",
-        });
-        logActivity(
-          `answer rejected session=${sessionId} id=${studentId} q=${payload.questionIndex} reason=${e instanceof Error ? e.message : "submission-failed"}`,
-        );
-      }
+      const result = apply(session, quiz, { type: "answerSubmit", studentId, payload }, Date.now());
+      Object.assign(session, result.session);
+      // An unjoined socket has no participant ID, so route its rejection directly.
+      if (!studentId) for (const item of result.messages) socket.emit(item.event, item.payload);
+      else emitMessages(io, sessionId, result.messages);
     });
-
-    // ── Disconnect handling ───────────────────
     socket.on("disconnect", () => {
-      const sid = (socket as Socket & { _studentId?: string })._studentId;
-      if (sid) {
-        const p = session.participants.get(sid);
-        if (p) {
-          p.connected = false;
-        }
-        broadcastParticipants(io, session, sessionId);
-        broadcastLiveAnswerCount(io, session, sessionId);
-        logActivity(`student disconnected session=${sessionId} id=${sid} socket=${socket.id}`);
-      }
+      const studentId = (socket as Socket & { _studentId?: string })._studentId;
+      if (studentId && quiz) applyAndEmit(io, session, quiz, { type: "disconnect", studentId, socketId: socket.id });
     });
   });
-
   return io;
 }
 
-/** Broadcast participant list to all connected clients in a session */
-function broadcastParticipants(io: Server, session: Session, sessionId: string): void {
-  const participants = [...session.participants.values()]
-    .filter((p) => p.connected)
-    .map((p) => ({ studentId: p.studentId, displayName: p.displayName }));
-
-  io.to(sessionRoom(sessionId)).emit(SocketEvents.SESSION_PARTICIPANTS, {
-    count: participants.length,
-    participants,
-  });
-}
-
-/**
- * Start the question timer for a session.
- * Auto-closes the question after timeLimitSec and broadcasts question:close.
- * Broadcasts question:tick every second.
- */
-export function startQuestionTimer(
-  io: Server,
-  session: Session,
-  sessionId: string,
-  timeLimitSec: number,
-): void {
-  // Clear any existing timers
+/** Schedule the existing ticks and automatic close using the engine deadline. */
+export function startQuestionTimer(io: Server, session: Session, sessionId: string, timeLimitSec: number, nextDeadline?: number | null): void {
   clearSessionTimers(sessionId);
-
-  const timedQuestionIndex = session.currentQuestionIndex;
-  const timedQuestionStartedAt = session.questionStartedAt;
+  const quiz = quizStore.get(session.week);
+  if (!quiz) return;
+  const timedIndex = session.currentQuestionIndex;
+  const timedStart = session.questionStartedAt;
+  const due = nextDeadline ?? Date.now() + timeLimitSec * 1000;
+  const isCurrent = () => session.state === "QUESTION_OPEN" && session.currentQuestionIndex === timedIndex
+    && session.questionStartedAt === timedStart && getQuestionType(quiz.questions[timedIndex]) !== "slide";
   let remaining = timeLimitSec;
-
-  const isCurrentTimedQuestion = (): boolean => {
-    const question = quizStore.get(session.week)?.questions[timedQuestionIndex];
-    return session.state === "QUESTION_OPEN"
-      && session.currentQuestionIndex === timedQuestionIndex
-      && session.questionStartedAt === timedQuestionStartedAt
-      && getQuestionType(question) !== "slide";
-  };
-
-  // Tick every second
-  const tickInterval = setInterval(() => {
-    if (tickTimers.get(sessionId) !== tickInterval || !isCurrentTimedQuestion()) {
-      if (tickTimers.get(sessionId) === tickInterval) {
-        clearSessionTimers(sessionId);
-      }
-      return;
-    }
+  const tick = setInterval(() => {
+    if (tickTimers.get(sessionId) !== tick || !isCurrent()) { if (tickTimers.get(sessionId) === tick) clearSessionTimers(sessionId); return; }
     remaining--;
-    if (remaining >= 0) {
-      io.to(sessionRoom(sessionId)).emit(SocketEvents.QUESTION_TICK, {
-        remainingSec: remaining,
-      });
-    }
+    if (remaining >= 0) emitMessages(io, sessionId, apply(session, quiz, { type: "tick", remainingSec: remaining }, Date.now()).messages);
   }, TICK_INTERVAL_MS);
-  tickTimers.set(sessionId, tickInterval);
-
-  // Auto-close after time limit
-  const closeTimer = setTimeout(() => {
-    if (sessionTimers.get(sessionId) !== closeTimer || !isCurrentTimedQuestion()) {
-      if (sessionTimers.get(sessionId) === closeTimer) {
-        clearSessionTimers(sessionId);
-      }
-      return;
-    }
+  tickTimers.set(sessionId, tick);
+  const timer = setTimeout(() => {
+    if (sessionTimers.get(sessionId) !== timer || !isCurrent()) { if (sessionTimers.get(sessionId) === timer) clearSessionTimers(sessionId); return; }
     clearSessionTimers(sessionId);
-    if (isCurrentTimedQuestion()) {
-      try {
-        transitionState(session, "QUESTION_CLOSED");
-        io.to(sessionRoom(sessionId)).emit(SocketEvents.QUESTION_CLOSE, {
-          questionIndex: timedQuestionIndex,
-        });
-        io.to(sessionRoom(sessionId)).emit(SocketEvents.SESSION_STATE, {
-          state: session.state,
-          questionIndex: session.currentQuestionIndex,
-        });
-
-        // Send distribution to instructor
-        const dist = getDistribution(session, session.currentQuestionIndex);
-        io.to(sessionRoom(sessionId)).emit(SocketEvents.RESULTS_DISTRIBUTION, {
-          questionIndex: session.currentQuestionIndex,
-          distribution: dist,
-        });
-      } catch {
-        // State may have already changed (instructor closed manually)
-      }
-    }
-  }, timeLimitSec * 1000);
-  sessionTimers.set(sessionId, closeTimer);
+    const result = apply(session, quiz, { type: "timeout", deadline: due }, Math.max(Date.now(), due));
+    Object.assign(session, result.session);
+    emitMessages(io, sessionId, result.messages);
+  }, Math.max(0, due - Date.now()));
+  sessionTimers.set(sessionId, timer);
 }
 
-/**
- * Broadcast a question open event and start the timer.
- */
-export function broadcastQuestionOpen(
-  io: Server,
-  session: Session,
-  sessionId: string,
-  quiz: Quiz,
-): void {
-  // Navigation must always retire the previous item's timer, including when
-  // the destination is a non-timed slide.
+/** Compatibility entry points used by existing in-process callers. */
+export function broadcastQuestionOpen(io: Server, session: Session, sessionId: string, quiz: Quiz): void {
   clearSessionTimers(sessionId);
-  const q = quiz.questions[session.currentQuestionIndex];
-  session.questionStartedAt = Date.now();
-
-  emitQuestionContext(io, session, sessionId, quiz);
-
-  io.to(sessionRoom(sessionId)).emit(SocketEvents.SESSION_STATE, {
-    state: session.state,
-    questionIndex: session.currentQuestionIndex,
-  });
-
-  if (getQuestionType(q) !== "slide") {
-    broadcastLiveAnswerCount(io, session, sessionId);
-    startQuestionTimer(io, session, sessionId, q.timeLimitSec);
+  const result = apply(session, quiz, { type: "broadcastOpen" }, Date.now());
+  Object.assign(session, result.session);
+  emitMessages(io, sessionId, result.messages);
+  if (result.nextDeadline !== null) {
+    startQuestionTimer(io, session, sessionId, quiz.questions[session.currentQuestionIndex].timeLimitSec, result.nextDeadline);
   }
 }
-
-/**
- * Broadcast reveal event with correct answer and explanation.
- */
-export function broadcastReveal(
-  io: Server,
-  session: Session,
-  sessionId: string,
-  quiz: Quiz,
-): void {
+export function broadcastReveal(io: Server, session: Session, sessionId: string, quiz: Quiz): void {
   clearSessionTimers(sessionId);
-  const q = quiz.questions[session.currentQuestionIndex];
-  const dist = getDistribution(session, session.currentQuestionIndex);
-
-  // Review navigation can land directly on a completed quiz. Replay the
-  // question context first so clients have the option text needed to render
-  // the reveal, but do not restart timers or reopen submissions.
-  emitQuestionContext(io, session, sessionId, quiz);
-
-  io.to(sessionRoom(sessionId)).emit(SocketEvents.RESULTS_REVEAL, {
-    questionIndex: session.currentQuestionIndex,
-    questionType: getQuestionType(q),
-    correctOptions: q.correctOptions,
-    explanation: q.explanation,
-    distribution: dist,
-    isPoll: q.isPoll === true,
-    openResponses: isOpenResponseQuestion(q) ? getOpenResponses(session, session.currentQuestionIndex) : undefined,
-  });
-
-  io.to(sessionRoom(sessionId)).emit(SocketEvents.SESSION_STATE, {
-    state: session.state,
-    questionIndex: session.currentQuestionIndex,
-  });
+  emitMessages(io, sessionId, apply(session, quiz, { type: "broadcastReveal" }, Date.now()).messages);
 }
-
-function emitQuestionContext(
-  io: Server,
-  session: Session,
-  sessionId: string,
-  quiz: Quiz,
-): void {
-  const q = quiz.questions[session.currentQuestionIndex];
-  io.to(sessionRoom(sessionId)).emit(SocketEvents.QUESTION_OPEN, {
-    questionIndex: session.currentQuestionIndex,
-    topic: q.topic,
-    text: q.textHtml,
-    questionType: getQuestionType(q),
-    attendeeNotes: buildPublicNotes(q),
-    slideMedia: q.slideMedia,
-    slideMediaPosition: q.slideMediaPosition,
-    slideMediaOpacity: q.slideMediaOpacity,
-    slideBackground: q.slideBackground,
-    slideLiveEmbed: q.slideLiveEmbed,
-    slideVideo: q.slideVideo,
-    slideReferences: q.slideReferences,
-    options: q.options.map((o) => ({ label: o.label, text: o.textHtml })),
-    allowsMultiple: q.allowsMultiple,
-    isPoll: q.isPoll === true,
-    timeLimitSec: q.timeLimitSec,
-    startedAt: session.questionStartedAt || Date.now(),
-  });
-}
-
-/**
- * Broadcast leaderboard.
- */
-export function broadcastLeaderboard(
-  io: Server,
-  session: Session,
-  sessionId: string,
-  quiz: Quiz,
-): void {
-  const correctMap = buildScoredCorrectAnswersMap(quiz);
-  const entries = computeLeaderboard(session, correctMap);
-
-  io.to(sessionRoom(sessionId)).emit(SocketEvents.LEADERBOARD_UPDATE, {
-    entries,
-    totalQuestions: getScoredQuestionCount(quiz),
-  });
-
-  io.to(sessionRoom(sessionId)).emit(SocketEvents.SESSION_STATE, {
-    state: session.state,
-  });
+export function broadcastLeaderboard(io: Server, session: Session, sessionId: string, quiz: Quiz): void {
+  emitMessages(io, sessionId, apply(session, quiz, { type: "broadcastLeaderboard" }, Date.now()).messages);
 }
