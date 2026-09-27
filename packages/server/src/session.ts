@@ -9,7 +9,6 @@ import {
   STATE_TRANSITIONS,
   SESSION_CODE_LENGTH,
 } from "@mdq/shared";
-import { v4 as uuidv4 } from "uuid";
 
 /** Error for invalid state transitions */
 export class StateTransitionError extends Error {
@@ -25,17 +24,67 @@ export class StateTransitionError extends Error {
 /** Generate a random alphanumeric session code */
 function generateSessionCode(): string {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // no I, O, 0, 1 to avoid confusion
+  const randomBytes = crypto.getRandomValues(new Uint8Array(SESSION_CODE_LENGTH));
   let code = "";
   for (let i = 0; i < SESSION_CODE_LENGTH; i++) {
-    code += chars.charAt(Math.floor(Math.random() * chars.length));
+    code += chars.charAt(randomBytes[i] % chars.length);
   }
   return code;
+}
+
+/** Convert a live session to JSON while preserving maps, sets, and explicit undefined fields. */
+export function serializeSession(session: Session): string {
+  return JSON.stringify(session, (_key, value: unknown) => {
+    if (value instanceof Map) {
+      return { __mdqSessionType: "Map", entries: [...value.entries()] };
+    }
+    if (value instanceof Set) {
+      return { __mdqSessionType: "Set", values: [...value.values()] };
+    }
+    if (value === undefined) {
+      return { __mdqSessionType: "Undefined" };
+    }
+    return value;
+  });
+}
+
+function restoreSessionValue(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map(restoreSessionValue);
+  }
+  if (value === null || typeof value !== "object") {
+    return value;
+  }
+
+  const record = value as Record<string, unknown>;
+  if (record.__mdqSessionType === "Map") {
+    return new Map((record.entries as [unknown, unknown][]).map(
+      ([key, entry]) => [restoreSessionValue(key), restoreSessionValue(entry)],
+    ));
+  }
+  if (record.__mdqSessionType === "Set") {
+    return new Set((record.values as unknown[]).map(restoreSessionValue));
+  }
+  if (record.__mdqSessionType === "Undefined") {
+    return undefined;
+  }
+
+  const restored: Record<string, unknown> = {};
+  for (const [key, entry] of Object.entries(record)) {
+    restored[key] = restoreSessionValue(entry);
+  }
+  return restored;
+}
+
+/** Restore a session previously returned by serializeSession. */
+export function deserializeSession(json: string): Session {
+  return restoreSessionValue(JSON.parse(json)) as Session;
 }
 
 /** Create a new Session in LOBBY state */
 export function createSession(week: string, mode: SessionMode): Session {
   return {
-    sessionId: uuidv4(),
+    sessionId: crypto.randomUUID(),
     sessionCode: generateSessionCode(),
     week,
     mode,
@@ -130,7 +179,7 @@ export function addParticipant(
   const participant: Participant = {
     studentId,
     displayName,
-    sessionToken: uuidv4(),
+    sessionToken: crypto.randomUUID(),
     clientInstanceId,
     socketId,
     joinedAt: Date.now(),

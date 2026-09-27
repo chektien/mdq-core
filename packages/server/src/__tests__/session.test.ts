@@ -1,5 +1,7 @@
 import {
   createSession,
+  serializeSession,
+  deserializeSession,
   transitionState,
   addParticipant,
   recordSubmission,
@@ -9,7 +11,9 @@ import {
   isExactOptionMatch,
   StateTransitionError,
 } from "../session";
-import { Session, SessionState, STATE_TRANSITIONS } from "@mdq/shared";
+import { Session, SessionState, SESSION_STATES, STATE_TRANSITIONS } from "@mdq/shared";
+import { readFileSync, readdirSync } from "node:fs";
+import { join } from "node:path";
 
 describe("Session Engine", () => {
   let session: Session;
@@ -28,6 +32,81 @@ describe("Session Engine", () => {
       );
       expect(session.mode).toBe("open");
       expect(session.week).toBe("week01");
+    });
+
+    it("generates join codes from the expected alphabet without using the legacy random source", () => {
+      const randomSpy = jest.spyOn(Math, "random").mockImplementation(() => {
+        throw new Error("Legacy random source used");
+      });
+      try {
+        const codes = Array.from({ length: 1000 }, () => createSession("week01", "open").sessionCode);
+        for (const code of codes) {
+          expect(code).toMatch(/^[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{6}$/);
+        }
+        expect(randomSpy).not.toHaveBeenCalled();
+      } finally {
+        randomSpy.mockRestore();
+      }
+    });
+
+    it("has no legacy random calls in server sources", () => {
+      const files: string[] = [];
+      const collect = (directory: string): void => {
+        for (const entry of readdirSync(directory, { withFileTypes: true })) {
+          const path = join(directory, entry.name);
+          if (entry.isDirectory()) collect(path);
+          else if (path.endsWith(".ts")) files.push(path);
+        }
+      };
+      collect(join(__dirname, ".."));
+      for (const file of files) {
+        expect(readFileSync(file, "utf8")).not.toMatch(/\bMath[.]random\b/);
+      }
+    });
+  });
+
+  describe("session JSON round trips", () => {
+    it.each(SESSION_STATES)("preserves a populated %s session", (state) => {
+      const original = createSession("week01", "strict");
+      addParticipant(original, "S001", "sock1", "Alice", undefined, "client-a");
+      addParticipant(original, "S002", "sock2");
+      original.state = state;
+      original.currentQuestionIndex = 1;
+      original.questionStartedAt = 123456;
+      original.revealedQuestionIndexes?.add(0);
+      original.revealedQuestionIndexes?.add(1);
+      original.submissions.push(
+        { studentId: "S001", questionIndex: 0, selectedOptions: ["A"], responseText: undefined, submittedAt: 123500, responseTimeMs: 44 },
+        { studentId: "S002", questionIndex: 1, selectedOptions: ["B"], responseText: undefined, submittedAt: 123600, responseTimeMs: 100 },
+      );
+
+      const restored = deserializeSession(serializeSession(original));
+      expect(restored).toStrictEqual(original);
+      expect(restored).not.toBe(original);
+      expect(restored.participants).toBeInstanceOf(Map);
+      expect(restored.revealedQuestionIndexes).toBeInstanceOf(Set);
+      expect(restored.participants.get("S001")).not.toBe(original.participants.get("S001"));
+      expect(getDistribution(restored, 0)).toEqual(getDistribution(original, 0));
+      expect(computeLeaderboard(restored, new Map([[0, ["A"]], [1, ["B"]]])))
+        .toEqual(computeLeaderboard(original, new Map([[0, ["A"]], [1, ["B"]]])));
+    });
+
+    it("preserves absent optional fields and remains usable after restoration", () => {
+      const original = createSession("week01", "open");
+      delete original.revealedQuestionIndexes;
+      const { participant } = addParticipant(original, "S001", "sock1");
+      original.state = "QUESTION_OPEN";
+      original.currentQuestionIndex = 0;
+      original.questionStartedAt = Date.now() - 1000;
+
+      const restored = deserializeSession(serializeSession(original));
+      expect(restored).toStrictEqual(original);
+      restored.participants.get("S001")!.connected = false;
+      expect(addParticipant(restored, "S001", "sock2", undefined, participant.sessionToken).isReconnect).toBe(true);
+      recordSubmission(restored, "S001", 0, ["A"]);
+      expect(getSubmissionCount(restored, 0)).toEqual({ submitted: 1, total: 1 });
+      transitionState(restored, "QUESTION_CLOSED");
+      expect(restored.state).toBe("QUESTION_CLOSED");
     });
   });
 
