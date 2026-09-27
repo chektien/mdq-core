@@ -2,14 +2,13 @@ import { createServer } from "http";
 import { createApp } from "./app";
 import {
   setupSocket,
-  broadcastQuestionOpen,
-  broadcastReveal,
-  broadcastLeaderboard,
   clearSessionTimers,
+  emitMessages,
+  startQuestionTimer,
 } from "./socket";
-import { DEFAULT_PORT, Quiz, Session, SessionState, SocketEvents } from "@mdq/shared";
+import { DEFAULT_PORT, Quiz, Session, SessionState } from "@mdq/shared";
+import { type EngineResult } from "./engine";
 import { detectAccessInfo } from "./access-info";
-import { getDistribution } from "./session";
 import * as path from "path";
 import * as fs from "fs";
 import express from "express";
@@ -160,9 +159,7 @@ async function checkPublicHealth(publicUrl: string): Promise<PublicHealthCheckRe
   }
 }
 
-function sessionRoom(sessionId: string): string {
-  return `session:${sessionId}`;
-}
+
 
 if (runtimeConfig.presenterNotes && !(process.env.INSTRUCTOR_PASSWORD || process.env.INSTRUCTOR_KEY)) {
   console.warn(
@@ -181,55 +178,14 @@ const app = createApp({
   autoGenerateStudentIds: runtimeConfig.autoGenerateStudentIds,
   presenterNotes: runtimeConfig.presenterNotes,
   presenterNotesDefaultOpen: runtimeConfig.presenterNotesDefaultOpen,
-  onStateChange: (session: Session, sessionId: string, newState: SessionState, quiz?: Quiz) => {
+  onStateChange: (session: Session, sessionId: string, _newState: SessionState, quiz?: Quiz, result?: EngineResult) => {
     const io = ioRef.current;
-    if (!io) return;
-
-    // Any REST-driven state/navigation change invalidates the previous item timer.
+    if (!io || !result) return;
     clearSessionTimers(sessionId);
-
-    switch (newState) {
-      case "QUESTION_OPEN":
-        if (quiz) {
-          broadcastQuestionOpen(io, session, sessionId, quiz);
-        }
-        break;
-
-      case "QUESTION_CLOSED": {
-        clearSessionTimers(sessionId);
-        io.to(sessionRoom(sessionId)).emit(SocketEvents.QUESTION_CLOSE, {
-          questionIndex: session.currentQuestionIndex,
-        });
-        io.to(sessionRoom(sessionId)).emit(SocketEvents.SESSION_STATE, {
-          state: session.state,
-          questionIndex: session.currentQuestionIndex,
-        });
-        // Send distribution
-        const dist = getDistribution(session, session.currentQuestionIndex);
-        io.to(sessionRoom(sessionId)).emit(SocketEvents.RESULTS_DISTRIBUTION, {
-          questionIndex: session.currentQuestionIndex,
-          distribution: dist,
-        });
-        break;
-      }
-
-      case "REVEAL":
-        if (quiz) {
-          broadcastReveal(io, session, sessionId, quiz);
-        }
-        break;
-
-      case "LEADERBOARD":
-        if (quiz) {
-          broadcastLeaderboard(io, session, sessionId, quiz);
-        }
-        break;
-
-      case "ENDED":
-        io.to(sessionRoom(sessionId)).emit(SocketEvents.SESSION_STATE, {
-          state: "ENDED",
-        });
-        break;
+    emitMessages(io, sessionId, result.messages);
+    if (quiz && result.nextDeadline !== null) {
+      const question = quiz.questions[session.currentQuestionIndex];
+      startQuestionTimer(io, session, sessionId, question.timeLimitSec, result.nextDeadline);
     }
   },
 });

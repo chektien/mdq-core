@@ -1,0 +1,118 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`captures existing outbound transition payloads 1`] = `
+[
+  {
+    "event": "question:open",
+    "payload": {
+      "allowsMultiple": false,
+      "attendeeNotes": undefined,
+      "isPoll": false,
+      "options": [
+        {
+          "label": "A",
+          "text": "One",
+        },
+        {
+          "label": "B",
+          "text": "Two",
+        },
+      ],
+      "questionIndex": 0,
+      "questionType": "multiple_choice",
+      "slideBackground": undefined,
+      "slideLiveEmbed": undefined,
+      "slideMedia": undefined,
+      "slideMediaOpacity": undefined,
+      "slideMediaPosition": undefined,
+      "slideReferences": undefined,
+      "slideVideo": undefined,
+      "startedAt": 1000,
+      "text": "<p>Question</p>",
+      "timeLimitSec": 20,
+      "topic": "Sample question",
+    },
+  },
+  {
+    "event": "session:state",
+    "payload": {
+      "questionIndex": 0,
+      "state": "QUESTION_OPEN",
+    },
+  },
+  {
+    "event": "answer:count",
+    "payload": {
+      "openResponses": undefined,
+      "questionIndex": 0,
+      "submitted": 0,
+      "total": 0,
+    },
+  },
+  {
+    "event": "question:open",
+    "payload": {
+      "allowsMultiple": false,
+      "attendeeNotes": undefined,
+      "isPoll": false,
+      "options": [
+        {
+          "label": "A",
+          "text": "One",
+        },
+        {
+          "label": "B",
+          "text": "Two",
+        },
+      ],
+      "questionIndex": 0,
+      "questionType": "multiple_choice",
+      "slideBackground": undefined,
+      "slideLiveEmbed": undefined,
+      "slideMedia": undefined,
+      "slideMediaOpacity": undefined,
+      "slideMediaPosition": undefined,
+      "slideReferences": undefined,
+      "slideVideo": undefined,
+      "startedAt": 1000,
+      "text": "<p>Question</p>",
+      "timeLimitSec": 20,
+      "topic": "Sample question",
+    },
+  },
+  {
+    "event": "results:reveal",
+    "payload": {
+      "correctOptions": [
+        "B",
+      ],
+      "distribution": {},
+      "explanation": "Two is correct",
+      "isPoll": false,
+      "openResponses": undefined,
+      "questionIndex": 0,
+      "questionType": "multiple_choice",
+    },
+  },
+  {
+    "event": "session:state",
+    "payload": {
+      "questionIndex": 0,
+      "state": "REVEAL",
+    },
+  },
+  {
+    "event": "leaderboard:update",
+    "payload": {
+      "entries": [],
+      "totalQuestions": 1,
+    },
+  },
+  {
+    "event": "session:state",
+    "payload": {
+      "state": "LEADERBOARD",
+    },
+  },
+]
+`;
