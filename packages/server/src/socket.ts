@@ -1,6 +1,5 @@
 import { Server as HttpServer } from "http";
 import { Server, Socket } from "socket.io";
-import { v4 as uuidv4 } from "uuid";
 import { SocketEvents, StudentJoinPayload, AnswerSubmitPayload, TICK_INTERVAL_MS, Quiz, Session } from "@mdq/shared";
 import { getSession } from "./session";
 import { apply, type EngineMessage, type EngineResult } from "./engine";
@@ -90,7 +89,7 @@ export function setupSocket(httpServer: HttpServer, quizzes: Map<string, Quiz>):
     }
     socket.on(SocketEvents.STUDENT_JOIN, (payload: StudentJoinPayload) => {
       if (!quiz) return;
-      const result = apply(session, quiz, { type: "join", payload, socketId: socket.id, newToken: uuidv4() }, Date.now());
+      const result = apply(session, quiz, { type: "join", payload, socketId: socket.id, newToken: crypto.randomUUID() }, Date.now());
       Object.assign(session, result.session);
       if (result.messages.some((m) => m.event === SocketEvents.STUDENT_JOINED)) {
         socket.join(sessionRoom(sessionId));
