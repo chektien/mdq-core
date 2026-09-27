@@ -282,9 +282,9 @@ function parseQuestionBlock(block: string, index: number, sourceFile: string, bl
     }
   }
 
-  const questionTypeMatch = block.match(/^(?:type|question_type):\s*([a-z_]+)\s*$/im);
-  const questionType = questionTypeMatch?.[1].trim().toLowerCase() as QuestionType | undefined;
-  if (questionType && questionType !== "poll" && questionType !== "open_response" && questionType !== "slide") {
+  const questionTypeMatch = block.match(/^(?:type|question_type):\s*([a-z_-]+)\s*$/im);
+  const questionType = questionTypeMatch?.[1].toLowerCase().replace(/-/g, "_");
+  if (questionType && questionType !== "multiple_choice" && questionType !== "poll" && questionType !== "open_response" && questionType !== "slide") {
     throw new QuizParseError(
       sourceFile,
       index,
@@ -292,7 +292,7 @@ function parseQuestionBlock(block: string, index: number, sourceFile: string, bl
       findLineNumber(lines, blockStartLine, (line) => /^(?:type|question_type):\s*/i.test(line)),
     );
   }
-  const normalizedQuestionType: QuestionType = questionType || "multiple_choice";
+  const normalizedQuestionType = (questionType || "multiple_choice") as QuestionType;
   const isPoll = normalizedQuestionType === "poll";
   const isOpenResponse = normalizedQuestionType === "open_response";
   const isSlide = normalizedQuestionType === "slide";
@@ -452,7 +452,7 @@ function parseQuestionBlock(block: string, index: number, sourceFile: string, bl
   let textLines = lines.slice(h2LineIdx + 1, contentEndLineIdx);
   // Remove time_limit line from text
   textLines = textLines.filter((l) => !/^time_limit:\s*\d+/i.test(l.trim()));
-  textLines = textLines.filter((l) => !/^(?:type|question_type):\s*[a-z_]+$/i.test(l.trim()));
+  textLines = textLines.filter((l) => !/^(?:type|question_type):\s*[a-z_-]+$/i.test(l.trim()));
   textLines = textLines.filter((l) => !/^multi_select:\s*(true|false|yes|no|1|0)$/i.test(l.trim()));
   const liveEmbedExtraction = isSlide
     ? extractSlideLiveEmbed(textLines)

@@ -394,7 +394,7 @@ title: Demo Presentation Session
 
 If the preamble title is omitted, MDQ falls back to the first `# ...` heading for backward compatibility.
 
-Each interactive question supports the existing `time-limit:` metadata plus optional `multi-select:` and `type:` flags. `question-type:` remains accepted as a backward-compatible alias. Question stems, slide bodies, and option text can also include standard markdown images.
+Each interactive question supports the existing `time-limit:` metadata plus optional `multi-select:` and `type:` flags. `question-type:` remains accepted as a backward-compatible alias. Questions default to multiple choice when `type:` is omitted, and `type: multiple_choice` can be written explicitly. Type values also accept hyphens in place of underscores, such as `open-response` for `open_response`. Question stems, slide bodies, and option text can also include standard markdown images.
 
 Setting keys are written with dashes, as above (`time-limit:`, `presenter-notes:`, `slide-background:`). Decks written with the earlier underscored spelling (`time_limit:`, `presenter_notes:`) still work, and so does `type: open_response`; the two spellings can be mixed in one deck.
 
@@ -422,7 +422,7 @@ Rules:
 - Use `multi-select: true` when you want students to be allowed to pick more than one option for that question.
 - Use `type: poll` when you want a non-scored poll question. Poll questions must not include `> Correct Answer:` or `> Correct Answers:` lines.
 - Poll questions still respect `multi-select:`. Omit it for a single-choice poll, or set `multi-select: true` for a multi-select poll.
-- Use `type: open-response` for a written, non-scored response prompt.
+- Use `type: open_response` for a written, non-scored response prompt.
 - Use `type: slide` for non-interactive slide content. Slides have no timer, answer choices, correct answers, submissions, or leaderboard weight.
 - Add standard markdown images to slide bodies when you want MDQ to arrange media beside the text. Images are scaled proportionately and never cropped or stretched.
 - Use `live-url: https://...` on a slide when you want the instructor/projector surface to embed a live website as the slide itself. Add `live-title-overlay: true` to keep the slide title and body text over the live surface, and keep a normal markdown image in the slide as the static fallback for PDF exports and non-live surfaces.
