@@ -24,8 +24,10 @@ import type {
   SlideReference,
   DeckPalette,
   DeckTheme,
+  StudentAnswer,
 } from "@mdq/shared";
 import { SocketEvents } from "@mdq/shared";
+import { mergeOwnAnswers, seedSubmittedAnswer, toOptionIndexes } from "../ownAnswers";
 
 // ── localStorage helpers ─────────────────────
 const STORAGE_KEY = "mdquiz_session";
@@ -213,6 +215,10 @@ export function useSocket(
   const studentIdRef = useRef<string | null>(null);
   const submittedOptionsRef = useRef<string[]>([]);
   const submittedResponseTextRef = useRef<string | null>(null);
+  // This student's own answers by question index, from the server on join and
+  // from accepted submissions, so a revisited or reloaded question shows them.
+  const ownAnswersRef = useRef<Map<number, StudentAnswer>>(new Map());
+  const pendingAnswerRef = useRef<StudentAnswer | null>(null);
   const [connected, setConnected] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -264,6 +270,8 @@ export function useSocket(
     });
 
     socketRef.current = socket;
+    ownAnswersRef.current = new Map();
+    pendingAnswerRef.current = null;
 
     socket.on("connect", () => {
       setConnected(true);
@@ -297,7 +305,25 @@ export function useSocket(
       setSessionState(data.sessionState);
       setAnsweredQuestions(data.answeredQuestions || []);
       answeredQuestionsRef.current = data.answeredQuestions || [];
+      ownAnswersRef.current = mergeOwnAnswers(ownAnswersRef.current, data.answers);
       setError(null);
+
+      // Fill in the question already on screen if this page lost its answer.
+      const shown = currentQuestionRef.current;
+      if (shown && answeredQuestionsRef.current.includes(shown.questionIndex)) {
+        const seeded = seedSubmittedAnswer({
+          questionIndex: shown.questionIndex,
+          options: shown.options,
+          alreadyAnswered: true,
+          isSameQuestion: true,
+          current: { selectedOptions: submittedOptionsRef.current, responseText: submittedResponseTextRef.current },
+          known: ownAnswersRef.current,
+        });
+        submittedOptionsRef.current = seeded.selectedOptions;
+        submittedResponseTextRef.current = seeded.responseText;
+        setSubmittedOptions(seeded.selectedOptions);
+        setSubmittedResponseText(seeded.responseText);
+      }
 
       // Persist for reconnection
       saveStoredSession({
@@ -346,12 +372,22 @@ export function useSocket(
       setReveal(null);
       setDistribution(null);
       // Reveal/reconnect snapshots replay question context before reveal details.
-      // Preserve the local answer when that replay is for the same question.
+      // Preserve the local answer when that replay is for the same question,
+      // and otherwise restore a known earlier answer to this question.
       const alreadyAnswered = answeredQuestionsRef.current.includes(data.questionIndex);
-      const shouldPreserveSubmission = isSameQuestion && alreadyAnswered;
+      const seeded = seedSubmittedAnswer({
+        questionIndex: data.questionIndex,
+        options: data.options,
+        alreadyAnswered,
+        isSameQuestion,
+        current: { selectedOptions: submittedOptionsRef.current, responseText: submittedResponseTextRef.current },
+        known: ownAnswersRef.current,
+      });
+      submittedOptionsRef.current = seeded.selectedOptions;
+      submittedResponseTextRef.current = seeded.responseText;
       setSubmitted(alreadyAnswered);
-      setSubmittedOptions(shouldPreserveSubmission ? submittedOptionsRef.current : []);
-      setSubmittedResponseText(shouldPreserveSubmission ? submittedResponseTextRef.current : null);
+      setSubmittedOptions(seeded.selectedOptions);
+      setSubmittedResponseText(seeded.responseText);
       setRemainingSec(data.timeLimitSec);
     });
 
@@ -365,6 +401,11 @@ export function useSocket(
     });
 
     socket.on(SocketEvents.ANSWER_ACCEPTED, (data: { questionIndex: number }) => {
+      const pending = pendingAnswerRef.current;
+      if (pending?.questionIndex === data.questionIndex) {
+        ownAnswersRef.current = mergeOwnAnswers(ownAnswersRef.current, [pending]);
+        pendingAnswerRef.current = null;
+      }
       setSubmitted(true);
       setAnsweredQuestions(prev => {
         const next = appendAnsweredQuestion(prev, data.questionIndex);
@@ -523,6 +564,14 @@ export function useSocket(
       socketRef.current.emit(SocketEvents.ANSWER_SUBMIT, payload);
       const nextSubmittedOptions = payload.selectedOptions ?? [];
       const nextSubmittedResponseText = payload.responseText?.trim() || null;
+      const shown = currentQuestionRef.current;
+      pendingAnswerRef.current = {
+        questionIndex: payload.questionIndex,
+        selectedOptions: shown?.questionIndex === payload.questionIndex
+          ? toOptionIndexes(nextSubmittedOptions, shown.options)
+          : [],
+        ...(nextSubmittedResponseText ? { responseText: nextSubmittedResponseText } : {}),
+      };
       submittedOptionsRef.current = nextSubmittedOptions;
       submittedResponseTextRef.current = nextSubmittedResponseText;
       setSubmittedOptions(nextSubmittedOptions);
