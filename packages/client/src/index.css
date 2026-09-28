@@ -5,9 +5,12 @@
   --font-mono: "IBM Plex Mono", ui-monospace, monospace;
 }
 
-html {
-  background: #262625;
-  color: #e8eaf0;
+/* No theme yet: the page waits for a view to set data-theme on <html> (from
+   the deck, the runtime config, or attributes the server rendered into the
+   HTML). Until then it keeps the browser's own blank canvas and hides the app,
+   so no guessed theme flashes before the deck's. theme.css paints each theme. */
+html:not([data-theme]) #root {
+  visibility: hidden;
 }
 
 body {
@@ -419,7 +422,7 @@ html[data-theme="light"] {
   --mdq-slide-heading: #211a13;
   --mdq-slide-ink: #2c241a;
   --mdq-slide-ink-soft: #665744;
-  --mdq-slide-eyebrow: #86745d;
+  --mdq-slide-eyebrow: #7a6852;
   --mdq-slide-rule: rgba(117, 92, 62, 0.18);
   --mdq-slide-accent: #1f6f78;
   --mdq-slide-accent-strong: #155d66;
@@ -507,7 +510,13 @@ html[data-theme="light"] .slide-surface::after {
    instead of Gruvbox's cream, and darkens aqua #427b58 to #35654a so every
    text and marker colour holds 4.5:1 against both ends of the slide gradient.
    Dark is the default theme, so the dark variant also applies when
-   data-theme is absent. Selectors out-rank the theme rules by specificity. */
+   data-theme is absent. Selectors out-rank the theme rules by specificity.
+   Besides the slide tokens, each variant sets the control-surface tokens
+   from theme.css (buttons, options, banners, status pills, timer, bars), so
+   question, poll and reveal screens follow the palette too. Where a Gruvbox
+   colour misses the contrast target it is darkened (light: green #79740e to
+   #66620d, yellow #b57614 to #8a5a0a) or, for small red text on dark, mixed
+   toward the foreground (#fb4934 to #fb7b60). */
 html[data-palette="gruvbox"]:not([data-theme="light"]) {
   --mdq-slide-bg: #282828;
   --mdq-slide-bg-soft: #32302f;
@@ -532,6 +541,61 @@ html[data-palette="gruvbox"]:not([data-theme="light"]) {
   --mdq-note-presenter: #d3869b;
   --mdq-note-presenter-tint: rgba(211, 134, 155, 0.12);
   --mdq-panel-radius: 0.2rem;
+  --mdq-paper: #282828;
+  --mdq-paper-strong: #32302f;
+  --mdq-card: rgba(50, 48, 47, 0.92);
+  --mdq-card-strong: #3c3836;
+  --mdq-line: rgba(235, 219, 178, 0.14);
+  --mdq-line-strong: rgba(235, 219, 178, 0.28);
+  --mdq-control-border: #928374;
+  --mdq-ink: #ebdbb2;
+  --mdq-ink-strong: #fbf1c7;
+  --mdq-ink-soft: #ebdbb2;
+  --mdq-muted: #bdae93;
+  --mdq-soft: #a89984;
+  --mdq-accent: #fe8019;
+  --mdq-accent-hover: #fe8019;
+  --mdq-accent-text: #fe8019;
+  --mdq-on-accent: #282828;
+  --mdq-accent-soft: rgba(254, 128, 25, 0.14);
+  --mdq-accent-soft-strong: rgba(254, 128, 25, 0.22);
+  --mdq-accent-ink: #fbf1c7;
+  --mdq-secondary: #8ec07c;
+  --mdq-secondary-text: #8ec07c;
+  --mdq-on-secondary: #282828;
+  --mdq-secondary-soft: rgba(142, 192, 124, 0.14);
+  --mdq-success: #b8bb26;
+  --mdq-success-text: #b8bb26;
+  --mdq-on-success: #282828;
+  --mdq-success-soft: rgba(184, 187, 38, 0.14);
+  --mdq-success-ink: #fbf1c7;
+  --mdq-success-line: #b8bb26;
+  --mdq-warning: #fabd2f;
+  --mdq-warning-text: #fabd2f;
+  --mdq-on-warning: #282828;
+  --mdq-warning-soft: rgba(250, 189, 47, 0.14);
+  --mdq-warning-ink: #fbf1c7;
+  --mdq-danger: #cc241d;
+  --mdq-danger-text: #fb7b60;
+  --mdq-on-danger: #fbf1c7;
+  --mdq-danger-soft: rgba(251, 73, 52, 0.16);
+  --mdq-danger-ink: #fbf1c7;
+  --mdq-danger-line: #fb4934;
+  --mdq-info: #83a598;
+  --mdq-info-text: #83a598;
+  --mdq-on-info: #282828;
+  --mdq-info-soft: rgba(131, 165, 152, 0.16);
+  --mdq-info-ink: #ebdbb2;
+  --mdq-info-line: #83a598;
+  --mdq-bar: #fe8019;
+  --mdq-on-bar: #282828;
+  --mdq-bar-muted: #a89984;
+  --mdq-on-bar-muted: #282828;
+  --mdq-bar-wash: rgba(254, 128, 25, 0.26);
+  --mdq-timer-ok: #b8bb26;
+  --mdq-timer-warn: #fabd2f;
+  --mdq-timer-urgent: #fb7b60;
+  --mdq-timer-track: rgba(235, 219, 178, 0.16);
   background: #282828;
 }
 
@@ -579,6 +643,72 @@ html[data-palette="gruvbox"][data-theme="light"] {
   --mdq-note-presenter: #8f3f71;
   --mdq-note-presenter-tint: rgba(143, 63, 113, 0.09);
   --mdq-panel-radius: 0.2rem;
+  --mdq-paper: #eff0ec;
+  --mdq-paper-strong: #f7f8f5;
+  --mdq-card: rgba(250, 250, 247, 0.92);
+  --mdq-card-strong: #fbfbf9;
+  --mdq-dialog: #fbfbf9;
+  --mdq-field: #fbfbf9;
+  --mdq-line: rgba(60, 56, 54, 0.14);
+  --mdq-line-strong: rgba(60, 56, 54, 0.26);
+  --mdq-control-border: #7c6f64;
+  --mdq-ink: #3c3836;
+  --mdq-ink-strong: #282828;
+  --mdq-ink-soft: #3c3836;
+  --mdq-muted: #57524d;
+  --mdq-soft: #665c54;
+  --mdq-accent: #af3a03;
+  --mdq-accent-hover: #8f3002;
+  --mdq-accent-text: #af3a03;
+  --mdq-on-accent: #fbf1c7;
+  --mdq-accent-soft: rgba(175, 58, 3, 0.1);
+  --mdq-accent-soft-strong: rgba(175, 58, 3, 0.16);
+  --mdq-accent-ink: #8a2e02;
+  --mdq-accent-wash: linear-gradient(135deg, #f8f2ee, #f1e6df);
+  --mdq-secondary: #076678;
+  --mdq-secondary-text: #076678;
+  --mdq-on-secondary: #fbf1c7;
+  --mdq-secondary-soft: rgba(7, 102, 120, 0.1);
+  --mdq-success: #66620d;
+  --mdq-success-text: #66620d;
+  --mdq-on-success: #fbf1c7;
+  --mdq-success-soft: rgba(102, 98, 13, 0.12);
+  --mdq-success-ink: #4a470a;
+  --mdq-success-line: #66620d;
+  --mdq-success-wash: linear-gradient(135deg, #f5f5ea, #ecebd9);
+  --mdq-warning: #8a5a0a;
+  --mdq-warning-text: #8a5a0a;
+  --mdq-on-warning: #fbf1c7;
+  --mdq-warning-soft: rgba(181, 118, 20, 0.14);
+  --mdq-warning-ink: #5c3c07;
+  --mdq-danger: #9d0006;
+  --mdq-danger-text: #9d0006;
+  --mdq-on-danger: #fbf1c7;
+  --mdq-danger-soft: rgba(157, 0, 6, 0.1);
+  --mdq-danger-ink: #7a0005;
+  --mdq-danger-line: #9d0006;
+  --mdq-danger-wash: linear-gradient(135deg, #f8eeed, #f1e0df);
+  --mdq-info: #076678;
+  --mdq-info-text: #076678;
+  --mdq-on-info: #fbf1c7;
+  --mdq-info-soft: rgba(7, 102, 120, 0.1);
+  --mdq-info-ink: #054f5d;
+  --mdq-info-line: #076678;
+  --mdq-bar: #af3a03;
+  --mdq-on-bar: #fbf1c7;
+  --mdq-bar-muted: #665c54;
+  --mdq-on-bar-muted: #fbf1c7;
+  --mdq-bar-wash: rgba(175, 58, 3, 0.16);
+  --mdq-timer-ok: #66620d;
+  --mdq-timer-warn: #8a5a0a;
+  --mdq-timer-urgent: #9d0006;
+  --mdq-timer-track: #d5d8d0;
+  --mdq-rank-first: #7a4f08;
+  --mdq-rank-second: #504945;
+  --mdq-rank-third: #8f3002;
+  --mdq-page-glow-top: transparent;
+  --mdq-page-glow-cool: transparent;
+  --mdq-page-glow-warm: transparent;
   background: #eff0ec;
 }
 
@@ -594,6 +724,71 @@ html[data-palette="gruvbox"][data-theme="light"] .slide-surface .quiz-html pre {
 
 html[data-palette="gruvbox"][data-theme="light"] .slide-surface .quiz-html strong {
   color: #282828;
+}
+
+/* Question and reveal text outside the slide canvas. */
+html[data-palette="gruvbox"]:not([data-theme="light"]) .quiz-html code,
+html[data-palette="gruvbox"]:not([data-theme="light"]) .quiz-html pre {
+  background: #1d2021;
+  color: #ebdbb2;
+}
+
+html[data-palette="gruvbox"][data-theme="light"] .quiz-html code,
+html[data-palette="gruvbox"][data-theme="light"] .quiz-html pre {
+  background: #e1e3dd;
+  color: #3c3836;
+}
+
+/* The dark selection-mode card and chips carry classic purple and green in
+   their base rules; the light theme already reads the tokens. */
+html[data-palette="gruvbox"]:not([data-theme="light"]) .selection-mode-card-single {
+  border-color: rgba(254, 128, 25, 0.34);
+  background: linear-gradient(135deg, #3c3836, #32302f);
+}
+
+html[data-palette="gruvbox"]:not([data-theme="light"]) .selection-mode-card-single::after {
+  background: rgba(254, 128, 25, 0.22);
+}
+
+html[data-palette="gruvbox"]:not([data-theme="light"]) .selection-mode-card-multi {
+  border-color: rgba(142, 192, 124, 0.32);
+  background: linear-gradient(135deg, #3c3836, #32302f);
+}
+
+html[data-palette="gruvbox"]:not([data-theme="light"]) .selection-mode-card-multi::after {
+  background: rgba(142, 192, 124, 0.2);
+}
+
+html[data-palette="gruvbox"]:not([data-theme="light"]) .selection-mode-label {
+  color: #fbf1c7;
+}
+
+html[data-palette="gruvbox"]:not([data-theme="light"]) .selection-mode-text {
+  color: #d5c4a1;
+}
+
+html[data-palette="gruvbox"]:not([data-theme="light"]) .selection-mode-chip-single {
+  color: #fe8019;
+  border-color: rgba(254, 128, 25, 0.4);
+  background: #1d2021;
+}
+
+html[data-palette="gruvbox"]:not([data-theme="light"]) .selection-mode-chip-multi {
+  color: #8ec07c;
+  border-color: rgba(142, 192, 124, 0.4);
+  background: #1d2021;
+}
+
+html[data-palette="gruvbox"]:not([data-theme="light"]) .leaderboard-row.rank-first {
+  --leaderboard-rank-color: #fabd2f;
+}
+
+html[data-palette="gruvbox"]:not([data-theme="light"]) .leaderboard-row.rank-second {
+  --leaderboard-rank-color: #d5c4a1;
+}
+
+html[data-palette="gruvbox"]:not([data-theme="light"]) .leaderboard-row.rank-third {
+  --leaderboard-rank-color: #fe8019;
 }
 
 /* ── Light-theme media canvas ───────────── */
@@ -941,7 +1136,7 @@ html[data-theme="light"] .image-expansion-close:focus-visible {
 }
 
 .slide-action-button-primary {
-  border-color: rgba(179, 102, 255, 0.56);
+  border-color: color-mix(in srgb, var(--mdq-accent, #b366ff) 56%, transparent);
   color: var(--mdq-slide-accent);
 }
 
@@ -965,8 +1160,8 @@ html[data-theme="light"] .image-expansion-close:focus-visible {
 }
 
 .slide-action-button-danger {
-  border-color: rgba(190, 63, 103, 0.48);
-  color: #ee7a9e;
+  border-color: color-mix(in srgb, var(--mdq-danger-line, #be3f67) 60%, transparent);
+  color: var(--mdq-danger-text, #ee7a9e);
 }
 
 .slide-status-pill {
@@ -978,8 +1173,8 @@ html[data-theme="light"] .image-expansion-close:focus-visible {
   max-width: min(32rem, 42cqi);
   overflow: hidden;
   border-radius: 0.46rem;
-  background: rgba(255, 253, 247, 0.055);
-  color: rgba(255, 253, 247, 0.68);
+  background: color-mix(in srgb, var(--mdq-slide-ink) 7%, transparent);
+  color: var(--mdq-slide-ink-soft);
   padding: 0.34rem 0.56rem;
   font-size: 0.64rem;
   font-weight: 700;
@@ -993,13 +1188,13 @@ html[data-theme="light"] .image-expansion-close:focus-visible {
 }
 
 .slide-status-pill-success {
-  background: rgba(53, 166, 77, 0.08);
-  color: rgba(143, 231, 159, 0.78);
+  background: var(--mdq-success-soft);
+  color: var(--mdq-success-text);
 }
 
 .slide-status-pill-warning {
-  background: rgba(216, 211, 82, 0.08);
-  color: rgba(226, 220, 85, 0.78);
+  background: var(--mdq-warning-soft);
+  color: var(--mdq-warning-text);
 }
 
 .slide-next-up {
@@ -2601,7 +2796,7 @@ html[data-theme="light"] .mdq-orbit-callout {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  color: #71717a;
+  color: #57534e;
   font-size: clamp(0.54rem, 0.78cqi, 0.66rem);
   font-weight: 850;
   letter-spacing: 0;
@@ -2621,7 +2816,7 @@ html[data-theme="light"] .mdq-orbit-callout {
 
 .session-code-card-meta {
   grid-column: 1;
-  color: #71717a;
+  color: #57534e;
   font-size: 0.7rem;
   font-weight: 800;
   line-height: 1;
@@ -2639,7 +2834,7 @@ html[data-theme="light"] .mdq-orbit-callout {
   justify-content: center;
   border: 1px solid rgba(36, 34, 31, 0.14);
   border-radius: 999px;
-  color: #71717a;
+  color: #57534e;
   font-size: 0.9rem;
   font-weight: 900;
   line-height: 1;
@@ -2739,7 +2934,7 @@ html[data-theme="light"] .mdq-orbit-callout {
 .fixed-session-code-card .session-code-card-kicker,
 .fixed-session-code-card .session-code-card-meta,
 .fixed-session-code-card .session-code-card-icon {
-  color: #71717a;
+  color: #57534e;
 }
 
 .fixed-session-code-card .session-code-card-toggle strong,
@@ -3464,9 +3659,10 @@ html[data-theme="light"] .mdq-orbit-callout {
 .bar-fill { transition: width 0.35s cubic-bezier(0.22, 1, 0.36, 1); }
 
 /* ── Timer urgency ───────────────────────── */
+/* Pulse by size, not opacity, so the urgent count keeps its contrast. */
 @keyframes timer-pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.5; }
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.08); }
 }
 .timer-urgent { animation: timer-pulse 0.5s ease-in-out infinite; }
 
@@ -4365,6 +4561,17 @@ html[data-theme="light"] .open-response-list {
 html[data-theme="light"] .open-response-entry {
   border-color: #59574f;
   background: #41413f;
+}
+
+/* The dark entry card keeps light ink in both themes; the light theme's
+   zinc text mapping would otherwise turn it dark-on-dark. */
+html[data-theme] .open-response-entry .open-response-student-id,
+html[data-theme] .open-response-entry .open-response-display-name {
+  color: #fffaf1 !important;
+}
+
+html[data-theme] .open-response-entry .open-response-text {
+  color: #ffffff !important;
 }
 
 

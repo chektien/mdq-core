@@ -39,6 +39,7 @@ function contrast(a: string, b: string): number {
 describe("client slide palette contract", () => {
   describe("per-deck palette application", () => {
     const theme = read("theme.ts");
+    const appearance = read("appearance.ts");
     const app = read("App.tsx");
     const main = read("main.tsx");
     const instructor = read("views/InstructorView.tsx");
@@ -47,8 +48,8 @@ describe("client slide palette contract", () => {
     const socket = read("hooks/useSocket.ts");
 
     it("normalizes and applies only supported palettes, defaulting to classic", () => {
-      expect(theme).toContain('DEFAULT_CLIENT_PALETTE: DeckPalette = "classic"');
-      expect(theme).toContain('palette === "classic" || palette === "gruvbox"');
+      expect(appearance).toContain('DEFAULT_CLIENT_PALETTE: DeckPalette = "classic"');
+      expect(appearance).toContain('palette === "classic" || palette === "gruvbox"');
       expect(theme).toContain("document.documentElement.dataset.palette = resolved");
     });
 

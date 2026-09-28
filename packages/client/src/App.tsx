@@ -228,11 +228,15 @@ function InstructorGate({
   const [checking, setChecking] = useState(true);
   const [authenticated, setAuthenticated] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [restoring] = useState(hasStoredInstructorRestore);
 
   useEffect(() => {
+    // A stored live session gets its deck theme from InstructorView; applying
+    // the default first would flash it. The login prompt still needs a theme.
+    if (restoring && (checking || authenticated)) return;
     applyClientTheme(defaultTheme);
     applyClientPalette(defaultPalette);
-  }, [defaultPalette, defaultTheme]);
+  }, [authenticated, checking, defaultPalette, defaultTheme, restoring]);
 
   useEffect(() => {
     fetchInstructorSessionStatus()

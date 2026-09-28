@@ -27,8 +27,8 @@ export default function DistributionChart({
         const isCorrect = showCorrect && correctOptions?.includes(label);
         const barColor = showCorrect
           ? isCorrect
-            ? "bg-emerald-500"
-            : "bg-zinc-600"
+            ? "dist-bar-correct bg-emerald-500"
+            : "dist-bar-muted bg-zinc-600"
           : "bg-indigo-500";
 
         return (
@@ -41,13 +41,13 @@ export default function DistributionChart({
             >
               {label}
             </span>
-            <div className="flex-1 bg-zinc-800 rounded-full h-8 overflow-hidden">
+            <div className="dist-bar-track flex-1 bg-zinc-800 rounded-full h-8 overflow-hidden">
               <div
-                className={`bar-fill h-full rounded-full ${barColor} flex items-center justify-end pr-3`}
+                className={`dist-bar bar-fill h-full rounded-full ${barColor} flex items-center justify-end pr-3`}
                 style={{ width: `${Math.max(pct, 2)}%` }}
               >
                 {count > 0 && (
-                  <span className="text-white text-sm font-semibold tabular-nums">
+                  <span className="dist-bar-label text-white text-sm font-semibold tabular-nums">
                     {count} ({percentageBase > 0 ? Math.round((count / percentageBase) * 100) : 0}%)
                   </span>
                 )}

@@ -21,13 +21,14 @@ export default function Timer({
       : `${remainingSec}`;
   const labelFontSize = label.length >= 4 ? size * 0.26 : size * 0.32;
 
-  // Color transitions: green -> yellow -> red
+  // Color transitions: green -> yellow -> red. The theme and palette set
+  // these tokens (theme.css, index.css) so the ring and count keep contrast.
   const color =
     remainingSec > totalSec * 0.5
-      ? "#22c55e"
+      ? "var(--mdq-timer-ok, #22c55e)"
       : remainingSec > totalSec * 0.2
-        ? "#eab308"
-        : "#ef4444";
+        ? "var(--mdq-timer-warn, #eab308)"
+        : "var(--mdq-timer-urgent, #ef4444)";
 
   return (
     <div
@@ -41,7 +42,7 @@ export default function Timer({
           cy={size / 2}
           r={radius}
           fill="none"
-          stroke="#e7d9c4"
+          style={{ stroke: "var(--mdq-timer-track, #e7d9c4)" }}
           strokeWidth="8"
         />
         {/* Progress arc */}
@@ -50,12 +51,11 @@ export default function Timer({
           cy={size / 2}
           r={radius}
           fill="none"
-          stroke={color}
           strokeWidth="8"
           strokeLinecap="round"
           strokeDasharray={circumference}
           strokeDashoffset={offset}
-          style={{ transition: "stroke-dashoffset 0.3s linear, stroke 0.5s" }}
+          style={{ stroke: color, transition: "stroke-dashoffset 0.3s linear, stroke 0.5s" }}
         />
       </svg>
       <span

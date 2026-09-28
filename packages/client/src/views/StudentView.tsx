@@ -132,18 +132,25 @@ export default function StudentView({
   const sock = useSocket(sessionId, "student");
   const { connected, sessionToken, joinSession, error: sockError } = sock;
 
-  useEffect(() => {
-    applyClientTheme(sessionTheme, defaultTheme);
-  }, [defaultTheme, sessionTheme]);
+  // Hold the theme until the deck's own theme is known (join-link lookup or
+  // stored session), so a reload never flashes the default theme first.
+  const [appearanceReady, setAppearanceReady] = useState(false);
 
   useEffect(() => {
+    if (!appearanceReady) return;
+    applyClientTheme(sessionTheme, defaultTheme);
+  }, [appearanceReady, defaultTheme, sessionTheme]);
+
+  useEffect(() => {
+    if (!appearanceReady) return;
     applyClientPalette(sessionPalette, defaultPalette);
-  }, [defaultPalette, sessionPalette]);
+  }, [appearanceReady, defaultPalette, sessionPalette]);
 
   // Resolve QR/join links early so the join form itself uses the deck theme.
   useEffect(() => {
     if (!initialSessionCode) return;
     let cancelled = false;
+    setAppearanceReady(false);
     setSessionTheme(defaultTheme);
     setSessionPalette(defaultPalette);
     setQuizKey(null);
@@ -161,6 +168,9 @@ export default function StudentView({
       })
       .catch(() => {
         // The submit path reports lookup errors; theme preloading is best-effort.
+      })
+      .finally(() => {
+        if (!cancelled) setAppearanceReady(true);
       });
     return () => {
       cancelled = true;
@@ -204,6 +214,7 @@ export default function StudentView({
       // ignore
     }
     setCompleted(false);
+    if (!initialSessionCode) setAppearanceReady(true);
   }, [defaultPalette, defaultTheme, initialSessionCode, initialSessionId]);
 
   const handleDone = useCallback(() => {
@@ -745,7 +756,7 @@ function QuestionView({
                         ? "border-indigo-500 bg-indigo-600/10"
                         : "border-zinc-700 bg-zinc-800/80"
                   }
-                  ${disabled ? "opacity-70" : "active:scale-[0.97]"}
+                  ${disabled ? "option-btn-locked" : "active:scale-[0.97]"}
                 `}
               >
                 <span

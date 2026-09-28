@@ -152,6 +152,15 @@ export default function InstructorView({
   const [restoredQuestionCache, setRestoredQuestionCache] = useState<Record<number, QuestionState>>({});
   const [restoredRevealCache, setRestoredRevealCache] = useState<Record<number, RevealState>>({});
   const [pendingRestore, setPendingRestore] = useState<StoredInstructorRestore | null>(null);
+  // While a stored live session restores, keep the current theme instead of
+  // flashing the default before the deck's own theme arrives.
+  const [holdAppearance, setHoldAppearance] = useState(() => {
+    try {
+      return Boolean(sessionStorage.getItem(INSTRUCTOR_RESTORE_KEY));
+    } catch {
+      return false;
+    }
+  });
   const restoreAttemptedRef = useRef(false);
   const actionInFlightRef = useRef(false);
   // Presenter notes (instructor-only). Populated from the instructor-
@@ -234,6 +243,7 @@ export default function InstructorView({
       setQuizLabel(formatQuizLabel(snapshot.week));
       setSessionTheme(snapshot.theme);
       setSessionPalette(snapshot.palette);
+      setHoldAppearance(false);
       setRestoredQuestionCache(
         Object.fromEntries(
           (snapshot.reviewQuestions || []).map((question) => {
@@ -277,6 +287,7 @@ export default function InstructorView({
       }
     } finally {
       setLoading(false);
+      setHoldAppearance(false);
     }
   }, []);
 
@@ -292,11 +303,14 @@ export default function InstructorView({
       }
     } catch {
       clearInstructorRestore();
+      setHoldAppearance(false);
       return;
     }
 
     if (stored?.sessionId) {
       void restoreInstructorSession(stored);
+    } else {
+      setHoldAppearance(false);
     }
   }, [restoreInstructorSession]);
 
@@ -409,11 +423,13 @@ export default function InstructorView({
   const sid = sessionInfo?.sessionId ?? "";
   const selectedDeck = decks.find((deck) => deck.week === selectedWeek);
   useEffect(() => {
+    if (holdAppearance) return;
     applyClientTheme(sessionTheme ?? selectedDeck?.theme, defaultTheme);
-  }, [defaultTheme, selectedDeck?.theme, sessionTheme]);
+  }, [defaultTheme, holdAppearance, selectedDeck?.theme, sessionTheme]);
   useEffect(() => {
+    if (holdAppearance) return;
     applyClientPalette(sessionPalette ?? selectedDeck?.palette, defaultPalette);
-  }, [defaultPalette, selectedDeck?.palette, sessionPalette]);
+  }, [defaultPalette, holdAppearance, selectedDeck?.palette, sessionPalette]);
   const filteredDecks = decks.filter((deck) => {
     const query = deckFilter.trim().toLowerCase();
     if (!query) return true;
