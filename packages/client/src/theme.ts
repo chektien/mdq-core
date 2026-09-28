@@ -1,22 +1,28 @@
 import type { DeckPalette, DeckTheme } from "@mdq/shared";
+import {
+  DEFAULT_CLIENT_PALETTE,
+  DEFAULT_CLIENT_THEME,
+  resolveClientPalette,
+  resolveClientTheme,
+} from "./appearance";
 
-export const DEFAULT_CLIENT_THEME: DeckTheme = "dark";
-export const DEFAULT_CLIENT_PALETTE: DeckPalette = "classic";
+export {
+  DEFAULT_CLIENT_PALETTE,
+  DEFAULT_CLIENT_THEME,
+  readServedAppearance,
+  resolveBootAppearance,
+  resolveClientPalette,
+  resolveClientTheme,
+} from "./appearance";
 
-export function resolveClientTheme(theme: unknown, fallback: DeckTheme = DEFAULT_CLIENT_THEME): DeckTheme {
-  if (theme === "light" || theme === "dark") return theme;
-  return fallback;
-}
+// <html data-theme data-palette> is the single place the appearance lives.
+// Until a view sets data-theme, index.css keeps the page unpainted and the
+// app hidden, so views apply a theme only once they know which one applies.
 
 export function applyClientTheme(theme: unknown, fallback: DeckTheme = DEFAULT_CLIENT_THEME): DeckTheme {
   const resolved = resolveClientTheme(theme, fallback);
   document.documentElement.dataset.theme = resolved;
   return resolved;
-}
-
-export function resolveClientPalette(palette: unknown, fallback: DeckPalette = DEFAULT_CLIENT_PALETTE): DeckPalette {
-  if (palette === "classic" || palette === "gruvbox") return palette;
-  return fallback;
 }
 
 export function applyClientPalette(palette: unknown, fallback: DeckPalette = DEFAULT_CLIENT_PALETTE): DeckPalette {

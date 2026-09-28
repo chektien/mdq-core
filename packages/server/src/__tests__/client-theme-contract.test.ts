@@ -8,13 +8,14 @@ const read = (rel: string): string =>
 describe("client light-theme contract", () => {
   describe("per-deck theme application", () => {
     const theme = read("theme.ts");
+    const appearance = read("appearance.ts");
     const instructor = read("views/InstructorView.tsx");
     const student = read("views/StudentView.tsx");
     const presentation = read("views/PresentationView.tsx");
     const socket = read("hooks/useSocket.ts");
 
     it("normalizes and applies only supported themes", () => {
-      expect(theme).toContain('theme === "light" || theme === "dark"');
+      expect(appearance).toContain('theme === "light" || theme === "dark"');
       expect(theme).toContain("document.documentElement.dataset.theme = resolved");
     });
 

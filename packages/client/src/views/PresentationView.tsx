@@ -52,13 +52,17 @@ export default function PresentationView({
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const sock = useSocket(meta ? sessionId : null, "presentation");
 
+  // Keep the current (or served) theme while the session loads, so the
+  // projector never flashes the default theme before the deck's own.
   useEffect(() => {
+    if (loading) return;
     applyClientTheme(meta?.theme, defaultTheme);
-  }, [defaultTheme, meta?.theme]);
+  }, [defaultTheme, loading, meta?.theme]);
 
   useEffect(() => {
+    if (loading) return;
     applyClientPalette(meta?.palette, defaultPalette);
-  }, [defaultPalette, meta?.palette]);
+  }, [defaultPalette, loading, meta?.palette]);
 
   useEffect(() => {
     let cancelled = false;
