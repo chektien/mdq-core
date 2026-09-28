@@ -42,6 +42,79 @@ D. 6
       expect(question.timeLimitSec).toBe(DEFAULT_TIME_LIMIT_SEC);
     });
 
+    it("parses explicit multiple_choice like the implicit default", () => {
+      const md = `# Quiz
+
+---
+
+## Topic
+
+**Which option is correct?**
+
+A. First
+B. Second
+
+> Correct Answer: B
+
+---
+`;
+      const implicit = parseQuizMarkdown(md, "week01.md");
+      const explicit = parseQuizMarkdown(md.replace("## Topic", "## Topic\ntype: multiple_choice"), "week01.md");
+      expect(implicit.errors).toHaveLength(0);
+      expect(explicit.errors).toHaveLength(0);
+      expect(explicit.quiz!.questions[0]).toEqual(implicit.quiz!.questions[0]);
+      expect(explicit.quiz!.questions[0].textMd).toBe("**Which option is correct?**");
+    });
+
+    it.each(["type: multiple-choice", "question_type: multiple-choice", "question-type: multiple-choice"])(
+      "parses %s like multiple_choice",
+      (typeLine) => {
+        const md = `# Quiz
+
+---
+
+## Topic
+type: multiple_choice
+
+**Which option is correct?**
+
+A. First
+B. Second
+
+> Correct Answer: B
+
+---
+`;
+        const canonical = parseQuizMarkdown(md, "week01.md");
+        const hyphenated = parseQuizMarkdown(md.replace("type: multiple_choice", typeLine), "week01.md");
+        expect(hyphenated.errors).toHaveLength(0);
+        expect(hyphenated.quiz!.questions[0]).toEqual(canonical.quiz!.questions[0]);
+      },
+    );
+
+    it.each(["type: open-response", "question_type: open-response", "question-type: open-response"])(
+      "parses %s like open_response",
+      (typeLine) => {
+        const md = `# Quiz
+
+---
+
+## Reflection
+type: open_response
+
+Share one takeaway.
+
+---
+`;
+        const canonical = parseQuizMarkdown(md, "week01.md");
+        const hyphenated = parseQuizMarkdown(md.replace("type: open_response", typeLine), "week01.md");
+        expect(canonical.errors).toHaveLength(0);
+        expect(hyphenated.errors).toHaveLength(0);
+        expect(hyphenated.quiz!.questions[0]).toEqual(canonical.quiz!.questions[0]);
+        expect(hyphenated.quiz!.questions[0].textMd).toBe("Share one takeaway.");
+      },
+    );
+
     it("parses time_limit field", () => {
       const md = `# Quiz
 
@@ -609,6 +682,34 @@ B. No
   });
 
   describe("validation errors", () => {
+    it.each(["type", "question_type", "question-type"])(
+      "rejects unknown hyphenated %s values like their underscore forms",
+      (key) => {
+        const md = `# Quiz
+
+---
+
+## Topic
+${key}: not-supported
+
+**Question?**
+
+A. Yes
+B. No
+
+> Correct Answer: A
+
+---
+`;
+        const hyphenated = parseQuizMarkdown(md, "week01.md");
+        const underscored = parseQuizMarkdown(md.replace("not-supported", "not_supported"), "week01.md");
+        expect(hyphenated.quiz).toBeNull();
+        expect(hyphenated.errors).toHaveLength(1);
+        expect(hyphenated.errors[0].detail).toBe("Unsupported type: not_supported");
+        expect(hyphenated.errors[0].message).toBe(underscored.errors[0].message);
+      },
+    );
+
     it("rejects correct answers on open_response questions", () => {
       const md = `# Quiz
 
@@ -899,6 +1000,18 @@ B. No
 
   describe("sample deck files", () => {
     const quizDir = path.join(__dirname, "fixtures/quizzes");
+
+    it("parses all public sample decks", () => {
+      const samplesDir = path.resolve(__dirname, "../../../../samples/decks");
+      const sampleFiles = fs.readdirSync(samplesDir).filter((file) => file.endsWith(".md"));
+      expect(sampleFiles.length).toBeGreaterThan(0);
+      for (const file of sampleFiles) {
+        const md = fs.readFileSync(path.join(samplesDir, file), "utf-8");
+        const result = parseQuizMarkdown(md, file);
+        expect(result.errors).toEqual([]);
+        expect(result.quiz!.questions.length).toBeGreaterThan(0);
+      }
+    });
 
     it("parses week01.md", () => {
       const md = fs.readFileSync(path.join(quizDir, "week01.md"), "utf-8");
