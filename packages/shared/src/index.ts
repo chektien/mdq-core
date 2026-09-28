@@ -65,12 +65,27 @@ export interface StudentJoinPayload {
   clientInstanceId?: string;
 }
 
+/**
+ * One of the joining student's own earlier submissions. `selectedOptions`
+ * holds zero-based positions in the question's `options` list.
+ */
+export interface StudentAnswer {
+  questionIndex: number;
+  selectedOptions: number[];
+  responseText?: string;
+}
+
 export interface StudentJoinedPayload {
   participantId: string;
   sessionToken: string;
   sessionState: SessionState;
   currentQuestion?: number;
   answeredQuestions?: number[]; // question indices already answered
+  /**
+   * The joining student's own submissions, so a reloaded page can show what
+   * they chose. Sent only to that student; never includes anyone else's.
+   */
+  answers?: StudentAnswer[];
 }
 
 export interface StudentRejectedPayload {

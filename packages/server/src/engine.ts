@@ -1,6 +1,6 @@
 import {
   Quiz, Session, SessionState, SocketEvents, QuestionOpenPayload, FoldoutNote,
-  StudentJoinPayload, AnswerSubmitPayload, Participant, STATE_TRANSITIONS,
+  StudentJoinPayload, AnswerSubmitPayload, Participant, STATE_TRANSITIONS, StudentAnswer,
 } from "@mdq/shared";
 import {
   StateTransitionError, computeLeaderboard, getAnsweredQuestions, getDistribution,
@@ -64,6 +64,18 @@ const revealPayload = (session: Session, quiz: Quiz) => {
     openResponses: isOpenResponseQuestion(q) ? getOpenResponses(session, session.currentQuestionIndex) : undefined,
   };
 };
+/** One student's own submissions, with option labels turned into option positions. */
+const ownAnswers = (session: Session, quiz: Quiz, studentId: string): StudentAnswer[] => session.submissions
+  .filter((s) => s.studentId === studentId)
+  .map((s) => {
+    const options = quiz.questions[s.questionIndex]?.options ?? [];
+    return {
+      questionIndex: s.questionIndex,
+      selectedOptions: s.selectedOptions.map((label) => options.findIndex((o) => o.label === label)).filter((i) => i >= 0),
+      ...(s.responseText ? { responseText: s.responseText } : {}),
+    };
+  })
+  .sort((a, b) => a.questionIndex - b.questionIndex);
 const leaderboardPayload = (session: Session, quiz: Quiz) => ({
   entries: computeLeaderboard(session, buildScoredCorrectAnswersMap(quiz)),
   totalQuestions: getScoredQuestionCount(quiz),
@@ -197,7 +209,7 @@ export function apply(input: Session, quiz: Quiz, command: Command, now: number)
       }
       emit(SocketEvents.STUDENT_JOINED, { participantId: id, sessionToken: participant.sessionToken,
         sessionState: session.state, currentQuestion: session.currentQuestionIndex >= 0 ? session.currentQuestionIndex : undefined,
-        answeredQuestions: getAnsweredQuestions(session, id) }, `participant:${id}`);
+        answeredQuestions: getAnsweredQuestions(session, id), answers: ownAnswers(session, quiz, id) }, `participant:${id}`);
       emit(SocketEvents.SESSION_PARTICIPANTS, participantsPayload(session), "staff");
       if (session.state === "QUESTION_OPEN" && session.currentQuestionIndex >= 0) emit(SocketEvents.ANSWER_COUNT, countPayload(session, quiz), "staff");
       messages.push(...snapshotMessages(session, quiz, now, `participant:${id}`, false, isReconnect));

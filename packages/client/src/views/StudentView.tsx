@@ -28,6 +28,26 @@ function clearSessionArtifacts(): void {
   }
 }
 
+/** How long to show "Reconnecting…" before falling back to the join form. */
+const REJOIN_GRACE_MS = 10_000;
+
+/**
+ * True when this page will rejoin with a stored seat on load: the same rule
+ * the restore effect and the socket auto-rejoin use.
+ */
+function hasStoredSeat(initialSessionId?: string, initialSessionCode?: string): boolean {
+  try {
+    const raw = localStorage.getItem("mdquiz_session");
+    if (!raw) return false;
+    const stored = JSON.parse(raw);
+    if (typeof stored?.sessionToken !== "string" || !stored.sessionToken || typeof stored.sessionId !== "string") return false;
+    const targetSessionId = (initialSessionId || "").trim();
+    return targetSessionId ? stored.sessionId === targetSessionId : !initialSessionCode && Boolean(stored.sessionId);
+  } catch {
+    return false;
+  }
+}
+
 function createGeneratedStudentId(): string {
   const randomPart =
     typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
@@ -78,6 +98,9 @@ export default function StudentView({
   const [joinError, setJoinError] = useState<string | null>(null);
   const [joining, setJoining] = useState(false);
   const [completed, setCompleted] = useState(false);
+  // A student with a stored seat sees "Reconnecting…" rather than the join
+  // form while the automatic rejoin runs.
+  const [awaitingRejoin, setAwaitingRejoin] = useState(() => hasStoredSeat(initialSessionId, initialSessionCode));
 
   // Sync route-provided code to input deterministically.
   useEffect(() => {
@@ -299,6 +322,17 @@ export default function StudentView({
     if (sessionToken) setJoining(false);
   }, [sessionToken]);
 
+  // Stop waiting for the automatic rejoin once it succeeds, fails, or takes too long.
+  useEffect(() => {
+    if (!awaitingRejoin) return;
+    if (sessionToken || sockError) {
+      setAwaitingRejoin(false);
+      return;
+    }
+    const timer = setTimeout(() => setAwaitingRejoin(false), REJOIN_GRACE_MS);
+    return () => clearTimeout(timer);
+  }, [awaitingRejoin, sessionToken, sockError]);
+
   useEffect(() => {
     if (sockError) {
       const lowered = sockError.toLowerCase();
@@ -317,6 +351,16 @@ export default function StudentView({
       <div className="min-h-dvh flex flex-col items-center justify-center gap-4 p-6 text-center">
         <h2 className="text-2xl font-bold text-white">Done</h2>
         <p className="text-zinc-400 text-sm max-w-md">Your session is complete. You can close this tab.</p>
+      </div>
+    );
+  }
+
+  // ── Rejoining with a stored seat ──
+  if (!sock.sessionToken && awaitingRejoin && !joinError) {
+    return (
+      <div className="min-h-dvh flex flex-col items-center justify-center gap-4 p-6" role="status" aria-live="polite">
+        <div className="w-12 h-12 border-4 border-zinc-600 border-t-transparent rounded-full animate-spin" />
+        <p className="text-zinc-400 text-sm">Reconnecting&hellip;</p>
       </div>
     );
   }

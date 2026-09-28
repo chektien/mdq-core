@@ -96,7 +96,7 @@ it("joins, answers and disconnects without changing the supplied session", () =>
   const joined = apply(input, quiz, { type: "join", socketId: "socket-1", newToken: "token-1", payload: { studentId: "S1", displayName: "Sam" } }, 2000);
   expect(input.participants.size).toBe(0);
   expect(joined.messages[0]).toEqual({ audience: "participant:S1", event: SocketEvents.STUDENT_JOINED,
-    payload: { participantId: "S1", sessionToken: "token-1", sessionState: "QUESTION_OPEN", currentQuestion: 0, answeredQuestions: [] } });
+    payload: { participantId: "S1", sessionToken: "token-1", sessionState: "QUESTION_OPEN", currentQuestion: 0, answeredQuestions: [], answers: [] } });
   const answered = apply(joined.session, quiz, { type: "answerSubmit", studentId: "S1", payload: { questionIndex: 0, selectedOptions: ["A"] } }, 3000);
   expect(joined.session.submissions).toHaveLength(0);
   expect(answered.messages).toEqual([
@@ -122,7 +122,7 @@ for (const state of states) {
     expect(result.session.participants.get("S1")?.sessionToken).toBe("token");
     expect(result.messages[0]).toEqual({ audience: "participant:S1", event: SocketEvents.STUDENT_JOINED,
       payload: { participantId: "S1", sessionToken: "token", sessionState: state,
-        currentQuestion: state === "LOBBY" ? undefined : 0, answeredQuestions: [] } });
+        currentQuestion: state === "LOBBY" ? undefined : 0, answeredQuestions: [], answers: [] } });
     expect(input.participants.size).toBe(0);
   });
 
