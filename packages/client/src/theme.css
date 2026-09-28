@@ -775,9 +775,32 @@ html[data-theme] .dist-bar .dist-bar-label {
   color: inherit !important;
 }
 
-/* The QR panel stays white in both themes for scanning. */
-html[data-theme] .instructor-qr-panel [class*="text-zinc-500"] {
+/* The QR panel stays white in both themes for scanning. Its labels use dark
+   stone text, so the panel paints its own white surface instead of relying on
+   the utility background, and the dark text is scoped to the labels that sit
+   on that surface. */
+html[data-theme] .instructor-qr-panel {
+  background: #ffffff !important;
+  color: #1c1917;
+}
+
+html[data-theme] .instructor-qr-panel .instructor-qr-code-label,
+html[data-theme] .instructor-qr-panel .instructor-qr-helper {
   color: #57534e !important;
+}
+
+html[data-theme] .instructor-qr-panel .instructor-qr-code {
+  color: #1c1917 !important;
+}
+
+/* Link and outline button on the white panel: 4.5:1 text, 3:1 outline. */
+html[data-theme] .instructor-qr-panel .instructor-qr-url {
+  color: var(--mdq-qr-link, #4f46e5) !important;
+}
+
+html[data-theme] .instructor-qr-panel .instructor-qr-presentation-link {
+  border-color: #78716c !important;
+  color: #44403c !important;
 }
 
 @media (max-width: 640px) {

@@ -619,6 +619,12 @@ html[data-palette="gruvbox"]:not([data-theme="light"]) .slide-surface .quiz-html
   color: #fbf1c7;
 }
 
+/* Gruvbox link on the white join QR panel (theme.css). */
+html[data-palette="gruvbox"][data-theme="dark"] .instructor-qr-panel,
+html[data-palette="gruvbox"][data-theme="light"] .instructor-qr-panel {
+  --mdq-qr-link: #076678;
+}
+
 html[data-palette="gruvbox"][data-theme="light"] {
   --mdq-slide-bg: #eff0ec;
   --mdq-slide-bg-soft: #e3e5e0;
