@@ -541,7 +541,7 @@ export default function StudentView({
         {state === "ENDED" && (
           <button
             onClick={handleDone}
-            className="bg-zinc-800 hover:bg-zinc-700 text-white font-semibold py-3 px-8 rounded-xl transition-colors text-sm mt-4"
+            className="student-done-button bg-zinc-800 hover:bg-zinc-700 text-white font-semibold py-3 px-8 rounded-xl transition-colors text-sm mt-4"
           >
             Done
           </button>
@@ -705,7 +705,7 @@ function QuestionView({
           Q{positionLabel}
         </span>
         {!isClosed && (
-          <Timer remainingSec={remainingSec} totalSec={question.timeLimitSec} size={56} />
+          <Timer remainingSec={remainingSec} totalSec={question.timeLimitSec} size={64} />
         )}
         {isClosed && (
           <span className="text-amber-400 text-sm font-medium">Time's up</span>

@@ -19,7 +19,10 @@ export default function Timer({
     remainingSec >= 60
       ? `${Math.floor(remainingSec / 60)}:${String(remainingSec % 60).padStart(2, "0")}`
       : `${remainingSec}`;
-  const labelFontSize = label.length >= 4 ? size * 0.26 : size * 0.32;
+  // Keep the count inside the ring: the inner diameter is size - 20 (radius
+  // minus half the 8px stroke), and a monospace digit is about 0.6em wide.
+  const fitFontSize = (0.8 * (size - 20)) / (label.length * 0.6);
+  const labelFontSize = Math.min(label.length >= 4 ? size * 0.26 : size * 0.32, fitFontSize);
 
   // Color transitions: green -> yellow -> red. The theme and palette set
   // these tokens (theme.css, index.css) so the ring and count keep contrast.

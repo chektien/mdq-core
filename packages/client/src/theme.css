@@ -565,7 +565,7 @@ html[data-theme="light"] .leaderboard-row.rank-third {
 }
 
 html[data-theme="light"] .leaderboard-row.rank-standard {
-  --leaderboard-rank-color: var(--mdq-accent-ink);
+  --leaderboard-rank-color: var(--mdq-muted);
 }
 
 html[data-theme="light"] [class*="bg-[#0f1117]/90"] {
@@ -747,6 +747,31 @@ html[data-theme] .option-btn-locked:not([class~="border-indigo-500"]) .quiz-html
 html[data-theme] input::placeholder,
 html[data-theme] textarea::placeholder {
   color: var(--mdq-soft) !important;
+}
+
+/* A field's own value reads as entered text, not as its placeholder: the
+   placeholder:text-zinc-* utility would otherwise match the soft-ink mapping
+   above and colour the value like the hint. */
+html[data-theme] :is(input, textarea)[class*="placeholder:text-zinc"] {
+  color: var(--mdq-ink) !important;
+}
+
+/* Loading spinners keep their open segment so they read as moving; the
+   border-zinc and border-indigo mappings would otherwise close the ring. */
+html[data-theme] .animate-spin[class*="border-t-transparent"] {
+  border-color: var(--mdq-control-border) !important;
+  border-top-color: transparent !important;
+}
+
+html[data-theme] .animate-spin[class*="border-indigo-600"] {
+  border-color: var(--mdq-accent) !important;
+  border-top-color: transparent !important;
+}
+
+/* Buttons that sit on the page without a fill of their own get the control
+   outline so they read as buttons. */
+html[data-theme] .student-done-button {
+  border: 1px solid var(--mdq-control-border) !important;
 }
 
 /* Student poll distribution bars (DistributionChart). */
