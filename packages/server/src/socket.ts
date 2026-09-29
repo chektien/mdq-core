@@ -116,7 +116,9 @@ export function setupSocket(httpServer: HttpServer, quizzes: Map<string, Quiz>):
     });
     socket.on(SocketEvents.ANSWER_SUBMIT, (payload: AnswerSubmitPayload) => {
       if (!quiz) return;
-      const studentId = (socket as Socket & { _studentId?: string })._studentId;
+      const joinedAs = (socket as Socket & { _studentId?: string })._studentId;
+      // A socket the seat has moved away from (a rejoin, or a seat the presenter freed) can no longer answer for it.
+      const studentId = joinedAs && session.participants.get(joinedAs)?.socketId === socket.id ? joinedAs : undefined;
       const result = apply(session, quiz, { type: "answerSubmit", studentId, payload }, Date.now());
       Object.assign(session, result.session);
       // An unjoined socket has no participant ID, so route its rejection directly.

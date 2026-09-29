@@ -1,6 +1,6 @@
 import express, { type Request, type Response } from "express";
 import cors from "cors";
-import { API, AccessInfo, CumulativeLeaderboardEntry, PublicCumulativeLeaderboardEntry, DeckPalette, DeckTheme, Quiz, ResponseVisibilityRequest, Session, SessionState, usesStudentIds } from "@mdq/shared";
+import { API, AccessInfo, CumulativeLeaderboardEntry, PublicCumulativeLeaderboardEntry, DeckPalette, DeckTheme, Quiz, ReleaseSeatRequest, ResponseVisibilityRequest, Session, SessionState, usesStudentIds } from "@mdq/shared";
 import {
   createSession,
   storeSession,
@@ -784,6 +784,27 @@ export function createApp(quizDirOrOpts?: string | AppOptions) {
         onMessages?.(session, req.params.id, result);
         logActivity(`instructor ${hidden ? "hid" : "showed"} a response session=${req.params.id} q=${questionIndex}`);
         return res.json({ questionIndex, publicKey, hidden });
+      } catch (e) {
+        if (e instanceof EngineCommandError) return res.status(400).json({ error: e.message });
+        throw e;
+      }
+    });
+  });
+
+  // ── Free a participant's seat so they can rejoin from a new device ──
+  app.post(API.SESSION_RELEASE_SEAT, requireInstructorAuth, (req, res) => {
+    withSession(req, res, (session) => {
+      const quiz = getQuizForSession(session.week);
+      if (!quiz) return res.status(500).json({ error: "Quiz data not found" });
+      const { publicKey } = (req.body ?? {}) as Partial<ReleaseSeatRequest>;
+      if (typeof publicKey !== "string" || !publicKey) return res.status(400).json({ error: "Send publicKey." });
+      try {
+        const result = apply(session, quiz, { type: "releaseSeat", role: "control", publicKey, newToken: crypto.randomUUID() }, Date.now());
+        Object.assign(session, result.session);
+        storeSession(session);
+        onMessages?.(session, req.params.id, result);
+        logActivity(`instructor released a seat session=${req.params.id}`);
+        return res.json({ publicKey, released: true });
       } catch (e) {
         if (e instanceof EngineCommandError) return res.status(400).json({ error: e.message });
         throw e;

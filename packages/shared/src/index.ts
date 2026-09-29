@@ -251,6 +251,12 @@ export interface ResponseVisibilityRequest {
   hidden: boolean;
 }
 
+/** The body of the presenter's request to free one participant's seat so they can rejoin from a new device. */
+export interface ReleaseSeatRequest {
+  /** The `publicKey` of the participant, as the instructor's participant list carries it. */
+  publicKey: string;
+}
+
 export interface QuestionOpenPayload {
   questionIndex: number;
   topic: string;
@@ -356,6 +362,11 @@ export interface SessionStatePayload {
 export interface SessionParticipantsPayload {
   count: number;
   participants: { publicKey: string; label: string; studentId?: string; displayName?: string }[];
+  /**
+   * Control only, and only when someone is offline: the seats that have joined but are not
+   * connected now, so the presenter can free one for a new device. `released` is true once freed.
+   */
+  offline?: { publicKey: string; label: string; studentId: string; displayName?: string; released?: boolean }[];
 }
 
 // ── REST API Paths ──────────────────────────
@@ -382,6 +393,7 @@ export const API = {
   SESSION_LEADERBOARD_SHOW: "/api/session/:id/leaderboard-show",
   SESSION_LEADERBOARD_HIDE: "/api/session/:id/leaderboard-hide",
   SESSION_RESPONSE_VISIBILITY: "/api/session/:id/response-visibility",
+  SESSION_RELEASE_SEAT: "/api/session/:id/release-seat",
   SESSION_RESULTS_CSV: "/api/session/:id/results.csv",
   SESSION_STATE_RESTORE: "/api/session/:id/state",
   SESSION_ACCESS_INFO: "/api/session/:id/access-info",
@@ -460,6 +472,8 @@ export interface Participant {
   socketId: string;
   joinedAt: number;
   connected: boolean;
+  /** The presenter freed this seat: the next join with its ID (or name) takes it over and keeps its answers. */
+  released?: boolean;
 }
 
 export interface Submission {
