@@ -1481,13 +1481,319 @@ html[data-palette="ayu"][data-theme="light"] .leaderboard-row.rank-standard {
 }
 
 /* ── Tokyo Night palette (deck palette: tokyo-night) ── */
-/* Rules follow. */
+/* Tokyo Night follows folke's tokyonight.nvim colours (Apache-2.0,
+   https://github.com/folke/tokyonight.nvim, extras/lua/tokyonight_night.lua
+   and tokyonight_day.lua at cdc07ac). Dark is the night style: background
+   #1a1b26, dark #16161e, highlight #292e42, foreground #c0caf5 with fg_dark
+   #a9b1d6, blue #7aa2f7 as the accent, magenta #bb9af7, green #9ece6a, yellow
+   #e0af68, orange #ff9e64, red #f7768e, cyan #7dcfff, and #737aa2 (dark5) for
+   borders and the timer track. Adjusted in dark: small danger text red
+   #f7768e to #ff899d, strong text #c0caf5 mixed 35% toward white (#d6ddf9),
+   soft text #737aa2 mixed toward #a9b1d6 (#8e96bc), and the join QR link is
+   the day blue #2e7de9 darkened to #186fe6 because that panel is white.
+   Light is the day style: background #e1e2e7, bg_dark #d0d5e3, foreground
+   #3760bf, with the brighter #ececef and #f2f2f4 being the background mixed
+   35% and 55% toward white for the slide gradient and cards. Day accents fail
+   4.5:1 on that background, so they are darkened, keeping the hue: text
+   #3760bf to #2a4990 (headings #1f356a), fg_dark #6172b0 to #3f4c7e (muted)
+   and #4e5f9d (soft), blue #2e7de9 to #1355b1 as text and #1769da as a
+   fill, purple #7847bd to #6d3faf, magenta #9854f1 to #7013ea, green #587539
+   to #485f2e, yellow #8c6c3e to #6d5430, red #c64343 to #a03131, cyan
+   #006a83 to #005e75, orange #b15c00 to #894700, and #68709a is #6172b0
+   darkened for borders and the timer track. Leaderboard ranks are darkened
+   from #8c6c3e to #5f492a, #6172b0 to #3d4a7a and #b15c00 to #763e00. Dark is
+   the default theme, so the dark variant also applies when data-theme is
+   absent. */
+html[data-palette="tokyo-night"]:not([data-theme="light"]) {
+  --mdq-slide-bg: #1a1b26;
+  --mdq-slide-bg-soft: #16161e;
+  --mdq-slide-frame: rgba(192, 202, 245, 0.16);
+  --mdq-slide-heading: #7aa2f7;
+  --mdq-slide-ink: #c0caf5;
+  --mdq-slide-ink-soft: #a9b1d6;
+  --mdq-slide-eyebrow: #a9b1d6;
+  --mdq-slide-rule: rgba(192, 202, 245, 0.16);
+  --mdq-slide-accent: #7aa2f7;
+  --mdq-slide-accent-strong: #7aa2f7;
+  --mdq-slide-accent-warm: #ff9e64;
+  --mdq-slide-accent-cool: #7dcfff;
+  --mdq-slide-blue: #7aa2f7;
+  --mdq-slide-scene: #9ece6a;
+  --mdq-slide-maroon: #bb9af7;
+  --mdq-slide-glass: #16161e;
+  --mdq-slide-glass-strong: #16161e;
+  --mdq-slide-glass-line: rgba(192, 202, 245, 0.16);
+  --mdq-note-attendee: #7aa2f7;
+  --mdq-note-attendee-tint: rgba(122, 162, 247, 0.12);
+  --mdq-note-presenter: #bb9af7;
+  --mdq-note-presenter-tint: rgba(187, 154, 247, 0.12);
+  --mdq-panel-radius: 0.2rem;
+  --mdq-paper: #1a1b26;
+  --mdq-paper-strong: #16161e;
+  --mdq-card: rgba(41, 46, 66, 0.92);
+  --mdq-card-strong: #292e42;
+  --mdq-line: rgba(192, 202, 245, 0.14);
+  --mdq-line-strong: rgba(192, 202, 245, 0.28);
+  --mdq-control-border: #737aa2;
+  --mdq-ink: #c0caf5;
+  --mdq-ink-strong: #d6ddf9;
+  --mdq-ink-soft: #c0caf5;
+  --mdq-muted: #a9b1d6;
+  --mdq-soft: #8e96bc;
+  --mdq-accent: #7aa2f7;
+  --mdq-accent-hover: #8db0ff;
+  --mdq-accent-text: #7aa2f7;
+  --mdq-on-accent: #16161e;
+  --mdq-accent-soft: rgba(122, 162, 247, 0.1);
+  --mdq-accent-soft-strong: rgba(122, 162, 247, 0.18);
+  --mdq-accent-ink: #c0caf5;
+  --mdq-secondary: #bb9af7;
+  --mdq-secondary-text: #bb9af7;
+  --mdq-on-secondary: #16161e;
+  --mdq-secondary-soft: rgba(187, 154, 247, 0.1);
+  --mdq-success: #9ece6a;
+  --mdq-success-text: #9ece6a;
+  --mdq-on-success: #16161e;
+  --mdq-success-soft: rgba(158, 206, 106, 0.1);
+  --mdq-success-ink: #c0caf5;
+  --mdq-success-line: #9ece6a;
+  --mdq-warning: #e0af68;
+  --mdq-warning-text: #e0af68;
+  --mdq-on-warning: #16161e;
+  --mdq-warning-soft: rgba(224, 175, 104, 0.1);
+  --mdq-warning-ink: #c0caf5;
+  --mdq-danger: #f7768e;
+  --mdq-danger-text: #ff899d;
+  --mdq-on-danger: #16161e;
+  --mdq-danger-soft: rgba(247, 118, 142, 0.1);
+  --mdq-danger-ink: #c0caf5;
+  --mdq-danger-line: #f7768e;
+  --mdq-info: #7dcfff;
+  --mdq-info-text: #7dcfff;
+  --mdq-on-info: #16161e;
+  --mdq-info-soft: rgba(125, 207, 255, 0.1);
+  --mdq-info-ink: #c0caf5;
+  --mdq-info-line: #7dcfff;
+  --mdq-bar: #7aa2f7;
+  --mdq-on-bar: #16161e;
+  --mdq-bar-muted: #787fa6;
+  --mdq-on-bar-muted: #16161e;
+  --mdq-bar-wash: rgba(122, 162, 247, 0.26);
+  --mdq-timer-ok: #9ece6a;
+  --mdq-timer-warn: #e0af68;
+  --mdq-timer-urgent: #f7768e;
+  --mdq-timer-track: #737aa2;
+  background: #1a1b26;
+}
 
-/* placeholder */
+html[data-palette="tokyo-night"]:not([data-theme="light"]) body {
+  background: #1a1b26;
+}
 
-/* placeholder */
+html[data-palette="tokyo-night"]:not([data-theme="light"]) .slide-surface {
+  background: linear-gradient(180deg, #1a1b26 0%, #16161e 100%);
+}
 
-/* placeholder */
+html[data-palette="tokyo-night"]:not([data-theme="light"]) .slide-surface .quiz-html code,
+html[data-palette="tokyo-night"]:not([data-theme="light"]) .slide-surface .quiz-html pre {
+  background: #16161e;
+  color: #c0caf5;
+}
+
+html[data-palette="tokyo-night"]:not([data-theme="light"]) .slide-surface .quiz-html strong {
+  color: #d6ddf9;
+}
+
+html[data-palette="tokyo-night"]:not([data-theme="light"]) .quiz-html code,
+html[data-palette="tokyo-night"]:not([data-theme="light"]) .quiz-html pre {
+  background: #16161e;
+  color: #c0caf5;
+}
+
+html[data-palette="tokyo-night"][data-theme="light"] {
+  --mdq-slide-bg: #e1e2e7;
+  --mdq-slide-bg-soft: #ececef;
+  --mdq-slide-frame: rgba(55, 96, 191, 0.18);
+  --mdq-slide-heading: #1f356a;
+  --mdq-slide-ink: #2a4990;
+  --mdq-slide-ink-soft: #404e81;
+  --mdq-slide-eyebrow: #404e81;
+  --mdq-slide-rule: rgba(55, 96, 191, 0.18);
+  --mdq-slide-accent: #1355b1;
+  --mdq-slide-accent-strong: #1355b1;
+  --mdq-slide-accent-warm: #894700;
+  --mdq-slide-accent-cool: #005e75;
+  --mdq-slide-blue: #1355b1;
+  --mdq-slide-scene: #485f2e;
+  --mdq-slide-maroon: #6d3faf;
+  --mdq-slide-glass: #d0d5e3;
+  --mdq-slide-glass-strong: #d0d5e3;
+  --mdq-slide-glass-line: rgba(55, 96, 191, 0.18);
+  --mdq-note-attendee: #1355b1;
+  --mdq-note-attendee-tint: rgba(19, 85, 177, 0.09);
+  --mdq-note-presenter: #6d3faf;
+  --mdq-note-presenter-tint: rgba(109, 63, 175, 0.09);
+  --mdq-panel-radius: 0.2rem;
+  --mdq-paper: #e1e2e7;
+  --mdq-paper-strong: #ececef;
+  --mdq-card: rgba(242, 242, 244, 0.92);
+  --mdq-card-strong: #f2f2f4;
+  --mdq-dialog: #f2f2f4;
+  --mdq-field: #f2f2f4;
+  --mdq-line: rgba(55, 96, 191, 0.14);
+  --mdq-line-strong: rgba(55, 96, 191, 0.26);
+  --mdq-control-border: #68709a;
+  --mdq-ink: #2a4990;
+  --mdq-ink-strong: #1f356a;
+  --mdq-ink-soft: #2a4990;
+  --mdq-muted: #3f4c7e;
+  --mdq-soft: #4e5f9d;
+  --mdq-accent: #1769da;
+  --mdq-accent-hover: #1769da;
+  --mdq-accent-text: #1355b1;
+  --mdq-on-accent: #f2f2f4;
+  --mdq-accent-soft: rgba(23, 105, 218, 0.08);
+  --mdq-accent-soft-strong: rgba(23, 105, 218, 0.14);
+  --mdq-accent-ink: #0d3a79;
+  --mdq-accent-wash: linear-gradient(135deg, #e7ebf3, #dae3f1);
+  --mdq-secondary: #7013ea;
+  --mdq-secondary-text: #7013ea;
+  --mdq-on-secondary: #f2f2f4;
+  --mdq-secondary-soft: rgba(112, 19, 234, 0.08);
+  --mdq-success: #485f2e;
+  --mdq-success-text: #485f2e;
+  --mdq-on-success: #f2f2f4;
+  --mdq-success-soft: rgba(72, 95, 46, 0.08);
+  --mdq-success-ink: #314120;
+  --mdq-success-line: #485f2e;
+  --mdq-success-wash: linear-gradient(135deg, #e9ebea, #dfe2de);
+  --mdq-warning: #6d5430;
+  --mdq-warning-text: #6d5430;
+  --mdq-on-warning: #f2f2f4;
+  --mdq-warning-soft: rgba(109, 84, 48, 0.08);
+  --mdq-warning-ink: #4a3921;
+  --mdq-danger: #a03131;
+  --mdq-danger-text: #a03131;
+  --mdq-on-danger: #f2f2f4;
+  --mdq-danger-soft: rgba(160, 49, 49, 0.08);
+  --mdq-danger-ink: #6e2121;
+  --mdq-danger-line: #a03131;
+  --mdq-danger-wash: linear-gradient(135deg, #eee8ea, #e9dddf);
+  --mdq-info: #005e75;
+  --mdq-info-text: #005e75;
+  --mdq-on-info: #f2f2f4;
+  --mdq-info-soft: rgba(0, 94, 117, 0.08);
+  --mdq-info-ink: #004252;
+  --mdq-info-line: #005e75;
+  --mdq-bar: #1769da;
+  --mdq-on-bar: #f2f2f4;
+  --mdq-bar-muted: #4b5b96;
+  --mdq-on-bar-muted: #f2f2f4;
+  --mdq-bar-wash: rgba(23, 105, 218, 0.16);
+  --mdq-timer-ok: #485f2e;
+  --mdq-timer-warn: #6d5430;
+  --mdq-timer-urgent: #a03131;
+  --mdq-timer-track: #68709a;
+  --mdq-rank-first: #5f492a;
+  --mdq-rank-second: #3d4a7a;
+  --mdq-rank-third: #763e00;
+  --mdq-page-glow-top: transparent;
+  --mdq-page-glow-cool: transparent;
+  --mdq-page-glow-warm: transparent;
+  background: #e1e2e7;
+}
+
+html[data-palette="tokyo-night"][data-theme="light"] .slide-surface {
+  background: linear-gradient(180deg, #ececef 0%, #e1e2e7 100%);
+}
+
+html[data-palette="tokyo-night"][data-theme="light"] .slide-surface .quiz-html code,
+html[data-palette="tokyo-night"][data-theme="light"] .slide-surface .quiz-html pre {
+  background: #d0d5e3;
+  color: #2a4990;
+}
+
+html[data-palette="tokyo-night"][data-theme="light"] .slide-surface .quiz-html strong {
+  color: #1f356a;
+}
+
+html[data-palette="tokyo-night"][data-theme="light"] .quiz-html code,
+html[data-palette="tokyo-night"][data-theme="light"] .quiz-html pre {
+  background: #d0d5e3;
+  color: #2a4990;
+}
+
+/* tokyo-night link on the white join QR panel (theme.css). */
+html[data-palette="tokyo-night"][data-theme="dark"] .instructor-qr-panel,
+html[data-palette="tokyo-night"][data-theme="light"] .instructor-qr-panel {
+  --mdq-qr-link: #186fe6;
+}
+
+/* Slide references are drawn at 78 percent of the soft ink, which leaves the
+   small link text under 4.5:1 on a light ground, so the light theme uses the
+   soft ink at full strength. */
+html[data-palette="tokyo-night"][data-theme="light"] .slide-references {
+  color: var(--mdq-slide-ink-soft);
+}
+
+/* The dark selection-mode card and chips carry classic purple and green in
+   their base rules; the light theme already reads the tokens. */
+html[data-palette="tokyo-night"]:not([data-theme="light"]) .selection-mode-card-single {
+  border-color: rgba(122, 162, 247, 0.34);
+  background: linear-gradient(135deg, #292e42, #16161e);
+}
+html[data-palette="tokyo-night"]:not([data-theme="light"]) .selection-mode-card-single::after {
+  background: rgba(122, 162, 247, 0.22);
+}
+html[data-palette="tokyo-night"]:not([data-theme="light"]) .selection-mode-card-multi {
+  border-color: rgba(187, 154, 247, 0.32);
+  background: linear-gradient(135deg, #292e42, #16161e);
+}
+html[data-palette="tokyo-night"]:not([data-theme="light"]) .selection-mode-card-multi::after {
+  background: rgba(187, 154, 247, 0.2);
+}
+html[data-palette="tokyo-night"]:not([data-theme="light"]) .selection-mode-label {
+  color: #d6ddf9;
+}
+html[data-palette="tokyo-night"]:not([data-theme="light"]) .selection-mode-text {
+  color: #a9b1d6;
+}
+html[data-palette="tokyo-night"]:not([data-theme="light"]) .selection-mode-chip-single {
+  color: #7aa2f7;
+  border-color: rgba(122, 162, 247, 0.4);
+  background: #16161e;
+}
+html[data-palette="tokyo-night"]:not([data-theme="light"]) .selection-mode-chip-multi {
+  color: #bb9af7;
+  border-color: rgba(187, 154, 247, 0.4);
+  background: #16161e;
+}
+
+html[data-palette="tokyo-night"]:not([data-theme="light"]) .leaderboard-row.rank-first {
+  --leaderboard-rank-color: #e0af68;
+}
+html[data-palette="tokyo-night"]:not([data-theme="light"]) .leaderboard-row.rank-second {
+  --leaderboard-rank-color: #a9b1d6;
+}
+html[data-palette="tokyo-night"]:not([data-theme="light"]) .leaderboard-row.rank-third {
+  --leaderboard-rank-color: #ff9e64;
+}
+
+/* Below the podium the row keeps a neutral tint, so fourth place does not
+   pick up the accent that third place uses. */
+html[data-palette="tokyo-night"]:not([data-theme="light"]) .leaderboard-row.rank-standard {
+  --leaderboard-rank-color: #a9b1d6;
+}
+
+/* The viewer's own row adds an accent wash; third place keeps the palette
+   colour there instead of the classic orange. */
+html[data-palette="tokyo-night"]:not([data-theme="light"]) .leaderboard-row.leaderboard-row-highlight.rank-third {
+  --leaderboard-rank-color: #ff9e64;
+}
+
+html[data-palette="tokyo-night"][data-theme="light"] .leaderboard-row.rank-standard {
+  --leaderboard-rank-color: var(--mdq-muted);
+}
 
 /* The viewer's own row adds an accent wash, so a dark theme lightens the
    third-place orange to hold 4.5:1 on it. */

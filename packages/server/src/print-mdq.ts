@@ -718,9 +718,64 @@ function renderAyuTokens(theme: PrintTheme): string {
     `;
 }
 
+// Tokyo Night mirrors the live slide palette in packages/client/src/index.css
+// (folke/tokyonight.nvim, Apache-2.0): dark is the night style, light is Day
+// with its accents darkened, for example blue #2e7de9 to #1355b1 and green
+// #587539 to #485f2e. Attendee notes use the blue, presenter notes the purple.
 function renderTokyoNightTokens(theme: PrintTheme): string {
-  // TODO(palette-values): tokyo-night
-  return renderThemeTokens(theme, "classic");
+  if (theme === "light") {
+    return `
+      --page-bg: #e1e2e7;
+      --ink: #1f356a;
+      --body: #2a4990;
+      --muted: #3f4c7e;
+      --line: rgba(55, 96, 191, 0.28);
+      --soft-line: rgba(55, 96, 191, 0.14);
+      --paper: #e1e2e7;
+      --wash: #d0d5e3;
+      --option-bg: #e1e2e7;
+      --media-bg: #d0d5e3;
+      --accent: #1355b1;
+      --accent-soft: rgba(19, 85, 177, 0.1);
+      --teal: #1355b1;
+      --teal-line: rgba(19, 85, 177, 0.35);
+      --teal-soft: rgba(19, 85, 177, 0.09);
+      --amber: #6d3faf;
+      --amber-line: rgba(109, 63, 175, 0.38);
+      --amber-soft: rgba(109, 63, 175, 0.09);
+      --green: #485f2e;
+      --green-line: rgba(72, 95, 46, 0.45);
+      --green-soft: rgba(72, 95, 46, 0.12);
+      --reference: #3f4c7e;
+      --shadow: rgba(31, 53, 106, 0.04);
+    `;
+  }
+
+  return `
+      --page-bg: #1a1b26;
+      --ink: #d6ddf9;
+      --body: #c0caf5;
+      --muted: #a9b1d6;
+      --line: rgba(192, 202, 245, 0.32);
+      --soft-line: rgba(192, 202, 245, 0.16);
+      --paper: #16161e;
+      --wash: #292e42;
+      --option-bg: #16161e;
+      --media-bg: #16161e;
+      --accent: #7aa2f7;
+      --accent-soft: rgba(122, 162, 247, 0.16);
+      --teal: #7aa2f7;
+      --teal-line: rgba(122, 162, 247, 0.42);
+      --teal-soft: rgba(122, 162, 247, 0.12);
+      --amber: #bb9af7;
+      --amber-line: rgba(187, 154, 247, 0.42);
+      --amber-soft: rgba(187, 154, 247, 0.12);
+      --green: #9ece6a;
+      --green-line: rgba(158, 206, 106, 0.46);
+      --green-soft: rgba(158, 206, 106, 0.16);
+      --reference: #a9b1d6;
+      --shadow: rgba(0, 0, 0, 0.18);
+    `;
 }
 
 function printPageBackground(theme: PrintTheme, palette: PrintPalette): string {
@@ -743,8 +798,7 @@ function printPageBackground(theme: PrintTheme, palette: PrintPalette): string {
       return theme === "dark" ? "#10141c" : "#fcfcfc";
 
     case "tokyo-night":
-      // TODO(palette-values): tokyo-night
-      return printPageBackground(theme, "classic");
+      return theme === "dark" ? "#1a1b26" : "#e1e2e7";
 
     case "classic":
       break;
