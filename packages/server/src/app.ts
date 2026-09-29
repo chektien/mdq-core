@@ -127,6 +127,9 @@ export function resultsFileName(title: string, createdAt: number): string {
   return `${slug || "session"}-results-${date}.csv`;
 }
 
+/** A participant's public key is a UUID; anything much longer is not one. */
+const MAX_PUBLIC_KEY_LENGTH = 128;
+
 export function createApp(quizDirOrOpts?: string | AppOptions) {
   const app = express();
   app.use(cors());
@@ -799,7 +802,7 @@ export function createApp(quizDirOrOpts?: string | AppOptions) {
       const quiz = getQuizForSession(session.week);
       if (!quiz) return res.status(500).json({ error: "Quiz data not found" });
       const { publicKey } = (req.body ?? {}) as Partial<ReleaseSeatRequest>;
-      if (typeof publicKey !== "string" || !publicKey) return res.status(400).json({ error: "Send publicKey." });
+      if (typeof publicKey !== "string" || !publicKey || publicKey.length > MAX_PUBLIC_KEY_LENGTH) return res.status(400).json({ error: "Send publicKey." });
       try {
         const result = apply(session, quiz, { type: "releaseSeat", role: "control", publicKey, newToken: crypto.randomUUID() }, Date.now());
         Object.assign(session, result.session);

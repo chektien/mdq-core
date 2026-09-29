@@ -1,6 +1,6 @@
 import { Server as HttpServer } from "http";
 import { Server, Socket } from "socket.io";
-import { SocketEvents, StudentJoinPayload, StudentJoinedPayload, AnswerSubmitPayload, TICK_INTERVAL_MS, Quiz, Session, SOCKET_ROLES, type SocketRole } from "@mdq/shared";
+import { SEAT_TAKEN_MESSAGE, SocketEvents, StudentJoinPayload, StudentJoinedPayload, AnswerSubmitPayload, TICK_INTERVAL_MS, Quiz, Session, SOCKET_ROLES, type SocketRole } from "@mdq/shared";
 import { getSession } from "./session";
 import { apply, audienceReaches, type Audience, type EngineMessage, type EngineResult } from "./engine";
 import { getQuestionType } from "./scoring";
@@ -52,6 +52,24 @@ function applyAndEmit(io: Server, session: Session, quiz: Quiz, command: Paramet
   Object.assign(session, result.session);
   emitMessages(io, session.sessionId, result.messages, directSocket);
   return result;
+}
+
+/** What the adapter remembers about a socket that joined as a participant. */
+type ParticipantSocket = Socket & { _studentId?: string; _sessionToken?: string };
+
+/**
+ * After a join took over a freed seat, tell every other connection of that participant
+ * (the old device) that it has lost the seat, and take it out of the class broadcasts.
+ */
+function releaseOldDevices(io: Server, sessionId: string, seatTaken: NonNullable<EngineResult["seatTaken"]>): void {
+  const room = roleRoom(sessionId, "participant");
+  for (const id of [...(io.sockets.adapter.rooms.get(room) ?? [])]) {
+    const old = io.sockets.sockets.get(id) as ParticipantSocket | undefined;
+    if (!old || old._studentId !== seatTaken.participantId || old._sessionToken === seatTaken.sessionToken) continue;
+    old.emit(SocketEvents.SEAT_TAKEN, { reason: SEAT_TAKEN_MESSAGE });
+    old.leave(room);
+    old.leave(sessionRoom(sessionId));
+  }
 }
 
 export function setupSocket(httpServer: HttpServer, quizzes: Map<string, Quiz>): Server {
@@ -110,23 +128,26 @@ export function setupSocket(httpServer: HttpServer, quizzes: Map<string, Quiz>):
       if (joined) {
         socket.join(sessionRoom(sessionId));
         socket.join(roleRoom(sessionId, "participant"));
-        (socket as Socket & { _studentId?: string })._studentId = joined.participantId;
+        (socket as ParticipantSocket)._studentId = joined.participantId;
+        (socket as ParticipantSocket)._sessionToken = joined.sessionToken;
       }
       emitMessages(io, sessionId, result.messages);
+      if (result.seatTaken) releaseOldDevices(io, sessionId, result.seatTaken);
     });
     socket.on(SocketEvents.ANSWER_SUBMIT, (payload: AnswerSubmitPayload) => {
       if (!quiz) return;
-      const joinedAs = (socket as Socket & { _studentId?: string })._studentId;
-      // A socket the seat has moved away from (a rejoin, or a seat the presenter freed) can no longer answer for it.
-      const studentId = joinedAs && session.participants.get(joinedAs)?.socketId === socket.id ? joinedAs : undefined;
-      const result = apply(session, quiz, { type: "answerSubmit", studentId, payload }, Date.now());
+      const { _studentId: studentId, _sessionToken: sessionToken } = socket as ParticipantSocket;
+      // The engine refuses a token the seat has moved away from; a second tab with the current token still answers.
+      const result = apply(session, quiz, { type: "answerSubmit", studentId, sessionToken, payload }, Date.now());
       Object.assign(session, result.session);
-      // An unjoined socket has no participant ID, so route its rejection directly.
-      if (!studentId) for (const item of result.messages) socket.emit(item.event, item.payload);
-      else emitMessages(io, sessionId, result.messages);
+      // The answer's own outcome goes to the socket that asked, not to whichever socket holds the seat now.
+      for (const item of result.messages) {
+        if (item.audience.startsWith("participant:")) socket.emit(item.event, item.payload);
+        else emitMessages(io, sessionId, [item]);
+      }
     });
     socket.on("disconnect", () => {
-      const studentId = (socket as Socket & { _studentId?: string })._studentId;
+      const studentId = (socket as ParticipantSocket)._studentId;
       if (studentId && quiz) applyAndEmit(io, session, quiz, { type: "disconnect", studentId, socketId: socket.id });
     });
   });

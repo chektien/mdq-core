@@ -126,6 +126,7 @@ describe("freeing a seat over real sockets", () => {
     const key = oldPhone.joined!.publicKey;
     await release("nope", key).expect(404);
     await release(sessionId, "").expect(400);
+    await release(sessionId, "k".repeat(129)).expect(400);
     await release(sessionId, "not-a-key").expect(400);
     await release(sessionId, key).expect(200);
     await until(() => (last<SessionParticipantsPayload>(control, SocketEvents.SESSION_PARTICIPANTS)?.offline ?? []).some((o) => o.released), "instructor sees the freed seat");
@@ -154,6 +155,42 @@ describe("freeing a seat over real sockets", () => {
     expect(stale.joined).toBeUndefined();
     const csv = (await request(app).get(`/api/session/${sessionId}/results.csv`).expect(200)).text;
     expect(csv.split("\n").filter((line) => line.includes(ID))).toHaveLength(1);
+  });
+
+  it("tells the old device, stops its broadcasts and keeps two tabs of one seat answering", async () => {
+    const { sessionId } = (await request(app).post("/api/session").send({ week: "seat" }).expect(201)).body;
+    const control = connect(sessionId, "instructor");
+    await until(() => control.socket.connected, "instructor connects");
+    const oldPhone = await joinAs(sessionId, { studentId: ID, displayName: "Alex Tan", clientInstanceId: "phone-old" });
+    // A second tab of the same seat (same token) joins; the first tab must still answer.
+    const secondTab = await joinAs(sessionId, { studentId: ID, sessionToken: oldPhone.joined!.sessionToken, clientInstanceId: "phone-old" });
+    expect(secondTab.joined!.sessionToken).toBe(oldPhone.joined!.sessionToken);
+    await post(sessionId, "start");
+    oldPhone.recorder.socket.emit(SocketEvents.ANSWER_SUBMIT, { questionIndex: 0, selectedOptions: ["A"] });
+    await until(() => oldPhone.recorder.events.some((e) => e.event === SocketEvents.ANSWER_ACCEPTED), "the older tab still answers");
+    expect(secondTab.recorder.events.some((e) => e.event === SocketEvents.SEAT_TAKEN)).toBe(false);
+
+    // The presenter frees the seat and another device takes it: both old tabs are told, plainly.
+    await release(sessionId, oldPhone.joined!.publicKey).expect(200);
+    const newPhone = await joinAs(sessionId, { studentId: ID, displayName: "Alex Tan", clientInstanceId: "phone-new" });
+    expect(newPhone.joined).toBeDefined();
+    for (const old of [oldPhone.recorder, secondTab.recorder]) {
+      await until(() => old.events.some((e) => e.event === SocketEvents.SEAT_TAKEN), "old tab told");
+      expect(last<{ reason: string }>(old, SocketEvents.SEAT_TAKEN).reason).toBe("You joined on another device. This screen is no longer in the session.");
+    }
+    expect(newPhone.recorder.events.some((e) => e.event === SocketEvents.SEAT_TAKEN)).toBe(false);
+
+    // The old device gets no more class broadcasts; the new one does.
+    const before = oldPhone.recorder.events.length;
+    await post(sessionId, "close");
+    await until(() => newPhone.recorder.events.some((e) => e.event === SocketEvents.QUESTION_CLOSE), "new phone hears the close");
+    expect(oldPhone.recorder.events.slice(before).map((e) => e.event)).not.toContain(SocketEvents.QUESTION_CLOSE);
+
+    // An answer from the old device is refused on that device only, and does not reach the new one.
+    const newBefore = newPhone.recorder.events.length;
+    oldPhone.recorder.socket.emit(SocketEvents.ANSWER_SUBMIT, { questionIndex: 0, selectedOptions: ["B"] });
+    await until(() => oldPhone.recorder.events.some((e) => e.event === SocketEvents.ANSWER_REJECTED && e.text.includes("in use on another device")), "old device refused");
+    expect(newPhone.recorder.events.slice(newBefore).some((e) => e.event === SocketEvents.ANSWER_REJECTED)).toBe(false);
   });
 
   it("lists a seat that went offline so the presenter can free it", async () => {

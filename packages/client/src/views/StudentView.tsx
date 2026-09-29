@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import { useSocket } from "../hooks/useSocket";
 import type { QuestionState, RevealState } from "../hooks/useSocket";
-import { API, MAX_OPEN_RESPONSE_LENGTH } from "@mdq/shared";
+import { API, MAX_OPEN_RESPONSE_LENGTH, SEAT_TAKEN_MESSAGE } from "@mdq/shared";
 import type { DeckPalette, DeckTheme, SessionState } from "@mdq/shared";
 import Timer from "../components/Timer";
 import Leaderboard from "../components/Leaderboard";
@@ -423,6 +423,16 @@ export default function StudentView({
       <div className="min-h-dvh flex flex-col items-center justify-center gap-4 p-6 text-center">
         <h2 className="text-2xl font-bold text-white">Done</h2>
         <p className="text-zinc-400 text-sm max-w-md">Your session is complete. You can close this tab.</p>
+      </div>
+    );
+  }
+
+  // ── Another device took this seat: nothing here can answer any more ──
+  if (sock.seatTaken) {
+    return (
+      <div className="student-seat-taken min-h-dvh flex flex-col items-center justify-center gap-3 p-6 text-center">
+        <h2 className="text-xl font-semibold text-white">You joined on another device</h2>
+        <p role="status" className="max-w-xs text-zinc-300 text-sm">{SEAT_TAKEN_MESSAGE}</p>
       </div>
     );
   }

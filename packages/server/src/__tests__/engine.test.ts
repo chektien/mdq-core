@@ -264,6 +264,34 @@ describe("releasing a seat", () => {
     expect(clash.messages.find((m) => m.event === SocketEvents.STUDENT_REJECTED)).toBeTruthy();
   });
 
+  it("answers by seat token: the current token answers from any tab, a replaced one is refused", () => {
+    // The token the seat holds answers; two tabs of one seat share it (see the socket tests).
+    const seatOnly = apply(base("QUESTION_OPEN"), quiz, { type: "join", socketId: "socket-1", newToken: "token-1", newPublicKey: "key-1", payload: { studentId: "S1", displayName: "Sam" } }, 2000).session;
+    const current = apply(seatOnly, quiz, { type: "answerSubmit", studentId: "S1", sessionToken: "token-1", payload: { questionIndex: 0, selectedOptions: ["A"] } }, 3000);
+    expect(current.messages.map((m) => m.event)).toContain(SocketEvents.ANSWER_ACCEPTED);
+    // A caller that names no token (another adapter's own check) is not refused by this rule.
+    expect(apply(seatOnly, quiz, { type: "answerSubmit", studentId: "S1", payload: { questionIndex: 0, selectedOptions: ["A"] } }, 3000).messages.map((m) => m.event)).toContain(SocketEvents.ANSWER_ACCEPTED);
+    // Freed and taken again: the old device's token is refused with a plain message, the new one answers.
+    const released = apply(seatOnly, quiz, { type: "releaseSeat", role: "control", publicKey: "key-1", newToken: "token-2" }, 4000).session;
+    const taken = apply(released, quiz, { type: "join", socketId: "socket-9", newToken: "token-3", payload: { studentId: "S1", clientInstanceId: "phone-2" } }, 5000).session;
+    const stale = apply(taken, quiz, { type: "answerSubmit", studentId: "S1", sessionToken: "token-1", payload: { questionIndex: 0, selectedOptions: ["A"] } }, 6000);
+    expect(stale.messages).toEqual([msg(SocketEvents.ANSWER_REJECTED, { questionIndex: 0, reason: "This seat is now in use on another device." }, "participant:S1")]);
+    expect(stale.session.submissions).toHaveLength(0);
+    const fresh = apply(taken, quiz, { type: "answerSubmit", studentId: "S1", sessionToken: "token-3", payload: { questionIndex: 0, selectedOptions: ["A"] } }, 6000);
+    expect(fresh.messages.map((m) => m.event)).toContain(SocketEvents.ANSWER_ACCEPTED);
+  });
+
+  it("says which seat a join took over, and only then", () => {
+    const first = apply(base("QUESTION_OPEN"), quiz, { type: "join", socketId: "socket-1", newToken: "token-1", newPublicKey: "key-1", payload: { studentId: "S1", displayName: "Sam" } }, 2000);
+    expect(first.seatTaken).toBeUndefined();
+    const same = apply(first.session, quiz, { type: "join", socketId: "socket-2", newToken: "token-x", payload: { studentId: "S1", sessionToken: "token-1" } }, 2500);
+    expect(same.seatTaken).toBeUndefined();
+    const released = apply(first.session, quiz, { type: "releaseSeat", role: "control", publicKey: "key-1", newToken: "token-2" }, 3000);
+    expect(released.seatTaken).toBeUndefined();
+    const taken = apply(released.session, quiz, { type: "join", socketId: "socket-9", newToken: "token-3", payload: { studentId: "S1" } }, 4000);
+    expect(taken.seatTaken).toEqual({ participantId: "S1", sessionToken: "token-3" });
+  });
+
   it("frees a seat by name when Student IDs are off", () => {
     const named: Quiz = { ...quiz, studentId: false };
     const first = apply(base("QUESTION_OPEN"), named, { type: "join", socketId: "socket-1", newToken: "token-1", newPublicKey: "key-1", payload: { displayName: "Alex Tan" } }, 2000);

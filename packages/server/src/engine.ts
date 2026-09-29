@@ -64,7 +64,12 @@ export type Command =
   | { type: "start" | "next" | "previous" | "open" | "close" | "reveal" | "end" | "leaderboardShow" | "leaderboardHide" | "broadcastOpen" | "broadcastReveal" | "broadcastLeaderboard" | "participants" | "repairClosedSlide" }
   | { type: "timeout"; deadline?: number }
   | { type: "join"; payload: StudentJoinPayload; socketId: string; newToken: string; newPublicKey?: string }
-  | { type: "answerSubmit"; studentId?: string; payload: AnswerSubmitPayload }
+  /**
+   * `sessionToken` is the token the answering connection joined with. When it is given and is no longer
+   * the participant's current token (the seat was freed and taken again), the answer is refused; a
+   * connection with the current token, on any device or tab, still answers.
+   */
+  | { type: "answerSubmit"; studentId?: string; sessionToken?: string; payload: AnswerSubmitPayload }
   /** Hide or show one open response on the projector. `role` is who is asking; only `control` may. */
   | { type: "responseVisibility"; role: SocketRole; questionIndex: number; publicKey: string; hidden: boolean }
   /** Free one participant's seat so the next join with that ID (or name) takes it over. `role` is who is asking; only `control` may. */
@@ -72,7 +77,20 @@ export type Command =
   | { type: "disconnect"; studentId: string; socketId: string }
   | { type: "snapshot"; participantId?: string; isReconnect?: boolean; view?: "control" | "display" }
   | { type: "tick"; remainingSec: number };
-export interface EngineResult { session: Session; messages: EngineMessage[]; nextDeadline: number | null }
+export interface EngineResult {
+  session: Session;
+  messages: EngineMessage[];
+  nextDeadline: number | null;
+  /**
+   * Set by a `join` that took over a seat the presenter freed. Every connection of that participant
+   * whose token is not `sessionToken` is on a device that has lost the seat, and an adapter should
+   * tell it (the `SEAT_TAKEN` event, `SEAT_TAKEN_MESSAGE` from `@mdq/shared`) and stop sending it session messages.
+   */
+  seatTaken?: { participantId: string; sessionToken: string };
+}
+
+/** Why an answer from a device that has lost its seat is refused. */
+export const SEAT_IN_USE_MESSAGE = "This seat is now in use on another device.";
 
 const message = (event: string, payload: unknown, audience: Audience = "all"): EngineMessage => ({ audience, event, payload });
 const clone = (session: Session): Session => ({
@@ -195,6 +213,7 @@ export function apply(input: Session, quiz: Quiz, command: Command, now: number)
   const session = clone(input);
   ensureParticipantIdentity(session);
   const messages: EngineMessage[] = [];
+  let seatTaken: EngineResult["seatTaken"];
   const emit = (event: string, payload: unknown, audience: Audience = "all") => messages.push(message(event, payload, audience));
   // Open responses go out in full to control only; the projector gets the count, then the visible responses at reveal.
   const emitCount = () => {
@@ -334,6 +353,7 @@ export function apply(input: Session, quiz: Quiz, command: Command, now: number)
         if (usesIds && typedName) existing.displayName = typedName;
         if (takeover) {
           existing.released = false; existing.sessionToken = command.newToken; existing.clientInstanceId = payload.clientInstanceId;
+          seatTaken = { participantId: existing.studentId, sessionToken: command.newToken };
         } else if (validToken && payload.clientInstanceId) existing.clientInstanceId = payload.clientInstanceId;
         participant = existing; isReconnect = true;
       } else {
@@ -354,10 +374,12 @@ export function apply(input: Session, quiz: Quiz, command: Command, now: number)
       break;
     }
     case "answerSubmit": {
-      const { payload, studentId } = command;
+      const { payload, studentId, sessionToken } = command;
       const target: Audience = `participant:${studentId || ""}`;
       const reject = (reason: string) => emit(SocketEvents.ANSWER_REJECTED, { questionIndex: payload.questionIndex, reason }, target);
       if (!studentId) { reject("Not joined to a session"); break; }
+      const seat = session.participants.get(studentId);
+      if (seat && sessionToken !== undefined && sessionToken !== seat.sessionToken) { reject(SEAT_IN_USE_MESSAGE); break; }
       const q = questionAt(session, quiz);
       if (!q) { reject(`Question ${session.currentQuestionIndex + 1} not found.`); break; }
       const options = payload.selectedOptions || [];
@@ -455,7 +477,7 @@ export function apply(input: Session, quiz: Quiz, command: Command, now: number)
       break;
     case "tick": emit(SocketEvents.QUESTION_TICK, { remainingSec: command.remainingSec }); break;
   }
-  return { session, messages, nextDeadline: deadline(session, quiz) };
+  return { session, messages, nextDeadline: deadline(session, quiz), ...(seatTaken ? { seatTaken } : {}) };
 }
 
 /**

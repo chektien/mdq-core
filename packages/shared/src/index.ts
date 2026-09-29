@@ -42,6 +42,8 @@ export const SocketEvents = {
   STUDENT_REJECTED: "student:rejected",
   ANSWER_ACCEPTED: "answer:accepted",
   ANSWER_REJECTED: "answer:rejected",
+  /** Sent to a device whose seat was freed and taken by another device; it carries a plain `reason`. */
+  SEAT_TAKEN: "seat:taken",
 
   // Server -> Instructor
   SESSION_PARTICIPANTS: "session:participants",
@@ -252,6 +254,9 @@ export interface ResponseVisibilityRequest {
   publicKey: string;
   hidden: boolean;
 }
+
+/** What a device is told when its seat was freed and another device took it. */
+export const SEAT_TAKEN_MESSAGE = "You joined on another device. This screen is no longer in the session.";
 
 /** The body of the presenter's request to free one participant's seat so they can rejoin from a new device. */
 export interface ReleaseSeatRequest {

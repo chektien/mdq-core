@@ -183,6 +183,8 @@ export interface UseSocketReturn {
   // Session
   sessionState: SessionState | null;
   sessionToken: string | null;
+  /** True once the presenter's Let rejoin was used from another device: this screen has lost the seat. */
+  seatTaken: boolean;
   studentId: string | null;
   /** This participant's random key; leaderboard and response rows carry it instead of the Student ID. */
   publicKey: string | null;
@@ -238,6 +240,10 @@ export function useSocket(
   const pendingAnswerRef = useRef<StudentAnswer | null>(null);
   // Server clock minus this device's, so the countdown can run on while offline.
   const clockOffsetRef = useRef(0);
+  // The token this screen joined with, and whether another device has since taken its seat.
+  const joinedTokenRef = useRef<string | null>(null);
+  const seatTakenRef = useRef(false);
+  const [seatTaken, setSeatTaken] = useState(false);
   const [connected, setConnected] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -298,6 +304,9 @@ export function useSocket(
     });
 
     socketRef.current = socket;
+    seatTakenRef.current = false;
+    joinedTokenRef.current = null;
+    setSeatTaken(false);
     ownAnswersRef.current = new Map();
     pendingAnswerRef.current = null;
 
@@ -306,7 +315,7 @@ export function useSocket(
       setError(null);
 
       // Auto-rejoin for students with stored token
-      if (role === "student") {
+      if (role === "student" && !seatTakenRef.current) {
         const stored = loadStoredSession();
         if (stored && stored.sessionId === sessionId && stored.sessionToken) {
           socket.emit(SocketEvents.STUDENT_JOIN, {
@@ -328,6 +337,8 @@ export function useSocket(
 
     // ── Student join response ──────────────
     socket.on(SocketEvents.STUDENT_JOINED, (data: StudentJoinedPayload) => {
+      if (seatTakenRef.current) return;
+      joinedTokenRef.current = data.sessionToken;
       setSessionToken(data.sessionToken);
       setStudentIdState(data.participantId);
       setPublicKey(data.publicKey ?? null);
@@ -363,6 +374,17 @@ export function useSocket(
         studentId: data.participantId,
         sessionToken: data.sessionToken,
       });
+    });
+
+    // The seat was freed and another device took it: stop here, and do not rejoin with the old token.
+    socket.on(SocketEvents.SEAT_TAKEN, () => {
+      seatTakenRef.current = true;
+      // The other device may share this browser's storage, so only clear a seat this screen still holds.
+      const stored = loadStoredSession();
+      if (stored && stored.sessionToken === joinedTokenRef.current) clearStoredSession();
+      setSeatTaken(true);
+      setError(null);
+      socket.disconnect();
     });
 
     socket.on(SocketEvents.STUDENT_REJECTED, (data: { reason: string }) => {
@@ -545,7 +567,7 @@ export function useSocket(
 
       foregroundReconnectTimer = setTimeout(() => {
         const currentSocket = socketRef.current;
-        if (!currentSocket || currentSocket !== socket) {
+        if (!currentSocket || currentSocket !== socket || seatTakenRef.current) {
           return;
         }
 
@@ -644,7 +666,7 @@ export function useSocket(
 
   const reconnect = useCallback(() => {
     const socket = socketRef.current;
-    if (!socket) return;
+    if (!socket || seatTakenRef.current) return;
 
     // Force a fresh transport rather than trusting a stale iOS Safari socket.
     // The server sends an authoritative state snapshot on every connection.
@@ -670,6 +692,7 @@ export function useSocket(
     error,
     sessionState,
     sessionToken,
+    seatTaken,
     studentId: studentIdState,
     publicKey,
     label,
