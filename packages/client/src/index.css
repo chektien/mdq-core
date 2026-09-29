@@ -1491,31 +1491,951 @@ html[data-palette="catppuccin"][data-theme="light"] .leaderboard-row.rank-standa
 
 
 /* ── seoul256 palette (deck palette: seoul256) ── */
-/* Rules follow. */
+/* seoul256 follows Junegunn Choi's seoul256.vim colour scheme (MIT, as stated
+   in its file headers, https://github.com/junegunn/seoul256.vim). Values are
+   the scheme's default GUI colour map: dark is seoul256 at background 237
+   (#4b4b4b) with foreground 252 (#d9d9d9), light is seoul256-light at
+   background 253 (#e1e1e1) with foreground 239 (#616161). Dark uses the
+   scheme's warm hues on the mid grey: Type gold #ffde99 (222) for headings,
+   Special peach #ffbd98 (216) as the accent, Statement green #98bc99 (108),
+   Conditional blue #98bede (110) and Keyword rose #e17899 (168); cards and
+   code sit on the darker 236 (#3f3f3f) and 235 (#333233). Dark text lifts
+   the greens, blue and rose to the neighbouring lighter entries of the same
+   map (green #98bc99 to #bcddbd (151), blue #98bede to #bce0ff (153), rose
+   #e17899 to #ffc0de (218), gold #dfbc72 to #ffde99 (222)) where small text
+   on the 235 cards would miss 4.5:1, and the label on filled accents is 234
+   (#252525). The timer track #999999 is a mix of 252 and 237.
+   Light shades that miss 4.5:1 on the grey are darkened, keeping the hue:
+   teal #007173 to #00686a, green #006f00 to #006d00, gold #9a7200 to
+   #775800, blue #0074be to #005f9c, orange #e19972 to #984a20. Body text is
+   237 (#4b4b4b) rather than 239 (#616161), which falls below 4.5:1 on the
+   252 panels. The accent fill is 125 (#bf2172) with
+   label 255, accent text is 89 (#9b1d72) and danger is 88 (#9b1300).
+   Leaderboard ranks are darkened from gold #9a7200 to #654b00 and from
+   #be7572 to #7c3c39, and muted text from 238 (#565656) to #525252 so
+   leaderboard ids hold 4.5:1 on the tinted rows. The dark poll bar wash is
+   18 percent of the accent so option text holds 4.5:1 on it. Dark is the
+   default theme, so the dark variant also applies when data-theme is absent. */
+html[data-palette="seoul256"]:not([data-theme="light"]) {
+  --mdq-slide-bg: #4b4b4b;
+  --mdq-slide-bg-soft: #3f3f3f;
+  --mdq-slide-frame: rgba(217, 217, 217, 0.16);
+  --mdq-slide-heading: #ffde99;
+  --mdq-slide-ink: #d9d9d9;
+  --mdq-slide-ink-soft: #d1d0d1;
+  --mdq-slide-eyebrow: #d1d0d1;
+  --mdq-slide-rule: rgba(217, 217, 217, 0.16);
+  --mdq-slide-accent: #ffbd98;
+  --mdq-slide-accent-strong: #ffbd98;
+  --mdq-slide-accent-warm: #e0bebc;
+  --mdq-slide-accent-cool: #bce0ff;
+  --mdq-slide-blue: #bce0ff;
+  --mdq-slide-scene: #bcddbd;
+  --mdq-slide-maroon: #e0bebc;
+  --mdq-slide-glass: #333233;
+  --mdq-slide-glass-strong: #333233;
+  --mdq-slide-glass-line: rgba(217, 217, 217, 0.16);
+  --mdq-note-attendee: #ffbd98;
+  --mdq-note-attendee-tint: rgba(255, 189, 152, 0.12);
+  --mdq-note-presenter: #bce0ff;
+  --mdq-note-presenter-tint: rgba(188, 224, 255, 0.12);
+  --mdq-panel-radius: 0.2rem;
+  --mdq-paper: #4b4b4b;
+  --mdq-paper-strong: #3f3f3f;
+  --mdq-card: rgba(63, 63, 63, 0.92);
+  --mdq-card-strong: #333233;
+  --mdq-line: rgba(217, 217, 217, 0.14);
+  --mdq-line-strong: rgba(217, 217, 217, 0.28);
+  --mdq-control-border: #bdbdbd;
+  --mdq-ink: #d9d9d9;
+  --mdq-ink-strong: #f1f1f1;
+  --mdq-ink-soft: #d9d9d9;
+  --mdq-muted: #d1d0d1;
+  --mdq-soft: #bfbfbf;
+  --mdq-accent: #ffbd98;
+  --mdq-accent-hover: #ffbd98;
+  --mdq-accent-text: #ffbd98;
+  --mdq-on-accent: #252525;
+  --mdq-accent-soft: rgba(255, 189, 152, 0.1);
+  --mdq-accent-soft-strong: rgba(255, 189, 152, 0.18);
+  --mdq-accent-ink: #ffdfdf;
+  --mdq-secondary: #98bc99;
+  --mdq-secondary-text: #bcddbd;
+  --mdq-on-secondary: #252525;
+  --mdq-secondary-soft: rgba(152, 188, 153, 0.1);
+  --mdq-success: #98bc99;
+  --mdq-success-text: #bcddbd;
+  --mdq-on-success: #252525;
+  --mdq-success-soft: rgba(152, 188, 153, 0.1);
+  --mdq-success-ink: #f1f1f1;
+  --mdq-success-line: #98bc99;
+  --mdq-warning: #dfbc72;
+  --mdq-warning-text: #ffde99;
+  --mdq-on-warning: #252525;
+  --mdq-warning-soft: rgba(223, 188, 114, 0.1);
+  --mdq-warning-ink: #ffffdf;
+  --mdq-danger: #e17899;
+  --mdq-danger-text: #ffc0de;
+  --mdq-on-danger: #252525;
+  --mdq-danger-soft: rgba(225, 120, 153, 0.12);
+  --mdq-danger-ink: #ffdfdf;
+  --mdq-danger-line: #e17899;
+  --mdq-info: #98bede;
+  --mdq-info-text: #bce0ff;
+  --mdq-on-info: #252525;
+  --mdq-info-soft: rgba(152, 190, 222, 0.12);
+  --mdq-info-ink: #dfdfff;
+  --mdq-info-line: #98bede;
+  --mdq-bar: #ffbd98;
+  --mdq-on-bar: #252525;
+  --mdq-bar-muted: #bfbfbf;
+  --mdq-on-bar-muted: #252525;
+  --mdq-bar-wash: rgba(255, 189, 152, 0.18);
+  --mdq-timer-ok: #bcddbd;
+  --mdq-timer-warn: #ffde99;
+  --mdq-timer-urgent: #ffc0de;
+  --mdq-timer-track: #999999;
+  background: #4b4b4b;
+}
 
-/* placeholder */
+html[data-palette="seoul256"]:not([data-theme="light"]) body {
+  background: #4b4b4b;
+}
 
-/* placeholder */
+html[data-palette="seoul256"]:not([data-theme="light"]) .slide-surface {
+  background: linear-gradient(180deg, #4b4b4b 0%, #3f3f3f 100%);
+}
 
-/* placeholder */
+html[data-palette="seoul256"]:not([data-theme="light"]) .slide-surface .quiz-html code,
+html[data-palette="seoul256"]:not([data-theme="light"]) .slide-surface .quiz-html pre {
+  background: #333233;
+  color: #d9d9d9;
+}
+
+html[data-palette="seoul256"]:not([data-theme="light"]) .slide-surface .quiz-html strong {
+  color: #f1f1f1;
+}
+
+html[data-palette="seoul256"]:not([data-theme="light"]) .quiz-html code,
+html[data-palette="seoul256"]:not([data-theme="light"]) .quiz-html pre {
+  background: #333233;
+  color: #d9d9d9;
+}
+
+html[data-palette="seoul256"][data-theme="light"] {
+  --mdq-slide-bg: #e1e1e1;
+  --mdq-slide-bg-soft: #e9e9e9;
+  --mdq-slide-frame: rgba(75, 75, 75, 0.18);
+  --mdq-slide-heading: #333233;
+  --mdq-slide-ink: #4b4b4b;
+  --mdq-slide-ink-soft: #565656;
+  --mdq-slide-eyebrow: #565656;
+  --mdq-slide-rule: rgba(75, 75, 75, 0.18);
+  --mdq-slide-accent: #9b1d72;
+  --mdq-slide-accent-strong: #9b1d72;
+  --mdq-slide-accent-warm: #984a20;
+  --mdq-slide-accent-cool: #00686a;
+  --mdq-slide-blue: #005f9c;
+  --mdq-slide-scene: #006d00;
+  --mdq-slide-maroon: #9b1d72;
+  --mdq-slide-glass: #d9d9d9;
+  --mdq-slide-glass-strong: #d9d9d9;
+  --mdq-slide-glass-line: rgba(75, 75, 75, 0.18);
+  --mdq-note-attendee: #9b1d72;
+  --mdq-note-attendee-tint: rgba(155, 29, 114, 0.09);
+  --mdq-note-presenter: #00686a;
+  --mdq-note-presenter-tint: rgba(0, 104, 106, 0.09);
+  --mdq-panel-radius: 0.2rem;
+  --mdq-paper: #e1e1e1;
+  --mdq-paper-strong: #e9e9e9;
+  --mdq-card: rgba(241, 241, 241, 0.92);
+  --mdq-card-strong: #f1f1f1;
+  --mdq-dialog: #f1f1f1;
+  --mdq-field: #f1f1f1;
+  --mdq-line: rgba(75, 75, 75, 0.14);
+  --mdq-line-strong: rgba(75, 75, 75, 0.26);
+  --mdq-control-border: #6b6b6b;
+  --mdq-ink: #4b4b4b;
+  --mdq-ink-strong: #333233;
+  --mdq-ink-soft: #4b4b4b;
+  --mdq-muted: #525252;
+  --mdq-soft: #616161;
+  --mdq-accent: #bf2172;
+  --mdq-accent-hover: #9b1d72;
+  --mdq-accent-text: #9b1d72;
+  --mdq-on-accent: #f1f1f1;
+  --mdq-accent-soft: rgba(191, 33, 114, 0.08);
+  --mdq-accent-soft-strong: rgba(191, 33, 114, 0.14);
+  --mdq-accent-ink: #841961;
+  --mdq-accent-wash: linear-gradient(135deg, #efe7eb, #ecdae3);
+  --mdq-secondary: #00686a;
+  --mdq-secondary-text: #00686a;
+  --mdq-on-secondary: #f1f1f1;
+  --mdq-secondary-soft: rgba(0, 104, 106, 0.08);
+  --mdq-success: #006d00;
+  --mdq-success-text: #006d00;
+  --mdq-on-success: #f1f1f1;
+  --mdq-success-soft: rgba(0, 109, 0, 0.08);
+  --mdq-success-ink: #004f00;
+  --mdq-success-line: #006d00;
+  --mdq-success-wash: linear-gradient(135deg, #e5eae5, #d6e2d6);
+  --mdq-warning: #775800;
+  --mdq-warning-text: #775800;
+  --mdq-on-warning: #f1f1f1;
+  --mdq-warning-soft: rgba(119, 88, 0, 0.08);
+  --mdq-warning-ink: #574000;
+  --mdq-danger: #9b1300;
+  --mdq-danger-text: #9b1300;
+  --mdq-on-danger: #f1f1f1;
+  --mdq-danger-soft: rgba(155, 19, 0, 0.08);
+  --mdq-danger-ink: #801000;
+  --mdq-danger-line: #9b1300;
+  --mdq-danger-wash: linear-gradient(135deg, #ede6e5, #e8d9d6);
+  --mdq-info: #005f9c;
+  --mdq-info-text: #005f9c;
+  --mdq-on-info: #f1f1f1;
+  --mdq-info-soft: rgba(0, 95, 156, 0.08);
+  --mdq-info-ink: #004673;
+  --mdq-info-line: #005f9c;
+  --mdq-bar: #bf2172;
+  --mdq-on-bar: #f1f1f1;
+  --mdq-bar-muted: #616161;
+  --mdq-on-bar-muted: #f1f1f1;
+  --mdq-bar-wash: rgba(191, 33, 114, 0.16);
+  --mdq-timer-ok: #006d00;
+  --mdq-timer-warn: #775800;
+  --mdq-timer-urgent: #9b1300;
+  --mdq-timer-track: #757575;
+  --mdq-rank-first: #654b00;
+  --mdq-rank-second: #4b4b4b;
+  --mdq-rank-third: #7c3c39;
+  --mdq-page-glow-top: transparent;
+  --mdq-page-glow-cool: transparent;
+  --mdq-page-glow-warm: transparent;
+  background: #e1e1e1;
+}
+
+html[data-palette="seoul256"][data-theme="light"] .slide-surface {
+  background: linear-gradient(180deg, #e9e9e9 0%, #e1e1e1 100%);
+}
+
+html[data-palette="seoul256"][data-theme="light"] .slide-surface .quiz-html code,
+html[data-palette="seoul256"][data-theme="light"] .slide-surface .quiz-html pre {
+  background: #d9d9d9;
+  color: #4b4b4b;
+}
+
+html[data-palette="seoul256"][data-theme="light"] .slide-surface .quiz-html strong {
+  color: #333233;
+}
+
+html[data-palette="seoul256"][data-theme="light"] .quiz-html code,
+html[data-palette="seoul256"][data-theme="light"] .quiz-html pre {
+  background: #d9d9d9;
+  color: #4b4b4b;
+}
+
+/* seoul256 link on the white join QR panel (theme.css). */
+html[data-palette="seoul256"][data-theme="dark"] .instructor-qr-panel,
+html[data-palette="seoul256"][data-theme="light"] .instructor-qr-panel {
+  --mdq-qr-link: #007173;
+}
+
+/* Slide references are drawn at 78 percent of the soft ink, which leaves the
+   small link text under 4.5:1 on a light ground, so the light theme uses the
+   soft ink at full strength. */
+html[data-palette="seoul256"][data-theme="light"] .slide-references {
+  color: var(--mdq-slide-ink-soft);
+}
+
+/* The dark selection-mode card and chips carry classic purple and green in
+   their base rules; the light theme already reads the tokens. */
+html[data-palette="seoul256"]:not([data-theme="light"]) .selection-mode-card-single {
+  border-color: rgba(255, 189, 152, 0.34);
+  background: linear-gradient(135deg, #333233, #3f3f3f);
+}
+html[data-palette="seoul256"]:not([data-theme="light"]) .selection-mode-card-single::after {
+  background: rgba(255, 189, 152, 0.22);
+}
+html[data-palette="seoul256"]:not([data-theme="light"]) .selection-mode-card-multi {
+  border-color: rgba(152, 188, 153, 0.32);
+  background: linear-gradient(135deg, #333233, #3f3f3f);
+}
+html[data-palette="seoul256"]:not([data-theme="light"]) .selection-mode-card-multi::after {
+  background: rgba(152, 188, 153, 0.2);
+}
+html[data-palette="seoul256"]:not([data-theme="light"]) .selection-mode-label {
+  color: #f1f1f1;
+}
+html[data-palette="seoul256"]:not([data-theme="light"]) .selection-mode-text {
+  color: #d1d0d1;
+}
+html[data-palette="seoul256"]:not([data-theme="light"]) .selection-mode-chip-single {
+  color: #ffbd98;
+  border-color: rgba(255, 189, 152, 0.4);
+  background: #333233;
+}
+html[data-palette="seoul256"]:not([data-theme="light"]) .selection-mode-chip-multi {
+  color: #bcddbd;
+  border-color: rgba(152, 188, 153, 0.4);
+  background: #333233;
+}
+
+html[data-palette="seoul256"]:not([data-theme="light"]) .leaderboard-row.rank-first {
+  --leaderboard-rank-color: #ffde99;
+}
+html[data-palette="seoul256"]:not([data-theme="light"]) .leaderboard-row.rank-second {
+  --leaderboard-rank-color: #d9d9d9;
+}
+html[data-palette="seoul256"]:not([data-theme="light"]) .leaderboard-row.rank-third {
+  --leaderboard-rank-color: #ffbd98;
+}
+
+/* Below the podium the row keeps a neutral tint, so fourth place does not
+   pick up the accent that third place uses. */
+html[data-palette="seoul256"]:not([data-theme="light"]) .leaderboard-row.rank-standard {
+  --leaderboard-rank-color: #d1d0d1;
+}
+
+/* The viewer's own row adds an accent wash; third place keeps the palette
+   colour there instead of the classic orange. */
+html[data-palette="seoul256"]:not([data-theme="light"]) .leaderboard-row.leaderboard-row-highlight.rank-third {
+  --leaderboard-rank-color: #ffbd98;
+}
+
+html[data-palette="seoul256"][data-theme="light"] .leaderboard-row.rank-standard {
+  --leaderboard-rank-color: var(--mdq-muted);
+}
 
 /* ── Ayu palette (deck palette: ayu) ── */
-/* Rules follow. */
+/* Ayu follows the ayu-colors themes by the Ayu theme authors (MIT,
+   https://github.com/ayu-theme/ayu-colors, generated from themes/dark.yaml and
+   themes/light.yaml at b0fd979). Dark is Ayu Dark: editor background #10141c,
+   panel #141821, base #0d1017, line #1b1f29, foreground #bfbdb6, accent
+   #e6b450, green #aad94c, orange #ff8f40, red #f07178, blue #59c2ff (tag blue
+   #39bae6 for fills), purple #d2a6ff. Ayu Dark passes without adjusting any
+   accent. Only neutrals are derived: strong text is #bfbdb6 mixed 55% toward
+   white (#e2e1de), muted #b1afaa and soft #8e8e8b are #bfbdb6 mixed toward
+   the background, and the join QR link is the light blue #22a4e6 darkened to
+   #147aae because that panel is white. Light is Ayu Light: background
+   #fcfcfc, base #f8f9fa, sunk #ebeef0, foreground #5c6166. Its accents fail
+   4.5:1 on that background, so they are darkened, keeping the hue: accent
+   #f29718 to #955a08 as text and #bd730b as a fill, green #86b300 to
+   #516c00, yellow #eba400 to #845c00, red #e65050 to #c41c1c, blue #22a4e6
+   to #116a97, teal #4cbf99 to #286f58, purple #a37acc to #8047b9, ui grey
+   #828e9f to #566070 (muted), #5f6b7c (soft), #6e7c90 (control border) and
+   #7c899a (timer track). Body text is #5c6166 darkened to #595d62 so it holds
+   4.5:1 where the toolbar shadow falls on it, headings are darkened to
+   #46494d, the accent fill is #f29718 darkened to #bd730b so it holds 3:1 on
+   every ground, the label on it is #5c6166 darkened to #1a1b1d, and leaderboard
+   ranks are darkened from yellow #eba400 to #7a5500, from #5c6166 to
+   #585c61 and from orange #f29718 to #834f07. Dark is the default theme, so
+   the dark variant also applies when data-theme is absent. */
+html[data-palette="ayu"]:not([data-theme="light"]) {
+  --mdq-slide-bg: #10141c;
+  --mdq-slide-bg-soft: #141821;
+  --mdq-slide-frame: rgba(191, 189, 182, 0.16);
+  --mdq-slide-heading: #e6b450;
+  --mdq-slide-ink: #bfbdb6;
+  --mdq-slide-ink-soft: #b1afaa;
+  --mdq-slide-eyebrow: #b1afaa;
+  --mdq-slide-rule: rgba(191, 189, 182, 0.16);
+  --mdq-slide-accent: #e6b450;
+  --mdq-slide-accent-strong: #e6b450;
+  --mdq-slide-accent-warm: #ff8f40;
+  --mdq-slide-accent-cool: #59c2ff;
+  --mdq-slide-blue: #59c2ff;
+  --mdq-slide-scene: #aad94c;
+  --mdq-slide-maroon: #d2a6ff;
+  --mdq-slide-glass: #0d1017;
+  --mdq-slide-glass-strong: #0d1017;
+  --mdq-slide-glass-line: rgba(191, 189, 182, 0.16);
+  --mdq-note-attendee: #e6b450;
+  --mdq-note-attendee-tint: rgba(230, 180, 80, 0.12);
+  --mdq-note-presenter: #d2a6ff;
+  --mdq-note-presenter-tint: rgba(210, 166, 255, 0.12);
+  --mdq-panel-radius: 0.2rem;
+  --mdq-paper: #10141c;
+  --mdq-paper-strong: #141821;
+  --mdq-card: rgba(20, 24, 33, 0.92);
+  --mdq-card-strong: #1b1f29;
+  --mdq-line: rgba(191, 189, 182, 0.14);
+  --mdq-line-strong: rgba(191, 189, 182, 0.28);
+  --mdq-control-border: #667381;
+  --mdq-ink: #bfbdb6;
+  --mdq-ink-strong: #e2e1de;
+  --mdq-ink-soft: #bfbdb6;
+  --mdq-muted: #b1afaa;
+  --mdq-soft: #8e8e8b;
+  --mdq-accent: #e6b450;
+  --mdq-accent-hover: #ffb454;
+  --mdq-accent-text: #e6b450;
+  --mdq-on-accent: #10141c;
+  --mdq-accent-soft: rgba(230, 180, 80, 0.14);
+  --mdq-accent-soft-strong: rgba(230, 180, 80, 0.22000000000000003);
+  --mdq-accent-ink: #ffcb8f;
+  --mdq-secondary: #aad94c;
+  --mdq-secondary-text: #aad94c;
+  --mdq-on-secondary: #10141c;
+  --mdq-secondary-soft: rgba(170, 217, 76, 0.14);
+  --mdq-success: #aad94c;
+  --mdq-success-text: #aad94c;
+  --mdq-on-success: #10141c;
+  --mdq-success-soft: rgba(170, 217, 76, 0.14);
+  --mdq-success-ink: #b8eb53;
+  --mdq-success-line: #aad94c;
+  --mdq-warning: #ff8f40;
+  --mdq-warning-text: #ff8f40;
+  --mdq-on-warning: #10141c;
+  --mdq-warning-soft: rgba(255, 143, 64, 0.14);
+  --mdq-warning-ink: #ffc9a8;
+  --mdq-danger: #f07178;
+  --mdq-danger-text: #f07178;
+  --mdq-on-danger: #10141c;
+  --mdq-danger-soft: rgba(240, 113, 120, 0.16);
+  --mdq-danger-ink: #f9c8c7;
+  --mdq-danger-line: #f07178;
+  --mdq-info: #39bae6;
+  --mdq-info-text: #59c2ff;
+  --mdq-on-info: #10141c;
+  --mdq-info-soft: rgba(57, 186, 230, 0.16);
+  --mdq-info-ink: #aadeff;
+  --mdq-info-line: #39bae6;
+  --mdq-bar: #e6b450;
+  --mdq-on-bar: #10141c;
+  --mdq-bar-muted: #858583;
+  --mdq-on-bar-muted: #10141c;
+  --mdq-bar-wash: rgba(230, 180, 80, 0.26);
+  --mdq-timer-ok: #aad94c;
+  --mdq-timer-warn: #ffb454;
+  --mdq-timer-urgent: #f07178;
+  --mdq-timer-track: #667381;
+  background: #10141c;
+}
 
-/* placeholder */
+html[data-palette="ayu"]:not([data-theme="light"]) body {
+  background: #10141c;
+}
 
-/* placeholder */
+html[data-palette="ayu"]:not([data-theme="light"]) .slide-surface {
+  background: linear-gradient(180deg, #141821 0%, #10141c 100%);
+}
 
-/* placeholder */
+html[data-palette="ayu"]:not([data-theme="light"]) .slide-surface .quiz-html code,
+html[data-palette="ayu"]:not([data-theme="light"]) .slide-surface .quiz-html pre {
+  background: #0d1017;
+  color: #bfbdb6;
+}
+
+html[data-palette="ayu"]:not([data-theme="light"]) .slide-surface .quiz-html strong {
+  color: #e2e1de;
+}
+
+html[data-palette="ayu"]:not([data-theme="light"]) .quiz-html code,
+html[data-palette="ayu"]:not([data-theme="light"]) .quiz-html pre {
+  background: #0d1017;
+  color: #bfbdb6;
+}
+
+html[data-palette="ayu"][data-theme="light"] {
+  --mdq-slide-bg: #fcfcfc;
+  --mdq-slide-bg-soft: #f8f9fa;
+  --mdq-slide-frame: rgba(107, 125, 143, 0.18);
+  --mdq-slide-heading: #46494d;
+  --mdq-slide-ink: #595d62;
+  --mdq-slide-ink-soft: #566070;
+  --mdq-slide-eyebrow: #566070;
+  --mdq-slide-rule: rgba(107, 125, 143, 0.18);
+  --mdq-slide-accent: #955a08;
+  --mdq-slide-accent-strong: #955a08;
+  --mdq-slide-accent-warm: #955a08;
+  --mdq-slide-accent-cool: #116a97;
+  --mdq-slide-blue: #116a97;
+  --mdq-slide-scene: #516c00;
+  --mdq-slide-maroon: #8047b9;
+  --mdq-slide-glass: #ebeef0;
+  --mdq-slide-glass-strong: #ebeef0;
+  --mdq-slide-glass-line: rgba(107, 125, 143, 0.18);
+  --mdq-note-attendee: #955a08;
+  --mdq-note-attendee-tint: rgba(149, 90, 8, 0.09);
+  --mdq-note-presenter: #8047b9;
+  --mdq-note-presenter-tint: rgba(128, 71, 185, 0.09);
+  --mdq-panel-radius: 0.2rem;
+  --mdq-paper: #fcfcfc;
+  --mdq-paper-strong: #f8f9fa;
+  --mdq-card: rgba(255, 255, 255, 0.92);
+  --mdq-card-strong: #ffffff;
+  --mdq-dialog: #ffffff;
+  --mdq-field: #ffffff;
+  --mdq-line: rgba(107, 125, 143, 0.14);
+  --mdq-line-strong: rgba(107, 125, 143, 0.26);
+  --mdq-control-border: #6e7c90;
+  --mdq-ink: #595d62;
+  --mdq-ink-strong: #46494d;
+  --mdq-ink-soft: #595d62;
+  --mdq-muted: #566070;
+  --mdq-soft: #5f6b7c;
+  --mdq-accent: #bd730b;
+  --mdq-accent-hover: #bd730b;
+  --mdq-accent-text: #955a08;
+  --mdq-on-accent: #1a1b1d;
+  --mdq-accent-soft: rgba(189, 115, 11, 0.08);
+  --mdq-accent-soft-strong: rgba(189, 115, 11, 0.14);
+  --mdq-accent-ink: #6c4106;
+  --mdq-accent-wash: linear-gradient(135deg, #fcf8f3, #f8f0e4);
+  --mdq-secondary: #286f58;
+  --mdq-secondary-text: #286f58;
+  --mdq-on-secondary: #fcfcfc;
+  --mdq-secondary-soft: rgba(40, 111, 88, 0.08);
+  --mdq-success: #516c00;
+  --mdq-success-text: #516c00;
+  --mdq-on-success: #fcfcfc;
+  --mdq-success-soft: rgba(81, 108, 0, 0.08);
+  --mdq-success-ink: #3d5100;
+  --mdq-success-line: #516c00;
+  --mdq-success-wash: linear-gradient(135deg, #f6f8f2, #ecefe3);
+  --mdq-warning: #845c00;
+  --mdq-warning-text: #845c00;
+  --mdq-on-warning: #fcfcfc;
+  --mdq-warning-soft: rgba(132, 92, 0, 0.08);
+  --mdq-warning-ink: #634500;
+  --mdq-danger: #c41c1c;
+  --mdq-danger-text: #c41c1c;
+  --mdq-on-danger: #fcfcfc;
+  --mdq-danger-soft: rgba(196, 28, 28, 0.08);
+  --mdq-danger-ink: #951515;
+  --mdq-danger-line: #c41c1c;
+  --mdq-danger-wash: linear-gradient(135deg, #fcf4f4, #f9e6e6);
+  --mdq-info: #116a97;
+  --mdq-info-text: #116a97;
+  --mdq-on-info: #fcfcfc;
+  --mdq-info-soft: rgba(17, 106, 151, 0.08);
+  --mdq-info-ink: #0d4f71;
+  --mdq-info-line: #116a97;
+  --mdq-bar: #bd730b;
+  --mdq-on-bar: #1a1b1d;
+  --mdq-bar-muted: #636f81;
+  --mdq-on-bar-muted: #fcfcfc;
+  --mdq-bar-wash: rgba(189, 115, 11, 0.16);
+  --mdq-timer-ok: #516c00;
+  --mdq-timer-warn: #845c00;
+  --mdq-timer-urgent: #c41c1c;
+  --mdq-timer-track: #7c899a;
+  --mdq-rank-first: #7a5500;
+  --mdq-rank-second: #585c61;
+  --mdq-rank-third: #834f07;
+  --mdq-page-glow-top: transparent;
+  --mdq-page-glow-cool: transparent;
+  --mdq-page-glow-warm: transparent;
+  background: #fcfcfc;
+}
+
+html[data-palette="ayu"][data-theme="light"] .slide-surface {
+  background: linear-gradient(180deg, #fcfcfc 0%, #f8f9fa 100%);
+}
+
+html[data-palette="ayu"][data-theme="light"] .slide-surface .quiz-html code,
+html[data-palette="ayu"][data-theme="light"] .slide-surface .quiz-html pre {
+  background: #ebeef0;
+  color: #595d62;
+}
+
+html[data-palette="ayu"][data-theme="light"] .slide-surface .quiz-html strong {
+  color: #46494d;
+}
+
+html[data-palette="ayu"][data-theme="light"] .quiz-html code,
+html[data-palette="ayu"][data-theme="light"] .quiz-html pre {
+  background: #ebeef0;
+  color: #595d62;
+}
+
+/* ayu link on the white join QR panel (theme.css). */
+html[data-palette="ayu"][data-theme="dark"] .instructor-qr-panel,
+html[data-palette="ayu"][data-theme="light"] .instructor-qr-panel {
+  --mdq-qr-link: #147aae;
+}
+
+/* Slide references are drawn at 78 percent of the soft ink, which leaves the
+   small link text under 4.5:1 on a light ground, so the light theme uses the
+   soft ink at full strength. */
+html[data-palette="ayu"][data-theme="light"] .slide-references {
+  color: var(--mdq-slide-ink-soft);
+}
+
+/* The dark selection-mode card and chips carry classic purple and green in
+   their base rules; the light theme already reads the tokens. */
+html[data-palette="ayu"]:not([data-theme="light"]) .selection-mode-card-single {
+  border-color: rgba(230, 180, 80, 0.34);
+  background: linear-gradient(135deg, #1b1f29, #141821);
+}
+html[data-palette="ayu"]:not([data-theme="light"]) .selection-mode-card-single::after {
+  background: rgba(230, 180, 80, 0.22);
+}
+html[data-palette="ayu"]:not([data-theme="light"]) .selection-mode-card-multi {
+  border-color: rgba(170, 217, 76, 0.32);
+  background: linear-gradient(135deg, #1b1f29, #141821);
+}
+html[data-palette="ayu"]:not([data-theme="light"]) .selection-mode-card-multi::after {
+  background: rgba(170, 217, 76, 0.2);
+}
+html[data-palette="ayu"]:not([data-theme="light"]) .selection-mode-label {
+  color: #e2e1de;
+}
+html[data-palette="ayu"]:not([data-theme="light"]) .selection-mode-text {
+  color: #b1afaa;
+}
+html[data-palette="ayu"]:not([data-theme="light"]) .selection-mode-chip-single {
+  color: #e6b450;
+  border-color: rgba(230, 180, 80, 0.4);
+  background: #0d1017;
+}
+html[data-palette="ayu"]:not([data-theme="light"]) .selection-mode-chip-multi {
+  color: #aad94c;
+  border-color: rgba(170, 217, 76, 0.4);
+  background: #0d1017;
+}
+
+html[data-palette="ayu"]:not([data-theme="light"]) .leaderboard-row.rank-first {
+  --leaderboard-rank-color: #e6b450;
+}
+html[data-palette="ayu"]:not([data-theme="light"]) .leaderboard-row.rank-second {
+  --leaderboard-rank-color: #bfbdb6;
+}
+html[data-palette="ayu"]:not([data-theme="light"]) .leaderboard-row.rank-third {
+  --leaderboard-rank-color: #ff8f40;
+}
+
+/* Below the podium the row keeps a neutral tint, so fourth place does not
+   pick up the accent that third place uses. */
+html[data-palette="ayu"]:not([data-theme="light"]) .leaderboard-row.rank-standard {
+  --leaderboard-rank-color: #b1afaa;
+}
+
+/* The viewer's own row adds an accent wash; third place keeps the palette
+   colour there instead of the classic orange. */
+html[data-palette="ayu"]:not([data-theme="light"]) .leaderboard-row.leaderboard-row-highlight.rank-third {
+  --leaderboard-rank-color: #ff8f40;
+}
+
+html[data-palette="ayu"][data-theme="light"] .leaderboard-row.rank-standard {
+  --leaderboard-rank-color: var(--mdq-muted);
+}
 
 /* ── Tokyo Night palette (deck palette: tokyo-night) ── */
-/* Rules follow. */
+/* Tokyo Night follows folke's tokyonight.nvim colours (Apache-2.0,
+   https://github.com/folke/tokyonight.nvim, extras/lua/tokyonight_night.lua
+   and tokyonight_day.lua at cdc07ac). Dark is the night style: background
+   #1a1b26, dark #16161e, highlight #292e42, foreground #c0caf5 with fg_dark
+   #a9b1d6, blue #7aa2f7 as the accent, magenta #bb9af7, green #9ece6a, yellow
+   #e0af68, orange #ff9e64, red #f7768e, cyan #7dcfff, and #737aa2 (dark5) for
+   borders and the timer track. Adjusted in dark: small danger text red
+   #f7768e to #ff899d, strong text #c0caf5 mixed 35% toward white (#d6ddf9),
+   soft text #737aa2 mixed toward #a9b1d6 (#8e96bc), and the join QR link is
+   the day blue #2e7de9 darkened to #186fe6 because that panel is white.
+   Light is the day style: background #e1e2e7, bg_dark #d0d5e3, foreground
+   #3760bf, with the brighter #ececef and #f2f2f4 being the background mixed
+   35% and 55% toward white for the slide gradient and cards. Day accents fail
+   4.5:1 on that background, so they are darkened, keeping the hue: text
+   #3760bf to #2a4990 (headings #1f356a), fg_dark #6172b0 to #3f4c7e (muted)
+   and #4e5f9d (soft), blue #2e7de9 to #1355b1 as text and #1769da as a
+   fill, purple #7847bd to #6d3faf, magenta #9854f1 to #7013ea, green #587539
+   to #485f2e, yellow #8c6c3e to #6d5430, red #c64343 to #a03131, cyan
+   #006a83 to #005e75, orange #b15c00 to #894700, and #68709a is #6172b0
+   darkened for borders and the timer track. Leaderboard ranks are darkened
+   from #8c6c3e to #5f492a, #6172b0 to #3d4a7a and #b15c00 to #763e00. Dark is
+   the default theme, so the dark variant also applies when data-theme is
+   absent. */
+html[data-palette="tokyo-night"]:not([data-theme="light"]) {
+  --mdq-slide-bg: #1a1b26;
+  --mdq-slide-bg-soft: #16161e;
+  --mdq-slide-frame: rgba(192, 202, 245, 0.16);
+  --mdq-slide-heading: #7aa2f7;
+  --mdq-slide-ink: #c0caf5;
+  --mdq-slide-ink-soft: #a9b1d6;
+  --mdq-slide-eyebrow: #a9b1d6;
+  --mdq-slide-rule: rgba(192, 202, 245, 0.16);
+  --mdq-slide-accent: #7aa2f7;
+  --mdq-slide-accent-strong: #7aa2f7;
+  --mdq-slide-accent-warm: #ff9e64;
+  --mdq-slide-accent-cool: #7dcfff;
+  --mdq-slide-blue: #7aa2f7;
+  --mdq-slide-scene: #9ece6a;
+  --mdq-slide-maroon: #bb9af7;
+  --mdq-slide-glass: #16161e;
+  --mdq-slide-glass-strong: #16161e;
+  --mdq-slide-glass-line: rgba(192, 202, 245, 0.16);
+  --mdq-note-attendee: #7aa2f7;
+  --mdq-note-attendee-tint: rgba(122, 162, 247, 0.12);
+  --mdq-note-presenter: #bb9af7;
+  --mdq-note-presenter-tint: rgba(187, 154, 247, 0.12);
+  --mdq-panel-radius: 0.2rem;
+  --mdq-paper: #1a1b26;
+  --mdq-paper-strong: #16161e;
+  --mdq-card: rgba(41, 46, 66, 0.92);
+  --mdq-card-strong: #292e42;
+  --mdq-line: rgba(192, 202, 245, 0.14);
+  --mdq-line-strong: rgba(192, 202, 245, 0.28);
+  --mdq-control-border: #737aa2;
+  --mdq-ink: #c0caf5;
+  --mdq-ink-strong: #d6ddf9;
+  --mdq-ink-soft: #c0caf5;
+  --mdq-muted: #a9b1d6;
+  --mdq-soft: #8e96bc;
+  --mdq-accent: #7aa2f7;
+  --mdq-accent-hover: #8db0ff;
+  --mdq-accent-text: #7aa2f7;
+  --mdq-on-accent: #16161e;
+  --mdq-accent-soft: rgba(122, 162, 247, 0.1);
+  --mdq-accent-soft-strong: rgba(122, 162, 247, 0.18);
+  --mdq-accent-ink: #c0caf5;
+  --mdq-secondary: #bb9af7;
+  --mdq-secondary-text: #bb9af7;
+  --mdq-on-secondary: #16161e;
+  --mdq-secondary-soft: rgba(187, 154, 247, 0.1);
+  --mdq-success: #9ece6a;
+  --mdq-success-text: #9ece6a;
+  --mdq-on-success: #16161e;
+  --mdq-success-soft: rgba(158, 206, 106, 0.1);
+  --mdq-success-ink: #c0caf5;
+  --mdq-success-line: #9ece6a;
+  --mdq-warning: #e0af68;
+  --mdq-warning-text: #e0af68;
+  --mdq-on-warning: #16161e;
+  --mdq-warning-soft: rgba(224, 175, 104, 0.1);
+  --mdq-warning-ink: #c0caf5;
+  --mdq-danger: #f7768e;
+  --mdq-danger-text: #ff899d;
+  --mdq-on-danger: #16161e;
+  --mdq-danger-soft: rgba(247, 118, 142, 0.1);
+  --mdq-danger-ink: #c0caf5;
+  --mdq-danger-line: #f7768e;
+  --mdq-info: #7dcfff;
+  --mdq-info-text: #7dcfff;
+  --mdq-on-info: #16161e;
+  --mdq-info-soft: rgba(125, 207, 255, 0.1);
+  --mdq-info-ink: #c0caf5;
+  --mdq-info-line: #7dcfff;
+  --mdq-bar: #7aa2f7;
+  --mdq-on-bar: #16161e;
+  --mdq-bar-muted: #787fa6;
+  --mdq-on-bar-muted: #16161e;
+  --mdq-bar-wash: rgba(122, 162, 247, 0.26);
+  --mdq-timer-ok: #9ece6a;
+  --mdq-timer-warn: #e0af68;
+  --mdq-timer-urgent: #f7768e;
+  --mdq-timer-track: #737aa2;
+  background: #1a1b26;
+}
 
-/* placeholder */
+html[data-palette="tokyo-night"]:not([data-theme="light"]) body {
+  background: #1a1b26;
+}
 
-/* placeholder */
+html[data-palette="tokyo-night"]:not([data-theme="light"]) .slide-surface {
+  background: linear-gradient(180deg, #1a1b26 0%, #16161e 100%);
+}
 
-/* placeholder */
+html[data-palette="tokyo-night"]:not([data-theme="light"]) .slide-surface .quiz-html code,
+html[data-palette="tokyo-night"]:not([data-theme="light"]) .slide-surface .quiz-html pre {
+  background: #16161e;
+  color: #c0caf5;
+}
+
+html[data-palette="tokyo-night"]:not([data-theme="light"]) .slide-surface .quiz-html strong {
+  color: #d6ddf9;
+}
+
+html[data-palette="tokyo-night"]:not([data-theme="light"]) .quiz-html code,
+html[data-palette="tokyo-night"]:not([data-theme="light"]) .quiz-html pre {
+  background: #16161e;
+  color: #c0caf5;
+}
+
+html[data-palette="tokyo-night"][data-theme="light"] {
+  --mdq-slide-bg: #e1e2e7;
+  --mdq-slide-bg-soft: #ececef;
+  --mdq-slide-frame: rgba(55, 96, 191, 0.18);
+  --mdq-slide-heading: #1f356a;
+  --mdq-slide-ink: #2a4990;
+  --mdq-slide-ink-soft: #404e81;
+  --mdq-slide-eyebrow: #404e81;
+  --mdq-slide-rule: rgba(55, 96, 191, 0.18);
+  --mdq-slide-accent: #1355b1;
+  --mdq-slide-accent-strong: #1355b1;
+  --mdq-slide-accent-warm: #894700;
+  --mdq-slide-accent-cool: #005e75;
+  --mdq-slide-blue: #1355b1;
+  --mdq-slide-scene: #485f2e;
+  --mdq-slide-maroon: #6d3faf;
+  --mdq-slide-glass: #d0d5e3;
+  --mdq-slide-glass-strong: #d0d5e3;
+  --mdq-slide-glass-line: rgba(55, 96, 191, 0.18);
+  --mdq-note-attendee: #1355b1;
+  --mdq-note-attendee-tint: rgba(19, 85, 177, 0.09);
+  --mdq-note-presenter: #6d3faf;
+  --mdq-note-presenter-tint: rgba(109, 63, 175, 0.09);
+  --mdq-panel-radius: 0.2rem;
+  --mdq-paper: #e1e2e7;
+  --mdq-paper-strong: #ececef;
+  --mdq-card: rgba(242, 242, 244, 0.92);
+  --mdq-card-strong: #f2f2f4;
+  --mdq-dialog: #f2f2f4;
+  --mdq-field: #f2f2f4;
+  --mdq-line: rgba(55, 96, 191, 0.14);
+  --mdq-line-strong: rgba(55, 96, 191, 0.26);
+  --mdq-control-border: #68709a;
+  --mdq-ink: #2a4990;
+  --mdq-ink-strong: #1f356a;
+  --mdq-ink-soft: #2a4990;
+  --mdq-muted: #3f4c7e;
+  --mdq-soft: #4e5f9d;
+  --mdq-accent: #1769da;
+  --mdq-accent-hover: #1769da;
+  --mdq-accent-text: #1355b1;
+  --mdq-on-accent: #f2f2f4;
+  --mdq-accent-soft: rgba(23, 105, 218, 0.08);
+  --mdq-accent-soft-strong: rgba(23, 105, 218, 0.14);
+  --mdq-accent-ink: #0d3a79;
+  --mdq-accent-wash: linear-gradient(135deg, #e7ebf3, #dae3f1);
+  --mdq-secondary: #7013ea;
+  --mdq-secondary-text: #7013ea;
+  --mdq-on-secondary: #f2f2f4;
+  --mdq-secondary-soft: rgba(112, 19, 234, 0.08);
+  --mdq-success: #485f2e;
+  --mdq-success-text: #485f2e;
+  --mdq-on-success: #f2f2f4;
+  --mdq-success-soft: rgba(72, 95, 46, 0.08);
+  --mdq-success-ink: #314120;
+  --mdq-success-line: #485f2e;
+  --mdq-success-wash: linear-gradient(135deg, #e9ebea, #dfe2de);
+  --mdq-warning: #6d5430;
+  --mdq-warning-text: #6d5430;
+  --mdq-on-warning: #f2f2f4;
+  --mdq-warning-soft: rgba(109, 84, 48, 0.08);
+  --mdq-warning-ink: #4a3921;
+  --mdq-danger: #a03131;
+  --mdq-danger-text: #a03131;
+  --mdq-on-danger: #f2f2f4;
+  --mdq-danger-soft: rgba(160, 49, 49, 0.08);
+  --mdq-danger-ink: #6e2121;
+  --mdq-danger-line: #a03131;
+  --mdq-danger-wash: linear-gradient(135deg, #eee8ea, #e9dddf);
+  --mdq-info: #005e75;
+  --mdq-info-text: #005e75;
+  --mdq-on-info: #f2f2f4;
+  --mdq-info-soft: rgba(0, 94, 117, 0.08);
+  --mdq-info-ink: #004252;
+  --mdq-info-line: #005e75;
+  --mdq-bar: #1769da;
+  --mdq-on-bar: #f2f2f4;
+  --mdq-bar-muted: #4b5b96;
+  --mdq-on-bar-muted: #f2f2f4;
+  --mdq-bar-wash: rgba(23, 105, 218, 0.16);
+  --mdq-timer-ok: #485f2e;
+  --mdq-timer-warn: #6d5430;
+  --mdq-timer-urgent: #a03131;
+  --mdq-timer-track: #68709a;
+  --mdq-rank-first: #5f492a;
+  --mdq-rank-second: #3d4a7a;
+  --mdq-rank-third: #763e00;
+  --mdq-page-glow-top: transparent;
+  --mdq-page-glow-cool: transparent;
+  --mdq-page-glow-warm: transparent;
+  background: #e1e2e7;
+}
+
+html[data-palette="tokyo-night"][data-theme="light"] .slide-surface {
+  background: linear-gradient(180deg, #ececef 0%, #e1e2e7 100%);
+}
+
+html[data-palette="tokyo-night"][data-theme="light"] .slide-surface .quiz-html code,
+html[data-palette="tokyo-night"][data-theme="light"] .slide-surface .quiz-html pre {
+  background: #d0d5e3;
+  color: #2a4990;
+}
+
+html[data-palette="tokyo-night"][data-theme="light"] .slide-surface .quiz-html strong {
+  color: #1f356a;
+}
+
+html[data-palette="tokyo-night"][data-theme="light"] .quiz-html code,
+html[data-palette="tokyo-night"][data-theme="light"] .quiz-html pre {
+  background: #d0d5e3;
+  color: #2a4990;
+}
+
+/* tokyo-night link on the white join QR panel (theme.css). */
+html[data-palette="tokyo-night"][data-theme="dark"] .instructor-qr-panel,
+html[data-palette="tokyo-night"][data-theme="light"] .instructor-qr-panel {
+  --mdq-qr-link: #186fe6;
+}
+
+/* Slide references are drawn at 78 percent of the soft ink, which leaves the
+   small link text under 4.5:1 on a light ground, so the light theme uses the
+   soft ink at full strength. */
+html[data-palette="tokyo-night"][data-theme="light"] .slide-references {
+  color: var(--mdq-slide-ink-soft);
+}
+
+/* The dark selection-mode card and chips carry classic purple and green in
+   their base rules; the light theme already reads the tokens. */
+html[data-palette="tokyo-night"]:not([data-theme="light"]) .selection-mode-card-single {
+  border-color: rgba(122, 162, 247, 0.34);
+  background: linear-gradient(135deg, #292e42, #16161e);
+}
+html[data-palette="tokyo-night"]:not([data-theme="light"]) .selection-mode-card-single::after {
+  background: rgba(122, 162, 247, 0.22);
+}
+html[data-palette="tokyo-night"]:not([data-theme="light"]) .selection-mode-card-multi {
+  border-color: rgba(187, 154, 247, 0.32);
+  background: linear-gradient(135deg, #292e42, #16161e);
+}
+html[data-palette="tokyo-night"]:not([data-theme="light"]) .selection-mode-card-multi::after {
+  background: rgba(187, 154, 247, 0.2);
+}
+html[data-palette="tokyo-night"]:not([data-theme="light"]) .selection-mode-label {
+  color: #d6ddf9;
+}
+html[data-palette="tokyo-night"]:not([data-theme="light"]) .selection-mode-text {
+  color: #a9b1d6;
+}
+html[data-palette="tokyo-night"]:not([data-theme="light"]) .selection-mode-chip-single {
+  color: #7aa2f7;
+  border-color: rgba(122, 162, 247, 0.4);
+  background: #16161e;
+}
+html[data-palette="tokyo-night"]:not([data-theme="light"]) .selection-mode-chip-multi {
+  color: #bb9af7;
+  border-color: rgba(187, 154, 247, 0.4);
+  background: #16161e;
+}
+
+html[data-palette="tokyo-night"]:not([data-theme="light"]) .leaderboard-row.rank-first {
+  --leaderboard-rank-color: #e0af68;
+}
+html[data-palette="tokyo-night"]:not([data-theme="light"]) .leaderboard-row.rank-second {
+  --leaderboard-rank-color: #a9b1d6;
+}
+html[data-palette="tokyo-night"]:not([data-theme="light"]) .leaderboard-row.rank-third {
+  --leaderboard-rank-color: #ff9e64;
+}
+
+/* Below the podium the row keeps a neutral tint, so fourth place does not
+   pick up the accent that third place uses. */
+html[data-palette="tokyo-night"]:not([data-theme="light"]) .leaderboard-row.rank-standard {
+  --leaderboard-rank-color: #a9b1d6;
+}
+
+/* The viewer's own row adds an accent wash; third place keeps the palette
+   colour there instead of the classic orange. */
+html[data-palette="tokyo-night"]:not([data-theme="light"]) .leaderboard-row.leaderboard-row-highlight.rank-third {
+  --leaderboard-rank-color: #ff9e64;
+}
+
+html[data-palette="tokyo-night"][data-theme="light"] .leaderboard-row.rank-standard {
+  --leaderboard-rank-color: var(--mdq-muted);
+}
 
 /* The viewer's own row adds an accent wash, so a dark theme lightens the
    third-place orange to hold 4.5:1 on it. */
