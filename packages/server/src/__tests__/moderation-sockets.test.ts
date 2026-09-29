@@ -7,9 +7,10 @@ import request from "supertest";
 import { Server } from "socket.io";
 import { io as ioClient, Socket as ClientSocket } from "socket.io-client";
 import { Quiz, SocketEvents, AnswerCountPayload, ResultsRevealPayload, StudentJoinedPayload } from "@mdq/shared";
-import { createApp } from "../app";
+import { createApp, resultsFileName } from "../app";
 import { clearAllSessions } from "../session";
 import { setupSocket, emitMessages } from "../socket";
+import { clearInstructorSessionsForTests } from "../instructor-auth";
 
 const DECK = `# Moderation Sockets
 
@@ -185,5 +186,56 @@ describe("open response moderation over real sockets", () => {
     await setVisibility(sessionId, 0, key, true).expect(200);
     // A phone cannot ask the server to hide anything: it has no such event.
     expect(phone.recorder.events.every((e) => !e.text.includes("hidden"))).toBe(true);
+  });
+
+  it("hands the instructor the results CSV while the session runs and after it ends", async () => {
+    const created = await request(app).post("/api/session").send({ week: "moderation" }).expect(201);
+    const { sessionId } = created.body;
+    const phone = await joinAs(sessionId, { studentId: IDS[0], displayName: "Alex Tan" });
+    await post(sessionId, "start");
+    phone.recorder.socket.emit(SocketEvents.ANSWER_SUBMIT, { questionIndex: 0, responseText: TEXTS[0] });
+    await until(() => phone.recorder.events.some((e) => e.event === SocketEvents.ANSWER_ACCEPTED), "accepted");
+
+    const running = await request(app).get(`/api/session/${sessionId}/results.csv`).expect(200);
+    expect(running.headers["content-type"]).toContain("text/csv");
+    expect(running.headers["cache-control"]).toBe("no-store");
+    expect(running.headers["content-disposition"]).toMatch(/^attachment; filename="moderation-sockets-results-\d{4}-\d{2}-\d{2}\.csv"$/);
+    expect(running.text.split("\n")[0]).toContain("student_id");
+    expect(running.text).toContain(IDS[0]);
+    expect(running.text).toContain(TEXTS[0]);
+
+    await post(sessionId, "close");
+    await post(sessionId, "reveal");
+    await post(sessionId, "end");
+    const ended = await request(app).get(`/api/session/${sessionId}/results.csv`).expect(200);
+    expect(ended.text).toContain(TEXTS[0]);
+    // The reveal time is still there after the end.
+    expect(ended.text.split("\n")[1]).toMatch(/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z,Kind words from Alex/);
+    await request(app).get("/api/session/nope/results.csv").expect(404);
+  });
+
+  describe("with an instructor password", () => {
+    const original = process.env.INSTRUCTOR_PASSWORD;
+    afterEach(() => {
+      if (typeof original === "string") process.env.INSTRUCTOR_PASSWORD = original; else delete process.env.INSTRUCTOR_PASSWORD;
+      clearInstructorSessionsForTests();
+    });
+
+    it("keeps the CSV and the visibility route to the instructor", async () => {
+      process.env.INSTRUCTOR_PASSWORD = "secret-password";
+      const protectedApp = createApp({ quizDir: dir, dataDir: path.join(dir, "data") });
+      const agent = request.agent(protectedApp);
+      await agent.post("/api/instructor/login").send({ password: "secret-password" }).expect(204);
+      const { sessionId } = (await agent.post("/api/session").send({ week: "moderation" }).expect(201)).body;
+      await request(protectedApp).get(`/api/session/${sessionId}/results.csv`).expect(401);
+      await request(protectedApp).post(`/api/session/${sessionId}/response-visibility`).send({ questionIndex: 0, publicKey: "k", hidden: true }).expect(401);
+      await agent.get(`/api/session/${sessionId}/results.csv`).expect(200);
+    });
+  });
+
+  it("names the download from the deck title and the session date", () => {
+    expect(resultsFileName("Week 1: Intro & Setup!", new Date(2026, 2, 4, 10).getTime())).toBe("week-1-intro-setup-results-2026-03-04.csv");
+    expect(resultsFileName("Café Ünïcode", new Date(2026, 11, 31, 23).getTime())).toBe("cafe-unicode-results-2026-12-31.csv");
+    expect(resultsFileName("!!!", new Date(2026, 0, 2).getTime())).toBe("session-results-2026-01-02.csv");
   });
 });

@@ -100,10 +100,6 @@ export function markQuestionRevealed(
   getRevealTimestampMap(session.sessionId).set(questionIndex, revealedAt);
 }
 
-function clearSessionRevealTracking(sessionId: string): void {
-  sessionRevealTimestamps.delete(sessionId);
-}
-
 function winnersDir(baseDir?: string): string {
   return path.join(resolveDataDir(baseDir), "winners");
 }
@@ -179,6 +175,14 @@ export interface SummaryWriteResult {
 }
 
 /**
+ * The results CSV for a session as it stands now, with the times each question
+ * was revealed. Works while the session runs and after it has ended.
+ */
+export function buildSessionResultsCsv(session: Session, quiz: Quiz): string {
+  return buildResultsCsv(session, quiz, { revealTimestamps: getRevealTimestampMap(session.sessionId) });
+}
+
+/**
  * Save per-student quiz results as CSV to data/submissions/<sessionId>.csv.
  * Intended for attendance and lightweight spreadsheet workflows.
  */
@@ -186,7 +190,7 @@ export function saveResultsCsv(session: Session, quiz: Quiz, baseDir?: string): 
   const dir = submissionsDir(baseDir);
   ensureDir(dir);
 
-  const csv = buildResultsCsv(session, quiz, { revealTimestamps: getRevealTimestampMap(session.sessionId) });
+  const csv = buildSessionResultsCsv(session, quiz);
 
   const filePath = getSessionResultsCsvPath(session, baseDir);
   const action: CsvWriteResult["action"] = fs.existsSync(filePath) ? "updated" : "created";
@@ -579,8 +583,6 @@ export function persistSessionOnEnd(
   } catch (e) {
     console.error(`Failed to save weekly result for ${session.week}:`, e);
   }
-
-  clearSessionRevealTracking(session.sessionId);
 }
 
 // ── Utility ─────────────────────────────────

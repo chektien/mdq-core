@@ -17,6 +17,7 @@ import {
   persistSessionOnEnd,
   computeCumulativeLeaderboard,
   persistSessionProgressOnReveal,
+  buildSessionResultsCsv,
 } from "./persistence";
 import { getQuestionType, getScoredQuestionCount, isOpenResponseQuestion } from "./scoring";
 import { getCachedAccessInfo, generateQrDataUrl, generateShortUrl, type ShortUrlProvider } from "./access-info";
@@ -115,6 +116,15 @@ export function publicCumulativeEntries(entries: CumulativeLeaderboardEntry[]): 
     used.add(label.toLowerCase());
     return { ...rest, label };
   });
+}
+
+/** A safe download name from the deck title and the session's date, e.g. `week-1-quiz-results-2026-03-04.csv`. */
+export function resultsFileName(title: string, createdAt: number): string {
+  const slug = title.normalize("NFKD").replace(/[\u0300-\u036f]/g, "").toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 60).replace(/-+$/, "");
+  const d = new Date(createdAt);
+  const date = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  return `${slug || "session"}-results-${date}.csv`;
 }
 
 export function createApp(quizDirOrOpts?: string | AppOptions) {
@@ -778,6 +788,19 @@ export function createApp(quizDirOrOpts?: string | AppOptions) {
         if (e instanceof EngineCommandError) return res.status(400).json({ error: e.message });
         throw e;
       }
+    });
+  });
+
+  // ── Results download ──
+  // The file names people by Student ID, so only the instructor may read it.
+  app.get(API.SESSION_RESULTS_CSV, requireInstructorAuth, (req, res) => {
+    withSession(req, res, (session) => {
+      const quiz = getQuizForSession(session.week);
+      if (!quiz) return res.status(500).json({ error: "Quiz data not found" });
+      res.setHeader("Content-Type", "text/csv; charset=utf-8");
+      res.setHeader("Content-Disposition", `attachment; filename="${resultsFileName(quiz.title, session.createdAt)}"`);
+      res.setHeader("Cache-Control", "no-store");
+      res.send(buildSessionResultsCsv(session, quiz));
     });
   });
 
