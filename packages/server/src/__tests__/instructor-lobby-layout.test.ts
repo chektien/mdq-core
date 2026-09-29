@@ -26,7 +26,7 @@ describe("instructor lobby layout", () => {
     const qr = lobby.indexOf("<QRPanel");
     expect(qr).toBeGreaterThan(join);
     expect(qr).toBeLessThan(side);
-    for (const marker of ["instructor-participant-count", "sock.participants.participants.map", "restoreNotice", "instructor-start-button"]) {
+    for (const marker of ["instructor-participant-count", "<ParticipantList", "restoreNotice", "instructor-start-button"]) {
       expect(lobby.indexOf(marker)).toBeGreaterThan(side);
     }
   });

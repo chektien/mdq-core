@@ -5,6 +5,7 @@ import type {
   StudentJoinedPayload,
   QuestionOpenPayload,
   QuestionTickPayload,
+  QuestionClosePayload,
   AnswerCountPayload,
   ResultsRevealPayload,
   ResultsDistributionPayload,
@@ -189,6 +190,8 @@ export interface UseSocketReturn {
   // Question
   currentQuestion: QuestionState | null;
   remainingSec: number;
+  /** True when the open question closed because its timer ran out, false when it was closed early. */
+  timedOut: boolean;
   answerCount: AnswerCountPayload | null;
   submitted: boolean;
   submittedOptions: string[];
@@ -242,6 +245,7 @@ export function useSocket(
 
   const [currentQuestion, setCurrentQuestion] = useState<QuestionState | null>(null);
   const [remainingSec, setRemainingSec] = useState(0);
+  const [timedOut, setTimedOut] = useState(false);
   const [answerCount, setAnswerCount] = useState<AnswerCountPayload | null>(null);
   const [submitted, setSubmitted] = useState(false);
   const [submittedOptions, setSubmittedOptions] = useState<string[]>([]);
@@ -412,6 +416,7 @@ export function useSocket(
       setSubmittedOptions(seeded.selectedOptions);
       setSubmittedResponseText(seeded.responseText);
       setRemainingSec(data.timeLimitSec);
+      setTimedOut(false);
       // A live open arrives as the question starts; a replayed one is followed by a tick that corrects this.
       clockOffsetRef.current = data.startedAt - Date.now();
     });
@@ -422,9 +427,10 @@ export function useSocket(
       if (shown) clockOffsetRef.current = clockOffsetFromTick(shown, data.remainingSec, Date.now());
     });
 
-    socket.on(SocketEvents.QUESTION_CLOSE, () => {
+    socket.on(SocketEvents.QUESTION_CLOSE, (data?: QuestionClosePayload) => {
       setSessionState("QUESTION_CLOSED");
       setRemainingSec(0);
+      setTimedOut(data?.timedOut === true);
     });
 
     socket.on(SocketEvents.ANSWER_ACCEPTED, (data: { questionIndex: number }) => {
@@ -660,6 +666,7 @@ export function useSocket(
     answeredQuestions,
     currentQuestion,
     remainingSec,
+    timedOut,
     answerCount,
     submitted,
     submittedOptions,

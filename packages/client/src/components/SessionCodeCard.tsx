@@ -1,9 +1,12 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 
 interface SessionCodeCardProps {
   qrDataUrl?: string;
   sessionCode: string;
   participantCount?: number;
+  /** True while the screen has lost its connection, so the count may be out of date. */
+  offline?: boolean;
   presentationUrl?: string;
   joinUrl?: string;
   shortUrl?: string;
@@ -15,6 +18,7 @@ export default function SessionCodeCard({
   qrDataUrl,
   sessionCode,
   participantCount,
+  offline = false,
   presentationUrl,
   joinUrl,
   shortUrl,
@@ -22,6 +26,7 @@ export default function SessionCodeCard({
   className = "",
 }: SessionCodeCardProps) {
   const [expanded, setExpanded] = useState(defaultExpanded);
+  const [enlarged, setEnlarged] = useState(false);
   const displayJoinUrl = shortUrl || joinUrl;
   const hasBody = qrDataUrl || presentationUrl || displayJoinUrl;
   const expandedLabel = shortUrl || "";
@@ -30,6 +35,15 @@ export default function SessionCodeCard({
     expanded ? "session-code-card-expanded" : "session-code-card-compact",
     className,
   ].filter(Boolean).join(" ");
+
+  useEffect(() => {
+    if (!enlarged) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setEnlarged(false);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [enlarged]);
 
   return (
     <aside className={rootClassName} aria-label="Session join details">
@@ -41,13 +55,30 @@ export default function SessionCodeCard({
       >
         {expanded && expandedLabel && <span className="session-code-card-kicker">{expandedLabel}</span>}
         <strong>{sessionCode}</strong>
-        {participantCount !== undefined && <span className="session-code-card-meta">{participantCount} online</span>}
+        {participantCount !== undefined && (
+          <span
+            className={`session-code-card-meta${offline ? " session-code-card-meta-offline" : ""}`}
+            title={offline ? "Reconnecting. This count may be out of date." : undefined}
+          >
+            {participantCount} online
+          </span>
+        )}
         {hasBody && <span className="session-code-card-icon" aria-hidden="true">{expanded ? "−" : "+"}</span>}
       </button>
 
       {expanded && hasBody && (
         <div className="session-code-card-body">
-          {qrDataUrl && <img className="session-code-card-qr" src={qrDataUrl} alt="Join QR" />}
+          {qrDataUrl && (
+            <button
+              type="button"
+              className="session-code-card-qr-button"
+              aria-label="Show the join QR code large"
+              onClick={() => setEnlarged(true)}
+            >
+              <img className="session-code-card-qr" src={qrDataUrl} alt="Join QR" />
+              <span className="session-code-card-qr-hint">Tap to enlarge</span>
+            </button>
+          )}
           {displayJoinUrl && <p className="session-code-card-link-text">{displayJoinUrl}</p>}
           {presentationUrl && (
             <a className="session-code-card-link" href={presentationUrl} target="_blank" rel="noopener noreferrer">
@@ -55,6 +86,31 @@ export default function SessionCodeCard({
             </a>
           )}
         </div>
+      )}
+
+      {enlarged && qrDataUrl && createPortal(
+        <div
+          className="qr-enlarged"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Join QR code"
+          onClick={() => setEnlarged(false)}
+        >
+          <div className="qr-enlarged-card">
+            <img className="qr-enlarged-image" src={qrDataUrl} alt="Join QR code" />
+            <p className="qr-enlarged-code">{sessionCode}</p>
+            {displayJoinUrl && <p className="qr-enlarged-url">{displayJoinUrl}</p>}
+            <button
+              type="button"
+              className="qr-enlarged-close"
+              autoFocus
+              onClick={(event) => { event.stopPropagation(); setEnlarged(false); }}
+            >
+              Close
+            </button>
+          </div>
+        </div>,
+        document.body,
       )}
     </aside>
   );

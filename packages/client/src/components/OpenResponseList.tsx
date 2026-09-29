@@ -31,14 +31,14 @@ export default function OpenResponseList({
   };
 
   return (
-    <div className="open-response-list w-full max-w-3xl rounded-2xl border border-zinc-800 bg-zinc-900/60 p-4">
+    <div className="open-response-list w-full max-w-3xl rounded-2xl border p-4">
       <div className="mb-3 flex items-center justify-between gap-3">
-        <h3 className="open-response-title text-sm font-semibold uppercase tracking-[0.2em] text-zinc-400">{title}</h3>
-        <span className="open-response-count text-xs tabular-nums text-zinc-500">{responses.length}</span>
+        <h3 className="open-response-title text-sm font-semibold uppercase tracking-[0.2em]">{title}</h3>
+        <span className="open-response-count text-xs tabular-nums">{responses.length}</span>
       </div>
       {notice && <p role="alert" className="open-response-notice mb-3 text-sm">{notice}</p>}
       {responses.length === 0 ? (
-        <p className="open-response-empty text-sm text-zinc-500">{emptyLabel}</p>
+        <p className="open-response-empty text-sm">{emptyLabel}</p>
       ) : (
         <div className="max-h-[340px] space-y-2 overflow-y-auto pr-1">
           {responses.map((response) => {
@@ -51,17 +51,17 @@ export default function OpenResponseList({
                 key={onToggleHidden ? undefined : rowKey}
                 type="button"
                 onClick={() => toggleRow(rowKey)}
-                className={`open-response-entry${hidden ? " open-response-entry-hidden" : ""} w-full min-w-0 rounded-xl border border-zinc-800 bg-zinc-950/70 px-3 py-3 text-left transition-colors hover:border-zinc-700`}
+                className={`open-response-entry${hidden ? " open-response-entry-hidden" : ""} w-full min-w-0 rounded-xl border px-3 py-3 text-left transition-colors`}
               >
-                <div className="open-response-identity flex items-center gap-3 overflow-hidden text-xs text-zinc-500">
+                <div className="open-response-identity flex items-center gap-3 overflow-hidden text-xs">
                   {showStudentIds && response.studentId && (
-                    <span className="open-response-student-id shrink-0 font-mono font-semibold text-zinc-300">{response.studentId}</span>
+                    <span className="open-response-student-id shrink-0 font-mono font-semibold">{response.studentId}</span>
                   )}
                   <span className="open-response-display-name truncate">{participantLabel}</span>
                   {hidden && <span className="open-response-hidden-note shrink-0 font-semibold">Hidden from the projector</span>}
                 </div>
                 <p
-                  className={`open-response-text mt-2 text-sm leading-relaxed text-zinc-100 ${expanded ? "whitespace-pre-wrap break-words" : "truncate whitespace-nowrap"}`}
+                  className={`open-response-text mt-2 text-sm leading-relaxed ${expanded ? "whitespace-pre-wrap break-words" : "truncate whitespace-nowrap"}`}
                   title={expanded ? undefined : response.responseText}
                 >
                   {response.responseText}
@@ -96,7 +96,7 @@ export default function OpenResponseList({
  */
 export function OpenResponseCount({ count }: { count: number }) {
   return (
-    <div className="open-response-list open-response-count-card w-full max-w-3xl rounded-2xl border border-zinc-800 bg-zinc-900/60 p-6 text-center">
+    <div className="open-response-list open-response-count-card w-full max-w-3xl rounded-2xl border p-6 text-center">
       <p className="open-response-count-number text-5xl font-semibold tabular-nums">{count}</p>
       <p className="open-response-count-label mt-2 text-lg">{count === 1 ? "response in" : "responses in"}</p>
       <p className="open-response-empty mt-3 text-sm">Responses appear after the reveal.</p>
