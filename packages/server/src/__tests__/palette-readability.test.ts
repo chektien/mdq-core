@@ -243,6 +243,29 @@ describe("palette readability, 7 palettes x 2 themes", () => {
       expectPairs(`${name} references`, { "reference text": token(t, "--mdq-slide-ink-soft") }, grounds);
     });
 
+    it("keeps every text on the end-session dialog at 4.5:1 and its button boundaries at 3:1", () => {
+      const dialog = token(t, "--mdq-dialog");
+      const lightTile = parseColor(/rgba\([^)]*\)/.exec(declarationsOf(theme, 'html[data-theme="light"] .end-session-stat').background)![0]);
+      const tile = mode === "dark" ? over([255, 255, 255, 0.045], dialog) : over(lightTile, dialog);
+      const keepFill = mode === "dark" ? over([255, 255, 255, 0.04], dialog) : parseColor(token(t, "--mdq-field"));
+      const dark = mode === "dark";
+      expectPairs(`${name} dialog`, {
+        title: token(t, dark ? "--mdq-ink-strong" : "--mdq-ink"),
+        description: token(t, dark ? "--mdq-ink" : "--mdq-muted"),
+        eyebrow: token(t, dark ? "--mdq-danger-ink" : "--mdq-danger-text"),
+      }, { dialog });
+      expectPairs(`${name} dialog stats`, {
+        value: token(t, dark ? "--mdq-ink-strong" : "--mdq-ink"),
+        label: token(t, "--mdq-muted"),
+      }, { tile });
+      expectPairs(`${name} keep session`, { label: token(t, "--mdq-ink") }, { fill: keepFill });
+      expectPairs(`${name} end session`, { label: token(t, "--mdq-on-danger") }, { fill: token(t, "--mdq-danger") });
+      expectPairs(`${name} dialog boundaries`, {
+        "keep session border": token(t, "--mdq-control-border"),
+        "end session border": token(t, "--mdq-danger-line"),
+      }, { dialog }, 3);
+    });
+
   });
 
   it("draws the presenter notes panel from palette tokens, with no fixed amber", () => {
@@ -258,6 +281,18 @@ describe("palette readability, 7 palettes x 2 themes", () => {
     expect(declarationsOf(index, ".slide-references").color).toBe("var(--mdq-slide-ink-soft)");
     expect(index).not.toMatch(/data-palette[^{]*\.slide-references/);
     expect(index).not.toMatch(/78 percent|78%/);
+  });
+
+  it("draws the end-session dialog from theme tokens in every palette", () => {
+    const tsx = fs.readFileSync(path.join(clientSrc, "views", "InstructorView.tsx"), "utf-8");
+    const card = /className="end-session-card [^"]*"/.exec(tsx)![0];
+    expect(card).toContain("bg-[var(--mdq-dialog)]");
+    expect(card).toContain("var(--mdq-danger-line)");
+    expect(card).not.toMatch(/#[0-9a-f]{3,8}|red-\d/i);
+    expect(declarationsOf(theme, 'html[data-theme="dark"]')["--mdq-dialog"]).toBe("#201d28");
+    for (const palette of PALETTES.filter((name) => name !== "classic")) {
+      for (const mode of MODES) expect([palette, mode, `--mdq-dialog` in declarationsOf(index, paletteSelector(palette, mode))]).toEqual([palette, mode, true]);
+    }
   });
 
 });

@@ -63,8 +63,8 @@ const printBlock = (fn: string, next: string): string =>
 describe("seoul256 palette", () => {
   const dark: Tokens = { ...tokens(theme, 'html[data-theme="dark"]'), ...tokens(index, DARK) };
   const light: Tokens = { ...tokens(theme, 'html[data-theme="light"]'), ...tokens(index, LIGHT) };
-  // The dark end-session dialog keeps the classic dark card in every palette.
-  const darkDialog = ["#201d28", "#292630"];
+  // The dark end-session dialog reads the palette's --mdq-dialog, with the Keep Session fill on it.
+  const darkDialog = [hex(dark["--mdq-dialog"], "dark dialog"), over("rgba(255, 255, 255, 0.04)", hex(dark["--mdq-dialog"], "dark dialog"))];
 
   it("defines a dark block, which also applies when data-theme is absent, and a light block", () => {
     expect(index).toContain(`${DARK} {`);
