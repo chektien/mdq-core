@@ -830,6 +830,51 @@ html[data-palette="gruvbox"][data-theme="light"] .leaderboard-row.rank-standard 
   --leaderboard-rank-color: var(--mdq-muted);
 }
 
+/* ── Rosé Pine palette (deck palette: rose-pine) ── */
+/* Rules follow. */
+
+/* placeholder */
+
+/* placeholder */
+
+/* placeholder */
+
+/* ── Catppuccin palette (deck palette: catppuccin) ── */
+/* Rules follow. */
+
+/* placeholder */
+
+/* placeholder */
+
+/* placeholder */
+
+/* ── seoul256 palette (deck palette: seoul256) ── */
+/* Rules follow. */
+
+/* placeholder */
+
+/* placeholder */
+
+/* placeholder */
+
+/* ── Ayu palette (deck palette: ayu) ── */
+/* Rules follow. */
+
+/* placeholder */
+
+/* placeholder */
+
+/* placeholder */
+
+/* ── Tokyo Night palette (deck palette: tokyo-night) ── */
+/* Rules follow. */
+
+/* placeholder */
+
+/* placeholder */
+
+/* placeholder */
+
 /* The viewer's own row adds an accent wash, so a dark theme lightens the
    third-place orange to hold 4.5:1 on it. */
 html:not([data-theme="light"]) .leaderboard-row.leaderboard-row-highlight.rank-third {

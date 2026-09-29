@@ -586,13 +586,85 @@ function renderGruvboxTokens(theme: PrintTheme): string {
     `;
 }
 
+function renderRosePineTokens(theme: PrintTheme): string {
+  // TODO(palette-values): rose-pine
+  return renderThemeTokens(theme, "classic");
+}
+
+function renderCatppuccinTokens(theme: PrintTheme): string {
+  // TODO(palette-values): catppuccin
+  return renderThemeTokens(theme, "classic");
+}
+
+function renderSeoul256Tokens(theme: PrintTheme): string {
+  // TODO(palette-values): seoul256
+  return renderThemeTokens(theme, "classic");
+}
+
+function renderAyuTokens(theme: PrintTheme): string {
+  // TODO(palette-values): ayu
+  return renderThemeTokens(theme, "classic");
+}
+
+function renderTokyoNightTokens(theme: PrintTheme): string {
+  // TODO(palette-values): tokyo-night
+  return renderThemeTokens(theme, "classic");
+}
+
 function printPageBackground(theme: PrintTheme, palette: PrintPalette): string {
-  if (palette === "gruvbox") return theme === "dark" ? "#282828" : "#eff0ec";
+  switch (palette) {
+    case "gruvbox":
+      return theme === "dark" ? "#282828" : "#eff0ec";
+
+    case "rose-pine":
+      // TODO(palette-values): rose-pine
+      return printPageBackground(theme, "classic");
+
+    case "catppuccin":
+      // TODO(palette-values): catppuccin
+      return printPageBackground(theme, "classic");
+
+    case "seoul256":
+      // TODO(palette-values): seoul256
+      return printPageBackground(theme, "classic");
+
+    case "ayu":
+      // TODO(palette-values): ayu
+      return printPageBackground(theme, "classic");
+
+    case "tokyo-night":
+      // TODO(palette-values): tokyo-night
+      return printPageBackground(theme, "classic");
+
+    case "classic":
+      break;
+  }
   return theme === "dark" ? "#242423" : "#ffffff";
 }
 
 function renderThemeTokens(theme: PrintTheme, palette: PrintPalette): string {
-  if (palette === "gruvbox") return renderGruvboxTokens(theme);
+  switch (palette) {
+    case "gruvbox":
+      return renderGruvboxTokens(theme);
+
+    case "rose-pine":
+      return renderRosePineTokens(theme);
+
+    case "catppuccin":
+      return renderCatppuccinTokens(theme);
+
+    case "seoul256":
+      return renderSeoul256Tokens(theme);
+
+    case "ayu":
+      return renderAyuTokens(theme);
+
+    case "tokyo-night":
+      return renderTokyoNightTokens(theme);
+
+    case "classic":
+      break;
+  }
   if (theme === "light") {
     return `
       --page-bg: #ffffff;
