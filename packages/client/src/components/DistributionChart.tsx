@@ -1,3 +1,6 @@
+import { useLayoutEffect, useRef, useState } from "react";
+import { labelFitsInBar } from "./distributionLabel";
+
 /** Horizontal bar chart for answer distribution */
 export default function DistributionChart({
   distribution,
@@ -41,21 +44,57 @@ export default function DistributionChart({
             >
               {label}
             </span>
-            <div className="dist-bar-track flex-1 bg-zinc-800 rounded-full h-8 overflow-hidden">
-              <div
-                className={`dist-bar bar-fill h-full rounded-full ${barColor} flex items-center justify-end pr-3`}
-                style={{ width: `${Math.max(pct, 2)}%` }}
-              >
-                {count > 0 && (
-                  <span className="dist-bar-label text-white text-sm font-semibold tabular-nums">
-                    {count} ({percentageBase > 0 ? Math.round((count / percentageBase) * 100) : 0}%)
-                  </span>
-                )}
-              </div>
-            </div>
+            <DistributionBar
+              widthPct={Math.max(pct, 2)}
+              barColor={barColor}
+              text={count > 0 ? `${count} (${percentageBase > 0 ? Math.round((count / percentageBase) * 100) : 0}%)` : null}
+            />
           </div>
         );
       })}
+    </div>
+  );
+}
+
+/** One bar drawn at its true share; its count sits inside when it fits and just after the bar when it does not. */
+function DistributionBar({ widthPct, barColor, text }: { widthPct: number; barColor: string; text: string | null }) {
+  const trackRef = useRef<HTMLDivElement>(null);
+  const labelRef = useRef<HTMLSpanElement>(null);
+  const [inside, setInside] = useState(true);
+
+  useLayoutEffect(() => {
+    const track = trackRef.current;
+    const measure = () => {
+      if (!track || !labelRef.current) return;
+      // The bar animates its width, so measure against the share it is heading to.
+      setInside(labelFitsInBar(track.clientWidth, widthPct, labelRef.current.offsetWidth));
+    };
+    measure();
+    if (!track || typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(measure);
+    observer.observe(track);
+    return () => observer.disconnect();
+  }, [widthPct, text]);
+
+  // Padding only surrounds a label drawn inside, so an empty or narrow bar keeps its true width.
+  const labelNode = text !== null && (
+    <span
+      ref={labelRef}
+      className={`dist-bar-label whitespace-nowrap text-sm font-semibold tabular-nums ${inside ? "text-white" : "dist-bar-label-outside ml-2 text-zinc-200"}`}
+    >
+      {text}
+    </span>
+  );
+
+  return (
+    <div ref={trackRef} className="dist-bar-track flex flex-1 items-center bg-zinc-800 rounded-full h-8 overflow-hidden">
+      <div
+        className={`dist-bar bar-fill h-full shrink-0 rounded-full ${barColor} flex items-center justify-end ${inside && text !== null ? "pr-3" : ""}`}
+        style={{ width: `${widthPct}%` }}
+      >
+        {inside && labelNode}
+      </div>
+      {!inside && labelNode}
     </div>
   );
 }

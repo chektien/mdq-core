@@ -781,7 +781,6 @@ html[data-theme] .dist-bar-track {
 }
 
 html[data-theme] .dist-bar {
-  min-width: max-content;
   background: var(--mdq-bar) !important;
   color: var(--mdq-on-bar);
 }
@@ -798,6 +797,12 @@ html[data-theme] .dist-bar-muted {
 
 html[data-theme] .dist-bar .dist-bar-label {
   color: inherit !important;
+}
+
+/* A share too narrow for its count keeps its true length; the count sits
+   just after the bar on the track in the page ink. */
+html[data-theme] .dist-bar-track .dist-bar-label-outside {
+  color: var(--mdq-ink) !important;
 }
 
 /* The QR panel stays white in both themes for scanning. Its labels use dark

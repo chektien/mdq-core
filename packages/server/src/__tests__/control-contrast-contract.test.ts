@@ -1,5 +1,6 @@
 import fs from "fs";
 import path from "path";
+import { labelFitsInBar } from "../../../client/src/components/distributionLabel";
 import { timerFontSize, timerLabel } from "../../../client/src/components/timerLabel";
 
 const clientSrc = path.resolve(__dirname, "..", "..", "..", "client", "src");
@@ -57,5 +58,15 @@ describe("control contrast contract", () => {
 
   it("lightens third place on the viewer's own row in dark themes", () => {
     expect(ruleBody(index, 'html:not([data-theme="light"]) .leaderboard-row.leaderboard-row-highlight.rank-third')).toContain("--leaderboard-rank-color: #ffa552");
+  });
+
+  it("draws a narrow distribution share at its true length with the count outside", () => {
+    expect(ruleBody(theme, "html[data-theme] .dist-bar")).not.toMatch(/min-width/);
+    // A 2 percent share of a 320 px track is 6.4 px; its "1 (2%)" count cannot fit inside.
+    expect(labelFitsInBar(320, 2, 44)).toBe(false);
+    expect(labelFitsInBar(320, 100, 70)).toBe(true);
+    expect(labelFitsInBar(320, 21, 44)).toBe(false);
+    expect(labelFitsInBar(320, 22, 44)).toBe(true);
+    expect(ruleBody(theme, "html[data-theme] .dist-bar-track .dist-bar-label-outside")).toContain("color: var(--mdq-ink)");
   });
 });
