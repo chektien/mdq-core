@@ -1,6 +1,6 @@
 import fs from "fs";
 import path from "path";
-import { readServedAppearance, resolveBootAppearance, systemFallbackTheme } from "../../../client/src/appearance";
+import { readServedAppearance, resolveBootAppearance, resolveClientPalette, systemFallbackTheme } from "../../../client/src/appearance";
 import { settleWithin } from "../../../client/src/boot";
 
 const clientSrc = path.resolve(__dirname, "..", "..", "..", "client", "src");
@@ -11,6 +11,21 @@ describe("client boot appearance", () => {
     expect(readServedAppearance({ theme: "light", palette: "gruvbox" })).toEqual({ theme: "light", palette: "gruvbox" });
     expect(readServedAppearance({ theme: "sepia", palette: "neon" })).toEqual({ theme: undefined, palette: undefined });
     expect(readServedAppearance({})).toEqual({ theme: undefined, palette: undefined });
+  });
+
+  it("keeps every supported palette served on <html> and ignores the rest", () => {
+    for (const palette of ["classic", "gruvbox", "rose-pine", "catppuccin", "seoul256", "ayu", "tokyo-night"]) {
+      expect(readServedAppearance({ palette })).toEqual({ theme: undefined, palette });
+      expect(resolveClientPalette(palette)).toBe(palette);
+    }
+    for (const palette of ["rosepine", "Tokyo-Night", "mocha", "", undefined, 3]) {
+      expect(resolveClientPalette(palette)).toBe("classic");
+      expect(resolveClientPalette(palette, "ayu")).toBe("ayu");
+    }
+    expect(readServedAppearance({ palette: "rosepine" })).toEqual({ theme: undefined, palette: undefined });
+    expect(resolveBootAppearance({}, { palette: "catppuccin" })).toEqual({ theme: "dark", palette: "catppuccin" });
+    expect(resolveBootAppearance({ palette: "seoul256" }, { palette: "ayu" })).toEqual({ theme: "dark", palette: "seoul256" });
+    expect(resolveBootAppearance({}, { palette: "unknown" })).toEqual({ theme: "dark", palette: "classic" });
   });
 
   it("prefers served attributes over the runtime config", () => {

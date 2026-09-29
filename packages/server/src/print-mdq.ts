@@ -1,12 +1,12 @@
 import { chromium, type Browser } from "playwright";
-import { Quiz, Question, QuestionType } from "@mdq/shared";
+import { DECK_PALETTES, DeckPalette, Quiz, Question, QuestionType, describeDeckPalettes, parseDeckPalette } from "@mdq/shared";
 import { parseQuizMarkdown, QuizParseError } from "./parser";
 import * as fs from "fs";
 import * as path from "path";
 import { pathToFileURL } from "url";
 
 type PrintTheme = "dark" | "light";
-type PrintPalette = "classic" | "gruvbox";
+type PrintPalette = DeckPalette;
 
 interface PrintOptions {
   inputFile: string;
@@ -61,7 +61,7 @@ Options:
   --no-answers         Hide correct answers and feedback. Default.
   --page-size <size>   A4 or Letter. Default: A4.
   --theme <theme>      dark or light. Default: dark.
-  --palette <palette>  classic or gruvbox. Default: the deck's palette, else classic.
+  --palette <palette>  ${DECK_PALETTES.join(", ")}. Default: the deck's palette, else classic.
   --title <title>      Override the PDF cover title.
   --html <file>        Also write the generated print HTML for debugging.
   -h, --help           Show this help.
@@ -168,9 +168,9 @@ function parseArgs(argv: string[]): CliResult {
     }
     if (arg === "--palette") {
       const value = readValue(argv, i, arg);
-      const normalized = value.toLowerCase();
-      if (normalized !== "classic" && normalized !== "gruvbox") {
-        throw new Error(`Unsupported palette "${value}". Use classic or gruvbox.`);
+      const normalized = parseDeckPalette(value);
+      if (!normalized) {
+        throw new Error(`Unsupported palette "${value}". Use ${describeDeckPalettes()}.`);
       }
       palette = normalized;
       i++;
