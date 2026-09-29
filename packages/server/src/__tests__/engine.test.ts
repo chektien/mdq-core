@@ -175,6 +175,15 @@ it("does not close before the deadline or after navigation", () => {
   expect(apply(moved.session, quiz, { type: "timeout", deadline: 21000 }, 20000).messages).toEqual([]);
 });
 
+it("ignores a stale alarm whose deadline belongs to an earlier opening", () => {
+  const reopened = { ...base("QUESTION_OPEN"), questionStartedAt: 5000 };
+  const stale = apply(reopened, quiz, { type: "timeout", deadline: 21000 }, 21000);
+  expect(stale.session.state).toBe("QUESTION_OPEN");
+  expect(stale.messages).toEqual([]);
+  expect(stale.nextDeadline).toBe(25000);
+  expect(apply(reopened, quiz, { type: "timeout", deadline: 25000 }, 25000).session.state).toBe("QUESTION_CLOSED");
+});
+
 it("routes participant messages to their socket and keeps staff in the session room", () => {
   const session = base("QUESTION_OPEN");
   session.participants.set("S1", { studentId: "S1", sessionToken: "token", socketId: "socket-1", joinedAt: 0, connected: true });

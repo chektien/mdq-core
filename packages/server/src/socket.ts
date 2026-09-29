@@ -134,7 +134,10 @@ export function startQuestionTimer(io: Server, session: Session, sessionId: stri
   const timer = setTimeout(() => {
     if (sessionTimers.get(sessionId) !== timer || !isCurrent()) { if (sessionTimers.get(sessionId) === timer) clearSessionTimers(sessionId); return; }
     clearSessionTimers(sessionId);
-    const result = apply(session, quiz, { type: "timeout", deadline: due }, Math.max(Date.now(), due));
+    // A caller-supplied time limit has no engine deadline, so the adapter closes the item it has confirmed is current.
+    const result = nextDeadline == null
+      ? apply(session, quiz, { type: "close" }, Date.now())
+      : apply(session, quiz, { type: "timeout", deadline: due }, Math.max(Date.now(), due));
     Object.assign(session, result.session);
     emitMessages(io, sessionId, result.messages);
   }, Math.max(0, due - Date.now()));
