@@ -47,6 +47,7 @@ const ended = [msg(SocketEvents.SESSION_STATE, { state: "ENDED" })];
 const cases: Record<string, { state: SessionState; messages: ReturnType<typeof msg>[] } | { error: string }> = {
   "LOBBY:start": { state: "QUESTION_OPEN", messages: opened(0) },
   "LOBBY:open": { state: "QUESTION_OPEN", messages: opened(0) },
+  "LOBBY:end": { state: "ENDED", messages: ended },
   "QUESTION_OPEN:close": { state: "QUESTION_CLOSED", messages: closed },
   "QUESTION_OPEN:timeout": { state: "QUESTION_CLOSED", messages: closed },
   "QUESTION_OPEN:end": { state: "ENDED", messages: ended },
