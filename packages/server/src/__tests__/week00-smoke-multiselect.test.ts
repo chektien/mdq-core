@@ -142,7 +142,7 @@ describe("week00 smoke multi-select", () => {
     student.connect();
     const joinedPromise = waitFor<StudentJoinedPayload>(student, SocketEvents.STUDENT_JOINED);
     student.emit(SocketEvents.STUDENT_JOIN, { studentId: "S001", displayName: "Smoke Student" });
-    await joinedPromise;
+    const { publicKey } = await joinedPromise;
 
     const q0OpenPromise = waitFor<QuestionOpenPayload>(student, SocketEvents.QUESTION_OPEN);
     await request(app).post(`/api/session/${sessionId}/start`).expect(200);
@@ -248,7 +248,7 @@ describe("week00 smoke multi-select", () => {
 
     await request(app).post(`/api/session/${sessionId}/leaderboard-show`).expect(200);
     const leaderboard = await leaderboardPromise;
-    const entry = leaderboard.entries.find((item) => item.studentId === "S001");
+    const entry = leaderboard.entries.find((item) => item.publicKey === publicKey);
     expect(leaderboard.totalQuestions).toBe(3);
     expect(entry?.correctCount).toBe(3);
 

@@ -326,9 +326,9 @@ describe("E2E Lifecycle: Full Quiz Session", () => {
     const lbAfterQ2 = await request(app)
       .get(`/api/session/${sessionId}/leaderboard`)
       .expect(200);
-    expect(lbAfterQ2.body.entries.find((e: { studentId: string; correctCount: number }) => e.studentId === "STU001")!.correctCount).toBe(2);
-    expect(lbAfterQ2.body.entries.find((e: { studentId: string; correctCount: number }) => e.studentId === "STU002")!.correctCount).toBe(1);
-    expect(lbAfterQ2.body.entries.find((e: { studentId: string; correctCount: number }) => e.studentId === "STU003")!.correctCount).toBe(2);
+    expect(lbAfterQ2.body.entries.find((e: { publicKey: string; correctCount: number }) => e.publicKey === students[0].joined.publicKey)!.correctCount).toBe(2);
+    expect(lbAfterQ2.body.entries.find((e: { publicKey: string; correctCount: number }) => e.publicKey === students[1].joined.publicKey)!.correctCount).toBe(1);
+    expect(lbAfterQ2.body.entries.find((e: { publicKey: string; correctCount: number }) => e.publicKey === students[2].joined.publicKey)!.correctCount).toBe(2);
 
     const prevRevealPromises = students.map((s) =>
       waitFor<ResultsRevealPayload>(s.socket, SocketEvents.RESULTS_REVEAL),
@@ -407,9 +407,12 @@ describe("E2E Lifecycle: Full Quiz Session", () => {
 
     // Alice: 3 correct, Charlie: 3 correct, Bob: 1 correct
     // Alice and Charlie tie on correctCount (3), tiebreak by time then studentId
-    const aliceEntry = leaderboard.entries.find((e) => e.studentId === "STU001");
-    const bobEntry = leaderboard.entries.find((e) => e.studentId === "STU002");
-    const charlieEntry = leaderboard.entries.find((e) => e.studentId === "STU003");
+    // Phones find their own row by public key; the leaderboard they get never carries Student IDs.
+    const [alice, bob, charlie] = students.map((s) => s.joined.publicKey);
+    const aliceEntry = leaderboard.entries.find((e) => e.publicKey === alice);
+    const bobEntry = leaderboard.entries.find((e) => e.publicKey === bob);
+    const charlieEntry = leaderboard.entries.find((e) => e.publicKey === charlie);
+    expect(leaderboard.entries.every((e) => e.studentId === undefined)).toBe(true);
 
     expect(aliceEntry!.correctCount).toBe(3);
     expect(charlieEntry!.correctCount).toBe(3);

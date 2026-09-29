@@ -163,7 +163,7 @@ describe("Socket.IO Integration", () => {
         sessionToken: "wrong-token",
       });
       const rejected = await rejectedPromise;
-      expect(rejected.reason).toContain("already in use");
+      expect(rejected.reason).toContain("already in this session on another device");
 
       client1.disconnect();
       client2.disconnect();

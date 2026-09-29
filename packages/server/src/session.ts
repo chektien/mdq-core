@@ -8,7 +8,9 @@ import {
   Quiz,
   STATE_TRANSITIONS,
   SESSION_CODE_LENGTH,
+  normalizeDisplayName,
 } from "@mdq/shared";
+import { assignLabel, ensureParticipantIdentity, newPublicKey } from "./identity";
 
 /** Error for invalid state transitions */
 export class StateTransitionError extends Error {
@@ -78,7 +80,10 @@ function restoreSessionValue(value: unknown): unknown {
 
 /** Restore a session previously returned by serializeSession. */
 export function deserializeSession(json: string): Session {
-  return restoreSessionValue(JSON.parse(json)) as Session;
+  const session = restoreSessionValue(JSON.parse(json)) as Session;
+  // A session saved before public keys and labels existed gets them now.
+  ensureParticipantIdentity(session);
+  return session;
 }
 
 /** Create a new Session in LOBBY state */
@@ -176,9 +181,13 @@ export function addParticipant(
   }
 
   // New participant
+  const { label, labelNote } = assignLabel(session, normalizeDisplayName(displayName));
   const participant: Participant = {
     studentId,
     displayName,
+    publicKey: newPublicKey(),
+    label,
+    labelNote,
     sessionToken: crypto.randomUUID(),
     clientInstanceId,
     socketId,
@@ -271,6 +280,8 @@ export function getOpenResponses(
   return session.submissions
     .filter((sub) => sub.questionIndex === questionIndex && typeof sub.responseText === "string" && sub.responseText.length > 0)
     .map((sub) => ({
+      publicKey: session.participants.get(sub.studentId)?.publicKey ?? "",
+      label: session.participants.get(sub.studentId)?.label ?? "",
       studentId: sub.studentId,
       displayName: session.participants.get(sub.studentId)?.displayName,
       responseText: sub.responseText!,
