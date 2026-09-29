@@ -596,9 +596,66 @@ function renderCatppuccinTokens(theme: PrintTheme): string {
   return renderThemeTokens(theme, "classic");
 }
 
+// seoul256 mirrors the live slide palette in packages/client/src/index.css
+// (junegunn/seoul256.vim, MIT, default GUI colour map): dark is background 237
+// (#4b4b4b), light is seoul256-light at 253 (#e1e1e1). Light shades are
+// darkened as the live palette describes, for example green #006f00 to #006d00
+// and teal #007173 to #00686a. Attendee notes use the accent and presenter
+// notes the teal (light) or blue (dark), as on live slides.
 function renderSeoul256Tokens(theme: PrintTheme): string {
-  // TODO(palette-values): seoul256
-  return renderThemeTokens(theme, "classic");
+  if (theme === "light") {
+    return `
+      --page-bg: #e1e1e1;
+      --ink: #333233;
+      --body: #4b4b4b;
+      --muted: #525252;
+      --line: rgba(75, 75, 75, 0.28);
+      --soft-line: rgba(75, 75, 75, 0.14);
+      --paper: #e1e1e1;
+      --wash: #d9d9d9;
+      --option-bg: #e1e1e1;
+      --media-bg: #d9d9d9;
+      --accent: #9b1d72;
+      --accent-soft: rgba(155, 29, 114, 0.1);
+      --teal: #9b1d72;
+      --teal-line: rgba(155, 29, 114, 0.35);
+      --teal-soft: rgba(155, 29, 114, 0.09);
+      --amber: #00686a;
+      --amber-line: rgba(0, 104, 106, 0.38);
+      --amber-soft: rgba(0, 104, 106, 0.09);
+      --green: #006d00;
+      --green-line: rgba(0, 109, 0, 0.45);
+      --green-soft: rgba(0, 109, 0, 0.12);
+      --reference: #525252;
+      --shadow: rgba(51, 50, 51, 0.04);
+    `;
+  }
+
+  return `
+      --page-bg: #4b4b4b;
+      --ink: #f1f1f1;
+      --body: #d9d9d9;
+      --muted: #d1d0d1;
+      --line: rgba(217, 217, 217, 0.32);
+      --soft-line: rgba(217, 217, 217, 0.16);
+      --paper: #3f3f3f;
+      --wash: #333233;
+      --option-bg: #3f3f3f;
+      --media-bg: #333233;
+      --accent: #ffbd98;
+      --accent-soft: rgba(255, 189, 152, 0.16);
+      --teal: #ffbd98;
+      --teal-line: rgba(255, 189, 152, 0.42);
+      --teal-soft: rgba(255, 189, 152, 0.12);
+      --amber: #bce0ff;
+      --amber-line: rgba(188, 224, 255, 0.42);
+      --amber-soft: rgba(188, 224, 255, 0.12);
+      --green: #bcddbd;
+      --green-line: rgba(188, 221, 189, 0.46);
+      --green-soft: rgba(188, 221, 189, 0.16);
+      --reference: #d1d0d1;
+      --shadow: rgba(0, 0, 0, 0.18);
+    `;
 }
 
 function renderAyuTokens(theme: PrintTheme): string {
@@ -625,8 +682,7 @@ function printPageBackground(theme: PrintTheme, palette: PrintPalette): string {
       return printPageBackground(theme, "classic");
 
     case "seoul256":
-      // TODO(palette-values): seoul256
-      return printPageBackground(theme, "classic");
+      return theme === "dark" ? "#4b4b4b" : "#e1e1e1";
 
     case "ayu":
       // TODO(palette-values): ayu

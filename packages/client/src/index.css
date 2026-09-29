@@ -849,13 +849,321 @@ html[data-palette="gruvbox"][data-theme="light"] .leaderboard-row.rank-standard 
 /* placeholder */
 
 /* ── seoul256 palette (deck palette: seoul256) ── */
-/* Rules follow. */
+/* seoul256 follows Junegunn Choi's seoul256.vim colour scheme (MIT, as stated
+   in its file headers, https://github.com/junegunn/seoul256.vim). Values are
+   the scheme's default GUI colour map: dark is seoul256 at background 237
+   (#4b4b4b) with foreground 252 (#d9d9d9), light is seoul256-light at
+   background 253 (#e1e1e1) with foreground 239 (#616161). Dark uses the
+   scheme's warm hues on the mid grey: Type gold #ffde99 (222) for headings,
+   Special peach #ffbd98 (216) as the accent, Statement green #98bc99 (108),
+   Conditional blue #98bede (110) and Keyword rose #e17899 (168); cards and
+   code sit on the darker 236 (#3f3f3f) and 235 (#333233). Dark text lifts
+   the greens, blue and rose to the neighbouring lighter entries of the same
+   map (green #98bc99 to #bcddbd (151), blue #98bede to #bce0ff (153), rose
+   #e17899 to #ffc0de (218), gold #dfbc72 to #ffde99 (222)) where small text
+   on the 235 cards would miss 4.5:1, and the label on filled accents is 234
+   (#252525). The timer track #999999 is a mix of 252 and 237.
+   Light shades that miss 4.5:1 on the grey are darkened, keeping the hue:
+   teal #007173 to #00686a, green #006f00 to #006d00, gold #9a7200 to
+   #775800, blue #0074be to #005f9c, orange #e19972 to #984a20. Body text is
+   237 (#4b4b4b) rather than 239 (#616161), which falls below 4.5:1 on the
+   252 panels. The accent fill is 125 (#bf2172) with
+   label 255, accent text is 89 (#9b1d72) and danger is 88 (#9b1300).
+   Leaderboard ranks are darkened from gold #9a7200 to #654b00 and from
+   #be7572 to #7c3c39, and muted text from 238 (#565656) to #525252 so
+   leaderboard ids hold 4.5:1 on the tinted rows. The dark poll bar wash is
+   18 percent of the accent so option text holds 4.5:1 on it. Dark is the
+   default theme, so the dark variant also applies when data-theme is absent. */
+html[data-palette="seoul256"]:not([data-theme="light"]) {
+  --mdq-slide-bg: #4b4b4b;
+  --mdq-slide-bg-soft: #3f3f3f;
+  --mdq-slide-frame: rgba(217, 217, 217, 0.16);
+  --mdq-slide-heading: #ffde99;
+  --mdq-slide-ink: #d9d9d9;
+  --mdq-slide-ink-soft: #d1d0d1;
+  --mdq-slide-eyebrow: #d1d0d1;
+  --mdq-slide-rule: rgba(217, 217, 217, 0.16);
+  --mdq-slide-accent: #ffbd98;
+  --mdq-slide-accent-strong: #ffbd98;
+  --mdq-slide-accent-warm: #e0bebc;
+  --mdq-slide-accent-cool: #bce0ff;
+  --mdq-slide-blue: #bce0ff;
+  --mdq-slide-scene: #bcddbd;
+  --mdq-slide-maroon: #e0bebc;
+  --mdq-slide-glass: #333233;
+  --mdq-slide-glass-strong: #333233;
+  --mdq-slide-glass-line: rgba(217, 217, 217, 0.16);
+  --mdq-note-attendee: #ffbd98;
+  --mdq-note-attendee-tint: rgba(255, 189, 152, 0.12);
+  --mdq-note-presenter: #bce0ff;
+  --mdq-note-presenter-tint: rgba(188, 224, 255, 0.12);
+  --mdq-panel-radius: 0.2rem;
+  --mdq-paper: #4b4b4b;
+  --mdq-paper-strong: #3f3f3f;
+  --mdq-card: rgba(63, 63, 63, 0.92);
+  --mdq-card-strong: #333233;
+  --mdq-line: rgba(217, 217, 217, 0.14);
+  --mdq-line-strong: rgba(217, 217, 217, 0.28);
+  --mdq-control-border: #bdbdbd;
+  --mdq-ink: #d9d9d9;
+  --mdq-ink-strong: #f1f1f1;
+  --mdq-ink-soft: #d9d9d9;
+  --mdq-muted: #d1d0d1;
+  --mdq-soft: #bfbfbf;
+  --mdq-accent: #ffbd98;
+  --mdq-accent-hover: #ffbd98;
+  --mdq-accent-text: #ffbd98;
+  --mdq-on-accent: #252525;
+  --mdq-accent-soft: rgba(255, 189, 152, 0.1);
+  --mdq-accent-soft-strong: rgba(255, 189, 152, 0.18);
+  --mdq-accent-ink: #ffdfdf;
+  --mdq-secondary: #98bc99;
+  --mdq-secondary-text: #bcddbd;
+  --mdq-on-secondary: #252525;
+  --mdq-secondary-soft: rgba(152, 188, 153, 0.1);
+  --mdq-success: #98bc99;
+  --mdq-success-text: #bcddbd;
+  --mdq-on-success: #252525;
+  --mdq-success-soft: rgba(152, 188, 153, 0.1);
+  --mdq-success-ink: #f1f1f1;
+  --mdq-success-line: #98bc99;
+  --mdq-warning: #dfbc72;
+  --mdq-warning-text: #ffde99;
+  --mdq-on-warning: #252525;
+  --mdq-warning-soft: rgba(223, 188, 114, 0.1);
+  --mdq-warning-ink: #ffffdf;
+  --mdq-danger: #e17899;
+  --mdq-danger-text: #ffc0de;
+  --mdq-on-danger: #252525;
+  --mdq-danger-soft: rgba(225, 120, 153, 0.12);
+  --mdq-danger-ink: #ffdfdf;
+  --mdq-danger-line: #e17899;
+  --mdq-info: #98bede;
+  --mdq-info-text: #bce0ff;
+  --mdq-on-info: #252525;
+  --mdq-info-soft: rgba(152, 190, 222, 0.12);
+  --mdq-info-ink: #dfdfff;
+  --mdq-info-line: #98bede;
+  --mdq-bar: #ffbd98;
+  --mdq-on-bar: #252525;
+  --mdq-bar-muted: #bfbfbf;
+  --mdq-on-bar-muted: #252525;
+  --mdq-bar-wash: rgba(255, 189, 152, 0.18);
+  --mdq-timer-ok: #bcddbd;
+  --mdq-timer-warn: #ffde99;
+  --mdq-timer-urgent: #ffc0de;
+  --mdq-timer-track: #999999;
+  background: #4b4b4b;
+}
 
-/* placeholder */
+html[data-palette="seoul256"]:not([data-theme="light"]) body {
+  background: #4b4b4b;
+}
 
-/* placeholder */
+html[data-palette="seoul256"]:not([data-theme="light"]) .slide-surface {
+  background: linear-gradient(180deg, #4b4b4b 0%, #3f3f3f 100%);
+}
 
-/* placeholder */
+html[data-palette="seoul256"]:not([data-theme="light"]) .slide-surface .quiz-html code,
+html[data-palette="seoul256"]:not([data-theme="light"]) .slide-surface .quiz-html pre {
+  background: #333233;
+  color: #d9d9d9;
+}
+
+html[data-palette="seoul256"]:not([data-theme="light"]) .slide-surface .quiz-html strong {
+  color: #f1f1f1;
+}
+
+html[data-palette="seoul256"]:not([data-theme="light"]) .quiz-html code,
+html[data-palette="seoul256"]:not([data-theme="light"]) .quiz-html pre {
+  background: #333233;
+  color: #d9d9d9;
+}
+
+html[data-palette="seoul256"][data-theme="light"] {
+  --mdq-slide-bg: #e1e1e1;
+  --mdq-slide-bg-soft: #e9e9e9;
+  --mdq-slide-frame: rgba(75, 75, 75, 0.18);
+  --mdq-slide-heading: #333233;
+  --mdq-slide-ink: #4b4b4b;
+  --mdq-slide-ink-soft: #565656;
+  --mdq-slide-eyebrow: #565656;
+  --mdq-slide-rule: rgba(75, 75, 75, 0.18);
+  --mdq-slide-accent: #9b1d72;
+  --mdq-slide-accent-strong: #9b1d72;
+  --mdq-slide-accent-warm: #984a20;
+  --mdq-slide-accent-cool: #00686a;
+  --mdq-slide-blue: #005f9c;
+  --mdq-slide-scene: #006d00;
+  --mdq-slide-maroon: #9b1d72;
+  --mdq-slide-glass: #d9d9d9;
+  --mdq-slide-glass-strong: #d9d9d9;
+  --mdq-slide-glass-line: rgba(75, 75, 75, 0.18);
+  --mdq-note-attendee: #9b1d72;
+  --mdq-note-attendee-tint: rgba(155, 29, 114, 0.09);
+  --mdq-note-presenter: #00686a;
+  --mdq-note-presenter-tint: rgba(0, 104, 106, 0.09);
+  --mdq-panel-radius: 0.2rem;
+  --mdq-paper: #e1e1e1;
+  --mdq-paper-strong: #e9e9e9;
+  --mdq-card: rgba(241, 241, 241, 0.92);
+  --mdq-card-strong: #f1f1f1;
+  --mdq-dialog: #f1f1f1;
+  --mdq-field: #f1f1f1;
+  --mdq-line: rgba(75, 75, 75, 0.14);
+  --mdq-line-strong: rgba(75, 75, 75, 0.26);
+  --mdq-control-border: #6b6b6b;
+  --mdq-ink: #4b4b4b;
+  --mdq-ink-strong: #333233;
+  --mdq-ink-soft: #4b4b4b;
+  --mdq-muted: #525252;
+  --mdq-soft: #616161;
+  --mdq-accent: #bf2172;
+  --mdq-accent-hover: #9b1d72;
+  --mdq-accent-text: #9b1d72;
+  --mdq-on-accent: #f1f1f1;
+  --mdq-accent-soft: rgba(191, 33, 114, 0.08);
+  --mdq-accent-soft-strong: rgba(191, 33, 114, 0.14);
+  --mdq-accent-ink: #841961;
+  --mdq-accent-wash: linear-gradient(135deg, #efe7eb, #ecdae3);
+  --mdq-secondary: #00686a;
+  --mdq-secondary-text: #00686a;
+  --mdq-on-secondary: #f1f1f1;
+  --mdq-secondary-soft: rgba(0, 104, 106, 0.08);
+  --mdq-success: #006d00;
+  --mdq-success-text: #006d00;
+  --mdq-on-success: #f1f1f1;
+  --mdq-success-soft: rgba(0, 109, 0, 0.08);
+  --mdq-success-ink: #004f00;
+  --mdq-success-line: #006d00;
+  --mdq-success-wash: linear-gradient(135deg, #e5eae5, #d6e2d6);
+  --mdq-warning: #775800;
+  --mdq-warning-text: #775800;
+  --mdq-on-warning: #f1f1f1;
+  --mdq-warning-soft: rgba(119, 88, 0, 0.08);
+  --mdq-warning-ink: #574000;
+  --mdq-danger: #9b1300;
+  --mdq-danger-text: #9b1300;
+  --mdq-on-danger: #f1f1f1;
+  --mdq-danger-soft: rgba(155, 19, 0, 0.08);
+  --mdq-danger-ink: #801000;
+  --mdq-danger-line: #9b1300;
+  --mdq-danger-wash: linear-gradient(135deg, #ede6e5, #e8d9d6);
+  --mdq-info: #005f9c;
+  --mdq-info-text: #005f9c;
+  --mdq-on-info: #f1f1f1;
+  --mdq-info-soft: rgba(0, 95, 156, 0.08);
+  --mdq-info-ink: #004673;
+  --mdq-info-line: #005f9c;
+  --mdq-bar: #bf2172;
+  --mdq-on-bar: #f1f1f1;
+  --mdq-bar-muted: #616161;
+  --mdq-on-bar-muted: #f1f1f1;
+  --mdq-bar-wash: rgba(191, 33, 114, 0.16);
+  --mdq-timer-ok: #006d00;
+  --mdq-timer-warn: #775800;
+  --mdq-timer-urgent: #9b1300;
+  --mdq-timer-track: #757575;
+  --mdq-rank-first: #654b00;
+  --mdq-rank-second: #4b4b4b;
+  --mdq-rank-third: #7c3c39;
+  --mdq-page-glow-top: transparent;
+  --mdq-page-glow-cool: transparent;
+  --mdq-page-glow-warm: transparent;
+  background: #e1e1e1;
+}
+
+html[data-palette="seoul256"][data-theme="light"] .slide-surface {
+  background: linear-gradient(180deg, #e9e9e9 0%, #e1e1e1 100%);
+}
+
+html[data-palette="seoul256"][data-theme="light"] .slide-surface .quiz-html code,
+html[data-palette="seoul256"][data-theme="light"] .slide-surface .quiz-html pre {
+  background: #d9d9d9;
+  color: #4b4b4b;
+}
+
+html[data-palette="seoul256"][data-theme="light"] .slide-surface .quiz-html strong {
+  color: #333233;
+}
+
+html[data-palette="seoul256"][data-theme="light"] .quiz-html code,
+html[data-palette="seoul256"][data-theme="light"] .quiz-html pre {
+  background: #d9d9d9;
+  color: #4b4b4b;
+}
+
+/* seoul256 link on the white join QR panel (theme.css). */
+html[data-palette="seoul256"][data-theme="dark"] .instructor-qr-panel,
+html[data-palette="seoul256"][data-theme="light"] .instructor-qr-panel {
+  --mdq-qr-link: #007173;
+}
+
+/* Slide references are drawn at 78 percent of the soft ink, which leaves the
+   small link text under 4.5:1 on a light ground, so the light theme uses the
+   soft ink at full strength. */
+html[data-palette="seoul256"][data-theme="light"] .slide-references {
+  color: var(--mdq-slide-ink-soft);
+}
+
+/* The dark selection-mode card and chips carry classic purple and green in
+   their base rules; the light theme already reads the tokens. */
+html[data-palette="seoul256"]:not([data-theme="light"]) .selection-mode-card-single {
+  border-color: rgba(255, 189, 152, 0.34);
+  background: linear-gradient(135deg, #333233, #3f3f3f);
+}
+html[data-palette="seoul256"]:not([data-theme="light"]) .selection-mode-card-single::after {
+  background: rgba(255, 189, 152, 0.22);
+}
+html[data-palette="seoul256"]:not([data-theme="light"]) .selection-mode-card-multi {
+  border-color: rgba(152, 188, 153, 0.32);
+  background: linear-gradient(135deg, #333233, #3f3f3f);
+}
+html[data-palette="seoul256"]:not([data-theme="light"]) .selection-mode-card-multi::after {
+  background: rgba(152, 188, 153, 0.2);
+}
+html[data-palette="seoul256"]:not([data-theme="light"]) .selection-mode-label {
+  color: #f1f1f1;
+}
+html[data-palette="seoul256"]:not([data-theme="light"]) .selection-mode-text {
+  color: #d1d0d1;
+}
+html[data-palette="seoul256"]:not([data-theme="light"]) .selection-mode-chip-single {
+  color: #ffbd98;
+  border-color: rgba(255, 189, 152, 0.4);
+  background: #333233;
+}
+html[data-palette="seoul256"]:not([data-theme="light"]) .selection-mode-chip-multi {
+  color: #bcddbd;
+  border-color: rgba(152, 188, 153, 0.4);
+  background: #333233;
+}
+
+html[data-palette="seoul256"]:not([data-theme="light"]) .leaderboard-row.rank-first {
+  --leaderboard-rank-color: #ffde99;
+}
+html[data-palette="seoul256"]:not([data-theme="light"]) .leaderboard-row.rank-second {
+  --leaderboard-rank-color: #d9d9d9;
+}
+html[data-palette="seoul256"]:not([data-theme="light"]) .leaderboard-row.rank-third {
+  --leaderboard-rank-color: #ffbd98;
+}
+
+/* Below the podium the row keeps a neutral tint, so fourth place does not
+   pick up the accent that third place uses. */
+html[data-palette="seoul256"]:not([data-theme="light"]) .leaderboard-row.rank-standard {
+  --leaderboard-rank-color: #d1d0d1;
+}
+
+/* The viewer's own row adds an accent wash; third place keeps the palette
+   colour there instead of the classic orange. */
+html[data-palette="seoul256"]:not([data-theme="light"]) .leaderboard-row.leaderboard-row-highlight.rank-third {
+  --leaderboard-rank-color: #ffbd98;
+}
+
+html[data-palette="seoul256"][data-theme="light"] .leaderboard-row.rank-standard {
+  --leaderboard-rank-color: var(--mdq-muted);
+}
 
 /* ── Ayu palette (deck palette: ayu) ── */
 /* Rules follow. */
