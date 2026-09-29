@@ -7,8 +7,20 @@
 
 /* No theme yet: the page waits for a view to set data-theme on <html> (from
    the deck, the runtime config, or attributes the server rendered into the
-   HTML). Until then it keeps the browser's own blank canvas and hides the app,
-   so no guessed theme flashes before the deck's. theme.css paints each theme. */
+   HTML). Until then it hides the app, so no guessed theme flashes before the
+   deck's, and shows a plain neutral that follows the system colour scheme so
+   neither a light nor a dark deck opens on a strong flash. theme.css paints
+   each theme. */
+html:not([data-theme]) {
+  background: #ffffff;
+}
+
+@media (prefers-color-scheme: dark) {
+  html:not([data-theme]) {
+    background: #262625;
+  }
+}
+
 html:not([data-theme]) #root {
   visibility: hidden;
 }
