@@ -91,7 +91,7 @@ const questionPayload = (session: Session, quiz: Quiz, now: number): QuestionOpe
   };
 };
 /** Open responses for one view: the instructor gets IDs and names, everyone else labels only. */
-const responsesFor = (responses: OpenResponseEntry[], view: PayloadView): OpenResponseEntry[] => view === "control"
+export const responsesFor = (responses: OpenResponseEntry[], view: PayloadView): OpenResponseEntry[] => view === "control"
   ? responses
   : responses.map(({ publicKey, label, responseText, submittedAt }) => ({ publicKey, label, responseText, submittedAt }));
 const countPayload = (session: Session, quiz: Quiz, view: PayloadView) => ({

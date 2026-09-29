@@ -1,6 +1,6 @@
 import express, { type Request, type Response } from "express";
 import cors from "cors";
-import { API, AccessInfo, DeckPalette, DeckTheme, Quiz, Session, SessionState, usesStudentIds } from "@mdq/shared";
+import { API, AccessInfo, CumulativeLeaderboardEntry, PublicCumulativeLeaderboardEntry, DeckPalette, DeckTheme, Quiz, Session, SessionState, usesStudentIds } from "@mdq/shared";
 import {
   createSession,
   storeSession,
@@ -12,7 +12,7 @@ import {
   getOpenResponses,
 } from "./session";
 import { parseQuizMarkdown } from "./parser";
-import { apply, leaderboardRows, EngineCommandError, type Command, type EngineResult } from "./engine";
+import { apply, leaderboardRows, responsesFor, EngineCommandError, type Command, type EngineResult } from "./engine";
 import {
   persistSessionOnEnd,
   computeCumulativeLeaderboard,
@@ -103,18 +103,41 @@ function shouldReplaceDuplicateDeck(existing: Quiz, candidate: Quiz): boolean {
   return candidate.week.localeCompare(existing.week, undefined, { numeric: true }) < 0;
 }
 
+/** Saved-results rows for callers who may not see Student IDs: a label instead of the ID, in the same rank order. */
+export function publicCumulativeEntries(entries: CumulativeLeaderboardEntry[]): PublicCumulativeLeaderboardEntry[] {
+  const used = new Set<string>();
+  return entries.map(({ studentId: _studentId, displayName, ...rest }) => {
+    const base = displayName?.trim() || `Participant ${rest.rank}`;
+    let label = base;
+    for (let n = 2; used.has(label.toLowerCase()); n++) label = `${base} (${n})`;
+    used.add(label.toLowerCase());
+    return { ...rest, label };
+  });
+}
+
 export function createApp(quizDirOrOpts?: string | AppOptions) {
   const app = express();
   app.use(cors());
   app.use(express.json());
+  /**
+   * True only for a request that proved it is the instructor: a login is
+   * configured and this request carries a valid instructor cookie. Without a
+   * configured login nobody can prove it, so this is false for everyone.
+   * Student IDs only go out over REST when this is true.
+   */
+  function isAuthenticatedInstructor(req: express.Request): boolean {
+    if (!isInstructorAuthEnabled()) return false;
+    const sessionToken = getInstructorSessionFromCookie(req.header("cookie"));
+    return !!sessionToken && hasValidInstructorSession(sessionToken);
+  }
+
   function requireInstructorAuth(req: express.Request, res: express.Response, next: express.NextFunction): void {
     if (!isInstructorAuthEnabled()) {
       next();
       return;
     }
 
-    const sessionToken = getInstructorSessionFromCookie(req.header("cookie"));
-    if (!sessionToken || !hasValidInstructorSession(sessionToken)) {
+    if (!isAuthenticatedInstructor(req)) {
       res.status(401).json({ error: "Instructor login required" });
       return;
     }
@@ -221,7 +244,7 @@ export function createApp(quizDirOrOpts?: string | AppOptions) {
     }));
   }
 
-  function getReviewReveals(session: Session, quiz: Quiz) {
+  function getReviewReveals(session: Session, quiz: Quiz, view: "control" | "public") {
     if (session.currentQuestionIndex < 0) {
       return [];
     }
@@ -246,7 +269,7 @@ export function createApp(quizDirOrOpts?: string | AppOptions) {
         explanation: question.explanation,
         distribution: getDistribution(session, questionIndex),
         isPoll: question.isPoll === true,
-        openResponses: isOpenResponseQuestion(question) ? getOpenResponses(session, questionIndex) : undefined,
+        openResponses: isOpenResponseQuestion(question) ? responsesFor(getOpenResponses(session, questionIndex), view) : undefined,
       }));
   }
 
@@ -659,7 +682,9 @@ export function createApp(quizDirOrOpts?: string | AppOptions) {
         questionHeadings: getQuestionHeadings(quiz),
         questionSummaries: getQuestionSummaries(quiz),
         reviewQuestions: getReviewQuestions(session, quiz),
-        reviewReveals: getReviewReveals(session, quiz),
+        // Student IDs and names only go to a logged-in instructor. With no login set, anyone can
+        // reach this route, so restored open responses carry labels only.
+        reviewReveals: getReviewReveals(session, quiz, isAuthenticatedInstructor(req) ? "control" : "public"),
       });
     });
   });
@@ -744,11 +769,13 @@ export function createApp(quizDirOrOpts?: string | AppOptions) {
   });
 
   // ── Cumulative leaderboard ────────────────
-  // Saved results name people by Student ID, so only the instructor may read them.
-  app.get(API.CUMULATIVE_LEADERBOARD, requireInstructorAuth, (_req, res) => {
+  // Saved results name people by Student ID. A logged-in instructor gets those rows. With a
+  // login configured everyone else gets 401. With no login configured nobody can prove they
+  // are the instructor, so every caller gets labels only, never Student IDs.
+  app.get(API.CUMULATIVE_LEADERBOARD, requireInstructorAuth, (req, res) => {
     try {
       const entries = computeCumulativeLeaderboard(dataDir);
-      res.json({ entries });
+      res.json({ entries: isAuthenticatedInstructor(req) ? entries : publicCumulativeEntries(entries) });
     } catch {
       res.json({ entries: [] });
     }

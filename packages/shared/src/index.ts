@@ -506,6 +506,15 @@ export interface CumulativeLeaderboardEntry {
   weeksParticipated: number;
 }
 
+/** A saved-results row with the Student ID and typed name replaced by a label. */
+export interface PublicCumulativeLeaderboardEntry {
+  rank: number;
+  label: string;
+  totalCorrect: number;
+  totalTimeMs: number;
+  weeksParticipated: number;
+}
+
 /** Access info returned by /api/access-info */
 export interface AccessInfo {
   fullUrl: string;
