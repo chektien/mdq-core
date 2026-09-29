@@ -607,7 +607,7 @@ html[data-palette="gruvbox"]:not([data-theme="light"]) {
   --mdq-timer-ok: #b8bb26;
   --mdq-timer-warn: #fabd2f;
   --mdq-timer-urgent: #fb7b60;
-  --mdq-timer-track: rgba(235, 219, 178, 0.16);
+  --mdq-timer-track: #877a6c;
   background: #282828;
 }
 
@@ -720,7 +720,7 @@ html[data-palette="gruvbox"][data-theme="light"] {
   --mdq-timer-ok: #66620d;
   --mdq-timer-warn: #8a5a0a;
   --mdq-timer-urgent: #9d0006;
-  --mdq-timer-track: #d5d8d0;
+  --mdq-timer-track: #897d73;
   --mdq-rank-first: #6f4807;
   --mdq-rank-second: #504945;
   --mdq-rank-third: #8f3002;

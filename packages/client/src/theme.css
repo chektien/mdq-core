@@ -4,8 +4,8 @@
    override token values, so every surface follows the deck's palette.
    Contrast targets (WCAG AA): text tokens hold 4.5:1 on the paper and card
    they sit on, `--mdq-on-*` tokens hold 4.5:1 on their fill, and
-   `--mdq-control-border`, the state lines and the timer colours hold 3:1
-   against the page. */
+   `--mdq-control-border`, the state lines, the timer colours and the timer
+   track hold 3:1 against the page. */
 html[data-theme="dark"] {
   --mdq-paper: #262625;
   --mdq-paper-strong: #2d2d2b;
@@ -61,7 +61,7 @@ html[data-theme="dark"] {
   --mdq-timer-ok: #22c55e;
   --mdq-timer-warn: #eab308;
   --mdq-timer-urgent: #f87171;
-  --mdq-timer-track: rgba(236, 232, 240, 0.16);
+  --mdq-timer-track: #7e7588;
   --mdq-shadow: 0 20px 45px rgba(0, 0, 0, 0.22);
   background: #262625;
   color: var(--mdq-ink);
@@ -275,7 +275,7 @@ html[data-theme="light"] {
   --mdq-timer-ok: #276b4d;
   --mdq-timer-warn: #8a4f16;
   --mdq-timer-urgent: #a03a3a;
-  --mdq-timer-track: #e7d9c4;
+  --mdq-timer-track: #93826f;
   --mdq-rank-first: #8a5024;
   --mdq-rank-second: #68584b;
   --mdq-rank-third: #80542d;
@@ -612,7 +612,7 @@ html[data-theme="light"] .end-session-stat-label {
 }
 
 html[data-theme="light"] .end-session-keep {
-  border-color: var(--mdq-line-strong) !important;
+  border-color: var(--mdq-control-border) !important;
   background: var(--mdq-field) !important;
   color: var(--mdq-ink) !important;
 }
@@ -777,6 +777,24 @@ html[data-theme] .student-submit-button:disabled {
   border: 1px dashed var(--mdq-control-border) !important;
   box-shadow: none !important;
   cursor: not-allowed;
+}
+
+/* Keep Session is an outlined button on the dialog; the control border holds
+   3:1 against the dialog in every theme. */
+html[data-theme] .end-session-keep {
+  border-color: var(--mdq-control-border) !important;
+}
+
+/* Keyboard focus on student fields, answer options and the end-session
+   dialog: a solid accent ring held 3px off the control, as on the presenter
+   toolbar, so the gap keeps it apart from the control's own border and the
+   ring holds 3:1 against the page or dialog behind it. */
+html[data-theme] :is(input, textarea)[class*="focus:ring-"]:focus-visible,
+html[data-theme] .option-btn:focus-visible,
+html[data-theme] :is(.end-session-keep, .end-session-end):focus-visible {
+  outline: 2px solid var(--mdq-accent) !important;
+  outline-offset: 3px !important;
+  box-shadow: none !important;
 }
 
 /* Buttons that sit on the page without a fill of their own get the control
