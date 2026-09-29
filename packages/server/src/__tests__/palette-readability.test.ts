@@ -150,7 +150,6 @@ describe("palette readability, 7 palettes x 2 themes", () => {
     const paperColor = over(token(t, "--mdq-paper"), "#ffffff");
 
     it("keeps the attendee fold-out note kicker and text at 4.5:1 on their wash", () => {
-      if (palette === "classic") return;
       const wash = parseColor(token(t, "--mdq-note-attendee-tint"));
       const grounds = Object.fromEntries(stops.map((stop, i) => [`note on slide stop ${i + 1}`, over(wash, stop)]));
       expectPairs(`${name} attendee note`, { kicker: token(t, "--mdq-slide-eyebrow"), body: token(t, "--mdq-slide-ink-soft") }, grounds);
@@ -201,7 +200,7 @@ describe("palette readability, 7 palettes x 2 themes", () => {
         expectPairs(`${name} leaderboard ${rank}`, { rank: text, "id and time": secondary }, grounds);
       }
       // The viewer's own row: the dark theme adds an accent wash on the strong glass.
-      if (mode === "dark" && palette !== "classic") {
+      if (mode === "dark") {
         const highlightWash = Number.parseFloat(declarationsOf(index, `${selector} .leaderboard-row`)["--leaderboard-highlight-wash"] ?? "24") / 100;
         const own: Record<string, Rgba> = {};
         for (const [i, base] of glass(true).entries()) own[`own row stop ${i + 1}`] = over(token(t, "--mdq-slide-accent"), base, highlightWash);

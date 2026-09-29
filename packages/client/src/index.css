@@ -434,7 +434,7 @@ html[data-theme="light"] {
   --mdq-slide-heading: #211a13;
   --mdq-slide-ink: #2c241a;
   --mdq-slide-ink-soft: #665744;
-  --mdq-slide-eyebrow: #7a6852;
+  --mdq-slide-eyebrow: #736250;
   --mdq-slide-rule: rgba(117, 92, 62, 0.18);
   --mdq-slide-accent: #1f6f78;
   --mdq-slide-accent-strong: #155d66;
@@ -2432,6 +2432,14 @@ html[data-palette="tokyo-night"][data-theme="light"] .leaderboard-row.rank-stand
    third-place orange to hold 4.5:1 on it. */
 html:not([data-theme="light"]) .leaderboard-row.leaderboard-row-highlight.rank-third {
   --leaderboard-rank-color: #ffa552;
+}
+
+/* The classic dark rank colour below the podium is the soft eyebrow grey, which
+   falls under 4.5:1 on the purple wash of the viewer's own row, so that row
+   uses the muted ink. Every dark palette sets its own colour for this row in a
+   more specific rule. */
+html:not([data-theme="light"]) .leaderboard-row-highlight.rank-standard {
+  --leaderboard-rank-color: var(--mdq-muted);
 }
 
 /* ── Light-theme media canvas ───────────── */
