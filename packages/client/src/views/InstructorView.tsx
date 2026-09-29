@@ -1029,7 +1029,7 @@ function LiveView({
       }}
     >
       <div
-        className="end-session-card w-full max-w-lg rounded-2xl border border-red-300/25 bg-[#201d28] p-6 text-white shadow-2xl shadow-black/50"
+        className="end-session-card w-full max-w-lg rounded-2xl border border-[color-mix(in_srgb,var(--mdq-danger-line)_40%,transparent)] bg-[var(--mdq-dialog)] p-6 text-white shadow-2xl shadow-black/50"
         role="dialog"
         aria-modal="true"
         aria-labelledby="end-session-title"

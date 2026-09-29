@@ -1,6 +1,6 @@
 import * as fs from "fs";
 import * as path from "path";
-import { DEFAULT_PORT } from "@mdq/shared";
+import { DEFAULT_PORT, parseDeckPalette, type DeckPalette } from "@mdq/shared";
 
 const DEFAULT_PORT_FALLBACKS = 10;
 
@@ -20,7 +20,7 @@ interface RuntimeConfigFile {
 }
 
 export type RuntimeTheme = "dark" | "light";
-export type RuntimePalette = "classic" | "gruvbox";
+export type RuntimePalette = DeckPalette;
 
 export interface RuntimeConfig {
   port: number;
@@ -91,11 +91,7 @@ function parseTheme(value: unknown): RuntimeTheme | undefined {
 }
 
 function parsePalette(value: unknown): RuntimePalette | undefined {
-  const normalized = parseString(value)?.toLowerCase();
-  if (normalized === "classic" || normalized === "gruvbox") {
-    return normalized;
-  }
-  return undefined;
+  return parseDeckPalette(value);
 }
 
 function parseBoolean(value: unknown): boolean | undefined {

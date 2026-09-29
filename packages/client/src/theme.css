@@ -13,6 +13,7 @@ html[data-theme="dark"] {
   --mdq-paper-strong: #2d2d2b;
   --mdq-card: rgba(45, 45, 43, 0.88);
   --mdq-card-strong: rgba(54, 54, 51, 0.96);
+  --mdq-dialog: #201d28;
   --mdq-line: rgba(179, 102, 255, 0.22);
   --mdq-line-strong: rgba(179, 102, 255, 0.38);
   --mdq-control-border: #857b8f;
@@ -535,7 +536,10 @@ html[data-theme="light"] .selection-mode-chip-multi {
   background: var(--mdq-secondary-soft);
 }
 
+/* The rank wash is lighter on the light ground, where the muted id and score
+   label are the lightest text on the row and hold 4.5:1 on it. */
 html[data-theme="light"] .leaderboard-row {
+  --leaderboard-wash: 11%;
   box-shadow: 0 14px 28px rgba(79, 57, 34, 0.08);
 }
 
@@ -583,14 +587,26 @@ html[data-theme="light"] [class*="bg-[#0f1117]/90"] {
   backdrop-filter: blur(18px);
 }
 
-/* ── End-session dialog (light theme) ─────── */
+/* ── End-session dialog ───────────────────────
+   The card reads --mdq-dialog for its surface and --mdq-danger-line for its
+   border in both themes (set on the card in InstructorView). The dark theme
+   maps the card's utility colours onto the tokens above; the eyebrow and the
+   stat labels use the danger ink and the muted ink, which hold 4.5:1 on the
+   dialog and its tinted stat tiles in every palette. The rules after them
+   restyle the text and buttons for the light theme. */
+html[data-theme="dark"] .end-session-eyebrow {
+  color: var(--mdq-danger-ink) !important;
+}
+
+html[data-theme="dark"] .end-session-stat-label {
+  color: var(--mdq-muted) !important;
+}
+
 html[data-theme="light"] .end-session-overlay {
   background: rgba(44, 36, 26, 0.4) !important;
 }
 
 html[data-theme="light"] .end-session-card {
-  border-color: color-mix(in srgb, var(--mdq-danger) 28%, transparent) !important;
-  background: var(--mdq-dialog) !important;
   color: var(--mdq-ink) !important;
   box-shadow: var(--mdq-shadow) !important;
 }

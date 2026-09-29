@@ -122,11 +122,13 @@ describe("control contrast contract", () => {
   describe("focus rings, the end-session button outlines and the timer track hold 3:1", () => {
     const darkBase = tokens(theme, 'html[data-theme="dark"]');
     const lightBase = tokens(theme, 'html[data-theme="light"]');
+    const gruvboxDark = { ...darkBase, ...tokens(index, 'html[data-palette="gruvbox"]:not([data-theme="light"])') };
+    // The Keep Session fill is white at 4 percent over the dialog card.
+    const withFill = (dialog: string, fill: string): string[] => [dialog, fill];
     const combos = [
-      // Pages and panels measured in each combination; the dark dialog card is #201d28 with a #292630 button fill.
-      { name: "dark classic", t: darkBase, pages: ["#262625", "#2d2d2b"], dialog: ["#201d28", "#292630"] },
-      { name: "dark gruvbox", t: { ...darkBase, ...tokens(index, 'html[data-palette="gruvbox"]:not([data-theme="light"])') },
-        pages: ["#282828", "#32302f"], dialog: ["#201d28", "#292630"] },
+      // Pages and panels measured in each combination; the classic dark dialog card is #201d28 with a #292630 button fill.
+      { name: "dark classic", t: darkBase, pages: ["#262625", "#2d2d2b"], dialog: withFill("#201d28", "#292630") },
+      { name: "dark gruvbox", t: gruvboxDark, pages: ["#282828", "#32302f"], dialog: withFill("#1d2021", "#26292a") },
       { name: "light classic", t: lightBase, pages: ["#ffffff", "#fffaf1", "#fffaf3", "#f7f1e3", "#f3ecdc"], dialog: [] as string[] },
       { name: "light gruvbox", t: { ...lightBase, ...tokens(index, 'html[data-palette="gruvbox"][data-theme="light"]') },
         pages: ["#eff0ec", "#e3e5e0", "#fbfbf9", "#f7f8f5"], dialog: [] as string[] },

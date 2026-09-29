@@ -73,9 +73,11 @@ describe("client light-theme contract", () => {
       }
     });
 
-    it("still carries the original dark Tailwind classes (dark stays identical)", () => {
-      expect(tsx).toContain("bg-[#201d28]");
+    it("keeps the dark overlay and reads the dialog surface and border from tokens (classic dark stays #201d28)", () => {
       expect(tsx).toContain("bg-[#07060b]/80");
+      expect(tsx).toContain("bg-[var(--mdq-dialog)]");
+      expect(tsx).not.toContain("bg-[#201d28]");
+      expect(read("theme.css")).toContain("--mdq-dialog: #201d28;");
     });
   });
 

@@ -6,6 +6,7 @@ import { createApp } from "../app";
 import { loadRuntimeConfig } from "../config";
 import { clearAllSessions } from "../session";
 import { parseQuizMarkdown } from "../parser";
+import { DECK_PALETTES } from "@mdq/shared";
 
 const QUESTION = `
 ---
@@ -27,6 +28,8 @@ function deck(title: string, palette?: string, theme?: string): string {
   return `# ${title}\n${theme ? `theme: ${theme}\n` : ""}${palette ? `palette: ${palette}\n` : ""}${QUESTION}`;
 }
 
+const ALL_PALETTES = ["classic", "gruvbox", "rose-pine", "catppuccin", "seoul256", "ayu", "tokyo-night"];
+
 describe("per-deck palette", () => {
   afterEach(() => clearAllSessions());
 
@@ -35,6 +38,18 @@ describe("per-deck palette", () => {
     expect(parseQuizMarkdown(deck("Classic", "'classic'"), "classic.md").quiz?.palette).toBe("classic");
     expect(parseQuizMarkdown(deck("Quoted", '"gruvbox"'), "quoted.md").quiz?.palette).toBe("gruvbox");
     expect(parseQuizMarkdown(deck("Fallback"), "fallback.md").quiz?.palette).toBeUndefined();
+  });
+
+  it("lists the supported palettes in one ordered shared constant", () => {
+    expect([...DECK_PALETTES]).toEqual(ALL_PALETTES);
+  });
+
+  it.each(ALL_PALETTES)("parses %s case-insensitively with optional quotes", (name) => {
+    for (const written of [name, name.toUpperCase(), `'${name}'`, `"${name.toUpperCase()}"`]) {
+      const result = parseQuizMarkdown(deck("Deck", written), "deck.md");
+      expect(result.errors).toEqual([]);
+      expect(result.quiz?.palette).toBe(name);
+    }
   });
 
   it("keeps palette independent of theme", () => {
@@ -53,8 +68,14 @@ describe("per-deck palette", () => {
   it("reports invalid palette metadata at deck level", () => {
     const result = parseQuizMarkdown(deck("Invalid", "solarized"), "invalid.md");
     expect(result.errors.map((error) => error.detail)).toContain(
-      "Invalid palette: solarized (expected classic or gruvbox)",
+      "Invalid palette: solarized (expected classic, gruvbox, rose-pine, catppuccin, seoul256, ayu, or tokyo-night)",
     );
+    // A near miss is still rejected, so only the exact hyphenated names work.
+    for (const nearMiss of ["rosepine", "rose_pine", "tokyonight", "tokyo night", "mocha", ""]) {
+      const rejected = parseQuizMarkdown(deck("Near miss", nearMiss || "''"), "near-miss.md");
+      expect(rejected.errors.some((error) => error.detail.startsWith("Invalid palette"))).toBe(true);
+      expect(rejected.quiz?.palette).toBeUndefined();
+    }
     expect(result.errors.find((error) => error.detail.startsWith("Invalid palette"))?.questionIndex).toBe(-1);
   });
 
@@ -64,6 +85,26 @@ describe("per-deck palette", () => {
     expect(loadRuntimeConfig({ rootDir: root, env: {} }).palette).toBe("classic");
     expect(loadRuntimeConfig({ rootDir: root, env: { MDQ_PALETTE: " Gruvbox " } }).palette).toBe("gruvbox");
     expect(loadRuntimeConfig({ rootDir: root, env: { MDQ_PALETTE: "sepia" } }).palette).toBe("classic");
+    for (const name of ALL_PALETTES) {
+      expect(loadRuntimeConfig({ rootDir: root, env: { MDQ_PALETTE: ` ${name.toUpperCase()} ` } }).palette).toBe(name);
+    }
+    expect(loadRuntimeConfig({ rootDir: root, env: { MDQ_PALETTE: "rosepine" } }).palette).toBe("classic");
+  });
+
+  it("delivers each new palette on deck and runtime endpoints", async () => {
+    const quizDir = fs.mkdtempSync(path.join(os.tmpdir(), "mdq-palette-all-"));
+    for (const name of ALL_PALETTES) {
+      fs.writeFileSync(path.join(quizDir, `${name}.md`), deck(name, name));
+    }
+    const app = createApp({ quizDir, palette: "tokyo-night" });
+
+    const runtime = await request(app).get("/api/runtime-config").expect(200);
+    expect(runtime.body.palette).toBe("tokyo-night");
+
+    for (const name of ALL_PALETTES) {
+      const response = await request(app).get(`/api/deck/${name}`).expect(200);
+      expect(response.body.palette).toBe(name);
+    }
   });
 
   it("serves classic by default so existing runtimes are unchanged", async () => {
@@ -131,9 +172,10 @@ describe("per-deck palette", () => {
 describe("print exporter palette", () => {
   const printSource = fs.readFileSync(path.resolve(__dirname, "..", "print-mdq.ts"), "utf-8");
 
-  it("accepts --palette classic|gruvbox and defaults to the deck palette", () => {
+  it("accepts every palette through --palette and defaults to the deck palette", () => {
     expect(printSource).toContain('arg === "--palette"');
-    expect(printSource).toContain('normalized !== "classic" && normalized !== "gruvbox"');
+    expect(printSource).toContain("parseDeckPalette(value)");
+    expect(printSource).toContain("Use ${describeDeckPalettes()}.");
     expect(printSource).toContain('options.palette ?? quiz.palette ?? "classic"');
   });
 

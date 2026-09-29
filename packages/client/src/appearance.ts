@@ -1,4 +1,4 @@
-import type { DeckPalette, DeckTheme } from "@mdq/shared";
+import { isDeckPalette, type DeckPalette, type DeckTheme } from "@mdq/shared";
 
 // DOM-free theme and palette rules, shared by theme.ts and the boot code.
 // The theme and palette themselves live only on <html> as data-theme and
@@ -18,8 +18,7 @@ export function resolveClientTheme(theme: unknown, fallback: DeckTheme = DEFAULT
 }
 
 export function resolveClientPalette(palette: unknown, fallback: DeckPalette = DEFAULT_CLIENT_PALETTE): DeckPalette {
-  if (palette === "classic" || palette === "gruvbox") return palette;
-  return fallback;
+  return isDeckPalette(palette) ? palette : fallback;
 }
 
 /**
@@ -31,7 +30,7 @@ export function readServedAppearance(dataset: { theme?: string; palette?: string
   const { theme, palette } = dataset;
   return {
     theme: theme === "light" || theme === "dark" ? theme : undefined,
-    palette: palette === "classic" || palette === "gruvbox" ? palette : undefined,
+    palette: isDeckPalette(palette) ? palette : undefined,
   };
 }
 

@@ -95,8 +95,40 @@ export interface StudentRejectedPayload {
 
 export type QuestionType = "multiple_choice" | "poll" | "open_response" | "slide";
 export type DeckTheme = "dark" | "light";
+/**
+ * Every supported slide color palette, in the order they are documented and
+ * listed in messages. Adding a palette starts with one more entry here.
+ */
+export const DECK_PALETTES = [
+  "classic",
+  "gruvbox",
+  "rose-pine",
+  "catppuccin",
+  "seoul256",
+  "ayu",
+  "tokyo-night",
+] as const;
 /** Slide color palette, chosen independently of the light/dark theme. */
-export type DeckPalette = "classic" | "gruvbox";
+export type DeckPalette = (typeof DECK_PALETTES)[number];
+
+/** True when `value` is exactly one of the supported palette names. */
+export function isDeckPalette(value: unknown): value is DeckPalette {
+  return typeof value === "string" && (DECK_PALETTES as readonly string[]).includes(value);
+}
+
+/** The palette named by `value` (case-insensitive, trimmed), or undefined when it is not a supported one. */
+export function parseDeckPalette(value: unknown): DeckPalette | undefined {
+  if (typeof value !== "string") return undefined;
+  const normalized = value.trim().toLowerCase();
+  return isDeckPalette(normalized) ? normalized : undefined;
+}
+
+/** The palette names as prose for messages: "a, b, or c". */
+export function describeDeckPalettes(): string {
+  const names = [...DECK_PALETTES];
+  const last = names.pop();
+  return `${names.join(", ")}, or ${last}`;
+}
 
 export interface FoldoutNote {
   id: string;

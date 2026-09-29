@@ -49,7 +49,7 @@ describe("client slide palette contract", () => {
 
     it("normalizes and applies only supported palettes, defaulting to classic", () => {
       expect(appearance).toContain('DEFAULT_CLIENT_PALETTE: DeckPalette = "classic"');
-      expect(appearance).toContain('palette === "classic" || palette === "gruvbox"');
+      expect(appearance).toContain("isDeckPalette(palette)");
       expect(theme).toContain("document.documentElement.dataset.palette = resolved");
     });
 
@@ -113,7 +113,7 @@ describe("client slide palette contract", () => {
       expect(css).not.toMatch(/data-palette="classic"/);
       expect(themeCss).not.toMatch(/data-palette/);
       for (const [, selector] of paletteRules) {
-        expect(selector).toContain('data-palette="gruvbox"');
+        expect(selector).toMatch(/data-palette="(gruvbox|rose-pine|catppuccin|seoul256|ayu|tokyo-night)"/);
       }
     });
 

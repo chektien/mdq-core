@@ -13,6 +13,8 @@ import {
   SlideReference,
   DeckPalette,
   DeckTheme,
+  describeDeckPalettes,
+  parseDeckPalette,
   dashedSettingKey,
   normalizeDeckSettingKeys,
 } from "@mdq/shared";
@@ -209,15 +211,15 @@ function extractDeckPaletteMetadata(
   const match = preamble.match(/^palette:\s*(.*?)\s*$/im);
   if (!match) return undefined;
 
-  const value = stripOptionalQuotes(match[1]).toLowerCase();
-  if (value === "classic" || value === "gruvbox") return value;
+  const palette = parseDeckPalette(stripOptionalQuotes(match[1]));
+  if (palette) return palette;
 
   const lineNumber = preamble.slice(0, match.index).split("\n").length;
   errors.push(
     new QuizParseError(
       sourceFile,
       -1,
-      `Invalid palette: ${match[1].trim()} (expected classic or gruvbox)`,
+      `Invalid palette: ${match[1].trim()} (expected ${describeDeckPalettes()})`,
       lineNumber,
     ),
   );

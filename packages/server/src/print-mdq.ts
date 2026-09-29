@@ -1,12 +1,12 @@
 import { chromium, type Browser } from "playwright";
-import { Quiz, Question, QuestionType } from "@mdq/shared";
+import { DECK_PALETTES, DeckPalette, Quiz, Question, QuestionType, describeDeckPalettes, parseDeckPalette } from "@mdq/shared";
 import { parseQuizMarkdown, QuizParseError } from "./parser";
 import * as fs from "fs";
 import * as path from "path";
 import { pathToFileURL } from "url";
 
 type PrintTheme = "dark" | "light";
-type PrintPalette = "classic" | "gruvbox";
+type PrintPalette = DeckPalette;
 
 interface PrintOptions {
   inputFile: string;
@@ -61,7 +61,7 @@ Options:
   --no-answers         Hide correct answers and feedback. Default.
   --page-size <size>   A4 or Letter. Default: A4.
   --theme <theme>      dark or light. Default: dark.
-  --palette <palette>  classic or gruvbox. Default: the deck's palette, else classic.
+  --palette <palette>  ${DECK_PALETTES.join(", ")}. Default: the deck's palette, else classic.
   --title <title>      Override the PDF cover title.
   --html <file>        Also write the generated print HTML for debugging.
   -h, --help           Show this help.
@@ -168,9 +168,9 @@ function parseArgs(argv: string[]): CliResult {
     }
     if (arg === "--palette") {
       const value = readValue(argv, i, arg);
-      const normalized = value.toLowerCase();
-      if (normalized !== "classic" && normalized !== "gruvbox") {
-        throw new Error(`Unsupported palette "${value}". Use classic or gruvbox.`);
+      const normalized = parseDeckPalette(value);
+      if (!normalized) {
+        throw new Error(`Unsupported palette "${value}". Use ${describeDeckPalettes()}.`);
       }
       palette = normalized;
       i++;
@@ -586,13 +586,368 @@ function renderGruvboxTokens(theme: PrintTheme): string {
     `;
 }
 
+// Rosé Pine follows the rose-pine/rose-pine-palette colours (MIT,
+// https://github.com/rose-pine/rose-pine-palette) and mirrors the live slide
+// palette in packages/client/src/index.css: dark is Rosé Pine, light is Rosé
+// Pine Dawn with text #575279. Dawn hues that miss 4.5:1 on the cream page
+// are lowered in lightness (iris #907aa9 to #6a5482, foam #56949f to #39636a,
+// pine #286983 to #26637b), and dark pine #31748f is lightened to #779eb7 for
+// answer text. Secondary text is moved off subtle (#908caa to #a4a0bc in dark,
+// #797593 to #5f5b7a in Dawn) as in the live palette. Attendee notes and
+// explanations use iris, presenter notes foam.
+function renderRosePineTokens(theme: PrintTheme): string {
+  if (theme === "light") {
+    return `
+      --page-bg: #faf4ed;
+      --ink: #575279;
+      --body: #575279;
+      --muted: #5f5b7a;
+      --line: rgba(87, 82, 121, 0.28);
+      --soft-line: rgba(87, 82, 121, 0.14);
+      --paper: #faf4ed;
+      --wash: #f4ede8;
+      --option-bg: #faf4ed;
+      --media-bg: #f2e9e1;
+      --accent: #6a5482;
+      --accent-soft: rgba(106, 84, 130, 0.1);
+      --teal: #6a5482;
+      --teal-line: rgba(106, 84, 130, 0.35);
+      --teal-soft: rgba(106, 84, 130, 0.09);
+      --amber: #39636a;
+      --amber-line: rgba(57, 99, 106, 0.38);
+      --amber-soft: rgba(57, 99, 106, 0.09);
+      --green: #26637b;
+      --green-line: rgba(38, 99, 123, 0.45);
+      --green-soft: rgba(38, 99, 123, 0.12);
+      --reference: #5f5b7a;
+      --shadow: rgba(87, 82, 121, 0.05);
+    `;
+  }
+
+  return `
+      --page-bg: #191724;
+      --ink: #e0def4;
+      --body: #e0def4;
+      --muted: #a4a0bc;
+      --line: rgba(224, 222, 244, 0.32);
+      --soft-line: rgba(224, 222, 244, 0.16);
+      --paper: #1f1d2e;
+      --wash: #26233a;
+      --option-bg: #1f1d2e;
+      --media-bg: #191724;
+      --accent: #c4a7e7;
+      --accent-soft: rgba(196, 167, 231, 0.12);
+      --teal: #c4a7e7;
+      --teal-line: rgba(196, 167, 231, 0.42);
+      --teal-soft: rgba(196, 167, 231, 0.12);
+      --amber: #9ccfd8;
+      --amber-line: rgba(156, 207, 216, 0.42);
+      --amber-soft: rgba(156, 207, 216, 0.12);
+      --green: #779eb7;
+      --green-line: rgba(119, 158, 183, 0.46);
+      --green-soft: rgba(119, 158, 183, 0.12);
+      --reference: #a4a0bc;
+      --shadow: rgba(0, 0, 0, 0.18);
+    `;
+}
+
+// Catppuccin follows the catppuccin/palette colours (MIT,
+// https://github.com/catppuccin/palette) and mirrors the live slide palette in
+// packages/client/src/index.css: dark is Mocha, light is Latte. Latte hues
+// that miss 4.5:1 on its base are lowered in lightness (mauve #8839ef to
+// #7113ec, sapphire #209fb5 to #146472, green #40a02b to #29681c, subtext1
+// #5c5f77 to #545770 for secondary text). Attendee notes and explanations use
+// mauve, presenter notes pink in Mocha and sapphire in Latte.
+function renderCatppuccinTokens(theme: PrintTheme): string {
+  if (theme === "light") {
+    return `
+      --page-bg: #eff1f5;
+      --ink: #4c4f69;
+      --body: #4c4f69;
+      --muted: #545770;
+      --line: rgba(76, 79, 105, 0.28);
+      --soft-line: rgba(76, 79, 105, 0.14);
+      --paper: #eff1f5;
+      --wash: #e6e9ef;
+      --option-bg: #eff1f5;
+      --media-bg: #dce0e8;
+      --accent: #7113ec;
+      --accent-soft: rgba(113, 19, 236, 0.1);
+      --teal: #7113ec;
+      --teal-line: rgba(113, 19, 236, 0.35);
+      --teal-soft: rgba(113, 19, 236, 0.09);
+      --amber: #146472;
+      --amber-line: rgba(20, 100, 114, 0.38);
+      --amber-soft: rgba(20, 100, 114, 0.09);
+      --green: #29681c;
+      --green-line: rgba(41, 104, 28, 0.45);
+      --green-soft: rgba(41, 104, 28, 0.12);
+      --reference: #545770;
+      --shadow: rgba(76, 79, 105, 0.05);
+    `;
+  }
+
+  return `
+      --page-bg: #1e1e2e;
+      --ink: #cdd6f4;
+      --body: #cdd6f4;
+      --muted: #bac2de;
+      --line: rgba(205, 214, 244, 0.32);
+      --soft-line: rgba(205, 214, 244, 0.16);
+      --paper: #313244;
+      --wash: #181825;
+      --option-bg: #313244;
+      --media-bg: #11111b;
+      --accent: #cba6f7;
+      --accent-soft: rgba(203, 166, 247, 0.12);
+      --teal: #cba6f7;
+      --teal-line: rgba(203, 166, 247, 0.42);
+      --teal-soft: rgba(203, 166, 247, 0.12);
+      --amber: #f5c2e7;
+      --amber-line: rgba(245, 194, 231, 0.42);
+      --amber-soft: rgba(245, 194, 231, 0.12);
+      --green: #a6e3a1;
+      --green-line: rgba(166, 227, 161, 0.46);
+      --green-soft: rgba(166, 227, 161, 0.12);
+      --reference: #a6adc8;
+      --shadow: rgba(0, 0, 0, 0.18);
+    `;
+}
+
+// seoul256 mirrors the live slide palette in packages/client/src/index.css
+// (junegunn/seoul256.vim,
+// https://github.com/junegunn/seoul256.vim, MIT, default GUI colour map): dark is background 237
+// (#4b4b4b), light is seoul256-light at 253 (#e1e1e1). Light shades are
+// darkened as the live palette describes, for example green #006f00 to #006d00
+// and teal #007173 to #00686a. Attendee notes use the accent and presenter
+// notes the teal (light) or blue (dark), as on live slides.
+function renderSeoul256Tokens(theme: PrintTheme): string {
+  if (theme === "light") {
+    return `
+      --page-bg: #e1e1e1;
+      --ink: #333233;
+      --body: #4b4b4b;
+      --muted: #525252;
+      --line: rgba(75, 75, 75, 0.28);
+      --soft-line: rgba(75, 75, 75, 0.14);
+      --paper: #e1e1e1;
+      --wash: #d9d9d9;
+      --option-bg: #e1e1e1;
+      --media-bg: #d9d9d9;
+      --accent: #9b1d72;
+      --accent-soft: rgba(155, 29, 114, 0.1);
+      --teal: #9b1d72;
+      --teal-line: rgba(155, 29, 114, 0.35);
+      --teal-soft: rgba(155, 29, 114, 0.09);
+      --amber: #00686a;
+      --amber-line: rgba(0, 104, 106, 0.38);
+      --amber-soft: rgba(0, 104, 106, 0.09);
+      --green: #006d00;
+      --green-line: rgba(0, 109, 0, 0.45);
+      --green-soft: rgba(0, 109, 0, 0.12);
+      --reference: #525252;
+      --shadow: rgba(51, 50, 51, 0.04);
+    `;
+  }
+
+  return `
+      --page-bg: #4b4b4b;
+      --ink: #f1f1f1;
+      --body: #d9d9d9;
+      --muted: #d1d0d1;
+      --line: rgba(217, 217, 217, 0.32);
+      --soft-line: rgba(217, 217, 217, 0.16);
+      --paper: #3f3f3f;
+      --wash: #333233;
+      --option-bg: #3f3f3f;
+      --media-bg: #333233;
+      --accent: #ffbd98;
+      --accent-soft: rgba(255, 189, 152, 0.16);
+      --teal: #ffbd98;
+      --teal-line: rgba(255, 189, 152, 0.42);
+      --teal-soft: rgba(255, 189, 152, 0.12);
+      --amber: #bce0ff;
+      --amber-line: rgba(188, 224, 255, 0.42);
+      --amber-soft: rgba(188, 224, 255, 0.12);
+      --green: #bcddbd;
+      --green-line: rgba(188, 221, 189, 0.46);
+      --green-soft: rgba(188, 221, 189, 0.16);
+      --reference: #d1d0d1;
+      --shadow: rgba(0, 0, 0, 0.18);
+    `;
+}
+
+// Ayu mirrors the live slide palette in packages/client/src/index.css
+// (ayu-theme/ayu-colors,
+// https://github.com/ayu-theme/ayu-colors, MIT): dark is Ayu Dark, light is Ayu Light with its
+// accents darkened, for example green #86b300 to #516c00 and accent #f29718
+// to #955a08. Attendee notes use the accent, presenter notes the purple.
+function renderAyuTokens(theme: PrintTheme): string {
+  if (theme === "light") {
+    return `
+      --page-bg: #fcfcfc;
+      --ink: #46494d;
+      --body: #595d62;
+      --muted: #566070;
+      --line: rgba(107, 125, 143, 0.28);
+      --soft-line: rgba(107, 125, 143, 0.14);
+      --paper: #fcfcfc;
+      --wash: #ebeef0;
+      --option-bg: #fcfcfc;
+      --media-bg: #ebeef0;
+      --accent: #955a08;
+      --accent-soft: rgba(149, 90, 8, 0.1);
+      --teal: #955a08;
+      --teal-line: rgba(149, 90, 8, 0.35);
+      --teal-soft: rgba(149, 90, 8, 0.09);
+      --amber: #8047b9;
+      --amber-line: rgba(128, 71, 185, 0.38);
+      --amber-soft: rgba(128, 71, 185, 0.09);
+      --green: #516c00;
+      --green-line: rgba(81, 108, 0, 0.45);
+      --green-soft: rgba(81, 108, 0, 0.12);
+      --reference: #566070;
+      --shadow: rgba(70, 73, 77, 0.04);
+    `;
+  }
+
+  return `
+      --page-bg: #10141c;
+      --ink: #e2e1de;
+      --body: #bfbdb6;
+      --muted: #b1afaa;
+      --line: rgba(191, 189, 182, 0.32);
+      --soft-line: rgba(191, 189, 182, 0.16);
+      --paper: #141821;
+      --wash: #1b1f29;
+      --option-bg: #141821;
+      --media-bg: #0d1017;
+      --accent: #e6b450;
+      --accent-soft: rgba(230, 180, 80, 0.16);
+      --teal: #e6b450;
+      --teal-line: rgba(230, 180, 80, 0.42);
+      --teal-soft: rgba(230, 180, 80, 0.12);
+      --amber: #d2a6ff;
+      --amber-line: rgba(210, 166, 255, 0.42);
+      --amber-soft: rgba(210, 166, 255, 0.12);
+      --green: #aad94c;
+      --green-line: rgba(170, 217, 76, 0.46);
+      --green-soft: rgba(170, 217, 76, 0.16);
+      --reference: #b1afaa;
+      --shadow: rgba(0, 0, 0, 0.18);
+    `;
+}
+
+// Tokyo Night mirrors the live slide palette in packages/client/src/index.css
+// (folke/tokyonight.nvim,
+// https://github.com/folke/tokyonight.nvim, Apache-2.0): dark is the night style, light is Day
+// with its accents darkened, for example blue #2e7de9 to #1355b1 and green
+// #587539 to #485f2e. Attendee notes use the blue, presenter notes the purple.
+function renderTokyoNightTokens(theme: PrintTheme): string {
+  if (theme === "light") {
+    return `
+      --page-bg: #e1e2e7;
+      --ink: #1f356a;
+      --body: #2a4990;
+      --muted: #3f4c7e;
+      --line: rgba(55, 96, 191, 0.28);
+      --soft-line: rgba(55, 96, 191, 0.14);
+      --paper: #e1e2e7;
+      --wash: #d0d5e3;
+      --option-bg: #e1e2e7;
+      --media-bg: #d0d5e3;
+      --accent: #1355b1;
+      --accent-soft: rgba(19, 85, 177, 0.1);
+      --teal: #1355b1;
+      --teal-line: rgba(19, 85, 177, 0.35);
+      --teal-soft: rgba(19, 85, 177, 0.09);
+      --amber: #6d3faf;
+      --amber-line: rgba(109, 63, 175, 0.38);
+      --amber-soft: rgba(109, 63, 175, 0.09);
+      --green: #485f2e;
+      --green-line: rgba(72, 95, 46, 0.45);
+      --green-soft: rgba(72, 95, 46, 0.12);
+      --reference: #3f4c7e;
+      --shadow: rgba(31, 53, 106, 0.04);
+    `;
+  }
+
+  return `
+      --page-bg: #1a1b26;
+      --ink: #d6ddf9;
+      --body: #c0caf5;
+      --muted: #a9b1d6;
+      --line: rgba(192, 202, 245, 0.32);
+      --soft-line: rgba(192, 202, 245, 0.16);
+      --paper: #16161e;
+      --wash: #292e42;
+      --option-bg: #16161e;
+      --media-bg: #16161e;
+      --accent: #7aa2f7;
+      --accent-soft: rgba(122, 162, 247, 0.16);
+      --teal: #7aa2f7;
+      --teal-line: rgba(122, 162, 247, 0.42);
+      --teal-soft: rgba(122, 162, 247, 0.12);
+      --amber: #bb9af7;
+      --amber-line: rgba(187, 154, 247, 0.42);
+      --amber-soft: rgba(187, 154, 247, 0.12);
+      --green: #9ece6a;
+      --green-line: rgba(158, 206, 106, 0.46);
+      --green-soft: rgba(158, 206, 106, 0.16);
+      --reference: #a9b1d6;
+      --shadow: rgba(0, 0, 0, 0.18);
+    `;
+}
+
 function printPageBackground(theme: PrintTheme, palette: PrintPalette): string {
-  if (palette === "gruvbox") return theme === "dark" ? "#282828" : "#eff0ec";
+  switch (palette) {
+    case "gruvbox":
+      return theme === "dark" ? "#282828" : "#eff0ec";
+
+    case "rose-pine":
+      return theme === "dark" ? "#191724" : "#faf4ed";
+
+    case "catppuccin":
+      return theme === "dark" ? "#1e1e2e" : "#eff1f5";
+
+    case "seoul256":
+      return theme === "dark" ? "#4b4b4b" : "#e1e1e1";
+
+    case "ayu":
+      return theme === "dark" ? "#10141c" : "#fcfcfc";
+
+    case "tokyo-night":
+      return theme === "dark" ? "#1a1b26" : "#e1e2e7";
+
+    case "classic":
+      break;
+  }
   return theme === "dark" ? "#242423" : "#ffffff";
 }
 
 function renderThemeTokens(theme: PrintTheme, palette: PrintPalette): string {
-  if (palette === "gruvbox") return renderGruvboxTokens(theme);
+  switch (palette) {
+    case "gruvbox":
+      return renderGruvboxTokens(theme);
+
+    case "rose-pine":
+      return renderRosePineTokens(theme);
+
+    case "catppuccin":
+      return renderCatppuccinTokens(theme);
+
+    case "seoul256":
+      return renderSeoul256Tokens(theme);
+
+    case "ayu":
+      return renderAyuTokens(theme);
+
+    case "tokyo-night":
+      return renderTokyoNightTokens(theme);
+
+    case "classic":
+      break;
+  }
   if (theme === "light") {
     return `
       --page-bg: #ffffff;

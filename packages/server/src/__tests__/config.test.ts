@@ -55,6 +55,23 @@ describe("loadRuntimeConfig", () => {
     expect(config.autoGenerateStudentIds).toBe(true);
   });
 
+  it("accepts each supported palette from the file, case-insensitively", () => {
+    for (const name of ["classic", "gruvbox", "rose-pine", "catppuccin", "seoul256", "ayu", "tokyo-night"]) {
+      const root = createRoot();
+      fs.writeFileSync(path.join(root, "data", "config.json"), JSON.stringify({ palette: ` ${name.toUpperCase()} ` }));
+      expect(loadRuntimeConfig({ rootDir: root, env: {} }).palette).toBe(name);
+    }
+  });
+
+  it("ignores an unknown palette in the file or environment", () => {
+    const root = createRoot();
+    fs.writeFileSync(path.join(root, "data", "config.json"), JSON.stringify({ palette: "rosepine" }));
+    expect(loadRuntimeConfig({ rootDir: root, env: {} }).palette).toBe("classic");
+    fs.writeFileSync(path.join(root, "data", "config.json"), JSON.stringify({ palette: "ayu" }));
+    expect(loadRuntimeConfig({ rootDir: root, env: { MDQ_PALETTE: "solarized" } }).palette).toBe("ayu");
+    expect(loadRuntimeConfig({ rootDir: root, env: { MDQ_PALETTE: "tokyo-night" } }).palette).toBe("tokyo-night");
+  });
+
   it("lets environment variables override file config", () => {
     const root = createRoot();
     fs.writeFileSync(
