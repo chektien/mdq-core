@@ -92,6 +92,9 @@ const questionAt = (session: Session, quiz: Quiz) => quiz.questions[session.curr
 const questionPayload = (session: Session, quiz: Quiz, now: number): QuestionOpenPayload | null => {
   const q = questionAt(session, quiz);
   if (!q) return null;
+  const isSlide = getQuestionType(q) === "slide";
+  const questionTotal = quiz.questions.filter((item) => getQuestionType(item) !== "slide").length;
+  const questionNumber = quiz.questions.slice(0, session.currentQuestionIndex + 1).filter((item) => getQuestionType(item) !== "slide").length;
   const attendeeNotes: FoldoutNote[] | undefined = q.attendeeNotes?.length ? q.attendeeNotes : undefined;
   return {
     questionIndex: session.currentQuestionIndex, topic: q.topic, text: q.textHtml,
@@ -102,6 +105,7 @@ const questionPayload = (session: Session, quiz: Quiz, now: number): QuestionOpe
     options: q.options.map((o) => ({ label: o.label, text: o.textHtml })),
     allowsMultiple: q.allowsMultiple, isPoll: q.isPoll === true,
     timeLimitSec: q.timeLimitSec, startedAt: session.questionStartedAt || now,
+    ...(isSlide ? {} : { questionNumber, questionTotal }),
   };
 };
 /**
@@ -342,7 +346,8 @@ export function apply(input: Session, quiz: Quiz, command: Command, now: number)
       emit(SocketEvents.STUDENT_JOINED, { participantId: participant.studentId, sessionToken: participant.sessionToken,
         sessionState: session.state, currentQuestion: session.currentQuestionIndex >= 0 ? session.currentQuestionIndex : undefined,
         answeredQuestions: getAnsweredQuestions(session, participant.studentId), answers: ownAnswers(session, quiz, participant.studentId),
-        publicKey: participant.publicKey, label: participant.label, labelNote: participant.labelNote }, `participant:${participant.studentId}`);
+        publicKey: participant.publicKey, label: participant.label, labelNote: participant.labelNote,
+        ...(quiz.title ? { deckTitle: quiz.title } : {}) }, `participant:${participant.studentId}`);
       emitParticipants();
       if (session.state === "QUESTION_OPEN" && session.currentQuestionIndex >= 0) emitCount();
       messages.push(...snapshotMessages(session, quiz, now, `participant:${participant.studentId}`, "participant", isReconnect));

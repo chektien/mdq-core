@@ -22,6 +22,7 @@ const openPayload = (index: number) => ({
   attendeeNotes: undefined, slideMedia: undefined, slideMediaPosition: undefined, slideMediaOpacity: undefined,
   slideBackground: undefined, slideLiveEmbed: undefined, slideVideo: undefined, slideReferences: undefined,
   options: [{ label: "A", text: "One" }], allowsMultiple: false, isPoll: false, timeLimitSec: 20, startedAt: 1000,
+  questionNumber: index + 1, questionTotal: 2,
 });
 const count = (index: number) => ({ questionIndex: index, submitted: 0, total: 0, openResponses: undefined });
 const reveal = (index: number) => ({ questionIndex: index, questionType: "multiple_choice", correctOptions: ["A"],
@@ -106,7 +107,7 @@ it("joins, answers and disconnects without changing the supplied session", () =>
   expect(input.participants.size).toBe(0);
   expect(joined.messages[0]).toEqual({ audience: "participant:S1", event: SocketEvents.STUDENT_JOINED,
     payload: { participantId: "S1", sessionToken: "token-1", sessionState: "QUESTION_OPEN", currentQuestion: 0, answeredQuestions: [], answers: [],
-      publicKey: "key-1", label: "Sam", labelNote: undefined } });
+      publicKey: "key-1", label: "Sam", labelNote: undefined, deckTitle: "Sample" } });
   const answered = apply(joined.session, quiz, { type: "answerSubmit", studentId: "S1", payload: { questionIndex: 0, selectedOptions: ["A"] } }, 3000);
   expect(joined.session.submissions).toHaveLength(0);
   expect(answered.messages).toEqual([
@@ -149,7 +150,7 @@ for (const state of states) {
     expect(result.messages[0]).toEqual({ audience: "participant:S1", event: SocketEvents.STUDENT_JOINED,
       payload: { participantId: "S1", sessionToken: "token", sessionState: state,
         currentQuestion: state === "LOBBY" ? undefined : 0, answeredQuestions: [], answers: [],
-        publicKey: "key-1", label: "Participant 1", labelNote: "You appear as Participant 1." } });
+        publicKey: "key-1", label: "Participant 1", labelNote: "You appear as Participant 1.", deckTitle: "Sample" } });
     expect(input.participants.size).toBe(0);
   });
 

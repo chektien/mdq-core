@@ -4,6 +4,8 @@ import type { LeaderboardRow } from "@mdq/shared";
  * Leaderboard table with staggered animation. Rows are named by label; a row
  * that carries a Student ID (the instructor's) shows it under the label when
  * `showStudentIds` is on. `highlightPublicKey` marks the viewer's own row.
+ * `compact` is for a phone or tablet held in the hand: rows stay a readable
+ * width and centred, and the small text is not shrunk.
  */
 export default function Leaderboard({
   entries,
@@ -11,12 +13,14 @@ export default function Leaderboard({
   highlightPublicKey,
   maxRows = 10,
   showStudentIds = true,
+  compact = false,
 }: {
   entries: LeaderboardRow[];
   totalQuestions: number;
   highlightPublicKey?: string;
   maxRows?: number;
   showStudentIds?: boolean;
+  compact?: boolean;
 }) {
   const visible = entries.slice(0, maxRows);
   const hasScoredQuestions = totalQuestions > 0;
@@ -30,7 +34,7 @@ export default function Leaderboard({
   };
 
   return (
-    <div className="leaderboard-board">
+    <div className={compact ? "leaderboard-board leaderboard-board-compact" : "leaderboard-board"}>
       {visible.length > 0 ? (
         <ol className="leaderboard-list" aria-label="Leaderboard rankings">
           {visible.map((entry, i) => {
@@ -66,10 +70,12 @@ export default function Leaderboard({
 
                 <div className="leaderboard-score">
                   <span>
-                    {hasScoredQuestions ? `${entry.correctCount}/${totalQuestions}` : "Poll only"}
+                    {hasScoredQuestions ? `${entry.correctCount} of ${totalQuestions} correct` : "Poll only"}
                   </span>
                   <small>
-                    {hasScoredQuestions ? `${(entry.totalTimeMs / 1000).toFixed(1)}s` : "No scored questions"}
+                    {hasScoredQuestions
+                      ? <>{(entry.totalTimeMs / 1000).toFixed(1)} s<span className="sr-only"> total time</span></>
+                      : "No scored questions"}
                   </small>
                 </div>
               </li>

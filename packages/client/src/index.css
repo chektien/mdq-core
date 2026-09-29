@@ -7087,3 +7087,99 @@ body.image-expansion-lock {
     font-size: clamp(0.85rem, 1.9cqi, 1.05rem);
   }
 }
+
+/* ── Phone and tablet leaderboard ─────────
+   Rows keep a readable width and stay centred on an iPad, and the small
+   lines (Student ID, time) are never below 14px. */
+.leaderboard-board-compact {
+  width: min(100%, 32rem);
+}
+
+.leaderboard-board-compact .leaderboard-id,
+.leaderboard-board-compact .leaderboard-score small,
+.leaderboard-board-compact .leaderboard-overflow,
+.leaderboard-board-compact .leaderboard-empty {
+  font-size: 0.875rem;
+}
+
+.leaderboard-board-compact .leaderboard-score {
+  font-size: 1rem;
+}
+
+/* ── Phone slide: readable status line and touch-sized controls ───────── */
+.slide-surface-student .slide-status-pill {
+  max-width: 100%;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  line-height: 1.25;
+  text-transform: none;
+  white-space: normal;
+}
+
+.slide-surface-student .slide-fullscreen-button {
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0.6rem 0.9rem;
+  font-size: 0.875rem;
+  letter-spacing: 0.02em;
+  text-transform: none;
+}
+
+/* ── Reduced motion ───────────────────────
+   People who ask their device for less motion get none of the movement here:
+   the loading spinner fades instead of turning, the last-seconds timer pulse
+   and the leaderboard slide-in stop, the resumed label leaves without fading,
+   and bars and buttons change at once. */
+@keyframes reduced-motion-fade {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-spin {
+    animation: reduced-motion-fade 1.6s ease-in-out infinite;
+  }
+
+  .timer-urgent,
+  .leaderboard-row {
+    animation: none;
+  }
+
+  .bar-fill,
+  .option-btn,
+  .quiz-surface-content-fit,
+  .image-expandable-inline,
+  .presenter-notes-summary::before,
+  .slide-video-card {
+    transition: none;
+  }
+
+  .option-btn:active:not(:disabled),
+  [class*="active:scale"]:active {
+    transform: none;
+    scale: none;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    transition-delay: 0s !important;
+    scroll-behavior: auto !important;
+  }
+
+  .animate-spin {
+    animation-duration: 1.6s !important;
+    animation-iteration-count: infinite !important;
+  }
+
+  /* The resumed label still leaves after five seconds, but it disappears at once instead of fading. */
+  .slide-status-pill-fades {
+    animation-duration: 5s !important;
+    animation-timing-function: steps(1, end) !important;
+  }
+}

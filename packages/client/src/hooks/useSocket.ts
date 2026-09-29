@@ -108,6 +108,10 @@ export interface QuestionState {
   isPoll: boolean;
   timeLimitSec: number;
   startedAt: number;
+  /** Position among the deck's questions, slides not counted; absent on a slide or from an older server. */
+  questionNumber?: number;
+  /** How many questions the deck has, slides not counted. */
+  questionTotal?: number;
 }
 
 /**
@@ -185,6 +189,8 @@ export interface UseSocketReturn {
   /** The name others see for this participant, and why it may differ from what they typed. */
   label: string | null;
   labelNote: string | null;
+  /** The deck's title, when the deck has one. */
+  deckTitle: string | null;
   answeredQuestions: number[];
 
   // Question
@@ -241,6 +247,7 @@ export function useSocket(
   const [publicKey, setPublicKey] = useState<string | null>(null);
   const [label, setLabel] = useState<string | null>(null);
   const [labelNote, setLabelNote] = useState<string | null>(null);
+  const [deckTitle, setDeckTitle] = useState<string | null>(null);
   const [answeredQuestions, setAnsweredQuestions] = useState<number[]>([]);
 
   const [currentQuestion, setCurrentQuestion] = useState<QuestionState | null>(null);
@@ -326,6 +333,7 @@ export function useSocket(
       setPublicKey(data.publicKey ?? null);
       setLabel(data.label ?? null);
       setLabelNote(data.labelNote ?? null);
+      setDeckTitle(data.deckTitle?.trim() || null);
       setSessionState(data.sessionState);
       setAnsweredQuestions(data.answeredQuestions || []);
       answeredQuestionsRef.current = data.answeredQuestions || [];
@@ -389,6 +397,8 @@ export function useSocket(
         isPoll: data.isPoll ?? false,
         timeLimitSec: data.timeLimitSec,
         startedAt: data.startedAt,
+        questionNumber: data.questionNumber,
+        questionTotal: data.questionTotal,
       };
       // A snapshot that repeats the opening on screen keeps the same object, so
       // the student view does not clear an option chosen while offline.
@@ -652,6 +662,7 @@ export function useSocket(
     setPublicKey(null);
     setLabel(null);
     setLabelNote(null);
+    setDeckTitle(null);
   }, []);
 
   return {
@@ -663,6 +674,7 @@ export function useSocket(
     publicKey,
     label,
     labelNote,
+    deckTitle,
     answeredQuestions,
     currentQuestion,
     remainingSec,

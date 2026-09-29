@@ -84,6 +84,8 @@ export interface SessionRestoreResponse {
   sessionId: string;
   sessionCode: string;
   week: string;
+  /** The deck's title, when it has one. */
+  title?: string;
   theme: DeckTheme;
   palette: DeckPalette;
   state: string;
@@ -99,6 +101,8 @@ export interface PresentationSessionResponse {
   sessionId: string;
   sessionCode: string;
   week: string;
+  /** The deck's title, when it has one. */
+  title?: string;
   theme: DeckTheme;
   palette: DeckPalette;
   state: string;
