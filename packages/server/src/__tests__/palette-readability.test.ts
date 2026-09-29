@@ -238,6 +238,11 @@ describe("palette readability, 7 palettes x 2 themes", () => {
       }, { page }, 3);
     });
 
+    it("keeps slide references in the solid soft slide ink at 4.5:1 on both slide stops", () => {
+      const grounds = Object.fromEntries(stops.map((stop, i) => [`slide stop ${i + 1}`, stop]));
+      expectPairs(`${name} references`, { "reference text": token(t, "--mdq-slide-ink-soft") }, grounds);
+    });
+
   });
 
   it("draws the presenter notes panel from palette tokens, with no fixed amber", () => {
@@ -247,6 +252,12 @@ describe("palette readability, 7 palettes x 2 themes", () => {
     expect(panelCss).toContain("background: color-mix(in srgb, var(--mdq-warning) 9%, var(--mdq-paper-strong));");
     expect(panelCss).not.toMatch(/#[0-9a-f]{3,8}\b|rgba?\(/i);
     expect(index).not.toMatch(/html\[data-theme="light"\] \.presenter-notes/);
+  });
+
+  it("keeps the slide references in one solid token colour with no per-palette override", () => {
+    expect(declarationsOf(index, ".slide-references").color).toBe("var(--mdq-slide-ink-soft)");
+    expect(index).not.toMatch(/data-palette[^{]*\.slide-references/);
+    expect(index).not.toMatch(/78 percent|78%/);
   });
 
 });

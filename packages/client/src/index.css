@@ -1053,12 +1053,6 @@ html[data-palette="rose-pine"][data-theme="light"] {
   background: #faf4ed;
 }
 
-/* The reference footer dims its text to 78 percent, which drops Dawn's soft
-   ink below 4.5:1 on the slide, so keep it solid. */
-html[data-palette="rose-pine"][data-theme="light"] .slide-references {
-  color: var(--mdq-slide-ink-soft);
-}
-
 html[data-palette="rose-pine"][data-theme="light"] .slide-surface {
   background: linear-gradient(180deg, #faf4ed 0%, #f4ede8 100%);
 }
@@ -1388,12 +1382,6 @@ html[data-palette="catppuccin"][data-theme="light"] {
   --mdq-page-glow-cool: transparent;
   --mdq-page-glow-warm: transparent;
   background: #eff1f5;
-}
-
-/* The reference footer dims its text to 78 percent, which drops Latte's soft
-   ink below 4.5:1 on the slide, so keep it solid. */
-html[data-palette="catppuccin"][data-theme="light"] .slide-references {
-  color: var(--mdq-slide-ink-soft);
 }
 
 html[data-palette="catppuccin"][data-theme="light"] .slide-surface {
@@ -1755,13 +1743,6 @@ html[data-palette="seoul256"][data-theme="light"] .instructor-qr-panel {
   --mdq-qr-link: #007173;
 }
 
-/* Slide references are drawn at 78 percent of the soft ink, which leaves the
-   small link text under 4.5:1 on a light ground, so the light theme uses the
-   soft ink at full strength. */
-html[data-palette="seoul256"][data-theme="light"] .slide-references {
-  color: var(--mdq-slide-ink-soft);
-}
-
 /* The dark selection-mode card and chips carry classic purple and green in
    their base rules; the light theme already reads the tokens. */
 html[data-palette="seoul256"]:not([data-theme="light"]) .selection-mode-card-single {
@@ -2074,13 +2055,6 @@ html[data-palette="ayu"][data-theme="light"] .instructor-qr-panel {
   --mdq-qr-link: #147aae;
 }
 
-/* Slide references are drawn at 78 percent of the soft ink, which leaves the
-   small link text under 4.5:1 on a light ground, so the light theme uses the
-   soft ink at full strength. */
-html[data-palette="ayu"][data-theme="light"] .slide-references {
-  color: var(--mdq-slide-ink-soft);
-}
-
 /* The dark selection-mode card and chips carry classic purple and green in
    their base rules; the light theme already reads the tokens. */
 html[data-palette="ayu"]:not([data-theme="light"]) .selection-mode-card-single {
@@ -2387,13 +2361,6 @@ html[data-palette="tokyo-night"][data-theme="light"] .quiz-html pre {
 html[data-palette="tokyo-night"][data-theme="dark"] .instructor-qr-panel,
 html[data-palette="tokyo-night"][data-theme="light"] .instructor-qr-panel {
   --mdq-qr-link: #186fe6;
-}
-
-/* Slide references are drawn at 78 percent of the soft ink, which leaves the
-   small link text under 4.5:1 on a light ground, so the light theme uses the
-   soft ink at full strength. */
-html[data-palette="tokyo-night"][data-theme="light"] .slide-references {
-  color: var(--mdq-slide-ink-soft);
 }
 
 /* The dark selection-mode card and chips carry classic purple and green in
@@ -4157,7 +4124,7 @@ html[data-theme="light"] .mdq-orbit-callout {
   align-self: flex-end;
   max-width: min(48rem, 58cqi);
   margin-top: auto;
-  color: color-mix(in srgb, var(--mdq-slide-ink-soft) 78%, transparent);
+  color: var(--mdq-slide-ink-soft);
   font-size: clamp(0.62rem, 0.78cqi, 0.82rem);
   line-height: 1.28;
   text-align: right;
