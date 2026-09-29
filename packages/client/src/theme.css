@@ -768,6 +768,17 @@ html[data-theme] .animate-spin[class*="border-indigo-600"] {
   border-top-color: transparent !important;
 }
 
+/* The accent fill mapping would otherwise keep a disabled Submit looking
+   ready (nothing chosen yet, or offline). Like the presenter toolbar, it keeps
+   readable muted text and switches to a dashed control outline. */
+html[data-theme] .student-submit-button:disabled {
+  background: transparent !important;
+  color: var(--mdq-muted) !important;
+  border: 1px dashed var(--mdq-control-border) !important;
+  box-shadow: none !important;
+  cursor: not-allowed;
+}
+
 /* Buttons that sit on the page without a fill of their own get the control
    outline so they read as buttons. */
 html[data-theme] .student-done-button {

@@ -503,6 +503,7 @@ export default function StudentView({
         submittedOptions={sock.submittedOptions}
         submittedResponseText={sock.submittedResponseText}
         totalQuestions={sock.totalQuestions}
+        connected={connected}
         onSubmit={sock.submitAnswer}
       />
     );
@@ -569,6 +570,7 @@ function QuestionView({
   submittedOptions,
   submittedResponseText,
   totalQuestions,
+  connected,
   onSubmit,
 }: {
   question: QuestionState | null;
@@ -578,6 +580,7 @@ function QuestionView({
   submittedOptions: string[];
   submittedResponseText: string | null;
   totalQuestions: number;
+  connected: boolean;
   onSubmit: (payload: { questionIndex: number; selectedOptions?: string[]; responseText?: string }) => void;
 }) {
   const [selected, setSelected] = useState<string[]>([]);
@@ -628,6 +631,7 @@ function QuestionView({
   };
 
   const handleSubmit = () => {
+    if (!connected) return;
     if (question.questionType === "open_response") {
       if (!responseText.trim()) return;
       onSubmit({ questionIndex: question.questionIndex, responseText });
@@ -805,13 +809,20 @@ function QuestionView({
             <span className="text-amber-400 font-semibold">Time expired</span>
           </div>
         ) : (
-          <button
-            onClick={handleSubmit}
-            disabled={question.questionType === "open_response" ? !responseText.trim() : selected.length === 0}
-            className="w-full bg-indigo-600 hover:bg-indigo-500 disabled:bg-zinc-700 disabled:text-zinc-500 text-white font-semibold py-4 rounded-xl transition-colors text-lg"
-          >
-            {submitLabel}
-          </button>
+          <>
+            {!connected && (
+              <p className="student-reconnecting mb-3 text-center text-sm text-amber-400" role="status" aria-live="polite">
+                Connection lost. Reconnecting&hellip;
+              </p>
+            )}
+            <button
+              onClick={handleSubmit}
+              disabled={!connected || (question.questionType === "open_response" ? !responseText.trim() : selected.length === 0)}
+              className="student-submit-button w-full bg-indigo-600 hover:bg-indigo-500 disabled:bg-zinc-700 disabled:text-zinc-500 text-white font-semibold py-4 rounded-xl transition-colors text-lg"
+            >
+              {submitLabel}
+            </button>
+          </>
         )}
       </div>
     </div>

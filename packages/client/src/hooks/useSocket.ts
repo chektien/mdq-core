@@ -27,6 +27,7 @@ import type {
   StudentAnswer,
 } from "@mdq/shared";
 import { SocketEvents } from "@mdq/shared";
+import { clockOffsetFromTick, localRemainingSec } from "../countdown";
 import { mergeOwnAnswers, seedSubmittedAnswer, toOptionIndexes } from "../ownAnswers";
 
 // ── localStorage helpers ─────────────────────
@@ -219,6 +220,8 @@ export function useSocket(
   // from accepted submissions, so a revisited or reloaded question shows them.
   const ownAnswersRef = useRef<Map<number, StudentAnswer>>(new Map());
   const pendingAnswerRef = useRef<StudentAnswer | null>(null);
+  // Server clock minus this device's, so the countdown can run on while offline.
+  const clockOffsetRef = useRef(0);
   const [connected, setConnected] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -389,10 +392,14 @@ export function useSocket(
       setSubmittedOptions(seeded.selectedOptions);
       setSubmittedResponseText(seeded.responseText);
       setRemainingSec(data.timeLimitSec);
+      // A live open arrives as the question starts; a replayed one is followed by a tick that corrects this.
+      clockOffsetRef.current = data.startedAt - Date.now();
     });
 
     socket.on(SocketEvents.QUESTION_TICK, (data: QuestionTickPayload) => {
       setRemainingSec(data.remainingSec);
+      const shown = currentQuestionRef.current;
+      if (shown) clockOffsetRef.current = clockOffsetFromTick(shown, data.remainingSec, Date.now());
     });
 
     socket.on(SocketEvents.QUESTION_CLOSE, () => {
@@ -542,6 +549,16 @@ export function useSocket(
     };
   }, [sessionId, role]);
 
+  // Ticks stop while offline, so keep the countdown moving from the question's
+  // start time until the rejoin snapshot's tick takes over again.
+  useEffect(() => {
+    if (connected || sessionState !== "QUESTION_OPEN" || !currentQuestion || currentQuestion.questionType === "slide") return;
+    const update = () => setRemainingSec(localRemainingSec(currentQuestion, Date.now(), clockOffsetRef.current));
+    update();
+    const timer = setInterval(update, 1000);
+    return () => clearInterval(timer);
+  }, [connected, sessionState, currentQuestion]);
+
   const joinSession = useCallback(
     (studentId: string, displayName?: string) => {
       if (!socketRef.current) return;
@@ -561,6 +578,13 @@ export function useSocket(
   const submitAnswer = useCallback(
     (payload: AnswerSubmitPayload) => {
       if (!socketRef.current) return;
+      // Socket.IO would buffer this and send it on reconnect before the rejoin,
+      // where the server rejects it, so an offline answer is not sent at all.
+      if (!socketRef.current.connected) {
+        setError("Not connected. Your answer was not sent; submit it again once you are reconnected.");
+        setTimeout(() => setError(null), 3000);
+        return;
+      }
       socketRef.current.emit(SocketEvents.ANSWER_SUBMIT, payload);
       const nextSubmittedOptions = payload.selectedOptions ?? [];
       const nextSubmittedResponseText = payload.responseText?.trim() || null;
