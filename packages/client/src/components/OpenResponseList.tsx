@@ -76,6 +76,7 @@ export default function OpenResponseList({
                   type="button"
                   className="open-response-toggle shrink-0"
                   aria-pressed={hidden}
+                  aria-label={`Hide response from ${participantLabel}`}
                   onClick={() => onToggleHidden(response, !hidden)}
                 >
                   {hidden ? "Show" : "Hide"}

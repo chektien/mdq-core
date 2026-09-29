@@ -345,7 +345,7 @@ export function apply(input: Session, quiz: Quiz, command: Command, now: number)
       if (isOpenResponseQuestion(q)) {
         if (options.length) { reject("Open response questions accept text responses only."); break; }
         if (!responseText) { reject("Response text cannot be blank."); break; }
-        if (responseText.length > MAX_OPEN_RESPONSE_LENGTH) { reject(`Please keep your response under ${MAX_OPEN_RESPONSE_LENGTH} characters.`); break; }
+        if (responseText.length > MAX_OPEN_RESPONSE_LENGTH) { reject(`Please use up to ${MAX_OPEN_RESPONSE_LENGTH} characters.`); break; }
       } else {
         if (!q.allowsMultiple && options.length > 1) { reject("This question accepts one answer only."); break; }
         if (!options.length) { reject("At least one option must be selected."); break; }

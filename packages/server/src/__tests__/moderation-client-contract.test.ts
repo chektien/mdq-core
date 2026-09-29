@@ -13,6 +13,7 @@ describe("open response moderation in the client", () => {
   it("gives every response a real Hide / Show button that reports its pressed state", () => {
     expect(list).toMatch(/<button[^>]*\n?[^>]*type="button"[^>]*\n?[^>]*className="open-response-toggle/);
     expect(list).toContain("aria-pressed={hidden}");
+    expect(list).toContain("aria-label={`Hide response from ${participantLabel}`}");
     expect(list).toContain('{hidden ? "Show" : "Hide"}');
     expect(list).toContain("Hidden from the projector");
   });

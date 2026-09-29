@@ -200,11 +200,20 @@ describe("open response moderation", () => {
     const long = "x".repeat(MAX_OPEN_RESPONSE_LENGTH + 1);
     const rejected = step({ type: "answerSubmit", studentId: IDS[0], payload: { questionIndex: 1, responseText: long } });
     const reason = (rejected.find((m) => m.event === SocketEvents.ANSWER_REJECTED)!.payload as { reason: string }).reason;
-    expect(reason).toBe("Please keep your response under 1000 characters.");
+    expect(reason).toBe("Please use up to 1000 characters.");
     expect(rejected.some((m) => m.event === SocketEvents.ANSWER_ACCEPTED)).toBe(false);
     expect(session.submissions.find((s) => s.studentId === IDS[0])?.responseText).toBe(TEXTS[0]);
     const exact = "y".repeat(MAX_OPEN_RESPONSE_LENGTH);
     const accepted = step({ type: "answerSubmit", studentId: IDS[0], payload: { questionIndex: 1, responseText: `  ${exact}  ` } });
     expect(accepted.some((m) => m.event === SocketEvents.ANSWER_ACCEPTED)).toBe(true);
+  });
+
+  it("counts characters, not bytes, so multibyte text has the same cap", () => {
+    const { step } = openSession();
+    const accepted = step({ type: "answerSubmit", studentId: IDS[0], payload: { questionIndex: 1, responseText: "é字".repeat(MAX_OPEN_RESPONSE_LENGTH / 2) } });
+    expect(accepted.some((m) => m.event === SocketEvents.ANSWER_ACCEPTED)).toBe(true);
+    const rejected = step({ type: "answerSubmit", studentId: IDS[1], payload: { questionIndex: 1, responseText: "字".repeat(MAX_OPEN_RESPONSE_LENGTH + 1) } });
+    expect(rejected.some((m) => m.event === SocketEvents.ANSWER_REJECTED)).toBe(true);
+    expect(rejected.some((m) => m.event === SocketEvents.ANSWER_ACCEPTED)).toBe(false);
   });
 });

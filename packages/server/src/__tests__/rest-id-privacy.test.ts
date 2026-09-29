@@ -93,6 +93,15 @@ describe("REST routes that could carry Student IDs", () => {
       expect(response.studentId).toBeUndefined();
       expect(response.displayName).toBeUndefined();
     });
+
+    it("leaves a hidden response out of a restored review, and does not reveal the flag", async () => {
+      const sessionId = await sessionWithOpenResponse(request(app));
+      const [{ publicKey }] = (await request(app).get(`/api/session/${sessionId}/state`).expect(200)).body.reviewReveals[0].openResponses;
+      await request(app).post(`/api/session/${sessionId}/response-visibility`).send({ questionIndex: 0, publicKey, hidden: true }).expect(200);
+      const res = await request(app).get(`/api/session/${sessionId}/state`).expect(200);
+      expect(res.body.reviewReveals[0].openResponses).toEqual([]);
+      expect(JSON.stringify(res.body)).not.toContain("A thought");
+    });
   });
 
   describe("with an instructor login configured", () => {
@@ -111,6 +120,17 @@ describe("REST routes that could carry Student IDs", () => {
       const sessionId = await sessionWithOpenResponse(agent);
       const restored = await agent.get(`/api/session/${sessionId}/state`).expect(200);
       expect(restored.body.reviewReveals[0].openResponses[0]).toMatchObject({ studentId: "ZQ-1001", displayName: "Alex", label: "Alex" });
+    });
+
+    it("restores hidden responses to the logged-in instructor with their hidden flag", async () => {
+      const agent = request.agent(app);
+      await agent.post("/api/instructor/login").send({ password: "secret-password" }).expect(204);
+      const sessionId = await sessionWithOpenResponse(agent);
+      const { publicKey } = (await agent.get(`/api/session/${sessionId}/state`).expect(200)).body.reviewReveals[0].openResponses[0];
+      expect(publicKey).toBeTruthy();
+      await agent.post(`/api/session/${sessionId}/response-visibility`).send({ questionIndex: 0, publicKey, hidden: true }).expect(200);
+      const restored = await agent.get(`/api/session/${sessionId}/state`).expect(200);
+      expect(restored.body.reviewReveals[0].openResponses[0]).toMatchObject({ studentId: "ZQ-1001", responseText: "A thought", hidden: true });
     });
   });
 
