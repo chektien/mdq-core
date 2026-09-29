@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useRef } from "react";
+import { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import { useSocket } from "../hooks/useSocket";
 import type { QuestionState, RevealState } from "../hooks/useSocket";
 import { API } from "@mdq/shared";
@@ -10,6 +10,8 @@ import InlineMarkdownText from "../components/InlineMarkdownText";
 import QuizHtml from "../components/QuizHtml";
 import SlideContent from "../components/SlideContent";
 import { getQuestionModeText } from "../questionMode";
+import { checkJoinValues, errorField, fieldElementId, joinFormSpec, joinIdentity } from "../joinForm";
+import type { JoinFieldName, JoinFieldSpec } from "../joinForm";
 import { applyClientPalette, applyClientTheme, resolveClientPalette, resolveClientTheme } from "../theme";
 
 function formatQuizLabel(quizKey: string): string {
@@ -98,7 +100,15 @@ export default function StudentView({
   const [sessionTheme, setSessionTheme] = useState<DeckTheme | null>(null);
   const [sessionPalette, setSessionPalette] = useState<DeckPalette | null>(null);
   const [joinError, setJoinError] = useState<string | null>(null);
+  // Which input the message is about, so it can be marked and focused.
+  const [joinErrorField, setJoinErrorField] = useState<JoinFieldName | null>(null);
   const [joining, setJoining] = useState(false);
+  // What the deck behind the typed code asks for. The fields wait for it, so a
+  // student never fills in a form the deck does not use.
+  const [codeLookup, setCodeLookup] = useState<{ status: "idle" | "checking" | "found" | "missing" | "failed"; studentIds: boolean }>({ status: "idle", studentIds: true });
+  const [lookupAttempt, setLookupAttempt] = useState(0);
+  // The session a join has already resolved, so returning to the form after a refusal keeps its code.
+  const resolvedSessionRef = useRef<string | null>(null);
   const [completed, setCompleted] = useState(false);
   // A student with a stored seat sees "Reconnecting…" rather than the join
   // form while the automatic rejoin runs.
@@ -110,26 +120,31 @@ export default function StudentView({
       setCode(normalizeSessionCode(initialSessionCode));
       return;
     }
-    if (initialSessionId) {
+    if (initialSessionId && resolvedSessionRef.current !== initialSessionId) {
       setCode("");
     }
   }, [initialSessionCode, initialSessionId, normalizeSessionCode]);
 
   // Clear error when user edits any input field
+  const clearJoinError = useCallback(() => {
+    setJoinError(null);
+    setJoinErrorField(null);
+  }, []);
+
   const handleCodeChange = useCallback((val: string) => {
     setCode(normalizeSessionCode(val));
-    if (joinError) setJoinError(null);
-  }, [joinError, normalizeSessionCode]);
+    if (joinError) clearJoinError();
+  }, [clearJoinError, joinError, normalizeSessionCode]);
 
   const handleStudentIdChange = useCallback((val: string) => {
     setStudentId(val);
-    if (joinError) setJoinError(null);
-  }, [joinError]);
+    if (joinError) clearJoinError();
+  }, [clearJoinError, joinError]);
 
   const handleDisplayNameChange = useCallback((val: string) => {
     setDisplayName(val);
-    if (joinError) setJoinError(null);
-  }, [joinError]);
+    if (joinError) clearJoinError();
+  }, [clearJoinError, joinError]);
 
   const sock = useSocket(sessionId, "student");
   const { connected, sessionToken, joinSession, error: sockError } = sock;
@@ -147,6 +162,35 @@ export default function StudentView({
     if (!appearanceReady) return;
     applyClientPalette(sessionPalette, defaultPalette);
   }, [appearanceReady, defaultPalette, sessionPalette]);
+
+  const spec = useMemo(() => joinFormSpec(codeLookup.studentIds, autoGenerateStudentIds), [autoGenerateStudentIds, codeLookup.studentIds]);
+
+  // Ask the server what the typed code's deck wants before showing the ID and name fields.
+  useEffect(() => {
+    if (code.length !== 6) {
+      setCodeLookup((prev) => (prev.status === "idle" ? prev : { status: "idle", studentIds: true }));
+      return;
+    }
+    let cancelled = false;
+    setCodeLookup({ status: "checking", studentIds: true });
+    fetch(API.SESSION_BY_CODE.replace(":code", code))
+      .then(async (response) => {
+        if (cancelled) return;
+        if (response.status === 404 || response.status === 410) {
+          setCodeLookup({ status: "missing", studentIds: true });
+          return;
+        }
+        if (!response.ok) throw new Error("lookup failed");
+        const data = (await response.json()) as { studentIds?: boolean };
+        if (!cancelled) setCodeLookup({ status: "found", studentIds: data.studentIds !== false });
+      })
+      .catch(() => {
+        if (!cancelled) setCodeLookup({ status: "failed", studentIds: true });
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [code, lookupAttempt]);
 
   // Resolve QR/join links early so the join form itself uses the deck theme.
   useEffect(() => {
@@ -229,20 +273,18 @@ export default function StudentView({
 
   // Handle join: first resolve session code to sessionId, then connect socket
   const handleJoin = useCallback(async () => {
-    const trimmedStudentId = autoGenerateStudentIds ? getGeneratedStudentId() : studentId.trim();
-    const trimmedDisplayName = displayName.trim();
-
-    if (!trimmedStudentId) {
-      setJoinError("Student ID is required");
+    if (codeLookup.status !== "found") return;
+    const values = { studentId, displayName };
+    const problem = checkJoinValues(spec, values);
+    if (problem) {
+      setJoinError(problem.message);
+      setJoinErrorField(problem.field);
       return;
     }
-    if (autoGenerateStudentIds && !trimmedDisplayName) {
-      setJoinError("Please enter your name to join.");
-      return;
-    }
+    const identity = joinIdentity(spec, values, getGeneratedStudentId);
 
     setJoining(true);
-    setJoinError(null);
+    clearJoinError();
 
     try {
       // Resolve session code to sessionId via REST endpoint
@@ -262,6 +304,7 @@ export default function StudentView({
       const data: { sessionId: string; week?: string; theme?: DeckTheme; palette?: DeckPalette } = await res.json();
       const resolvedTheme = resolveClientTheme(data.theme, defaultTheme);
       const resolvedPalette = resolveClientPalette(data.palette, defaultPalette);
+      resolvedSessionRef.current = data.sessionId;
       setSessionId(data.sessionId);
       setSessionTheme(resolvedTheme);
       setSessionPalette(resolvedPalette);
@@ -272,14 +315,14 @@ export default function StudentView({
       // Store pending join info and session for the socket handler
       localStorage.setItem(
         "mdquiz_pending_join",
-        JSON.stringify({ studentId: trimmedStudentId, displayName: trimmedDisplayName || undefined }),
+        JSON.stringify({ studentId: identity.studentId, displayName: identity.displayName }),
       );
       // Also update the session store so page refreshes restore the session
       localStorage.setItem(
         "mdquiz_session",
         JSON.stringify({
           sessionId: data.sessionId,
-          studentId: trimmedStudentId,
+          studentId: identity.seatKey,
           sessionWeek: data.week,
           sessionTheme: resolvedTheme,
           sessionPalette: resolvedPalette,
@@ -292,7 +335,7 @@ export default function StudentView({
                 if (
                   existing
                   && existing.sessionId === data.sessionId
-                  && existing.studentId === trimmedStudentId
+                  && existing.studentId === identity.seatKey
                   && typeof existing.sessionToken === "string"
                 ) {
                   return existing.sessionToken;
@@ -307,12 +350,18 @@ export default function StudentView({
 
       if (window.location.hash !== `#/s/${data.sessionId}`) {
         window.location.hash = `/s/${data.sessionId}`;
+      } else if (connected && !sessionToken) {
+        // A second try after a refusal: the socket is already open, so nothing else will send the join.
+        localStorage.removeItem("mdquiz_pending_join");
+        joinSession(identity.studentId, identity.displayName);
       }
     } catch (e) {
-      setJoinError(e instanceof Error ? e.message : "Failed to join");
+      const reason = e instanceof Error ? e.message : "Failed to join";
+      setJoinError(reason);
+      setJoinErrorField(errorField(spec, reason));
       setJoining(false);
     }
-  }, [autoGenerateStudentIds, code, defaultPalette, defaultTheme, studentId, displayName, normalizeSessionCode]);
+  }, [clearJoinError, code, codeLookup.status, connected, defaultPalette, defaultTheme, displayName, joinSession, normalizeSessionCode, sessionToken, spec, studentId]);
 
   // When socket connects and we have pending join, emit student:join
   useEffect(() => {
@@ -321,7 +370,7 @@ export default function StudentView({
         const raw = localStorage.getItem("mdquiz_pending_join");
         if (raw) {
           const pending = JSON.parse(raw);
-          joinSession(pending.studentId, pending.displayName);
+          joinSession(pending.studentId || undefined, pending.displayName);
           localStorage.removeItem("mdquiz_pending_join");
         }
       } catch {
@@ -355,9 +404,16 @@ export default function StudentView({
         setQuizKey(null);
       }
       setJoinError(sockError);
+      setJoinErrorField(errorField(spec, sockError));
       setJoining(false);
     }
-  }, [sockError]);
+  }, [sockError, spec]);
+
+  // Put the cursor in the field a message is about, so the fix is one edit away.
+  useEffect(() => {
+    if (!joinError || !joinErrorField) return;
+    document.getElementById(fieldElementId(spec, joinErrorField))?.focus();
+  }, [joinError, joinErrorField, spec]);
 
   if (completed) {
     return (
@@ -380,7 +436,40 @@ export default function StudentView({
 
   // ── Not yet connected: show join form ──
   if (!sock.sessionToken) {
-    const showNameRequiredTip = autoGenerateStudentIds && joinError === "Please enter your name to join.";
+    const fieldsReady = codeLookup.status === "found";
+    const lookupMessage = codeLookup.status === "missing"
+      ? "We could not find a session with that code. Check the code on the screen and try again."
+      : codeLookup.status === "failed"
+        ? "We could not reach the server. Check your connection and try again."
+        : null;
+    const alertText = joinError ?? lookupMessage;
+    const invalid = (field: JoinFieldName) => (joinError ? joinErrorField === field : field === "code" && codeLookup.status === "missing");
+    const inputClass = (field: JoinFieldName, extra = "") => `w-full bg-zinc-800 border rounded-xl px-4 py-3 text-white placeholder:text-zinc-600 focus:outline-none focus:ring-2 ${extra} ${
+      invalid(field) ? "border-red-500 focus:ring-red-500" : "border-zinc-700 focus:ring-indigo-500"
+    }`;
+    const fieldProps = (field: JoinFieldName, f: JoinFieldSpec) => ({
+      id: f.id,
+      name: f.name,
+      type: "text" as const,
+      required: f.required,
+      "aria-required": f.required,
+      "aria-invalid": invalid(field) ? true : undefined,
+      "aria-describedby": invalid(field) ? "join-error" : undefined,
+      placeholder: f.placeholder,
+      maxLength: f.maxLength,
+      autoComplete: f.autoComplete,
+      autoCapitalize: f.autoCapitalize,
+      autoCorrect: "off",
+      spellCheck: false,
+      inputMode: f.inputMode,
+      enterKeyHint: f.enterKeyHint,
+    });
+    const fieldLabel = (f: JoinFieldSpec) => (
+      <label htmlFor={f.id} className="block text-zinc-400 text-xs mb-1 font-medium">
+        {f.label}{" "}
+        {f.required ? <span className="text-red-400" aria-hidden="true">*</span> : <span className="text-zinc-600">(optional)</span>}
+      </label>
+    );
 
     return (
       <div className="min-h-dvh flex flex-col items-center justify-center gap-6 p-6">
@@ -395,13 +484,15 @@ export default function StudentView({
           <p className="text-zinc-400 text-sm">Enter the session code shown on screen</p>
         </div>
 
-        {joinError && (
-          <div className="bg-red-900/50 border border-red-700 text-red-200 px-4 py-3 rounded-xl w-full max-w-sm text-center text-sm">
-            {joinError}
-          </div>
-        )}
-
-        <div className="w-full max-w-sm space-y-4">
+        <form
+          noValidate
+          className="join-form w-full max-w-sm space-y-4"
+          data-join-mode={fieldsReady ? spec.mode : undefined}
+          onSubmit={(event) => {
+            event.preventDefault();
+            void handleJoin();
+          }}
+        >
           <div>
             <label htmlFor="join-session-code" className="block text-zinc-400 text-xs mb-1 font-medium">Session Code</label>
             <input
@@ -412,69 +503,77 @@ export default function StudentView({
               onChange={(e) => handleCodeChange(e.target.value)}
               placeholder="ABC123"
               maxLength={6}
-              className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-white text-center text-2xl font-mono tracking-[0.15em] placeholder:text-zinc-600 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              required
+              aria-required={true}
+              aria-invalid={invalid("code") ? true : undefined}
+              aria-describedby={invalid("code") ? "join-error" : undefined}
+              className={inputClass("code", "text-center text-2xl font-mono tracking-[0.15em]")}
               autoComplete="off"
+              autoCapitalize="characters"
+              autoCorrect="off"
+              spellCheck={false}
+              inputMode="text"
+              enterKeyHint={fieldsReady ? "next" : "go"}
             />
           </div>
 
-          {!autoGenerateStudentIds && (
+          {codeLookup.status === "checking" && (
+            <p role="status" className="text-center text-sm text-zinc-500">Checking the code&hellip;</p>
+          )}
+
+          {fieldsReady && spec.studentId && (
             <div>
-              <label htmlFor="join-student-id" className="block text-zinc-400 text-xs mb-1 font-medium">
-                Student ID <span className="text-red-400">*</span>
-              </label>
+              {fieldLabel(spec.studentId)}
               <input
-                id="join-student-id"
-                name="studentId"
-                type="text"
+                {...fieldProps("studentId", spec.studentId)}
                 value={studentId}
                 onChange={(e) => handleStudentIdChange(e.target.value)}
-                placeholder="e.g. 2301234"
-                className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-white placeholder:text-zinc-600 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                autoComplete="off"
+                className={inputClass("studentId")}
               />
             </div>
           )}
 
-          <div>
-            <label htmlFor="join-display-name" className="block text-zinc-400 text-xs mb-1 font-medium">
-              {autoGenerateStudentIds ? "Name" : "Display Name"}{" "}
-              {autoGenerateStudentIds ? (
-                <span className="text-red-400">*</span>
-              ) : (
-                <span className="text-zinc-600">(optional)</span>
+          {fieldsReady && (
+            <div>
+              {fieldLabel(spec.displayName)}
+              <input
+                {...fieldProps("displayName", spec.displayName)}
+                value={displayName}
+                onChange={(e) => handleDisplayNameChange(e.target.value)}
+                className={inputClass("displayName")}
+              />
+              {spec.mode === "name" && (
+                <p className="mt-2 text-xs text-zinc-500">Use the name you want to appear as. Nobody else in the session can use the same one.</p>
               )}
-            </label>
-            <input
-              id="join-display-name"
-              name="displayName"
-              type="text"
-              value={displayName}
-              onChange={(e) => handleDisplayNameChange(e.target.value)}
-              placeholder="Your name"
-              aria-invalid={showNameRequiredTip ? true : undefined}
-              aria-describedby={showNameRequiredTip ? "join-display-name-tip" : undefined}
-              className={`w-full bg-zinc-800 border rounded-xl px-4 py-3 text-white placeholder:text-zinc-600 focus:outline-none focus:ring-2 ${
-                showNameRequiredTip
-                  ? "border-red-500 focus:ring-red-500"
-                  : "border-zinc-700 focus:ring-indigo-500"
-              }`}
-              autoComplete="off"
-            />
-            {showNameRequiredTip && (
-              <p id="join-display-name-tip" className="mt-2 text-sm text-red-300">
-                Fill in your name before joining.
-              </p>
-            )}
+            </div>
+          )}
+
+          <div
+            id="join-error"
+            role="alert"
+            className={alertText ? "rounded-xl border border-red-700 bg-red-900/50 px-4 py-3 text-center text-sm text-red-200" : "sr-only"}
+          >
+            {alertText}
           </div>
 
+          {codeLookup.status === "failed" && !joinError && (
+            <button
+              type="button"
+              onClick={() => setLookupAttempt((attempt) => attempt + 1)}
+              className="w-full rounded-xl bg-zinc-800 py-3 text-sm font-semibold text-white hover:bg-zinc-700"
+            >
+              Try again
+            </button>
+          )}
+
           <button
-            onClick={handleJoin}
-            disabled={joining || !code.trim() || (!autoGenerateStudentIds && !studentId.trim())}
+            type="submit"
+            disabled={joining || !fieldsReady}
             className="w-full bg-indigo-600 hover:bg-indigo-500 disabled:bg-zinc-700 disabled:text-zinc-500 text-white font-semibold py-4 rounded-xl transition-colors text-lg"
           >
             {joining ? "Joining..." : "Join"}
           </button>
-        </div>
+        </form>
       </div>
     );
   }
@@ -489,6 +588,14 @@ export default function StudentView({
         <div className="w-16 h-16 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin" />
         <h2 className="text-xl font-semibold text-white">Waiting for quiz to start...</h2>
         <p className="text-zinc-400 text-sm">The instructor will begin shortly</p>
+        {sock.label && (
+          <p className="student-lobby-label text-zinc-300 text-sm">
+            You are in as <strong className="font-semibold text-white">{sock.label}</strong>.
+          </p>
+        )}
+        {sock.labelNote && (
+          <p role="status" className="student-lobby-note max-w-xs text-center text-sm text-amber-200">{sock.labelNote}</p>
+        )}
       </div>
     );
   }
@@ -537,7 +644,7 @@ export default function StudentView({
         <Leaderboard
           entries={sock.leaderboard}
           totalQuestions={sock.totalQuestions}
-          highlightStudentId={sock.studentId ?? undefined}
+          highlightPublicKey={sock.publicKey ?? undefined}
           maxRows={15}
           showStudentIds={!autoGenerateStudentIds}
         />

@@ -153,7 +153,6 @@ export default function App({ runtimeConfig = {} }: { runtimeConfig?: RuntimeCli
           next: `/present/${route.param}`,
           authContext: "presentation",
         })}
-        autoGenerateStudentIds={autoGenerateStudentIds}
         defaultTheme={defaultTheme}
         defaultPalette={defaultPalette}
       />

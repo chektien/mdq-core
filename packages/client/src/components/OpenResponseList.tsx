@@ -29,9 +29,9 @@ export default function OpenResponseList({
       ) : (
         <div className="max-h-[340px] space-y-2 overflow-y-auto pr-1">
           {responses.map((response) => {
-            const rowKey = `${response.studentId}-${response.submittedAt}`;
+            const rowKey = `${response.publicKey}-${response.submittedAt}`;
             const expanded = !!expandedRows[rowKey];
-            const participantLabel = response.displayName || (showStudentIds ? response.studentId : "Anonymous");
+            const participantLabel = response.label || response.displayName || "Participant";
             return (
               <button
                 key={rowKey}
@@ -40,7 +40,7 @@ export default function OpenResponseList({
                 className="open-response-entry w-full rounded-xl border border-zinc-800 bg-zinc-950/70 px-3 py-3 text-left transition-colors hover:border-zinc-700"
               >
                 <div className="open-response-identity flex items-center gap-3 overflow-hidden text-xs text-zinc-500">
-                  {showStudentIds && (
+                  {showStudentIds && response.studentId && (
                     <span className="open-response-student-id shrink-0 font-mono font-semibold text-zinc-300">{response.studentId}</span>
                   )}
                   <span className="open-response-display-name truncate">{participantLabel}</span>
