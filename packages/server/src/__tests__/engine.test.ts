@@ -77,7 +77,11 @@ for (const state of states) for (const type of commands) {
     if (fixture && "state" in fixture) {
       const result = apply(input, quiz, { type } as Command, type === "timeout" ? 21000 : 1000);
       expect(result.session.state).toBe(fixture.state);
-      expect(result.messages).toEqual(fixture.messages);
+      // The timer running out says so in the close message; the presenter closing early does not.
+      const expected = type === "timeout"
+        ? fixture.messages.map((m) => m.event === SocketEvents.QUESTION_CLOSE ? { ...m, payload: { questionIndex: 0, timedOut: true } } : m)
+        : fixture.messages;
+      expect(result.messages).toEqual(expected);
       expect(result.nextDeadline).toBe(fixture.state === "QUESTION_OPEN" ? 21000 : null);
     } else if (type === "timeout") {
       const result = apply(input, quiz, { type }, 1000);
@@ -267,4 +271,15 @@ describe("releasing a seat", () => {
     expect(taken.session.participants.size).toBe(1);
     expect(taken.session.participants.get("Alex Tan")).toMatchObject({ connected: true, sessionToken: "token-3", publicKey: "key-1" });
   });
+});
+
+it("tells screens whether a question closed because the timer ran out", () => {
+  const closedEarly = apply(base("QUESTION_OPEN"), quiz, { type: "close" }, 5000);
+  expect(closedEarly.messages[0]).toEqual(msg(SocketEvents.QUESTION_CLOSE, { questionIndex: 0 }));
+  const timedOut = apply(base("QUESTION_OPEN"), quiz, { type: "timeout" }, 21000);
+  expect(timedOut.messages[0]).toEqual(msg(SocketEvents.QUESTION_CLOSE, { questionIndex: 0, timedOut: true }));
+  // A screen that connects later is told the same.
+  const late = (session: Session) => apply(session, quiz, { type: "snapshot", view: "display" }, 30000).messages.find((m) => m.event === SocketEvents.QUESTION_CLOSE)!.payload;
+  expect(late(closedEarly.session)).toEqual({ questionIndex: 0 });
+  expect(late(timedOut.session)).toEqual({ questionIndex: 0, timedOut: true });
 });

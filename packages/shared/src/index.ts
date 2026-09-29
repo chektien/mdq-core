@@ -305,6 +305,8 @@ export interface AnswerCountPayload {
 
 export interface QuestionClosePayload {
   questionIndex: number;
+  /** True when the timer ran out; absent when the presenter closed the question early. */
+  timedOut?: true;
 }
 
 export interface ResultsDistributionPayload {
@@ -500,6 +502,8 @@ export interface Session {
    * Plain data, so it survives session serialisation.
    */
   hiddenResponses?: Record<string, string[]>;
+  /** Whether the question now closed was closed by its timer running out, not by the presenter. */
+  closedByTimer?: boolean;
   participants: Map<string, Participant>;
   submissions: Submission[];
   createdAt: number;

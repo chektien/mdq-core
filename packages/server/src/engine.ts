@@ -1,5 +1,5 @@
 import {
-  Quiz, Session, SessionState, SocketEvents, QuestionOpenPayload, FoldoutNote,
+  Quiz, Session, SessionState, SocketEvents, QuestionOpenPayload, QuestionClosePayload, FoldoutNote,
   StudentJoinPayload, AnswerSubmitPayload, Participant, STATE_TRANSITIONS, StudentAnswer,
   LeaderboardRow, OpenResponseEntry, SessionParticipantsPayload, SocketRole,
   MAX_DISPLAY_NAME_LENGTH, MAX_OPEN_RESPONSE_LENGTH, MAX_STUDENT_ID_LENGTH, normalizeDisplayName, usesStudentIds,
@@ -176,6 +176,10 @@ const participantsPayload = (session: Session, view: PayloadView): SessionPartic
       ...(p.released ? { released: true } : {}) }));
   return offline.length ? { count: participants.length, participants, offline } : { count: participants.length, participants };
 };
+/** The close message: it says so when the timer ran out, so screens can tell that from the presenter closing early. */
+const closePayload = (session: Session): QuestionClosePayload => ({
+  questionIndex: session.currentQuestionIndex, ...(session.closedByTimer ? { timedOut: true as const } : {}),
+});
 const deadline = (session: Session, quiz: Quiz): number | null => {
   const q = questionAt(session, quiz);
   return session.state === "QUESTION_OPEN" && q && getQuestionType(q) !== "slide" && session.questionStartedAt !== undefined
@@ -275,7 +279,8 @@ export function apply(input: Session, quiz: Quiz, command: Command, now: number)
         if (due === null || (command.deadline !== undefined && command.deadline !== due) || now < due) break;
       }
       transition(session, "QUESTION_CLOSED");
-      emit(SocketEvents.QUESTION_CLOSE, { questionIndex: session.currentQuestionIndex }); state();
+      session.closedByTimer = command.type === "timeout";
+      emit(SocketEvents.QUESTION_CLOSE, closePayload(session)); state();
       emit(SocketEvents.RESULTS_DISTRIBUTION, { questionIndex: session.currentQuestionIndex, distribution: getDistribution(session, session.currentQuestionIndex) }, "staff");
       break;
     case "reveal":
@@ -470,7 +475,7 @@ function snapshotMessages(session: Session, quiz: Quiz, now: number, audience: A
     if (staff) emitCount();
   } else if (session.state === "QUESTION_CLOSED") {
     emit(SocketEvents.QUESTION_OPEN, payload);
-    emit(SocketEvents.QUESTION_CLOSE, { questionIndex: session.currentQuestionIndex });
+    emit(SocketEvents.QUESTION_CLOSE, closePayload(session));
     if (staff) {
       emit(SocketEvents.RESULTS_DISTRIBUTION, { questionIndex: session.currentQuestionIndex, distribution: getDistribution(session, session.currentQuestionIndex) });
       emitCount();
