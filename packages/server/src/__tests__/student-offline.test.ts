@@ -1,6 +1,7 @@
 import fs from "fs";
 import path from "path";
 import { clockOffsetFromTick, localRemainingSec } from "../../../client/src/countdown";
+import { isSameOpening } from "../../../client/src/questionOpening";
 
 const clientSrc = path.resolve(__dirname, "..", "..", "..", "client", "src");
 const read = (rel: string): string => fs.readFileSync(path.join(clientSrc, rel), "utf-8");
@@ -26,6 +27,33 @@ describe("student countdown while offline", () => {
     expect(offset).toBe(14_000);
     expect(localRemainingSec(question, 96_000, offset)).toBe(20);
     expect(localRemainingSec(question, 101_000, offset)).toBe(15);
+  });
+});
+
+describe("student choice across a rejoin", () => {
+  const shown = { questionIndex: 2, startedAt: 100_000, text: "Q3" };
+
+  it("treats a snapshot of the opening on screen as the same opening", () => {
+    expect(isSameOpening(shown, { questionIndex: 2, startedAt: 100_000 })).toBe(true);
+  });
+
+  it("starts fresh for another question or a new opening of the same one", () => {
+    expect(isSameOpening(shown, { questionIndex: 3, startedAt: 100_000 })).toBe(false);
+    expect(isSameOpening(shown, { questionIndex: 2, startedAt: 160_000 })).toBe(false);
+  });
+
+  it("starts fresh when no question is on screen", () => {
+    expect(isSameOpening(null, { questionIndex: 0, startedAt: 100_000 })).toBe(false);
+    expect(isSameOpening(undefined, { questionIndex: 0, startedAt: 100_000 })).toBe(false);
+  });
+
+  it("keeps the question on screen when the rejoin snapshot repeats its opening", () => {
+    const socket = read("hooks/useSocket.ts");
+    const open = socket.slice(socket.indexOf("socket.on(SocketEvents.QUESTION_OPEN"));
+    expect(open).toContain("isSameOpening(previousQuestion, nextQuestion) ? previousQuestion : nextQuestion");
+    expect(open).toContain("setCurrentQuestion(shownQuestion)");
+    // The student view clears its unsent choice only when the question object changes.
+    expect(read("views/StudentView.tsx")).toContain("}, [question, questionIndex]);");
   });
 });
 

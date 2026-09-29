@@ -29,6 +29,7 @@ import type {
 import { SocketEvents } from "@mdq/shared";
 import { clockOffsetFromTick, localRemainingSec } from "../countdown";
 import { mergeOwnAnswers, seedSubmittedAnswer, toOptionIndexes } from "../ownAnswers";
+import { isSameOpening } from "../questionOpening";
 
 // ── localStorage helpers ─────────────────────
 const STORAGE_KEY = "mdquiz_session";
@@ -369,8 +370,11 @@ export function useSocket(
         timeLimitSec: data.timeLimitSec,
         startedAt: data.startedAt,
       };
-      currentQuestionRef.current = nextQuestion;
-      setCurrentQuestion(nextQuestion);
+      // A snapshot that repeats the opening on screen keeps the same object, so
+      // the student view does not clear an option chosen while offline.
+      const shownQuestion = isSameOpening(previousQuestion, nextQuestion) ? previousQuestion : nextQuestion;
+      currentQuestionRef.current = shownQuestion;
+      setCurrentQuestion(shownQuestion);
       setSessionState("QUESTION_OPEN");
       setReveal(null);
       setDistribution(null);
