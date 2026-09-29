@@ -630,7 +630,6 @@ html[data-theme="light"] .end-session-keep:hover {
 }
 
 html[data-theme="light"] .end-session-end {
-  border-color: color-mix(in srgb, var(--mdq-danger) 40%, transparent) !important;
   background: var(--mdq-danger) !important;
   color: var(--mdq-on-danger) !important;
 }
@@ -791,6 +790,13 @@ html[data-theme] .student-submit-button:disabled {
    3:1 against the dialog in every theme. */
 html[data-theme] .end-session-keep {
   border-color: var(--mdq-control-border) !important;
+}
+
+/* End Session outlines its fill in the danger line, 4.8:1 or more against the
+   dialog in every theme; the fill alone only just reaches 3:1 on the dark
+   dialog, and the dark border mapping would otherwise give it a faint line. */
+html[data-theme] .end-session-end:not(:disabled) {
+  border-color: var(--mdq-danger-line) !important;
 }
 
 /* Keyboard focus on student fields, answer options and the end-session

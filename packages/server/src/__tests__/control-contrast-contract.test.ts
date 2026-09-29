@@ -98,7 +98,7 @@ describe("control contrast contract", () => {
     expect(ruleBody(theme, "html[data-theme] .dist-bar-track .dist-bar-label-outside")).toContain("color: var(--mdq-ink)");
   });
 
-  describe("focus rings, the Keep Session outline and the timer track hold 3:1", () => {
+  describe("focus rings, the end-session button outlines and the timer track hold 3:1", () => {
     const darkBase = tokens(theme, 'html[data-theme="dark"]');
     const lightBase = tokens(theme, 'html[data-theme="light"]');
     const combos = [
@@ -120,6 +120,7 @@ describe("control contrast contract", () => {
         }
         for (const surface of dialogSurfaces) {
           expect(contrast(t["--mdq-control-border"], surface)).toBeGreaterThanOrEqual(3);
+          expect(contrast(t["--mdq-danger-line"], surface)).toBeGreaterThanOrEqual(3);
           expect(contrast(t["--mdq-accent"], surface)).toBeGreaterThanOrEqual(3);
         }
       });
@@ -128,6 +129,8 @@ describe("control contrast contract", () => {
     it("uses those tokens for the Keep Session outline and the focus rings", () => {
       expect(ruleBody(theme, "html[data-theme] .end-session-keep")).toContain("border-color: var(--mdq-control-border)");
       expect(ruleBody(theme, 'html[data-theme="light"] .end-session-keep')).toContain("border-color: var(--mdq-control-border)");
+      expect(ruleBody(theme, "html[data-theme] .end-session-end:not(:disabled)")).toContain("border-color: var(--mdq-danger-line) !important");
+      expect(ruleBody(theme, 'html[data-theme="light"] .end-session-end')).not.toContain("border-color");
       const focus = ruleBody(theme, "html[data-theme] :is(.end-session-keep, .end-session-end):focus-visible");
       expect(focus).toContain("outline: 2px solid var(--mdq-accent) !important");
       expect(focus).toContain("outline-offset: 3px");
