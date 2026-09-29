@@ -658,9 +658,64 @@ function renderSeoul256Tokens(theme: PrintTheme): string {
     `;
 }
 
+// Ayu mirrors the live slide palette in packages/client/src/index.css
+// (ayu-theme/ayu-colors, MIT): dark is Ayu Dark, light is Ayu Light with its
+// accents darkened, for example green #86b300 to #516c00 and accent #f29718
+// to #955a08. Attendee notes use the accent, presenter notes the purple.
 function renderAyuTokens(theme: PrintTheme): string {
-  // TODO(palette-values): ayu
-  return renderThemeTokens(theme, "classic");
+  if (theme === "light") {
+    return `
+      --page-bg: #fcfcfc;
+      --ink: #46494d;
+      --body: #595d62;
+      --muted: #566070;
+      --line: rgba(107, 125, 143, 0.28);
+      --soft-line: rgba(107, 125, 143, 0.14);
+      --paper: #fcfcfc;
+      --wash: #ebeef0;
+      --option-bg: #fcfcfc;
+      --media-bg: #ebeef0;
+      --accent: #955a08;
+      --accent-soft: rgba(149, 90, 8, 0.1);
+      --teal: #955a08;
+      --teal-line: rgba(149, 90, 8, 0.35);
+      --teal-soft: rgba(149, 90, 8, 0.09);
+      --amber: #8047b9;
+      --amber-line: rgba(128, 71, 185, 0.38);
+      --amber-soft: rgba(128, 71, 185, 0.09);
+      --green: #516c00;
+      --green-line: rgba(81, 108, 0, 0.45);
+      --green-soft: rgba(81, 108, 0, 0.12);
+      --reference: #566070;
+      --shadow: rgba(70, 73, 77, 0.04);
+    `;
+  }
+
+  return `
+      --page-bg: #10141c;
+      --ink: #e2e1de;
+      --body: #bfbdb6;
+      --muted: #b1afaa;
+      --line: rgba(191, 189, 182, 0.32);
+      --soft-line: rgba(191, 189, 182, 0.16);
+      --paper: #141821;
+      --wash: #1b1f29;
+      --option-bg: #141821;
+      --media-bg: #0d1017;
+      --accent: #e6b450;
+      --accent-soft: rgba(230, 180, 80, 0.16);
+      --teal: #e6b450;
+      --teal-line: rgba(230, 180, 80, 0.42);
+      --teal-soft: rgba(230, 180, 80, 0.12);
+      --amber: #d2a6ff;
+      --amber-line: rgba(210, 166, 255, 0.42);
+      --amber-soft: rgba(210, 166, 255, 0.12);
+      --green: #aad94c;
+      --green-line: rgba(170, 217, 76, 0.46);
+      --green-soft: rgba(170, 217, 76, 0.16);
+      --reference: #b1afaa;
+      --shadow: rgba(0, 0, 0, 0.18);
+    `;
 }
 
 function renderTokyoNightTokens(theme: PrintTheme): string {
@@ -685,8 +740,7 @@ function printPageBackground(theme: PrintTheme, palette: PrintPalette): string {
       return theme === "dark" ? "#4b4b4b" : "#e1e1e1";
 
     case "ayu":
-      // TODO(palette-values): ayu
-      return printPageBackground(theme, "classic");
+      return theme === "dark" ? "#10141c" : "#fcfcfc";
 
     case "tokyo-night":
       // TODO(palette-values): tokyo-night
