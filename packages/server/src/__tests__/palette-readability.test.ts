@@ -221,6 +221,13 @@ describe("palette readability, 7 palettes x 2 themes", () => {
       }
     });
 
+    it("keeps the attendee fold-out note title at 4.5:1 on its wash", () => {
+      const wash = parseColor(token(t, "--mdq-note-attendee-tint"));
+      const title = mixColors(token(t, "--mdq-note-attendee"), token(t, "--mdq-slide-heading"), 0.75);
+      const grounds = Object.fromEntries(stops.map((stop, i) => [`note on slide stop ${i + 1}`, over(wash, stop)]));
+      expectPairs(`${name} attendee note title`, { title }, grounds);
+    });
+
     it("keeps the presenter notes panel text at 4.5:1 and its border and marker at 3:1", () => {
       const panel = over(token(t, "--mdq-warning"), token(t, "--mdq-paper-strong"), 0.09);
       expectPairs(`${name} presenter notes`, {

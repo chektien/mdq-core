@@ -4259,7 +4259,7 @@ html[data-theme="light"] .mdq-orbit-callout {
   align-items: baseline;
   gap: 0.7rem;
   cursor: pointer;
-  color: var(--mdq-note-attendee);
+  color: color-mix(in srgb, var(--mdq-note-attendee) 75%, var(--mdq-slide-heading));
   font-weight: 800;
 }
 
