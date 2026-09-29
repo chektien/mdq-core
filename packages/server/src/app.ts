@@ -12,7 +12,7 @@ import {
   getOpenResponses,
 } from "./session";
 import { parseQuizMarkdown } from "./parser";
-import { apply, leaderboardRows, responsesFor, EngineCommandError, type Command, type EngineResult } from "./engine";
+import { apply, leaderboardRows, questionPosition, responsesFor, EngineCommandError, type Command, type EngineResult } from "./engine";
 import {
   persistSessionOnEnd,
   computeCumulativeLeaderboard,
@@ -243,6 +243,7 @@ export function createApp(quizDirOrOpts?: string | AppOptions) {
       topic: question.topic,
       text: question.textHtml,
       questionType: getQuestionType(question),
+      ...questionPosition(quiz, questionIndex),
       attendeeNotes: question.attendeeNotes && question.attendeeNotes.length > 0
         ? question.attendeeNotes
         : undefined,

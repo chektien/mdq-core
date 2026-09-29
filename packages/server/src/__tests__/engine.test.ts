@@ -1,5 +1,5 @@
 import { Quiz, Session, SessionState, SocketEvents } from "@mdq/shared";
-import { apply, type Audience, type Command } from "../engine";
+import { apply, questionPosition, type Audience, type Command } from "../engine";
 import { emitMessages } from "../socket";
 import { storeSession, clearAllSessions } from "../session";
 import { Server } from "socket.io";
@@ -216,6 +216,18 @@ it("routes participant messages to their socket and staff messages to the contro
     { room: "session:session", event: SocketEvents.SESSION_STATE, payload: { state: "QUESTION_OPEN", questionIndex: 0 } },
   ]);
   clearAllSessions();
+});
+
+describe("question position", () => {
+  const slide = { ...question(1), questionType: "slide" as const, options: [], correctOptions: [] };
+  const deck: Quiz = { ...quiz, questions: [slide, question(0), slide, question(2)] };
+  it("counts only questions, and gives slides no position", () => {
+    expect(questionPosition(deck, 0)).toEqual({});
+    expect(questionPosition(deck, 1)).toEqual({ questionNumber: 1, questionTotal: 2 });
+    expect(questionPosition(deck, 2)).toEqual({});
+    expect(questionPosition(deck, 3)).toEqual({ questionNumber: 2, questionTotal: 2 });
+    expect(questionPosition(deck, 9)).toEqual({});
+  });
 });
 
 describe("releasing a seat", () => {

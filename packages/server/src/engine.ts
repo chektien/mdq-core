@@ -107,12 +107,21 @@ const transition = (session: Session, to: SessionState): void => {
   session.state = to;
 };
 const questionAt = (session: Session, quiz: Quiz) => quiz.questions[session.currentQuestionIndex];
+/**
+ * "Question 3 of 8" counts only items that ask something: slides have no
+ * position. Shared by the live payload and the instructor's restore.
+ */
+export const questionPosition = (quiz: Quiz, questionIndex: number): { questionNumber?: number; questionTotal?: number } => {
+  const q = quiz.questions[questionIndex];
+  if (!q || getQuestionType(q) === "slide") return {};
+  return {
+    questionNumber: quiz.questions.slice(0, questionIndex + 1).filter((item) => getQuestionType(item) !== "slide").length,
+    questionTotal: quiz.questions.filter((item) => getQuestionType(item) !== "slide").length,
+  };
+};
 const questionPayload = (session: Session, quiz: Quiz, now: number): QuestionOpenPayload | null => {
   const q = questionAt(session, quiz);
   if (!q) return null;
-  const isSlide = getQuestionType(q) === "slide";
-  const questionTotal = quiz.questions.filter((item) => getQuestionType(item) !== "slide").length;
-  const questionNumber = quiz.questions.slice(0, session.currentQuestionIndex + 1).filter((item) => getQuestionType(item) !== "slide").length;
   const attendeeNotes: FoldoutNote[] | undefined = q.attendeeNotes?.length ? q.attendeeNotes : undefined;
   return {
     questionIndex: session.currentQuestionIndex, topic: q.topic, text: q.textHtml,
@@ -123,7 +132,7 @@ const questionPayload = (session: Session, quiz: Quiz, now: number): QuestionOpe
     options: q.options.map((o) => ({ label: o.label, text: o.textHtml })),
     allowsMultiple: q.allowsMultiple, isPoll: q.isPoll === true,
     timeLimitSec: q.timeLimitSec, startedAt: session.questionStartedAt || now,
-    ...(isSlide ? {} : { questionNumber, questionTotal }),
+    ...questionPosition(quiz, session.currentQuestionIndex),
   };
 };
 /**

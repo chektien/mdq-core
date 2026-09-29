@@ -85,6 +85,8 @@ function questionStateFromRestore(data: NonNullable<SessionRestoreResponse["revi
     isPoll: data.isPoll ?? false,
     timeLimitSec: data.timeLimitSec,
     startedAt: data.startedAt,
+    questionNumber: data.questionNumber,
+    questionTotal: data.questionTotal,
   };
 }
 
