@@ -4821,6 +4821,17 @@ html[data-theme] .open-response-entry .open-response-text {
    presentation generous, but switch phones, tablets, and short laptop windows
    to safe-area-aware top flow with compact scan-first controls.
    ============================================================ */
+/* The lobby groups the join details and the room status (count, names,
+   notices, Start Session). They stack in the shell's flow and share its gap. */
+.instructor-lobby-body,
+.instructor-lobby-side {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: inherit;
+  width: 100%;
+}
+
 @media (max-width: 760px), (max-height: 820px) {
   .instructor-phase-shell {
     justify-content: flex-start;
@@ -4910,6 +4921,26 @@ html[data-theme] .open-response-entry .open-response-text {
     padding: 0.78rem 2rem;
     font-size: 1rem;
     line-height: 1.25;
+  }
+}
+
+/* On a landscape screen the stacked lobby is taller than a 900px laptop
+   window once names and a notice appear, so the join details sit beside the
+   room status and Start Session stays in view. */
+@media (min-width: 900px) and (orientation: landscape) {
+  .instructor-lobby-body {
+    flex-direction: row;
+    justify-content: center;
+    column-gap: clamp(2rem, 5vw, 4.5rem);
+  }
+
+  .instructor-lobby-join {
+    flex: 0 0 auto;
+  }
+
+  .instructor-lobby-side {
+    flex: 0 1 32rem;
+    min-width: 0;
   }
 }
 
