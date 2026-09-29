@@ -38,14 +38,24 @@ export function readServedAppearance(dataset: { theme?: string; palette?: string
 /**
  * The fallback appearance for views that have no deck of their own yet.
  * Attributes served in the HTML describe this page more closely than the
- * global runtime config, so they win; the built-in defaults come last.
+ * global runtime config, so they win; `fallbackTheme` and the classic palette
+ * come last.
  */
 export function resolveBootAppearance(
   served: ClientAppearance,
   runtime: { theme?: unknown; palette?: unknown },
+  fallbackTheme: DeckTheme = DEFAULT_CLIENT_THEME,
 ): { theme: DeckTheme; palette: DeckPalette } {
   return {
-    theme: served.theme ?? resolveClientTheme(runtime.theme),
+    theme: served.theme ?? resolveClientTheme(runtime.theme, fallbackTheme),
     palette: served.palette ?? resolveClientPalette(runtime.palette),
   };
+}
+
+/**
+ * The theme to show before any theme is known: light on a device set to a
+ * light colour scheme, so it does not go from the light neutral to dark.
+ */
+export function systemFallbackTheme(prefersLight: boolean): DeckTheme {
+  return prefersLight ? "light" : DEFAULT_CLIENT_THEME;
 }

@@ -6,7 +6,7 @@ import App from "./App";
 import { settleWithin } from "./boot";
 import { fetchRuntimeClientConfig } from "./hooks/api";
 import type { RuntimeClientConfig } from "./hooks/api";
-import { applyClientPalette, applyClientTheme, readServedAppearance, resolveBootAppearance } from "./theme";
+import { applyClientPalette, applyClientTheme, readServedAppearance, resolveBootAppearance, systemFallbackTheme } from "./theme";
 
 // A view that is still waiting for its deck (for example a slow session
 // lookup) or a slow runtime config must not leave the page hidden for long;
@@ -14,8 +14,13 @@ import { applyClientPalette, applyClientTheme, readServedAppearance, resolveBoot
 // theme when it arrives.
 const THEME_WAIT_MS = 3000;
 
+// With no served attributes and no config yet, follow the device's colour
+// scheme as the neutral in index.css does, so a light device is not shown the
+// light neutral and then dark. A config that arrives later still wins.
+const systemTheme = systemFallbackTheme(window.matchMedia?.("(prefers-color-scheme: dark)").matches === false);
+
 function bootConfig(served: ReturnType<typeof readServedAppearance>, fetched: RuntimeClientConfig): RuntimeClientConfig {
-  const boot = resolveBootAppearance(served, fetched);
+  const boot = resolveBootAppearance(served, fetched, systemTheme);
   return { ...fetched, theme: boot.theme, palette: boot.palette };
 }
 

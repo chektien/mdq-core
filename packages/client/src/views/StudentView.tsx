@@ -93,8 +93,10 @@ export default function StudentView({
   const [displayName, setDisplayName] = useState("");
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [quizKey, setQuizKey] = useState<string | null>(null);
-  const [sessionTheme, setSessionTheme] = useState<DeckTheme>(defaultTheme);
-  const [sessionPalette, setSessionPalette] = useState<DeckPalette>(defaultPalette);
+  // The deck's own appearance once a session is known. Until then (null) the
+  // page follows the defaults, including a runtime config that arrives late.
+  const [sessionTheme, setSessionTheme] = useState<DeckTheme | null>(null);
+  const [sessionPalette, setSessionPalette] = useState<DeckPalette | null>(null);
   const [joinError, setJoinError] = useState<string | null>(null);
   const [joining, setJoining] = useState(false);
   const [completed, setCompleted] = useState(false);
@@ -151,8 +153,8 @@ export default function StudentView({
     if (!initialSessionCode) return;
     let cancelled = false;
     setAppearanceReady(false);
-    setSessionTheme(defaultTheme);
-    setSessionPalette(defaultPalette);
+    setSessionTheme(null);
+    setSessionPalette(null);
     setQuizKey(null);
     const normalizedCode = normalizeSessionCode(initialSessionCode);
     fetch(API.SESSION_BY_CODE.replace(":code", normalizedCode))
@@ -221,9 +223,9 @@ export default function StudentView({
     clearSessionArtifacts();
     sock.disconnect();
     setCompleted(true);
-    setSessionTheme(defaultTheme);
-    setSessionPalette(defaultPalette);
-  }, [defaultPalette, defaultTheme, sock]);
+    setSessionTheme(null);
+    setSessionPalette(null);
+  }, [sock]);
 
   // Handle join: first resolve session code to sessionId, then connect socket
   const handleJoin = useCallback(async () => {
@@ -252,8 +254,8 @@ export default function StudentView({
           clearSessionArtifacts();
           setSessionId(null);
           setQuizKey(null);
-          setSessionTheme(defaultTheme);
-          setSessionPalette(defaultPalette);
+          setSessionTheme(null);
+          setSessionPalette(null);
         }
         throw new Error(data.error || "Session not found. Check the code and try again.");
       }
