@@ -1,14 +1,15 @@
 import fs from "fs";
 import path from "path";
-import { closedLabel, formatRemaining, pluralize } from "../../../client/src/instructorText";
+import { closedLabel, formatRemaining, pluralize, positionLabel } from "../../../client/src/instructorText";
 import { readShowStudentIds, saveShowStudentIds } from "../../../client/src/showStudentIds";
 
 const clientSrc = path.resolve(__dirname, "..", "..", "..", "client", "src");
 const read = (rel: string): string => fs.readFileSync(path.join(clientSrc, rel), "utf-8");
 /** The last rule of `selector` in the file: the one that wins where rules tie. */
 const lastRule = (css: string, selector: string): string => {
-  const start = css.lastIndexOf(`${selector} {`);
-  expect(start).toBeGreaterThanOrEqual(0);
+  const found = css.lastIndexOf(`\n${selector} {`);
+  expect(found).toBeGreaterThanOrEqual(0);
+  const start = found + 1;
   return css.slice(start, css.indexOf("}", start));
 };
 
@@ -30,6 +31,18 @@ describe("presenter wording", () => {
       const tsx = read(view);
       expect(tsx).toContain("closedLabelFor(sock.timedOut)");
       expect(tsx).not.toMatch(/>Time(?:'|&apos;)s up</);
+    }
+  });
+
+  it("numbers questions the way the phones do: slides are not counted and show no number", () => {
+    expect(positionLabel({ questionNumber: 3, questionTotal: 8 })).toBe("3/8");
+    expect(positionLabel({})).toBeUndefined();
+    expect(positionLabel(null)).toBeUndefined();
+    for (const view of ["views/InstructorView.tsx", "views/PresentationView.tsx"]) {
+      const tsx = read(view);
+      expect(tsx).toContain("positionLabelFor(");
+      expect(tsx).not.toContain("formatPositionLabel");
+      expect(tsx).not.toMatch(/Q\{\w+\.questionIndex \+ 1\}/);
     }
   });
 

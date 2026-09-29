@@ -318,8 +318,12 @@ describe("reduced motion", () => {
     expect(block).toContain("transition-duration: 0.01ms !important");
   });
 
+  it("lets the resumed label leave after its five seconds without fading", () => {
+    expect(block).toMatch(/\.slide-status-pill-fades \{\s*animation-duration: 5s !important;\s*animation-timing-function: steps\(1, end\) !important;/);
+  });
+
   it("covers every animation and transition the stylesheet declares", () => {
     const animated = [...css.matchAll(/animation:\s*([a-z-]+)/g)].map((m) => m[1]).filter((n) => n !== "none");
-    expect(new Set(animated)).toEqual(new Set(["timer-pulse", "slide-in", "reduced-motion-fade"]));
+    expect(new Set(animated)).toEqual(new Set(["timer-pulse", "slide-in", "reduced-motion-fade", "mdq-status-fade"]));
   });
 });

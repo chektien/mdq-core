@@ -16,14 +16,10 @@ import ResponsiveQuizSurface from "../components/ResponsiveQuizSurface";
 import SlideContent, { SlideContentBody } from "../components/SlideContent";
 import SlideBackgroundLayer from "../components/SlideBackgroundLayer";
 import { getQuestionModeText } from "../questionMode";
-import { closedLabel as closedLabelFor } from "../instructorText";
+import { closedLabel as closedLabelFor, positionLabel as positionLabelFor } from "../instructorText";
 import { applyClientPalette, applyClientTheme } from "../theme";
 
 const EMPTY_QUESTION_HEADINGS: string[] = [];
-
-function formatPositionLabel(questionIndex: number, totalQuestions: number): string {
-  return totalQuestions > 0 ? `${questionIndex + 1}/${totalQuestions}` : `${questionIndex + 1}`;
-}
 
 function isInstructorLoginRequired(message: string | null): boolean {
   return (message || "").toLowerCase().includes("login required");
@@ -129,9 +125,8 @@ export default function PresentationView({
   const closedLabel = closedLabelFor(sock.timedOut);
   const noVotesClosed = state === "QUESTION_CLOSED" && currentQuestion?.isPoll === true && (sock.answerCount?.submitted ?? 0) === 0;
   const noVotesRevealed = currentReveal?.isPoll === true && Object.values(currentReveal.distribution).every((count) => count === 0);
-  const positionLabel = currentQuestion
-    ? formatPositionLabel(currentQuestion.questionIndex, totalQuestions)
-    : undefined;
+  // Questions are counted without slides, the same as on the phones; a slide shows no number.
+  const positionLabel = positionLabelFor(currentQuestion);
   const quizStatusLabel = (() => {
     if (!currentQuestion || currentQuestion.questionType === "slide") return null;
     if (currentReveal) return currentReveal.isPoll ? "Results open" : "Answer revealed";
@@ -464,9 +459,9 @@ export default function PresentationView({
       {!isLiveSurfaceDisplay && (
       <div className="mb-6 flex items-center justify-between gap-4">
         <div className="flex items-center gap-4">
-          {currentQuestion && (
+          {positionLabel && (
             <span className="text-lg font-medium text-zinc-400">
-              Q{currentQuestion.questionIndex + 1}/{totalQuestions}
+              Q{positionLabel}
             </span>
           )}
           {currentHeading && <span className="text-sm text-zinc-600">{currentHeading}</span>}

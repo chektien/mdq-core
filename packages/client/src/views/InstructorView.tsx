@@ -42,7 +42,7 @@ import SlideBackgroundLayer from "../components/SlideBackgroundLayer";
 import PresenterNotesPanel from "../components/PresenterNotesPanel";
 import { getQuestionModeText, getRevealActionLabel } from "../questionMode";
 import { readShowStudentIds, saveShowStudentIds } from "../showStudentIds";
-import { closedLabel as closedLabelFor, formatRemaining, pluralize } from "../instructorText";
+import { closedLabel as closedLabelFor, formatRemaining, pluralize, positionLabel as positionLabelFor } from "../instructorText";
 
 type InstructorPhase = "setup" | "lobby" | "live" | "ended";
 const INSTRUCTOR_RESTORE_KEY = "mdquiz_instructor_session";
@@ -55,10 +55,6 @@ interface StoredInstructorRestore {
   sessionCode: string;
   week: string;
   createdAt: number;
-}
-
-function formatPositionLabel(questionIndex: number, totalQuestions: number): string {
-  return totalQuestions > 0 ? `${questionIndex + 1}/${totalQuestions}` : `${questionIndex + 1}`;
 }
 
 function formatDeckChooserSummary(deck: DeckSummary): string {
@@ -927,15 +923,18 @@ function LiveView({
     : isReviewing
       ? "warning"
       : "neutral";
+  // Questions are counted without slides, the same as on the phones; a slide shows no number.
+  const displayPositionLabel = positionLabelFor(displayQuestion);
+  const reviewingLabel = displayPositionLabel ? `Reviewing ${displayPositionLabel}` : "Reviewing";
   const slideStatusLabel = liveConnectionNoticeLabel ?? liveRestoreNoticeLabel ?? (isReviewing && reviewQuestionIndex !== null
-    ? `Reviewing ${formatPositionLabel(reviewQuestionIndex, totalQuestionsInQuiz)}; students stay live`
+    ? `${reviewingLabel}; students stay live`
     : null);
   const quizStatusLabel = (() => {
     if (liveConnectionNoticeLabel) return liveConnectionNoticeLabel;
     if (liveRestoreNoticeLabel) return liveRestoreNoticeLabel;
     if (!displayQuestion || displayQuestion.questionType === "slide") return null;
     if (isReviewing && reviewQuestionIndex !== null) {
-      return `Reviewing ${formatPositionLabel(reviewQuestionIndex, totalQuestionsInQuiz)}; students stay live`;
+      return `${reviewingLabel}; students stay live`;
     }
     if (displayReveal) return displayReveal.isPoll ? "Results open" : "Answer revealed";
     if (state === "QUESTION_CLOSED") return closedLabel;
@@ -944,9 +943,6 @@ function LiveView({
     }
     return null;
   })();
-  const displayPositionLabel = displayQuestion
-    ? formatPositionLabel(displayQuestion.questionIndex, totalQuestionsInQuiz)
-    : undefined;
   const currentReviewListIndex = isReviewing && reviewQuestionIndex !== null
     ? availableReviewIndices.findIndex((v) => v === reviewQuestionIndex)
     : -1;
@@ -1507,9 +1503,9 @@ function LiveView({
       {!isLiveSurfaceDisplay && (
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-4">
-          {displayQuestion && (
+          {displayPositionLabel && (
             <span className="text-zinc-400 text-lg font-medium">
-              Q{displayQuestion.questionIndex + 1}/{totalQuestionsInQuiz}
+              Q{displayPositionLabel}
             </span>
           )}
           {displayQuestion && (
@@ -1530,7 +1526,7 @@ function LiveView({
           </span>
           {isReviewing && reviewQuestionIndex !== null && (
             <span className="text-amber-300 text-sm font-medium">
-              Reviewing Q{reviewQuestionIndex + 1} (students stay on live state)
+              {displayPositionLabel ? `Reviewing Q${displayPositionLabel}` : "Reviewing"} (students stay on live state)
             </span>
           )}
         </div>

@@ -16,3 +16,9 @@ export function formatRemaining(quizQuestions: number, slides: number): string {
 export function closedLabel(timedOut: boolean): string {
   return timedOut ? "Time's up" : "Answers closed";
 }
+
+/** "3/8" from the engine's question numbers (slides are not counted); undefined on a slide or from an older server. */
+export function positionLabel(question: { questionNumber?: number; questionTotal?: number } | null | undefined): string | undefined {
+  if (!question?.questionNumber || !question.questionTotal) return undefined;
+  return `${question.questionNumber}/${question.questionTotal}`;
+}
