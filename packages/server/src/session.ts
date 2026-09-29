@@ -273,6 +273,12 @@ export function getDistribution(
   return dist;
 }
 
+/** Whether the presenter has hidden this participant's response to a question from the projector. */
+export function isResponseHidden(session: Session, questionIndex: number, publicKey: string): boolean {
+  return session.hiddenResponses?.[String(questionIndex)]?.includes(publicKey) === true;
+}
+
+/** Every open response to a question, newest first, each marked hidden or not. Instructor data: it carries IDs. */
 export function getOpenResponses(
   session: Session,
   questionIndex: number,
@@ -287,6 +293,7 @@ export function getOpenResponses(
       responseText: sub.responseText!,
       submittedAt: sub.submittedAt,
     }))
+    .map((entry) => ({ ...entry, hidden: isResponseHidden(session, questionIndex, entry.publicKey) }))
     .sort((a, b) => b.submittedAt - a.submittedAt);
 }
 

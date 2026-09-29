@@ -1,6 +1,6 @@
 import express, { type Request, type Response } from "express";
 import cors from "cors";
-import { API, AccessInfo, CumulativeLeaderboardEntry, PublicCumulativeLeaderboardEntry, DeckPalette, DeckTheme, Quiz, Session, SessionState, usesStudentIds } from "@mdq/shared";
+import { API, AccessInfo, CumulativeLeaderboardEntry, PublicCumulativeLeaderboardEntry, DeckPalette, DeckTheme, Quiz, ResponseVisibilityRequest, Session, SessionState, usesStudentIds } from "@mdq/shared";
 import {
   createSession,
   storeSession,
@@ -44,6 +44,8 @@ export interface AppOptions {
   shortUrlProviders?: ShortUrlProvider[];
   /** Called after a successful REST-driven state transition */
   onStateChange?: (session: Session, sessionId: string, newState: SessionState, quiz?: Quiz, result?: EngineResult) => void;
+  /** Called with the messages of a REST-driven change that is not a state transition, so the timers stay as they are. */
+  onMessages?: (session: Session, sessionId: string, result: EngineResult) => void;
 }
 
 function resolveDeckTheme(q: Quiz, fallbackTheme: DeckTheme): DeckTheme {
@@ -156,6 +158,7 @@ export function createApp(quizDirOrOpts?: string | AppOptions) {
   let presenterNotesDefaultOpen = false;
   let shortUrlProviders: ShortUrlProvider[] | undefined;
   let onStateChange: AppOptions["onStateChange"];
+  let onMessages: AppOptions["onMessages"];
   if (typeof quizDirOrOpts === "string") {
     quizDir = quizDirOrOpts;
   } else if (quizDirOrOpts) {
@@ -169,6 +172,7 @@ export function createApp(quizDirOrOpts?: string | AppOptions) {
     presenterNotesDefaultOpen = quizDirOrOpts.presenterNotesDefaultOpen || false;
     shortUrlProviders = quizDirOrOpts.shortUrlProviders;
     onStateChange = quizDirOrOpts.onStateChange;
+    onMessages = quizDirOrOpts.onMessages;
   }
   const resolvedInstanceId = (instanceId || process.env.MDQ_INSTANCE_ID || "").trim() || `pid-${process.pid}`;
   const imagesDir = dataDir ? path.join(dataDir, "images") : undefined;
@@ -244,7 +248,7 @@ export function createApp(quizDirOrOpts?: string | AppOptions) {
     }));
   }
 
-  function getReviewReveals(session: Session, quiz: Quiz, view: "control" | "public") {
+  function getReviewReveals(session: Session, quiz: Quiz, view: "control" | "display") {
     if (session.currentQuestionIndex < 0) {
       return [];
     }
@@ -684,7 +688,7 @@ export function createApp(quizDirOrOpts?: string | AppOptions) {
         reviewQuestions: getReviewQuestions(session, quiz),
         // Student IDs and names only go to a logged-in instructor. With no login set, anyone can
         // reach this route, so restored open responses carry labels only.
-        reviewReveals: getReviewReveals(session, quiz, isAuthenticatedInstructor(req) ? "control" : "public"),
+        reviewReveals: getReviewReveals(session, quiz, isAuthenticatedInstructor(req) ? "control" : "display"),
       });
     });
   });
@@ -753,6 +757,29 @@ export function createApp(quizDirOrOpts?: string | AppOptions) {
       });
     });
   }
+
+  // ── Hide or show one open response on the projector ──
+  app.post(API.SESSION_RESPONSE_VISIBILITY, requireInstructorAuth, (req, res) => {
+    withSession(req, res, (session) => {
+      const quiz = getQuizForSession(session.week);
+      if (!quiz) return res.status(500).json({ error: "Quiz data not found" });
+      const { questionIndex, publicKey, hidden } = (req.body ?? {}) as Partial<ResponseVisibilityRequest>;
+      if (!Number.isInteger(questionIndex) || typeof publicKey !== "string" || !publicKey || typeof hidden !== "boolean") {
+        return res.status(400).json({ error: "Send questionIndex, publicKey and hidden." });
+      }
+      try {
+        const result = apply(session, quiz, { type: "responseVisibility", role: "control", questionIndex: questionIndex as number, publicKey, hidden }, Date.now());
+        Object.assign(session, result.session);
+        storeSession(session);
+        onMessages?.(session, req.params.id, result);
+        logActivity(`instructor ${hidden ? "hid" : "showed"} a response session=${req.params.id} q=${questionIndex}`);
+        return res.json({ questionIndex, publicKey, hidden });
+      } catch (e) {
+        if (e instanceof EngineCommandError) return res.status(400).json({ error: e.message });
+        throw e;
+      }
+    });
+  });
 
   app.get(API.SESSION_LEADERBOARD, (req, res) => {
     withSession(req, res, (session) => {

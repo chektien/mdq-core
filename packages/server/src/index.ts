@@ -178,6 +178,10 @@ const app = createApp({
   autoGenerateStudentIds: runtimeConfig.autoGenerateStudentIds,
   presenterNotes: runtimeConfig.presenterNotes,
   presenterNotesDefaultOpen: runtimeConfig.presenterNotesDefaultOpen,
+  onMessages: (_session: Session, sessionId: string, result: EngineResult) => {
+    const io = ioRef.current;
+    if (io) emitMessages(io, sessionId, result.messages);
+  },
   onStateChange: (session: Session, sessionId: string, _newState: SessionState, quiz?: Quiz, result?: EngineResult) => {
     const io = ioRef.current;
     if (!io || !result) return;
