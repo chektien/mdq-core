@@ -215,6 +215,14 @@ html[data-theme="dark"] input::placeholder {
   color: var(--mdq-soft);
 }
 
+/* Leaderboard names and scores take the body ink, as in the light theme.
+   The slide heading colour is Gruvbox yellow in the dark palette, which would
+   paint every name in the first-place gold. */
+html[data-theme="dark"] .leaderboard-name,
+html[data-theme="dark"] .leaderboard-score {
+  color: var(--mdq-ink) !important;
+}
+
 html[data-theme="light"] {
   --mdq-paper: #f7f1e3;
   --mdq-paper-strong: #fffaf1;

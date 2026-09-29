@@ -78,6 +78,16 @@ describe("control contrast contract", () => {
     expect(ruleBody(index, 'html:not([data-theme="light"]) .leaderboard-row.leaderboard-row-highlight.rank-third')).toContain("--leaderboard-rank-color: #ffa552");
   });
 
+  it("paints leaderboard names and scores in the ink so first place's gold stands out", () => {
+    for (const mode of ["dark", "light"]) {
+      expect(ruleBody(theme, `html[data-theme="${mode}"] .leaderboard-score`)).toContain("color: var(--mdq-ink) !important");
+      expect(theme).toContain(`html[data-theme="${mode}"] .leaderboard-name,\nhtml[data-theme="${mode}"] .leaderboard-score {`);
+    }
+    const gruvboxDark = tokens(index, 'html[data-palette="gruvbox"]:not([data-theme="light"])');
+    expect(ruleBody(index, 'html[data-palette="gruvbox"]:not([data-theme="light"]) .leaderboard-row.rank-first')).toContain("--leaderboard-rank-color: #fabd2f");
+    expect(gruvboxDark["--mdq-ink"]).not.toBe("#fabd2f");
+  });
+
   it("draws a narrow distribution share at its true length with the count outside", () => {
     expect(ruleBody(theme, "html[data-theme] .dist-bar")).not.toMatch(/min-width/);
     // A 2 percent share of a 320 px track is 6.4 px; its "1 (2%)" count cannot fit inside.
