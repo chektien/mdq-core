@@ -26,10 +26,17 @@ function getSubmissionValue(submission: Submission): string {
   return submission.selectedOptions.join("|");
 }
 
-/** Escape one CSV cell: quote it when it holds a comma, quote or line break. */
+/**
+ * Escape one CSV cell. Text that starts with =, +, -, @, tab or carriage return
+ * is prefixed with a single quote so spreadsheets do not run it as a formula
+ * (OWASP CSV injection rule). Numbers and booleans are written as they are.
+ */
 export function csvEscape(value: string | number | boolean): string {
-  const raw = String(value);
-  if (raw.includes(",") || raw.includes("\n") || raw.includes('"')) {
+  let raw = String(value);
+  if (typeof value === "string" && /^[=+\-@\t\r]/.test(raw)) {
+    raw = `'${raw}`;
+  }
+  if (raw.includes(",") || raw.includes("\n") || raw.includes("\r") || raw.includes('"')) {
     return `"${raw.replace(/"/g, '""')}"`;
   }
   return raw;

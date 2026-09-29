@@ -2,7 +2,7 @@ import * as fs from "fs";
 import * as os from "os";
 import * as path from "path";
 import { Quiz, Question } from "@mdq/shared";
-import { buildResultsCsv } from "../results-csv";
+import { buildResultsCsv, csvEscape } from "../results-csv";
 import { getSessionResultsCsvPath, markQuestionRevealed, saveResultsCsv } from "../persistence";
 import { addParticipant, createSession, recordSubmission, transitionState } from "../session";
 
@@ -195,6 +195,38 @@ describe("results CSV builder", () => {
     const jo = byId.get("S0003")!;
     expect(jo[col("q2_selected")]).toBe("");
     expect(jo[col("q3_selected")]).toBe("");
+  });
+
+  describe("formula injection", () => {
+    it.each(["=1+1", "+1", "-1", "@SUM(A1)", "\tcmd", "\rcmd"])("prefixes text starting with %j", (text) => {
+      const out = csvEscape(text);
+      expect(out.replace(/^"|"$/g, "").startsWith("'")).toBe(true);
+    });
+
+    it("leaves ordinary text, numbers and booleans alone", () => {
+      expect(csvEscape("Alex Tan")).toBe("Alex Tan");
+      expect(csvEscape("a=b")).toBe("a=b");
+      expect(csvEscape("A|B")).toBe("A|B");
+      expect(csvEscape("")).toBe("");
+      expect(csvEscape(-5)).toBe("-5");
+      expect(csvEscape(true)).toBe("true");
+    });
+
+    it("quotes after prefixing when the cell also needs CSV escaping", () => {
+      expect(csvEscape('=SUM(1,2)')).toBe(`"'=SUM(1,2)"`);
+      expect(csvEscape("\rx")).toBe(`"'\rx"`);
+    });
+
+    it("neutralises names and open responses in the built CSV", () => {
+      const { session, quiz } = makeFixture();
+      addParticipant(session, "S0005", "sock5", "@evil");
+      const rows = parseCsv(buildResultsCsv(session, quiz));
+      const header = rows[0];
+      const evil = rows.find((r) => r[header.indexOf("student_id")] === "S0005")!;
+      expect(evil[header.indexOf("display_name")]).toBe("'@evil");
+      const sam = rows.find((r) => r[header.indexOf("student_id")] === "S0002")!;
+      expect(sam[header.indexOf("q3_selected")]).toBe(`'=HYPERLINK("http://example.invalid")`);
+    });
   });
 
   it("does not import fs or path (bundles for runtimes without a filesystem)", () => {
