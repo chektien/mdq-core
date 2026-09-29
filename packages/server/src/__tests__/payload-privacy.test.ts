@@ -161,7 +161,7 @@ describe("payload privacy through a whole session (Student IDs on)", () => {
     for (const row of publicBoard.entries) expect(Object.keys(row).sort()).toEqual(["correctCount", "label", "publicKey", "rank", "totalTimeMs"]);
     const lobby = messages.filter((m) => m.event === SocketEvents.SESSION_PARTICIPANTS && m.audience === "display").pop()!.payload as SessionParticipantsPayload;
     for (const person of lobby.participants) expect(Object.keys(person).sort()).toEqual(["label", "publicKey"]);
-    const reveal = messages.filter((m) => m.event === SocketEvents.RESULTS_REVEAL && m.audience === "public" && (m.payload as ResultsRevealPayload).openResponses).pop()!.payload as ResultsRevealPayload;
+    const reveal = messages.filter((m) => m.event === SocketEvents.RESULTS_REVEAL && m.audience === "display" && (m.payload as ResultsRevealPayload).openResponses).pop()!.payload as ResultsRevealPayload;
     for (const response of reveal.openResponses!) expect(Object.keys(response).sort()).toEqual(["label", "publicKey", "responseText", "submittedAt"]);
   });
 
@@ -311,7 +311,9 @@ describe("payload privacy over real sockets", () => {
     // The projector still gets the lobby, counts and reveals, by label.
     const lobby = display.events.filter((e) => e.event === SocketEvents.SESSION_PARTICIPANTS).pop()!.payload as SessionParticipantsPayload;
     expect(lobby.participants.map((p) => p.label).sort()).toEqual(["Alex", "Alex (2)", "Participant 3"]);
-    expect(display.events.some((e) => e.event === SocketEvents.ANSWER_COUNT && e.text.includes("Thought 2"))).toBe(true);
+    // While the question is open the projector gets the count only, then the responses at reveal.
+    expect(display.events.some((e) => e.event === SocketEvents.ANSWER_COUNT && !e.text.includes("Thought"))).toBe(true);
+    expect(display.events.some((e) => e.event === SocketEvents.RESULTS_REVEAL && e.text.includes("Thought 2"))).toBe(true);
     expect(display.events.some((e) => e.event === SocketEvents.RESULTS_DISTRIBUTION)).toBe(true);
     // A phone finds its own leaderboard row by public key.
     const board = a.recorder.events.filter((e) => e.event === SocketEvents.LEADERBOARD_UPDATE).pop()!.payload as LeaderboardUpdatePayload;

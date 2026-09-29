@@ -3,7 +3,9 @@ import SessionCodeCard from "./SessionCodeCard";
 
 export interface LiveSurfaceAction {
   label: string;
-  onClick: () => void | Promise<void>;
+  onClick?: () => void | Promise<void>;
+  /** Makes the action a plain link that downloads a file instead of a button. */
+  href?: string;
   disabled?: boolean;
   tone?: "neutral" | "primary" | "warning" | "danger";
   detail?: string | null;
@@ -105,6 +107,19 @@ export default function LiveSurface({
       variant === "nav" ? "slide-nav-button" : null,
       hasDetail ? "slide-action-button-with-detail" : null,
     ].filter(Boolean).join(" ");
+
+    if (action.href) {
+      return (
+        <a
+          key={`${variant}-${action.label}-${index}`}
+          className={className}
+          href={action.href}
+          download
+        >
+          <span className="slide-button-label">{action.label}</span>
+        </a>
+      );
+    }
 
     return (
       <button

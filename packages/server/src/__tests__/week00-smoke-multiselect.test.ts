@@ -231,7 +231,8 @@ describe("week00 smoke multi-select", () => {
     const openReveal = await openRevealPromise;
     expect(openReveal.questionIndex).toBe(4);
     expect(openReveal.questionType).toBe("open_response");
-    expect(openReveal.openResponses?.[0]?.responseText).toContain("submitted");
+    // A phone never gets other participants' responses, not even after the reveal.
+    expect(openReveal.openResponses).toBeUndefined();
 
     const q5OpenPromise = waitFor<QuestionOpenPayload>(student, SocketEvents.QUESTION_OPEN);
     await request(app).post(`/api/session/${sessionId}/next`).expect(200);

@@ -104,7 +104,7 @@ For each question:
 ls data/sessions/
 ls data/winners/
 
-# View cumulative leaderboard
+# View cumulative leaderboard (labels only without an instructor login; Student IDs need the login cookie)
 curl http://localhost:3000/api/leaderboard/cumulative | jq
 ```
 

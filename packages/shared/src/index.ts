@@ -228,8 +228,9 @@ export interface SlideLiveEmbed {
 }
 
 /**
- * One open response. Only control sockets (the instructor) get `studentId`
- * and `displayName`; every other audience sees `publicKey` and `label`.
+ * One open response. Only control sockets (the instructor) get `studentId`,
+ * `displayName` and `hidden`; every other audience sees `publicKey` and
+ * `label`, and only for responses that are not hidden.
  */
 export interface OpenResponseEntry {
   publicKey: string;
@@ -238,6 +239,16 @@ export interface OpenResponseEntry {
   displayName?: string;
   responseText: string;
   submittedAt: number;
+  /** Control sockets only: the presenter has hidden this response from the projector. */
+  hidden?: boolean;
+}
+
+/** The body of the presenter's request to hide or show one open response. */
+export interface ResponseVisibilityRequest {
+  questionIndex: number;
+  /** The `publicKey` of the response, as the instructor's payloads carry it. */
+  publicKey: string;
+  hidden: boolean;
 }
 
 export interface QuestionOpenPayload {
@@ -370,6 +381,8 @@ export const API = {
   SESSION_LEADERBOARD: "/api/session/:id/leaderboard",
   SESSION_LEADERBOARD_SHOW: "/api/session/:id/leaderboard-show",
   SESSION_LEADERBOARD_HIDE: "/api/session/:id/leaderboard-hide",
+  SESSION_RESPONSE_VISIBILITY: "/api/session/:id/response-visibility",
+  SESSION_RESULTS_CSV: "/api/session/:id/results.csv",
   SESSION_STATE_RESTORE: "/api/session/:id/state",
   SESSION_ACCESS_INFO: "/api/session/:id/access-info",
   SESSION_PRESENTATION: "/api/session/:id/presentation",
@@ -467,6 +480,12 @@ export interface Session {
   currentQuestionIndex: number;
   questionStartedAt?: number;
   revealedQuestionIndexes?: Set<number>;
+  /**
+   * Open responses the presenter has hidden from the projector: for each
+   * question index (as a string key) the public keys of the hidden responses.
+   * Plain data, so it survives session serialisation.
+   */
+  hiddenResponses?: Record<string, string[]>;
   participants: Map<string, Participant>;
   submissions: Submission[];
   createdAt: number;
@@ -506,6 +525,15 @@ export interface CumulativeLeaderboardEntry {
   weeksParticipated: number;
 }
 
+/** A saved-results row with the Student ID and typed name replaced by a label. */
+export interface PublicCumulativeLeaderboardEntry {
+  rank: number;
+  label: string;
+  totalCorrect: number;
+  totalTimeMs: number;
+  weeksParticipated: number;
+}
+
 /** Access info returned by /api/access-info */
 export interface AccessInfo {
   fullUrl: string;
@@ -523,6 +551,8 @@ export interface AccessInfo {
 
 // ── Constants ───────────────────────────────
 export const DEFAULT_TIME_LIMIT_SEC = 35;
+/** Longest open response a participant can send, in characters. */
+export const MAX_OPEN_RESPONSE_LENGTH = 1000;
 export const SESSION_CODE_LENGTH = 6;
 export const DEFAULT_PORT = 3000;
 export const TICK_INTERVAL_MS = 1000;

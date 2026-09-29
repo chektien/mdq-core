@@ -2739,6 +2739,7 @@ html[data-theme="light"] .image-expansion-close:focus-visible {
 .slide-action-button {
   flex: 0 0 auto;
   display: inline-flex;
+  text-decoration: none;
   min-height: 2.35rem;
   align-items: center;
   justify-content: center;
@@ -6258,6 +6259,56 @@ html[data-theme] .open-response-entry .open-response-display-name {
 
 html[data-theme] .open-response-entry .open-response-text {
   color: #ffffff !important;
+}
+
+/* Instructor moderation: a hidden response stays in the list, dimmed and
+   labelled, with a Hide / Show button beside it. */
+.open-response-row > .open-response-entry {
+  flex: 1 1 auto;
+}
+
+html[data-theme] .open-response-entry-hidden .open-response-text {
+  color: #b9b4a8 !important;
+}
+
+html[data-theme] .open-response-entry-hidden .open-response-hidden-note {
+  color: #ffd9a0 !important;
+}
+
+.open-response-toggle {
+  min-width: 4.5rem;
+  min-height: 2.75rem;
+  border: 1px solid var(--mdq-control-border, var(--mdq-slide-glass-line));
+  border-radius: var(--mdq-control-radius);
+  background: var(--mdq-slide-glass);
+  color: var(--mdq-slide-ink);
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.open-response-toggle:hover {
+  background: var(--mdq-slide-glass-strong);
+}
+
+.open-response-toggle[data-hidden="true"] {
+  border-color: var(--mdq-slide-accent);
+  color: var(--mdq-slide-accent);
+}
+
+.open-response-toggle:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--mdq-slide-accent) 72%, white);
+  outline-offset: 2px;
+}
+
+.open-response-notice {
+  color: var(--mdq-slide-ink);
+}
+
+.open-response-count-number,
+.open-response-count-label {
+  color: var(--mdq-slide-ink);
 }
 
 

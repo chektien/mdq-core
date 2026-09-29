@@ -9,7 +9,8 @@ import {
   Submission,
   DATA_DIR,
 } from "@mdq/shared";
-import { computeLeaderboard, isExactOptionMatch } from "./session";
+import { computeLeaderboard } from "./session";
+import { buildResultsCsv, isSubmissionCorrect, toIso } from "./results-csv";
 import { buildScoredCorrectAnswersMap, getQuestionType, getScoredQuestionCount, isScoredQuestion } from "./scoring";
 
 const sessionRevealTimestamps = new Map<string, Map<number, number>>();
@@ -77,10 +78,6 @@ export function getSessionSummaryMarkdownPath(session: Session, baseDir?: string
   return path.join(submissionsDir(baseDir), `${sessionArtifactPrefix(session)}-summary.md`);
 }
 
-function toIso(ts?: number): string {
-  return typeof ts === "number" ? new Date(ts).toISOString() : "";
-}
-
 function formatSecondsFromMs(ms: number): string {
   return `${(Math.max(0, ms) / 1000).toFixed(2)}s`;
 }
@@ -101,10 +98,6 @@ export function markQuestionRevealed(
     return;
   }
   getRevealTimestampMap(session.sessionId).set(questionIndex, revealedAt);
-}
-
-function clearSessionRevealTracking(sessionId: string): void {
-  sessionRevealTimestamps.delete(sessionId);
 }
 
 function winnersDir(baseDir?: string): string {
@@ -161,14 +154,6 @@ export function saveSubmissions(session: Session, baseDir?: string): void {
   fs.writeFileSync(filePath, JSON.stringify(data, null, 2), "utf-8");
 }
 
-function csvEscape(value: string | number | boolean): string {
-  const raw = String(value);
-  if (raw.includes(",") || raw.includes("\n") || raw.includes('"')) {
-    return `"${raw.replace(/"/g, '""')}"`;
-  }
-  return raw;
-}
-
 export interface CsvWriteResult {
   action: "created" | "updated";
   filePath: string;
@@ -189,15 +174,12 @@ export interface SummaryWriteResult {
   lineCount: number;
 }
 
-function isSubmissionCorrect(submission: Submission, correctOptions: string[]): boolean {
-  return isExactOptionMatch(submission.selectedOptions, correctOptions);
-}
-
-function getSubmissionValue(submission: Submission): string {
-  if (submission.responseText) {
-    return submission.responseText;
-  }
-  return submission.selectedOptions.join("|");
+/**
+ * The results CSV for a session as it stands now, with the times each question
+ * was revealed. Works while the session runs and after it has ended.
+ */
+export function buildSessionResultsCsv(session: Session, quiz: Quiz): string {
+  return buildResultsCsv(session, quiz, { revealTimestamps: getRevealTimestampMap(session.sessionId) });
 }
 
 /**
@@ -207,93 +189,17 @@ function getSubmissionValue(submission: Submission): string {
 export function saveResultsCsv(session: Session, quiz: Quiz, baseDir?: string): CsvWriteResult {
   const dir = submissionsDir(baseDir);
   ensureDir(dir);
-  const revealTimestamps = getRevealTimestampMap(session.sessionId);
 
-  const correctMap = buildScoredCorrectAnswersMap(quiz);
-  const leaderboard = computeLeaderboard(session, correctMap);
-  const boardMap = new Map(leaderboard.map((entry) => [entry.studentId, entry]));
-
-  const submissionsByStudent = new Map<string, Map<number, Submission>>();
-  for (const sub of session.submissions) {
-    if (!submissionsByStudent.has(sub.studentId)) {
-      submissionsByStudent.set(sub.studentId, new Map<number, Submission>());
-    }
-    submissionsByStudent.get(sub.studentId)!.set(sub.questionIndex, sub);
-  }
-
-  const headers = [
-    "session_id",
-    "session_code",
-    "week",
-    "session_created_at_iso",
-    "snapshot_written_at_iso",
-    "student_id",
-    "display_name",
-    "joined_at_iso",
-    "connected_at_end",
-    "questions_answered",
-    "correct_count",
-    "total_time_ms",
-    "attendance",
-  ];
-
-  for (let i = 0; i < quiz.questions.length; i++) {
-    headers.push(`q${i + 1}_revealed_at_iso`);
-    headers.push(`q${i + 1}_selected`);
-    headers.push(`q${i + 1}_correct`);
-    headers.push(`q${i + 1}_response_ms`);
-    headers.push(`q${i + 1}_answered_at_iso`);
-  }
-
-  const rows: string[] = [headers.join(",")];
-
-  const participants = [...session.participants.values()].sort((a, b) => a.studentId.localeCompare(b.studentId));
-  for (const participant of participants) {
-    const subs = submissionsByStudent.get(participant.studentId) || new Map<number, Submission>();
-    const stats = boardMap.get(participant.studentId);
-
-    const row: (string | number | boolean)[] = [
-      session.sessionId,
-      session.sessionCode,
-      session.week,
-      toIso(session.createdAt),
-      new Date().toISOString(),
-      participant.studentId,
-      participant.displayName || "",
-      new Date(participant.joinedAt).toISOString(),
-      participant.connected,
-      subs.size,
-      stats?.correctCount ?? 0,
-      stats?.totalTimeMs ?? 0,
-      "present",
-    ];
-
-    for (let i = 0; i < quiz.questions.length; i++) {
-      const sub = subs.get(i);
-      const revealedAtIso = toIso(revealTimestamps.get(i));
-      const isScored = isScoredQuestion(quiz.questions[i]);
-      if (!sub) {
-        row.push(revealedAtIso, "", "", "", "");
-        continue;
-      }
-      row.push(revealedAtIso);
-      row.push(getSubmissionValue(sub));
-      row.push(isScored ? (isSubmissionCorrect(sub, correctMap.get(i) || []) ? 1 : 0) : "");
-      row.push(sub.responseTimeMs);
-      row.push(toIso(sub.submittedAt));
-    }
-
-    rows.push(row.map(csvEscape).join(","));
-  }
+  const csv = buildSessionResultsCsv(session, quiz);
 
   const filePath = getSessionResultsCsvPath(session, baseDir);
   const action: CsvWriteResult["action"] = fs.existsSync(filePath) ? "updated" : "created";
-  fs.writeFileSync(filePath, `${rows.join("\n")}\n`, "utf-8");
+  fs.writeFileSync(filePath, csv, "utf-8");
 
   return {
     action,
     filePath,
-    rowCount: participants.length,
+    rowCount: session.participants.size,
     questionCount: quiz.questions.length,
   };
 }
@@ -677,8 +583,6 @@ export function persistSessionOnEnd(
   } catch (e) {
     console.error(`Failed to save weekly result for ${session.week}:`, e);
   }
-
-  clearSessionRevealTracking(session.sessionId);
 }
 
 // ── Utility ─────────────────────────────────
