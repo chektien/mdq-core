@@ -715,7 +715,8 @@ function renderCatppuccinTokens(theme: PrintTheme): string {
 }
 
 // seoul256 mirrors the live slide palette in packages/client/src/index.css
-// (junegunn/seoul256.vim, MIT, default GUI colour map): dark is background 237
+// (junegunn/seoul256.vim,
+// https://github.com/junegunn/seoul256.vim, MIT, default GUI colour map): dark is background 237
 // (#4b4b4b), light is seoul256-light at 253 (#e1e1e1). Light shades are
 // darkened as the live palette describes, for example green #006f00 to #006d00
 // and teal #007173 to #00686a. Attendee notes use the accent and presenter
@@ -777,7 +778,8 @@ function renderSeoul256Tokens(theme: PrintTheme): string {
 }
 
 // Ayu mirrors the live slide palette in packages/client/src/index.css
-// (ayu-theme/ayu-colors, MIT): dark is Ayu Dark, light is Ayu Light with its
+// (ayu-theme/ayu-colors,
+// https://github.com/ayu-theme/ayu-colors, MIT): dark is Ayu Dark, light is Ayu Light with its
 // accents darkened, for example green #86b300 to #516c00 and accent #f29718
 // to #955a08. Attendee notes use the accent, presenter notes the purple.
 function renderAyuTokens(theme: PrintTheme): string {
@@ -837,7 +839,8 @@ function renderAyuTokens(theme: PrintTheme): string {
 }
 
 // Tokyo Night mirrors the live slide palette in packages/client/src/index.css
-// (folke/tokyonight.nvim, Apache-2.0): dark is the night style, light is Day
+// (folke/tokyonight.nvim,
+// https://github.com/folke/tokyonight.nvim, Apache-2.0): dark is the night style, light is Day
 // with its accents darkened, for example blue #2e7de9 to #1355b1 and green
 // #587539 to #485f2e. Attendee notes use the blue, presenter notes the purple.
 function renderTokyoNightTokens(theme: PrintTheme): string {

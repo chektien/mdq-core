@@ -717,11 +717,17 @@ authors.
 | Palette | Upstream | Licence |
 | --- | --- | --- |
 | Gruvbox | [morhetz/gruvbox](https://github.com/morhetz/gruvbox) | MIT/X11 |
-| Rosé Pine | [rose-pine/palette](https://github.com/rose-pine/palette) (now at rose-pine/rose-pine-palette) | MIT |
+| Rosé Pine | [rose-pine/rose-pine-palette](https://github.com/rose-pine/rose-pine-palette) | MIT |
 | Catppuccin | [catppuccin/palette](https://github.com/catppuccin/palette) | MIT |
 | seoul256 | [junegunn/seoul256.vim](https://github.com/junegunn/seoul256.vim) | MIT |
 | Ayu | [ayu-theme/ayu-colors](https://github.com/ayu-theme/ayu-colors) | MIT |
 | Tokyo Night | [folke/tokyonight.nvim](https://github.com/folke/tokyonight.nvim) | Apache-2.0 |
+
+The colours are adapted. Where an upstream colour misses 4.5:1 for text or 3:1
+for a control boundary, MDQ uses a darker or lighter shade of the same hue, and
+the comment above each palette in `packages/client/src/index.css` names the
+change. The Apache-2.0 licence text is at
+<https://www.apache.org/licenses/LICENSE-2.0>.
 
 ## Disclaimer
 

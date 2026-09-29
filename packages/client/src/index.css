@@ -832,6 +832,8 @@ html[data-palette="gruvbox"][data-theme="light"] .leaderboard-row.rank-standard 
 }
 
 /* ── Rosé Pine palette (deck palette: rose-pine) ── */
+/* The -ink tokens and rank colours are darker (light) or lighter (dark)
+   shades of the named accents, so they are not listed one by one. */
 /* Rosé Pine follows the rose-pine/rose-pine-palette colours (MIT,
    https://github.com/rose-pine/rose-pine-palette): dark is Rosé Pine (main),
    light is Rosé Pine Dawn, with the canonical Dawn text #575279 from that
@@ -1171,6 +1173,8 @@ html[data-palette="rose-pine"][data-theme="light"] .leaderboard-row.rank-standar
 
 
 /* ── Catppuccin palette (deck palette: catppuccin) ── */
+/* The -ink tokens and rank colours are darker (light) or lighter (dark)
+   shades of the named accents, so they are not listed one by one. */
 /* Catppuccin follows the catppuccin/palette colours (MIT,
    https://github.com/catppuccin/palette): dark is Mocha, light is Latte.
    Mocha uses its colours as published. Latte's accents are bright pastels
@@ -1494,6 +1498,8 @@ html[data-palette="catppuccin"][data-theme="light"] .leaderboard-row.rank-standa
 
 
 /* ── seoul256 palette (deck palette: seoul256) ── */
+/* The -ink tokens and rank colours are darker (light) or lighter (dark)
+   shades of the named accents, so they are not listed one by one. */
 /* seoul256 follows Junegunn Choi's seoul256.vim colour scheme (MIT, as stated
    in its file headers, https://github.com/junegunn/seoul256.vim). Values are
    the scheme's default GUI colour map: dark is seoul256 at background 237
@@ -1811,6 +1817,8 @@ html[data-palette="seoul256"][data-theme="light"] .leaderboard-row.rank-standard
 }
 
 /* ── Ayu palette (deck palette: ayu) ── */
+/* The -ink tokens and rank colours are darker (light) or lighter (dark)
+   shades of the named accents, so they are not listed one by one. */
 /* Ayu follows the ayu-colors themes by the Ayu theme authors (MIT,
    https://github.com/ayu-theme/ayu-colors, generated from themes/dark.yaml and
    themes/light.yaml at b0fd979). Dark is Ayu Dark: editor background #10141c,
@@ -2120,6 +2128,8 @@ html[data-palette="ayu"][data-theme="light"] .leaderboard-row.rank-standard {
 }
 
 /* ── Tokyo Night palette (deck palette: tokyo-night) ── */
+/* The -ink tokens and rank colours are darker (light) or lighter (dark)
+   shades of the named accents, so they are not listed one by one. */
 /* Tokyo Night follows folke's tokyonight.nvim colours (Apache-2.0,
    https://github.com/folke/tokyonight.nvim, extras/lua/tokyonight_night.lua
    and tokyonight_day.lua at cdc07ac). Dark is the night style: background
