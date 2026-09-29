@@ -709,7 +709,7 @@ html[data-palette="gruvbox"][data-theme="light"] {
   --mdq-timer-warn: #8a5a0a;
   --mdq-timer-urgent: #9d0006;
   --mdq-timer-track: #d5d8d0;
-  --mdq-rank-first: #7a4f08;
+  --mdq-rank-first: #6f4807;
   --mdq-rank-second: #504945;
   --mdq-rank-third: #8f3002;
   --mdq-page-glow-top: transparent;
@@ -730,6 +730,17 @@ html[data-palette="gruvbox"][data-theme="light"] .slide-surface .quiz-html pre {
 
 html[data-palette="gruvbox"][data-theme="light"] .slide-surface .quiz-html strong {
   color: #282828;
+}
+
+/* The Gruvbox light green and yellow text tokens sit just under 4.5:1 on
+   their own tinted pill over the lower slide gradient, so the pills use the
+   deeper ink shade. */
+html[data-palette="gruvbox"][data-theme="light"] .slide-status-pill-success {
+  color: var(--mdq-success-ink);
+}
+
+html[data-palette="gruvbox"][data-theme="light"] .slide-status-pill-warning {
+  color: var(--mdq-warning-ink);
 }
 
 /* Question and reveal text outside the slide canvas. */
@@ -795,6 +806,22 @@ html[data-palette="gruvbox"]:not([data-theme="light"]) .leaderboard-row.rank-sec
 
 html[data-palette="gruvbox"]:not([data-theme="light"]) .leaderboard-row.rank-third {
   --leaderboard-rank-color: #fe8019;
+}
+
+/* Below the podium the row keeps a neutral tint, so fourth place does not
+   pick up the orange accent that third place uses. */
+html[data-palette="gruvbox"]:not([data-theme="light"]) .leaderboard-row.rank-standard {
+  --leaderboard-rank-color: #bdae93;
+}
+
+html[data-palette="gruvbox"][data-theme="light"] .leaderboard-row.rank-standard {
+  --leaderboard-rank-color: var(--mdq-muted);
+}
+
+/* The viewer's own row adds an accent wash, so a dark theme lightens the
+   third-place orange to hold 4.5:1 on it. */
+html:not([data-theme="light"]) .leaderboard-row.leaderboard-row-highlight.rank-third {
+  --leaderboard-rank-color: #ffa552;
 }
 
 /* ── Light-theme media canvas ───────────── */
@@ -1132,17 +1159,15 @@ html[data-theme="light"] .image-expansion-close:focus-visible {
   background: var(--mdq-slide-glass-strong);
 }
 
-.slide-action-button:disabled {
-  cursor: not-allowed;
-  opacity: 0.42;
-}
-
-.slide-nav-button:disabled {
-  opacity: 0.62;
+/* Toolbar buttons outline in the theme's control border, which holds 3:1
+   against the slide, so each button reads as a control on its own. */
+.slide-action-button,
+.slide-fullscreen-button {
+  border-color: var(--mdq-control-border, var(--mdq-slide-glass-line));
 }
 
 .slide-action-button-primary {
-  border-color: color-mix(in srgb, var(--mdq-accent, #b366ff) 56%, transparent);
+  border-color: var(--mdq-slide-accent);
   color: var(--mdq-slide-accent);
 }
 
@@ -1166,8 +1191,30 @@ html[data-theme="light"] .image-expansion-close:focus-visible {
 }
 
 .slide-action-button-danger {
-  border-color: color-mix(in srgb, var(--mdq-danger-line, #be3f67) 60%, transparent);
+  border-color: var(--mdq-danger-line, #be3f67);
   color: var(--mdq-danger-text, #ee7a9e);
+}
+
+/* On light paper the pale yellow edge disappears, so outline the warning
+   fill in the theme's warning ink. */
+html[data-theme="light"] .slide-action-button-warning {
+  border-color: var(--mdq-warning);
+}
+
+/* A disabled button keeps readable text: it switches to the soft ink and a
+   dashed outline rather than fading, so labels such as the next item's title
+   stay at 4.5:1 while it is unavailable. */
+.slide-action-button:disabled {
+  border-style: dashed;
+  border-color: var(--mdq-control-border, var(--mdq-slide-glass-line));
+  background: var(--mdq-slide-glass);
+  color: var(--mdq-slide-ink-soft);
+  box-shadow: none;
+  cursor: not-allowed;
+}
+
+html[data-theme="light"] .slide-action-button-warning:disabled {
+  border-color: var(--mdq-control-border);
 }
 
 .slide-status-pill {
@@ -4534,14 +4581,19 @@ html[data-theme="light"] .presenter-notes-body {
   color: var(--mdq-slide-ink-soft);
 }
 
+/* The dark theme maps border-zinc-* to its faint line colour, so the entry
+   names the control border directly to keep a 3:1 outline. */
+html[data-theme="dark"] button.open-response-entry {
+  border-color: var(--mdq-control-border) !important;
+}
+
 .open-response-entry {
-  border-color: rgba(255, 255, 255, 0.14);
   background: #343432;
 }
 
-.open-response-entry:hover,
-.open-response-entry:focus-visible {
-  border-color: var(--mdq-slide-accent);
+html[data-theme="dark"] button.open-response-entry:hover,
+html[data-theme="dark"] button.open-response-entry:focus-visible {
+  border-color: var(--mdq-slide-accent) !important;
 }
 
 .open-response-entry:focus-visible {
@@ -4565,7 +4617,6 @@ html[data-theme="light"] .open-response-list {
 }
 
 html[data-theme="light"] .open-response-entry {
-  border-color: #59574f;
   background: #41413f;
 }
 

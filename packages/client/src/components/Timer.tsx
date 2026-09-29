@@ -1,3 +1,5 @@
+import { timerFontSize, timerLabel } from "./timerLabel";
+
 /** Countdown timer ring for projector display */
 export default function Timer({
   remainingSec,
@@ -14,12 +16,8 @@ export default function Timer({
   const offset = circumference * (1 - progress);
   const urgent = remainingSec <= 5 && remainingSec > 0;
 
-  // Show m:ss for a minute or more (e.g. a 5-minute prompt), raw seconds below 60.
-  const label =
-    remainingSec >= 60
-      ? `${Math.floor(remainingSec / 60)}:${String(remainingSec % 60).padStart(2, "0")}`
-      : `${remainingSec}`;
-  const labelFontSize = label.length >= 4 ? size * 0.26 : size * 0.32;
+  const label = timerLabel(remainingSec);
+  const labelFontSize = timerFontSize(size, label);
 
   // Color transitions: green -> yellow -> red. The theme and palette set
   // these tokens (theme.css, index.css) so the ring and count keep contrast.
