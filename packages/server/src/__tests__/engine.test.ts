@@ -108,6 +108,19 @@ it("joins, answers and disconnects without changing the supplied session", () =>
   expect(answered.session.participants.get("S1")?.connected).toBe(true);
 });
 
+it("ignores a late disconnect from a socket the student has already replaced", () => {
+  const input = base("QUESTION_OPEN");
+  const first = apply(input, quiz, { type: "join", socketId: "socket-1", newToken: "token-1", payload: { studentId: "S1" } }, 2000);
+  const rejoined = apply(first.session, quiz, { type: "join", socketId: "socket-2", newToken: "unused", payload: { studentId: "S1", sessionToken: "token-1" } }, 3000);
+  expect(rejoined.session.participants.get("S1")?.socketId).toBe("socket-2");
+  const stale = apply(rejoined.session, quiz, { type: "disconnect", studentId: "S1", socketId: "socket-1" }, 4000);
+  expect(stale.session.participants.get("S1")?.connected).toBe(true);
+  expect(stale.messages).toEqual([]);
+  const current = apply(stale.session, quiz, { type: "disconnect", studentId: "S1", socketId: "socket-2" }, 5000);
+  expect(current.session.participants.get("S1")?.connected).toBe(false);
+  expect(current.messages[0]).toEqual(msg(SocketEvents.SESSION_PARTICIPANTS, { count: 0, participants: [] }, "staff"));
+});
+
 for (const state of states) {
   it(`${state} accepts a join and preserves its current state`, () => {
     const input = base(state);

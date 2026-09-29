@@ -247,7 +247,8 @@ export function apply(input: Session, quiz: Quiz, command: Command, now: number)
     }
     case "disconnect": {
       const participant = session.participants.get(command.studentId);
-      if (participant) {
+      // A socket replaced by a rejoin can time out later; only the current socket marks the student offline.
+      if (participant && participant.socketId === command.socketId) {
         participant.connected = false;
         emit(SocketEvents.SESSION_PARTICIPANTS, participantsPayload(session), "staff");
         if (session.state === "QUESTION_OPEN" && session.currentQuestionIndex >= 0) emit(SocketEvents.ANSWER_COUNT, countPayload(session, quiz), "staff");
