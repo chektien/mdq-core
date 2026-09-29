@@ -52,8 +52,10 @@ describe("student submit while offline", () => {
     expect(student).toContain("disabled={!connected || (");
     expect(student).toMatch(/\{!connected && \(\s*<p className="student-reconnecting[^"]*" role="status"/);
     expect(student).toContain("Connection lost. Reconnecting&hellip;");
+    // Submit carries the marker class that the theme's disabled look keys on.
+    expect(student).toMatch(/className="student-submit-button [^"]*disabled:bg-zinc-700/);
     const theme = read("theme.css");
-    const disabled = theme.slice(theme.indexOf("html[data-theme] .student-submit-button:disabled {"));
+    const disabled = theme.slice(theme.indexOf('html[data-theme] button[class~="disabled:bg-zinc-700"]:disabled {'));
     expect(disabled.slice(0, disabled.indexOf("}"))).toContain("border: 1px dashed var(--mdq-control-border) !important");
   });
 });

@@ -638,13 +638,6 @@ html[data-theme="light"] .end-session-end:hover:not(:disabled) {
   background: color-mix(in srgb, var(--mdq-danger) 88%, #000) !important;
 }
 
-html[data-theme="light"] .end-session-end:disabled {
-  border-color: var(--mdq-line) !important;
-  background: rgba(44, 36, 26, 0.1) !important;
-  color: var(--mdq-soft) !important;
-  box-shadow: none !important;
-}
-
 /* ── Control surfaces (both themes) ───────────
    Status colours the views use without a per-theme mapping above, plus the
    boundaries of interactive controls. Everything reads the theme tokens. */
@@ -775,10 +768,13 @@ html[data-theme] .animate-spin[class*="border-indigo-600"] {
   border-top-color: transparent !important;
 }
 
-/* The accent fill mapping would otherwise keep a disabled Submit looking
-   ready (nothing chosen yet, or offline). Like the presenter toolbar, it keeps
-   readable muted text and switches to a dashed control outline. */
-html[data-theme] .student-submit-button:disabled {
+/* The fill mappings above would otherwise keep a disabled filled button
+   looking ready: Join before a code is typed, Submit with nothing chosen or
+   while offline, Create Session, Unlock, Start Session while reconnecting and
+   End Session while controls are unavailable. Every such button marks its
+   disabled look with `disabled:bg-zinc-700`; like the presenter toolbar, it
+   keeps readable muted text and switches to a dashed control outline. */
+html[data-theme] button[class~="disabled:bg-zinc-700"]:disabled {
   background: transparent !important;
   color: var(--mdq-muted) !important;
   border: 1px dashed var(--mdq-control-border) !important;

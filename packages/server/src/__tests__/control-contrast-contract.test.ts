@@ -78,6 +78,27 @@ describe("control contrast contract", () => {
     expect(ruleBody(index, 'html:not([data-theme="light"]) .leaderboard-row.leaderboard-row-highlight.rank-third')).toContain("--leaderboard-rank-color: #ffa552");
   });
 
+  it("gives every disabled filled button the dashed disabled look", () => {
+    const disabled = ruleBody(theme, 'html[data-theme] button[class~="disabled:bg-zinc-700"]:disabled');
+    expect(disabled).toContain("background: transparent !important");
+    expect(disabled).toContain("color: var(--mdq-muted) !important");
+    expect(disabled).toContain("border: 1px dashed var(--mdq-control-border) !important");
+    // The theme maps these fills with !important, so a button that can be
+    // disabled must carry the marker class the rule above keys on.
+    const files = ["views/StudentView.tsx", "views/InstructorView.tsx", "components/InstructorLoginPrompt.tsx"];
+    let checked = 0;
+    for (const file of files) {
+      for (const chunk of read(file).split("<button").slice(1).map((c) => c.slice(0, c.indexOf("</button>")))) {
+        const className = /className=(?:"([^"]*)"|\{`([^`]*)`\})/.exec(chunk);
+        const classes = className ? className[1] ?? className[2] : "";
+        if (!/disabled=/.test(chunk) || !/(?<![\w:/-])bg-(indigo|purple|emerald|red)-600(?![\w/-])/.test(classes)) continue;
+        expect(classes).toContain("disabled:bg-zinc-700");
+        checked += 1;
+      }
+    }
+    expect(checked).toBeGreaterThanOrEqual(6);
+  });
+
   it("paints leaderboard names and scores in the ink so first place's gold stands out", () => {
     for (const mode of ["dark", "light"]) {
       expect(ruleBody(theme, `html[data-theme="${mode}"] .leaderboard-score`)).toContain("color: var(--mdq-ink) !important");
