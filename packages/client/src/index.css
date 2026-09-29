@@ -837,8 +837,11 @@ html[data-palette="gruvbox"][data-theme="light"] .leaderboard-row.rank-standard 
    repository's source/index.ts. Rosé Pine has no green, so success uses pine:
    Dawn keeps #286983 as is, and dark lightens pine #31748f by 40 percent
    toward the foreground (#779eb7) so it holds 4.5:1 as text on the dark
-   surfaces. Dark headings are rose #ebbcba, Dawn headings are pine because
-   every lightness-lowered rose is a saturated red. Secondary text sits on
+   surfaces, and by 50 percent (#89a9c2) for success text, which also sits on
+   the tinted reveal panel. Dark headings are rose #ebbcba, Dawn headings are
+   pine because every lightness-lowered rose is a saturated red. Leaderboard
+   rows wash their rank colour at 8 to 10 percent so the secondary text
+   holds 4.5:1 on them. Secondary text sits on
    tinted cards, pills and leaderboard rows, so it is moved further from the
    page: dark subtle #908caa to #a4a0bc (25 percent toward text), Dawn subtle
    #797593 to #5f5b7a (both still #908caa and #797593 for outlines and the
@@ -898,7 +901,7 @@ html[data-palette="rose-pine"]:not([data-theme="light"]) {
   --mdq-on-secondary: #191724;
   --mdq-secondary-soft: rgba(156, 207, 216, 0.14);
   --mdq-success: #779eb7;
-  --mdq-success-text: #779eb7;
+  --mdq-success-text: #89a9c2;
   --mdq-on-success: #191724;
   --mdq-success-soft: rgba(119, 158, 183, 0.14);
   --mdq-success-ink: #e0def4;
@@ -1147,8 +1150,17 @@ html[data-palette="rose-pine"]:not([data-theme="light"]) .leaderboard-row.rank-t
 
 /* Below the podium the row keeps a neutral tint, so fourth place does not
    pick up the accent that the podium places use. */
+/* Rank washes are lighter than the default 16 and 24 percent, so the muted id
+   and score label (#a4a0bc) hold 4.5:1 on every row, including the viewer's
+   own. Fourth place and below keep the text colour for their rank on a still
+   lighter wash. */
+html[data-palette="rose-pine"]:not([data-theme="light"]) .leaderboard-row {
+  --leaderboard-wash: 10%;
+  --leaderboard-highlight-wash: 10%;
+}
 html[data-palette="rose-pine"]:not([data-theme="light"]) .leaderboard-row.rank-standard {
   --leaderboard-rank-color: #e0def4;
+  --leaderboard-wash: 8%;
 }
 
 /* The viewer's own row adds an accent wash. Third place keeps its own
@@ -1504,7 +1516,9 @@ html[data-palette="catppuccin"][data-theme="light"] .leaderboard-row.rank-standa
    map (green #98bc99 to #bcddbd (151), blue #98bede to #bce0ff (153), rose
    #e17899 to #ffc0de (218), gold #dfbc72 to #ffde99 (222)) where small text
    on the 235 cards would miss 4.5:1, and the label on filled accents is 234
-   (#252525). The timer track #999999 is a mix of 252 and 237.
+   (#252525). The dark attendee note wash is 9 percent of the accent, so its
+   kicker, text and link (#d1d0d1) hold 4.5:1 on it. The timer track #999999
+   is a mix of 252 and 237.
    Light shades that miss 4.5:1 on the grey are darkened, keeping the hue:
    teal #007173 to #00686a, green #006f00 to #006d00, gold #9a7200 to
    #775800, blue #0074be to #005f9c, orange #e19972 to #984a20. Body text is
@@ -1536,7 +1550,7 @@ html[data-palette="seoul256"]:not([data-theme="light"]) {
   --mdq-slide-glass-strong: #333233;
   --mdq-slide-glass-line: rgba(217, 217, 217, 0.16);
   --mdq-note-attendee: #ffbd98;
-  --mdq-note-attendee-tint: rgba(255, 189, 152, 0.12);
+  --mdq-note-attendee-tint: rgba(255, 189, 152, 0.09);
   --mdq-note-presenter: #bce0ff;
   --mdq-note-presenter-tint: rgba(188, 224, 255, 0.12);
   --mdq-panel-radius: 0.2rem;
@@ -1797,8 +1811,12 @@ html[data-palette="seoul256"]:not([data-theme="light"]) .leaderboard-row.rank-st
   --leaderboard-rank-color: #d1d0d1;
 }
 
-/* The viewer's own row adds an accent wash; third place keeps the palette
+/* The viewer's own row adds an accent wash, lightened to 18 percent so the
+   third-place peach holds 4.5:1 on it, and third place keeps the palette
    colour there instead of the classic orange. */
+html[data-palette="seoul256"]:not([data-theme="light"]) .leaderboard-row {
+  --leaderboard-highlight-wash: 18%;
+}
 html[data-palette="seoul256"]:not([data-theme="light"]) .leaderboard-row.leaderboard-row-highlight.rank-third {
   --leaderboard-rank-color: #ffbd98;
 }
@@ -1815,7 +1833,7 @@ html[data-palette="seoul256"][data-theme="light"] .leaderboard-row.rank-standard
    #e6b450, green #aad94c, orange #ff8f40, red #f07178, blue #59c2ff (tag blue
    #39bae6 for fills), purple #d2a6ff. Ayu Dark passes without adjusting any
    accent. Only neutrals are derived: strong text is #bfbdb6 mixed 55% toward
-   white (#e2e1de), muted #b1afaa and soft #8e8e8b are #bfbdb6 mixed toward
+   white (#e2e1de), muted #b1afaa and soft #959591 are #bfbdb6 mixed toward
    the background, and the join QR link is the light blue #22a4e6 darkened to
    #147aae because that panel is white. Light is Ayu Light: background
    #fcfcfc, base #f8f9fa, sunk #ebeef0, foreground #5c6166. Its accents fail
@@ -1866,7 +1884,7 @@ html[data-palette="ayu"]:not([data-theme="light"]) {
   --mdq-ink-strong: #e2e1de;
   --mdq-ink-soft: #bfbdb6;
   --mdq-muted: #b1afaa;
-  --mdq-soft: #8e8e8b;
+  --mdq-soft: #959591;
   --mdq-accent: #e6b450;
   --mdq-accent-hover: #ffb454;
   --mdq-accent-text: #e6b450;
@@ -5805,7 +5823,7 @@ body.image-expansion-lock {
   border: 1px solid var(--mdq-slide-glass-line);
   border-radius: var(--mdq-panel-radius);
   background:
-    linear-gradient(90deg, color-mix(in srgb, var(--leaderboard-rank-color, var(--mdq-slide-accent)) 16%, transparent), transparent 34%),
+    linear-gradient(90deg, color-mix(in srgb, var(--leaderboard-rank-color, var(--mdq-slide-accent)) var(--leaderboard-wash, 16%), transparent), transparent 34%),
     var(--mdq-slide-glass);
   padding: clamp(0.72rem, 1.2vw, 0.95rem) clamp(0.82rem, 1.8vw, 1.25rem);
   color: var(--mdq-slide-ink);
@@ -5828,7 +5846,7 @@ body.image-expansion-lock {
 .leaderboard-row-highlight {
   border-color: color-mix(in srgb, var(--mdq-slide-accent) 44%, var(--mdq-slide-glass-line));
   background:
-    linear-gradient(90deg, color-mix(in srgb, var(--mdq-slide-accent) 24%, transparent), transparent 42%),
+    linear-gradient(90deg, color-mix(in srgb, var(--mdq-slide-accent) var(--leaderboard-highlight-wash, 24%), transparent), transparent 42%),
     var(--mdq-slide-glass-strong);
 }
 

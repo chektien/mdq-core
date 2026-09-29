@@ -535,7 +535,10 @@ html[data-theme="light"] .selection-mode-chip-multi {
   background: var(--mdq-secondary-soft);
 }
 
+/* The rank wash is lighter on the light ground, where the muted id and score
+   label are the lightest text on the row and hold 4.5:1 on it. */
 html[data-theme="light"] .leaderboard-row {
+  --leaderboard-wash: 11%;
   box-shadow: 0 14px 28px rgba(79, 57, 34, 0.08);
 }
 
