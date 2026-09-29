@@ -10,10 +10,10 @@ describe("open response moderation in the client", () => {
   const projector = read("views/PresentationView.tsx");
   const student = read("views/StudentView.tsx");
 
-  it("gives every response a real Hide / Show button that reports its pressed state", () => {
+  it("gives every response a real Hide / Show button whose name starts with its visible word", () => {
     expect(list).toMatch(/<button[^>]*\n?[^>]*type="button"[^>]*\n?[^>]*className="open-response-toggle/);
-    expect(list).toContain("aria-pressed={hidden}");
-    expect(list).toContain("aria-label={`Hide response from ${participantLabel}`}");
+    expect(list).not.toContain("aria-pressed={hidden}");
+    expect(list).toContain('aria-label={`${hidden ? "Show" : "Hide"} response from ${participantLabel}`}');
     expect(list).toContain('{hidden ? "Show" : "Hide"}');
     expect(list).toContain("Hidden from the projector");
   });
@@ -36,7 +36,8 @@ describe("open response moderation in the client", () => {
   });
 
   it("caps the phone's response box at the engine's limit", () => {
-    expect(student).toContain("maxLength={MAX_OPEN_RESPONSE_LENGTH}");
+    expect(student).not.toContain("maxLength={MAX_OPEN_RESPONSE_LENGTH}");
+    expect(student).toContain("clampOpenResponse(e.target.value)");
     expect(student).toContain("characters left");
   });
 });

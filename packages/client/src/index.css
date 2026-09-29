@@ -6292,7 +6292,7 @@ html[data-theme] .open-response-entry-hidden .open-response-hidden-note {
   background: var(--mdq-slide-glass-strong);
 }
 
-.open-response-toggle[aria-pressed="true"] {
+.open-response-toggle[data-hidden="true"] {
   border-color: var(--mdq-slide-accent);
   color: var(--mdq-slide-accent);
 }
