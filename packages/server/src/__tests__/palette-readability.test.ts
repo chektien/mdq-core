@@ -222,6 +222,31 @@ describe("palette readability, 7 palettes x 2 themes", () => {
       }
     });
 
+    it("keeps the presenter notes panel text at 4.5:1 and its border and marker at 3:1", () => {
+      const panel = over(token(t, "--mdq-warning"), token(t, "--mdq-paper-strong"), 0.09);
+      expectPairs(`${name} presenter notes`, {
+        kicker: token(t, "--mdq-warning-ink"),
+        summary: token(t, "--mdq-warning-ink"),
+        position: token(t, "--mdq-muted"),
+        "hint": token(t, "--mdq-muted"),
+        body: token(t, "--mdq-ink"),
+      }, { panel });
+      const page = token(t, "--mdq-paper");
+      expectPairs(`${name} presenter notes boundary`, {
+        border: mixColors(token(t, "--mdq-warning-text"), page, 0.85),
+        marker: token(t, "--mdq-warning-text"),
+      }, { page }, 3);
+    });
+
+  });
+
+  it("draws the presenter notes panel from palette tokens, with no fixed amber", () => {
+    const start = index.indexOf("/* ── Presenter notes panel");
+    const panelCss = index.slice(start, index.indexOf("/* ── Slide video card", start));
+    expect(panelCss).toContain("border: 1px solid color-mix(in srgb, var(--mdq-warning-text) 85%, var(--mdq-paper));");
+    expect(panelCss).toContain("background: color-mix(in srgb, var(--mdq-warning) 9%, var(--mdq-paper-strong));");
+    expect(panelCss).not.toMatch(/#[0-9a-f]{3,8}\b|rgba?\(/i);
+    expect(index).not.toMatch(/html\[data-theme="light"\] \.presenter-notes/);
   });
 
 });
