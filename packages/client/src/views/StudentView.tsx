@@ -593,92 +593,105 @@ export default function StudentView({
   }
 
   // ── Joined: show session content based on state ──
-  const state = sock.sessionState as SessionState;
-  const resultsLabel = sock.deckTitle || quizKey ? deckLabel(sock.deckTitle, quizKey || "") : "";
-  const lobbyNote = extraLabelNote(sock.label, sock.labelNote);
+  // One live region stays mounted while joined, so a screen reader hears the result when its text changes
+  // rather than missing a region that arrives already filled.
+  const resultAnnouncement = sock.sessionState === "REVEAL" && sock.currentQuestion && sock.reveal
+    ? revealBannerText(sock.currentQuestion, sock.reveal, sock.submittedOptions, sock.submittedResponseText)
+    : "";
+  const renderJoined = () => {
+    const state = sock.sessionState as SessionState;
+    const resultsLabel = sock.deckTitle || quizKey ? deckLabel(sock.deckTitle, quizKey || "") : "";
+    const lobbyNote = extraLabelNote(sock.label, sock.labelNote);
 
-  // Waiting in lobby
-  if (state === "LOBBY") {
+    // Waiting in lobby
+    if (state === "LOBBY") {
+      return (
+        <div className="min-h-dvh flex flex-col items-center justify-center gap-4 p-6">
+          <div className="w-16 h-16 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin" />
+          <h2 className="text-xl font-semibold text-white">Waiting for quiz to start...</h2>
+          <p className="text-zinc-400 text-sm">The instructor will begin shortly</p>
+          {sock.label && (
+            <p className="student-lobby-label text-zinc-300 text-sm">
+              You are in as <strong className="font-semibold text-white">{sock.label}</strong>{sentenceStop(sock.label)}
+            </p>
+          )}
+          {lobbyNote && (
+            <p role="status" className="student-lobby-note max-w-xs text-center text-sm text-amber-200">{lobbyNote}</p>
+          )}
+        </div>
+      );
+    }
+
+    // Question open
+    if (state === "QUESTION_OPEN" || state === "QUESTION_CLOSED") {
+      return (
+        <QuestionView
+          key={sock.currentQuestion?.questionIndex ?? 0}
+          question={sock.currentQuestion}
+          state={state}
+          remainingSec={sock.remainingSec}
+          submitted={sock.submitted}
+          submittedOptions={sock.submittedOptions}
+          submittedResponseText={sock.submittedResponseText}
+          timedOut={sock.timedOut}
+          connected={connected}
+          onSubmit={sock.submitAnswer}
+        />
+      );
+    }
+
+    // Reveal
+    if (state === "REVEAL") {
+      return (
+        <RevealView
+          question={sock.currentQuestion}
+          reveal={sock.reveal}
+          submittedOptions={sock.submittedOptions}
+          submittedResponseText={sock.submittedResponseText}
+        />
+      );
+    }
+
+    // Leaderboard
+    if (state === "LEADERBOARD" || state === "ENDED") {
+      return (
+        <div className="min-h-dvh flex flex-col items-center justify-center gap-6 p-6">
+          <h2 className="text-center text-2xl font-bold text-white">
+            {resultsHeading(state === "ENDED" ? "final" : "leaderboard", resultsLabel)}
+          </h2>
+          <Leaderboard
+            entries={sock.leaderboard}
+            totalQuestions={sock.totalQuestions}
+            highlightPublicKey={sock.publicKey ?? undefined}
+            maxRows={15}
+            showStudentIds={!autoGenerateStudentIds}
+            compact
+          />
+          {state === "ENDED" && (
+            <button
+              onClick={handleDone}
+              className="student-done-button bg-zinc-800 hover:bg-zinc-700 text-white font-semibold py-3 px-8 rounded-xl transition-colors text-sm mt-4"
+            >
+              Done
+            </button>
+          )}
+        </div>
+      );
+    }
+
+    // Fallback: connecting state
     return (
       <div className="min-h-dvh flex flex-col items-center justify-center gap-4 p-6">
-        <div className="w-16 h-16 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin" />
-        <h2 className="text-xl font-semibold text-white">Waiting for quiz to start...</h2>
-        <p className="text-zinc-400 text-sm">The instructor will begin shortly</p>
-        {sock.label && (
-          <p className="student-lobby-label text-zinc-300 text-sm">
-            You are in as <strong className="font-semibold text-white">{sock.label}</strong>{sentenceStop(sock.label)}
-          </p>
-        )}
-        {lobbyNote && (
-          <p role="status" className="student-lobby-note max-w-xs text-center text-sm text-amber-200">{lobbyNote}</p>
-        )}
+        <div className="w-12 h-12 border-4 border-zinc-600 border-t-transparent rounded-full animate-spin" />
+        <p className="text-zinc-400 text-sm">Connecting to session...</p>
       </div>
     );
-  }
-
-  // Question open
-  if (state === "QUESTION_OPEN" || state === "QUESTION_CLOSED") {
-    return (
-      <QuestionView
-        key={sock.currentQuestion?.questionIndex ?? 0}
-        question={sock.currentQuestion}
-        state={state}
-        remainingSec={sock.remainingSec}
-        submitted={sock.submitted}
-        submittedOptions={sock.submittedOptions}
-        submittedResponseText={sock.submittedResponseText}
-        timedOut={sock.timedOut}
-        connected={connected}
-        onSubmit={sock.submitAnswer}
-      />
-    );
-  }
-
-  // Reveal
-  if (state === "REVEAL") {
-    return (
-      <RevealView
-        question={sock.currentQuestion}
-        reveal={sock.reveal}
-        submittedOptions={sock.submittedOptions}
-        submittedResponseText={sock.submittedResponseText}
-      />
-    );
-  }
-
-  // Leaderboard
-  if (state === "LEADERBOARD" || state === "ENDED") {
-    return (
-      <div className="min-h-dvh flex flex-col items-center justify-center gap-6 p-6">
-        <h2 className="text-center text-2xl font-bold text-white">
-          {resultsHeading(state === "ENDED" ? "final" : "leaderboard", resultsLabel)}
-        </h2>
-        <Leaderboard
-          entries={sock.leaderboard}
-          totalQuestions={sock.totalQuestions}
-          highlightPublicKey={sock.publicKey ?? undefined}
-          maxRows={15}
-          showStudentIds={!autoGenerateStudentIds}
-          compact
-        />
-        {state === "ENDED" && (
-          <button
-            onClick={handleDone}
-            className="student-done-button bg-zinc-800 hover:bg-zinc-700 text-white font-semibold py-3 px-8 rounded-xl transition-colors text-sm mt-4"
-          >
-            Done
-          </button>
-        )}
-      </div>
-    );
-  }
-
-  // Fallback: connecting state
+  };
   return (
-    <div className="min-h-dvh flex flex-col items-center justify-center gap-4 p-6">
-      <div className="w-12 h-12 border-4 border-zinc-600 border-t-transparent rounded-full animate-spin" />
-      <p className="text-zinc-400 text-sm">Connecting to session...</p>
-    </div>
+    <>
+      <div role="status" aria-live="polite" aria-atomic="true" className="sr-only student-result-live">{resultAnnouncement}</div>
+      {renderJoined()}
+    </>
   );
 }
 
@@ -997,6 +1010,22 @@ function QuestionView({
   );
 }
 
+/** The result line shown at the top of a reveal ("Correct!", "Poll results", ...). */
+function revealBannerText(
+  question: QuestionState,
+  reveal: RevealState,
+  submittedOptions: string[],
+  submittedResponseText: string | null,
+): string {
+  const didAnswer = submittedOptions.length > 0;
+  if (question.questionType === "open_response") return submittedResponseText ? "Response received" : "No response submitted";
+  if (reveal.isPoll || question.isPoll) return didAnswer ? "Poll results" : "No vote submitted";
+  const isCorrect = didAnswer
+    && submittedOptions.length === reveal.correctOptions.length
+    && submittedOptions.every((o) => reveal.correctOptions.includes(o));
+  return isCorrect ? "Correct!" : didAnswer ? "Incorrect" : "No answer submitted";
+}
+
 // ── Reveal sub-view ──────────────────────
 
 function RevealView({
@@ -1051,23 +1080,12 @@ function RevealView({
         ? "text-red-400"
         : "text-zinc-400";
 
-  const bannerText = isOpenResponse
-    ? submittedResponseText ? "Response received" : "No response submitted"
-    : isPoll
-    ? didAnswer ? "Poll results" : "No vote submitted"
-    : isCorrect
-      ? "Correct!"
-      : didAnswer
-        ? "Incorrect"
-        : "No answer submitted";
+  const bannerText = revealBannerText(question, reveal, submittedOptions, submittedResponseText);
 
   return (
     <div className="min-h-dvh flex flex-col p-4 pb-safe">
       {/* Result banner */}
       <div
-        role="status"
-        aria-live="polite"
-        aria-atomic="true"
         className={`
           reveal-banner text-center py-4 rounded-xl mb-4
           ${bannerClass}

@@ -1228,7 +1228,7 @@ function LiveView({
           </button>
         </div>
         <p className="participants-help mt-2 text-sm">
-          If someone&apos;s phone stops working, choose Let rejoin. The next time they join with their ID from any device, they carry on with their answers.
+          If someone&apos;s phone stops working, choose Let rejoin. The next time they join with their {idsAvailable ? "ID" : "ID or name"} from any device, they carry on with their answers.
         </p>
         <div className="mt-4 max-h-[50vh] overflow-y-auto">
           {(sock.participants?.count ?? 0) + (sock.participants?.offline?.length ?? 0) === 0 ? (

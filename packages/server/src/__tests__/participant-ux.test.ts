@@ -253,10 +253,14 @@ describe("screen reader and touch details", () => {
     expect(view).toContain("aria-labelledby={questionTextId}");
   });
 
-  it("announces the reveal banner politely", () => {
+  it("announces the reveal result from a live region that stays mounted", () => {
+    // The banner itself is plain; a persistent region outside RevealView carries the text, so it is announced on change.
     const banner = view.slice(view.indexOf("reveal-banner") - 200, view.indexOf("reveal-banner"));
-    expect(banner).toContain('role="status"');
-    expect(banner).toContain('aria-live="polite"');
+    expect(banner).not.toContain("role=");
+    const region = view.match(/<div role="status" aria-live="polite" aria-atomic="true" className="sr-only student-result-live">\{resultAnnouncement\}<\/div>/);
+    expect(region).not.toBeNull();
+    expect(view.indexOf("student-result-live")).toBeLessThan(view.indexOf("{renderJoined()}"));
+    expect(view).toContain('sock.sessionState === "REVEAL"');
   });
 
   it("shows no repeated no-response line, and 0 (0%) on an empty poll bar", () => {
@@ -325,5 +329,50 @@ describe("reduced motion", () => {
   it("covers every animation and transition the stylesheet declares", () => {
     const animated = [...css.matchAll(/animation:\s*([a-z-]+)/g)].map((m) => m[1]).filter((n) => n !== "none");
     expect(new Set(animated)).toEqual(new Set(["timer-pulse", "slide-in", "reduced-motion-fade", "mdq-status-fade"]));
+  });
+});
+
+describe("presenter review fixes", () => {
+  const instructor = read("views/InstructorView.tsx");
+
+  it("restores each reviewed question's position for the instructor", () => {
+    const restore = instructor.slice(instructor.indexOf("function questionStateFromRestore"), instructor.indexOf("function revealStateFromRestore"));
+    expect(restore).toContain("questionNumber: data.questionNumber");
+    expect(restore).toContain("questionTotal: data.questionTotal");
+  });
+
+  it("says ID or name in the participants help when Student IDs are off", () => {
+    expect(instructor).toContain('join with their {idsAvailable ? "ID" : "ID or name"} from any device');
+  });
+
+  it("keeps the QR hint readable in both themes", () => {
+    const css = read("index.css");
+    const theme = read("theme.css");
+    const rule = css.slice(css.indexOf(".session-code-card-qr-hint {"), css.indexOf("}", css.indexOf(".session-code-card-qr-hint {")));
+    expect(rule).toContain("color: var(--mdq-join-card-hint)");
+    const size = Number(/font-size:\s*([\d.]+)rem/.exec(rule)?.[1]);
+    expect(size).toBeGreaterThanOrEqual(0.75);
+    const lin = (hex: string) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255)
+      .map((c) => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4)) as [number, number, number];
+    const lum = ([r, g, b]: number[]) => 0.2126 * r + 0.7152 * g + 0.0722 * b;
+    const ratio = (a: number, b: number) => (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
+    // The card is 88% white over the theme's page colour.
+    for (const [themeName, paper] of [["dark", "#262625"], ["light", "#f7f1e3"]] as const) {
+      const block = theme.slice(theme.indexOf(`html[data-theme="${themeName}"] {`));
+      const hint = new RegExp("--mdq-join-card-hint:\\s*(#[0-9a-f]{6})").exec(block.slice(0, block.indexOf("\n}")))?.[1];
+      expect(hint).toBeDefined();
+      const surface = lin(paper).map((c) => 0.88 * 1 + 0.12 * c);
+      expect(ratio(lum(lin(hint!)), lum(surface))).toBeGreaterThanOrEqual(4.5);
+    }
+  });
+
+  it("tells a device that lost its seat and stops it rejoining with the old token", () => {
+    const view = read("views/StudentView.tsx");
+    const socket = read("hooks/useSocket.ts");
+    expect(view).toContain("sock.seatTaken");
+    expect(view).toContain("SEAT_TAKEN_MESSAGE");
+    expect(socket).toContain("SocketEvents.SEAT_TAKEN");
+    expect(socket).toContain('role === "student" && !seatTakenRef.current');
+    expect(socket).toContain("stored.sessionToken === joinedTokenRef.current");
   });
 });

@@ -6777,8 +6777,8 @@ body.image-expansion-lock {
 }
 
 .session-code-card-qr-hint {
-  color: #57534e;
-  font-size: 0.66rem;
+  color: var(--mdq-join-card-hint);
+  font-size: 0.75rem;
   font-weight: 800;
 }
 
