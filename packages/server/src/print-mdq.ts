@@ -651,9 +651,67 @@ function renderRosePineTokens(theme: PrintTheme): string {
     `;
 }
 
+// Catppuccin follows the catppuccin/palette colours (MIT,
+// https://github.com/catppuccin/palette) and mirrors the live slide palette in
+// packages/client/src/index.css: dark is Mocha, light is Latte. Latte hues
+// that miss 4.5:1 on its base are lowered in lightness (mauve #8839ef to
+// #7113ec, sapphire #209fb5 to #146472, green #40a02b to #29681c, subtext1
+// #5c5f77 to #545770 for secondary text). Attendee notes and explanations use
+// mauve, presenter notes pink in Mocha and sapphire in Latte.
 function renderCatppuccinTokens(theme: PrintTheme): string {
-  // TODO(palette-values): catppuccin
-  return renderThemeTokens(theme, "classic");
+  if (theme === "light") {
+    return `
+      --page-bg: #eff1f5;
+      --ink: #4c4f69;
+      --body: #4c4f69;
+      --muted: #545770;
+      --line: rgba(76, 79, 105, 0.28);
+      --soft-line: rgba(76, 79, 105, 0.14);
+      --paper: #eff1f5;
+      --wash: #e6e9ef;
+      --option-bg: #eff1f5;
+      --media-bg: #dce0e8;
+      --accent: #7113ec;
+      --accent-soft: rgba(113, 19, 236, 0.1);
+      --teal: #7113ec;
+      --teal-line: rgba(113, 19, 236, 0.35);
+      --teal-soft: rgba(113, 19, 236, 0.09);
+      --amber: #146472;
+      --amber-line: rgba(20, 100, 114, 0.38);
+      --amber-soft: rgba(20, 100, 114, 0.09);
+      --green: #29681c;
+      --green-line: rgba(41, 104, 28, 0.45);
+      --green-soft: rgba(41, 104, 28, 0.12);
+      --reference: #545770;
+      --shadow: rgba(76, 79, 105, 0.05);
+    `;
+  }
+
+  return `
+      --page-bg: #1e1e2e;
+      --ink: #cdd6f4;
+      --body: #cdd6f4;
+      --muted: #bac2de;
+      --line: rgba(205, 214, 244, 0.32);
+      --soft-line: rgba(205, 214, 244, 0.16);
+      --paper: #313244;
+      --wash: #181825;
+      --option-bg: #313244;
+      --media-bg: #11111b;
+      --accent: #cba6f7;
+      --accent-soft: rgba(203, 166, 247, 0.12);
+      --teal: #cba6f7;
+      --teal-line: rgba(203, 166, 247, 0.42);
+      --teal-soft: rgba(203, 166, 247, 0.12);
+      --amber: #f5c2e7;
+      --amber-line: rgba(245, 194, 231, 0.42);
+      --amber-soft: rgba(245, 194, 231, 0.12);
+      --green: #a6e3a1;
+      --green-line: rgba(166, 227, 161, 0.46);
+      --green-soft: rgba(166, 227, 161, 0.12);
+      --reference: #a6adc8;
+      --shadow: rgba(0, 0, 0, 0.18);
+    `;
 }
 
 function renderSeoul256Tokens(theme: PrintTheme): string {
@@ -680,8 +738,7 @@ function printPageBackground(theme: PrintTheme, palette: PrintPalette): string {
       return theme === "dark" ? "#191724" : "#faf4ed";
 
     case "catppuccin":
-      // TODO(palette-values): catppuccin
-      return printPageBackground(theme, "classic");
+      return theme === "dark" ? "#1e1e2e" : "#eff1f5";
 
     case "seoul256":
       // TODO(palette-values): seoul256
