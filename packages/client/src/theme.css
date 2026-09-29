@@ -5,7 +5,9 @@
    Contrast targets (WCAG AA): text tokens hold 4.5:1 on the paper and card
    they sit on, `--mdq-on-*` tokens hold 4.5:1 on their fill, and
    `--mdq-control-border`, the state lines, the timer colours and the timer
-   track hold 3:1 against the page. */
+   track hold 3:1 against the page. The timer colours do not hold 3:1
+   against the track (1.5 to 2.5:1); the countdown number inside the ring
+   carries the remaining time. */
 html[data-theme="dark"] {
   --mdq-paper: #262625;
   --mdq-paper-strong: #2d2d2b;
