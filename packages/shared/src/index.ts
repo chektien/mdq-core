@@ -109,6 +109,8 @@ export interface StudentJoinedPayload {
    * why in a sentence for the waiting screen.
    */
   labelNote?: string;
+  /** The deck's title, for the leaderboard heading. Empty or absent when the deck has none. */
+  deckTitle?: string;
 }
 
 export interface StudentRejectedPayload {
@@ -269,6 +271,10 @@ export interface QuestionOpenPayload {
   isPoll?: boolean;
   timeLimitSec: number;
   startedAt: number; // unix ms
+  /** Position among the deck's questions, counting questions only (slides are skipped). Absent on a slide. */
+  questionNumber?: number;
+  /** How many questions the deck has, not counting slides. */
+  questionTotal?: number;
 }
 
 export interface QuestionTickPayload {

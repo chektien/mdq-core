@@ -659,6 +659,7 @@ export function createApp(quizDirOrOpts?: string | AppOptions) {
       sessionCode: session.sessionCode,
       state: session.state,
       week: session.week,
+      title: quiz?.title || undefined,
       theme: quiz ? resolveDeckTheme(quiz, theme) : theme,
       palette: quiz ? resolveDeckPalette(quiz, palette) : palette,
       // Whether the join form asks for a Student ID (the deck's `student-id` setting, on by default).
@@ -688,6 +689,7 @@ export function createApp(quizDirOrOpts?: string | AppOptions) {
         sessionId: session.sessionId,
         sessionCode: session.sessionCode,
         week: session.week,
+        title: quiz.title || undefined,
         theme: resolveDeckTheme(quiz, theme),
         palette: resolveDeckPalette(quiz, palette),
         state: session.state,
@@ -882,6 +884,7 @@ export function createApp(quizDirOrOpts?: string | AppOptions) {
       sessionId: session.sessionId,
       sessionCode: session.sessionCode,
       week: session.week,
+      title: quiz.title || undefined,
       theme: resolveDeckTheme(quiz, theme),
       palette: resolveDeckPalette(quiz, palette),
       state: session.state,
