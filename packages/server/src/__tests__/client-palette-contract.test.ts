@@ -54,7 +54,7 @@ describe("client slide palette contract", () => {
     });
 
     it("applies the runtime palette before and after the app mounts", () => {
-      expect(main).toContain("applyClientPalette(runtimeConfig.palette)");
+      expect(main).toContain("applyClientPalette(fallback.palette)");
       expect(app).toContain("resolveClientPalette(runtimeConfig.palette)");
       expect(app).toContain("applyClientPalette(defaultPalette)");
     });

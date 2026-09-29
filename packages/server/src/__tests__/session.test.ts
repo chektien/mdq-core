@@ -134,7 +134,12 @@ describe("Session Engine", () => {
         StateTransitionError,
       );
       expect(() => transitionState(session, "REVEAL")).toThrow(StateTransitionError);
-      expect(() => transitionState(session, "ENDED")).toThrow(StateTransitionError);
+      expect(() => transitionState(session, "LEADERBOARD")).toThrow(StateTransitionError);
+    });
+
+    it("allows ending a session that never started", () => {
+      transitionState(session, "ENDED");
+      expect(session.state).toBe("ENDED");
     });
 
     it("rejects transitions from ENDED", () => {

@@ -552,77 +552,83 @@ export default function InstructorView({
         </button>
         <h1 className="instructor-phase-title text-2xl font-bold text-white">Waiting for Students</h1>
 
-        {/* QR + Join Info */}
-        {accessInfo && sessionInfo && (
-          <QRPanel
-            qrDataUrl={accessInfo.qrCodeDataUrl}
-            fullUrl={accessInfo.fullUrl}
-            shortUrl={accessInfo.shortUrl}
-            sessionCode={sessionInfo.sessionCode}
-            presentationUrl={accessInfo.presentationUrl}
-          />
-        )}
-        {!accessInfo && sessionInfo && (
-          <div className="text-center">
-            <p className="text-zinc-400 text-sm mb-1">Session Code</p>
-            <p className="text-5xl font-mono font-bold text-white tracking-[0.2em]">
-              {sessionInfo.sessionCode}
-            </p>
+        {/* Join details beside the room status on landscape screens, stacked otherwise */}
+        <div className="instructor-lobby-body">
+          <div className="instructor-lobby-join">
+            {accessInfo && sessionInfo && (
+              <QRPanel
+                qrDataUrl={accessInfo.qrCodeDataUrl}
+                fullUrl={accessInfo.fullUrl}
+                shortUrl={accessInfo.shortUrl}
+                sessionCode={sessionInfo.sessionCode}
+                presentationUrl={accessInfo.presentationUrl}
+              />
+            )}
+            {!accessInfo && sessionInfo && (
+              <div className="text-center">
+                <p className="text-zinc-400 text-sm mb-1">Session Code</p>
+                <p className="text-5xl font-mono font-bold text-white tracking-[0.2em]">
+                  {sessionInfo.sessionCode}
+                </p>
+              </div>
+            )}
           </div>
-        )}
 
-        {/* Participant count */}
-        <div className="instructor-participant-count text-center">
-          <span className="instructor-participant-count-value text-5xl font-bold text-white tabular-nums">
-            {sock.participants?.count ?? 0}
-          </span>
-          <span className="instructor-participant-count-label text-zinc-400 text-lg ml-2">students joined</span>
-        </div>
-
-        {/* Participant list */}
-        {sock.participants && sock.participants.count > 0 && (
-          <div className="bg-zinc-800/50 rounded-xl p-4 max-w-lg w-full max-h-48 overflow-y-auto">
-            <div className="flex flex-wrap gap-2">
-              {sock.participants.participants.map((p) => (
-                <span
-                  key={p.studentId}
-                  className="bg-zinc-700 text-zinc-200 px-3 py-1 rounded-full text-sm"
-                >
-                  {p.displayName || p.studentId}
-                </span>
-              ))}
+          <div className="instructor-lobby-side">
+            {/* Participant count */}
+            <div className="instructor-participant-count text-center">
+              <span className="instructor-participant-count-value text-5xl font-bold text-white tabular-nums">
+                {sock.participants?.count ?? 0}
+              </span>
+              <span className="instructor-participant-count-label text-zinc-400 text-lg ml-2">students joined</span>
             </div>
-          </div>
-        )}
 
-        {errorMsg && (
-          <div className="bg-red-900/50 border border-red-700 text-red-200 px-4 py-3 rounded-xl">
-            {errorMsg}
-          </div>
-        )}
+            {/* Participant list */}
+            {sock.participants && sock.participants.count > 0 && (
+              <div className="bg-zinc-800/50 rounded-xl p-4 max-w-lg w-full max-h-48 overflow-y-auto">
+                <div className="flex flex-wrap gap-2">
+                  {sock.participants.participants.map((p) => (
+                    <span
+                      key={p.studentId}
+                      className="bg-zinc-700 text-zinc-200 px-3 py-1 rounded-full text-sm"
+                    >
+                      {p.displayName || p.studentId}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
 
-        {restoreNotice && (
-          <div className="bg-emerald-900/40 border border-emerald-700 text-emerald-100 px-4 py-3 rounded-xl text-sm text-center max-w-2xl w-full">
-            {restoreNotice}
-          </div>
-        )}
+            {errorMsg && (
+              <div className="bg-red-900/50 border border-red-700 text-red-200 px-4 py-3 rounded-xl">
+                {errorMsg}
+              </div>
+            )}
 
-        <button
-          onClick={() => handleAction(() => startSession(sid), "start")}
-          disabled={loading || !sock.connected}
-          className="instructor-start-button bg-emerald-600 hover:bg-emerald-500 disabled:bg-zinc-700 text-white font-semibold py-4 px-12 rounded-xl transition-colors text-xl"
-        >
-          {loading ? "Starting..." : sock.connected ? "Start Session" : "Reconnecting..."}
-        </button>
-        {!sock.connected && (
-          <button
-            type="button"
-            className="rounded-lg border border-zinc-600 px-4 py-2 text-sm font-semibold text-zinc-200"
-            onClick={sock.reconnect}
-          >
-            Retry Connection
-          </button>
-        )}
+            {restoreNotice && (
+              <div className="bg-emerald-900/40 border border-emerald-700 text-emerald-100 px-4 py-3 rounded-xl text-sm text-center max-w-2xl w-full">
+                {restoreNotice}
+              </div>
+            )}
+
+            <button
+              onClick={() => handleAction(() => startSession(sid), "start")}
+              disabled={loading || !sock.connected}
+              className="instructor-start-button bg-emerald-600 hover:bg-emerald-500 disabled:bg-zinc-700 text-white font-semibold py-4 px-12 rounded-xl transition-colors text-xl"
+            >
+              {loading ? "Starting..." : sock.connected ? "Start Session" : "Reconnecting..."}
+            </button>
+            {!sock.connected && (
+              <button
+                type="button"
+                className="rounded-lg border border-zinc-600 px-4 py-2 text-sm font-semibold text-zinc-200"
+                onClick={sock.reconnect}
+              >
+                Retry Connection
+              </button>
+            )}
+          </div>
+        </div>
       </div>
     );
   }

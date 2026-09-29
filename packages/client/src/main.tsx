@@ -3,41 +3,53 @@ import { createRoot } from "react-dom/client";
 import "./index.css";
 import "./theme.css";
 import App from "./App";
+import { settleWithin } from "./boot";
 import { fetchRuntimeClientConfig } from "./hooks/api";
 import type { RuntimeClientConfig } from "./hooks/api";
-import { applyClientPalette, applyClientTheme, readServedAppearance, resolveBootAppearance } from "./theme";
+import { applyClientPalette, applyClientTheme, readServedAppearance, resolveBootAppearance, systemFallbackTheme } from "./theme";
 
 // A view that is still waiting for its deck (for example a slow session
-// lookup) must not leave the page hidden for long; after this the boot
-// fallback appears and the view switches to the deck theme when it arrives.
+// lookup) or a slow runtime config must not leave the page hidden for long;
+// after this the boot fallback appears and the view switches to the deck
+// theme when it arrives.
 const THEME_WAIT_MS = 3000;
+
+// With no served attributes and no config yet, follow the device's colour
+// scheme as the neutral in index.css does, so a light device is not shown the
+// light neutral and then dark. A config that arrives later still wins.
+const systemTheme = systemFallbackTheme(window.matchMedia?.("(prefers-color-scheme: dark)").matches === false);
+
+function bootConfig(served: ReturnType<typeof readServedAppearance>, fetched: RuntimeClientConfig): RuntimeClientConfig {
+  const boot = resolveBootAppearance(served, fetched, systemTheme);
+  return { ...fetched, theme: boot.theme, palette: boot.palette };
+}
 
 async function bootstrap(): Promise<void> {
   // Apply nothing yet: a theme guessed here would flash before the deck's own
   // theme. Attributes the server already rendered into <html> stay as served.
   const served = readServedAppearance(document.documentElement.dataset);
-  let fetched: RuntimeClientConfig = {};
+  let fetched: RuntimeClientConfig | undefined;
 
-  try {
-    fetched = await fetchRuntimeClientConfig();
-  } catch {
-    // Fall back to the served attributes, then the built-in defaults.
-  }
-
-  const boot = resolveBootAppearance(served, fetched);
-  const runtimeConfig: RuntimeClientConfig = { ...fetched, theme: boot.theme, palette: boot.palette };
-
+  // Started before the config request so a hung request cannot keep the page blank.
   window.setTimeout(() => {
     if (document.documentElement.dataset.theme) return;
-    applyClientTheme(runtimeConfig.theme);
-    applyClientPalette(runtimeConfig.palette);
+    const fallback = bootConfig(served, fetched ?? {});
+    applyClientTheme(fallback.theme);
+    applyClientPalette(fallback.palette);
   }, THEME_WAIT_MS);
 
-  createRoot(document.getElementById("root")!).render(
+  const request = fetchRuntimeClientConfig().catch((): RuntimeClientConfig => ({}));
+  fetched = await settleWithin(request, THEME_WAIT_MS);
+
+  const root = createRoot(document.getElementById("root")!);
+  const render = (config: RuntimeClientConfig) => root.render(
     <StrictMode>
-      <App runtimeConfig={runtimeConfig} />
+      <App runtimeConfig={bootConfig(served, config)} />
     </StrictMode>,
   );
+  render(fetched ?? {});
+  // A config that arrives late still applies its settings once it lands.
+  if (!fetched) void request.then((late) => { fetched = late; render(late); });
 }
 
 void bootstrap();

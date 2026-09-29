@@ -643,6 +643,25 @@ type: slide
       expect(res.body.state).toBe("ENDED");
     });
 
+    it("ends a session from the lobby without writing results", async () => {
+      const tempDataDir = fs.mkdtempSync(path.join(os.tmpdir(), "mdq-lifecycle-lobby-end-"));
+      const persistApp = createApp({ quizDir, dataDir: tempDataDir });
+      try {
+        const createRes = await request(persistApp)
+          .post("/api/session")
+          .send({ week: "week01", mode: "open" })
+          .expect(201);
+        const res = await request(persistApp)
+          .post(`/api/session/${createRes.body.sessionId}/end`)
+          .expect(200);
+        expect(res.body.state).toBe("ENDED");
+        expect(fs.existsSync(path.join(tempDataDir, "winners", "week01.json"))).toBe(false);
+        await request(persistApp).post(`/api/session/${createRes.body.sessionId}/start`).expect(400);
+      } finally {
+        fs.rmSync(tempDataDir, { recursive: true, force: true });
+      }
+    });
+
     it("writes per-reveal CSV progress and end-of-quiz markdown summary", async () => {
       const tempDataDir = fs.mkdtempSync(path.join(os.tmpdir(), "mdq-lifecycle-persist-"));
       const persistApp = createApp({ quizDir, dataDir: tempDataDir });

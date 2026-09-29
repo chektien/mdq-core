@@ -6,7 +6,7 @@ Pre-class verification steps for running mdq live. Covers both Tailscale-availab
 
 ### 1. Environment Check
 
-- [ ] Node.js installed (`node -v`, need v18+)
+- [ ] Node.js installed (`node -v`, need v20+)
 - [ ] Dependencies installed (`cd /path/to/mdq && npm install`)
 - [ ] Local data dirs bootstrapped (`npm run setup:local`)
 - [ ] Deck file ready (`data/decks/<deck-id>.md` exists, validated)

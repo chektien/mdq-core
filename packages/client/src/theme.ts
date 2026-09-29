@@ -13,6 +13,7 @@ export {
   resolveBootAppearance,
   resolveClientPalette,
   resolveClientTheme,
+  systemFallbackTheme,
 } from "./appearance";
 
 // <html data-theme data-palette> is the single place the appearance lives.

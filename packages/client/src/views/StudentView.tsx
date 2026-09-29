@@ -93,8 +93,10 @@ export default function StudentView({
   const [displayName, setDisplayName] = useState("");
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [quizKey, setQuizKey] = useState<string | null>(null);
-  const [sessionTheme, setSessionTheme] = useState<DeckTheme>(defaultTheme);
-  const [sessionPalette, setSessionPalette] = useState<DeckPalette>(defaultPalette);
+  // The deck's own appearance once a session is known. Until then (null) the
+  // page follows the defaults, including a runtime config that arrives late.
+  const [sessionTheme, setSessionTheme] = useState<DeckTheme | null>(null);
+  const [sessionPalette, setSessionPalette] = useState<DeckPalette | null>(null);
   const [joinError, setJoinError] = useState<string | null>(null);
   const [joining, setJoining] = useState(false);
   const [completed, setCompleted] = useState(false);
@@ -151,8 +153,8 @@ export default function StudentView({
     if (!initialSessionCode) return;
     let cancelled = false;
     setAppearanceReady(false);
-    setSessionTheme(defaultTheme);
-    setSessionPalette(defaultPalette);
+    setSessionTheme(null);
+    setSessionPalette(null);
     setQuizKey(null);
     const normalizedCode = normalizeSessionCode(initialSessionCode);
     fetch(API.SESSION_BY_CODE.replace(":code", normalizedCode))
@@ -221,9 +223,9 @@ export default function StudentView({
     clearSessionArtifacts();
     sock.disconnect();
     setCompleted(true);
-    setSessionTheme(defaultTheme);
-    setSessionPalette(defaultPalette);
-  }, [defaultPalette, defaultTheme, sock]);
+    setSessionTheme(null);
+    setSessionPalette(null);
+  }, [sock]);
 
   // Handle join: first resolve session code to sessionId, then connect socket
   const handleJoin = useCallback(async () => {
@@ -252,8 +254,8 @@ export default function StudentView({
           clearSessionArtifacts();
           setSessionId(null);
           setQuizKey(null);
-          setSessionTheme(defaultTheme);
-          setSessionPalette(defaultPalette);
+          setSessionTheme(null);
+          setSessionPalette(null);
         }
         throw new Error(data.error || "Session not found. Check the code and try again.");
       }
@@ -503,6 +505,7 @@ export default function StudentView({
         submittedOptions={sock.submittedOptions}
         submittedResponseText={sock.submittedResponseText}
         totalQuestions={sock.totalQuestions}
+        connected={connected}
         onSubmit={sock.submitAnswer}
       />
     );
@@ -569,6 +572,7 @@ function QuestionView({
   submittedOptions,
   submittedResponseText,
   totalQuestions,
+  connected,
   onSubmit,
 }: {
   question: QuestionState | null;
@@ -578,6 +582,7 @@ function QuestionView({
   submittedOptions: string[];
   submittedResponseText: string | null;
   totalQuestions: number;
+  connected: boolean;
   onSubmit: (payload: { questionIndex: number; selectedOptions?: string[]; responseText?: string }) => void;
 }) {
   const [selected, setSelected] = useState<string[]>([]);
@@ -628,6 +633,7 @@ function QuestionView({
   };
 
   const handleSubmit = () => {
+    if (!connected) return;
     if (question.questionType === "open_response") {
       if (!responseText.trim()) return;
       onSubmit({ questionIndex: question.questionIndex, responseText });
@@ -805,13 +811,20 @@ function QuestionView({
             <span className="text-amber-400 font-semibold">Time expired</span>
           </div>
         ) : (
-          <button
-            onClick={handleSubmit}
-            disabled={question.questionType === "open_response" ? !responseText.trim() : selected.length === 0}
-            className="w-full bg-indigo-600 hover:bg-indigo-500 disabled:bg-zinc-700 disabled:text-zinc-500 text-white font-semibold py-4 rounded-xl transition-colors text-lg"
-          >
-            {submitLabel}
-          </button>
+          <>
+            {!connected && (
+              <p className="student-reconnecting mb-3 text-center text-sm text-amber-400" role="status" aria-live="polite">
+                Connection lost. Reconnecting&hellip;
+              </p>
+            )}
+            <button
+              onClick={handleSubmit}
+              disabled={!connected || (question.questionType === "open_response" ? !responseText.trim() : selected.length === 0)}
+              className="student-submit-button w-full bg-indigo-600 hover:bg-indigo-500 disabled:bg-zinc-700 disabled:text-zinc-500 text-white font-semibold py-4 rounded-xl transition-colors text-lg"
+            >
+              {submitLabel}
+            </button>
+          </>
         )}
       </div>
     </div>

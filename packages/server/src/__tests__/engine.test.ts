@@ -47,6 +47,7 @@ const ended = [msg(SocketEvents.SESSION_STATE, { state: "ENDED" })];
 const cases: Record<string, { state: SessionState; messages: ReturnType<typeof msg>[] } | { error: string }> = {
   "LOBBY:start": { state: "QUESTION_OPEN", messages: opened(0) },
   "LOBBY:open": { state: "QUESTION_OPEN", messages: opened(0) },
+  "LOBBY:end": { state: "ENDED", messages: ended },
   "QUESTION_OPEN:close": { state: "QUESTION_CLOSED", messages: closed },
   "QUESTION_OPEN:timeout": { state: "QUESTION_CLOSED", messages: closed },
   "QUESTION_OPEN:end": { state: "ENDED", messages: ended },
@@ -108,6 +109,19 @@ it("joins, answers and disconnects without changing the supplied session", () =>
   expect(answered.session.participants.get("S1")?.connected).toBe(true);
 });
 
+it("ignores a late disconnect from a socket the student has already replaced", () => {
+  const input = base("QUESTION_OPEN");
+  const first = apply(input, quiz, { type: "join", socketId: "socket-1", newToken: "token-1", payload: { studentId: "S1" } }, 2000);
+  const rejoined = apply(first.session, quiz, { type: "join", socketId: "socket-2", newToken: "unused", payload: { studentId: "S1", sessionToken: "token-1" } }, 3000);
+  expect(rejoined.session.participants.get("S1")?.socketId).toBe("socket-2");
+  const stale = apply(rejoined.session, quiz, { type: "disconnect", studentId: "S1", socketId: "socket-1" }, 4000);
+  expect(stale.session.participants.get("S1")?.connected).toBe(true);
+  expect(stale.messages).toEqual([]);
+  const current = apply(stale.session, quiz, { type: "disconnect", studentId: "S1", socketId: "socket-2" }, 5000);
+  expect(current.session.participants.get("S1")?.connected).toBe(false);
+  expect(current.messages[0]).toEqual(msg(SocketEvents.SESSION_PARTICIPANTS, { count: 0, participants: [] }, "staff"));
+});
+
 for (const state of states) {
   it(`${state} accepts a join and preserves its current state`, () => {
     const input = base(state);
@@ -160,6 +174,15 @@ it("does not close before the deadline or after navigation", () => {
   expect(apply(input, quiz, { type: "timeout" }, 20000).messages).toEqual([]);
   const moved = apply({ ...input, state: "REVEAL" }, quiz, { type: "next" }, 1000);
   expect(apply(moved.session, quiz, { type: "timeout", deadline: 21000 }, 20000).messages).toEqual([]);
+});
+
+it("ignores a stale alarm whose deadline belongs to an earlier opening", () => {
+  const reopened = { ...base("QUESTION_OPEN"), questionStartedAt: 5000 };
+  const stale = apply(reopened, quiz, { type: "timeout", deadline: 21000 }, 21000);
+  expect(stale.session.state).toBe("QUESTION_OPEN");
+  expect(stale.messages).toEqual([]);
+  expect(stale.nextDeadline).toBe(25000);
+  expect(apply(reopened, quiz, { type: "timeout", deadline: 25000 }, 25000).session.state).toBe("QUESTION_CLOSED");
 });
 
 it("routes participant messages to their socket and keeps staff in the session room", () => {

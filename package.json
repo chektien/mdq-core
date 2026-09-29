@@ -2,6 +2,9 @@
   "name": "mdq",
   "version": "0.3.4-beta",
   "private": true,
+  "engines": {
+    "node": ">=20"
+  },
   "workspaces": [
     "packages/*"
   ],

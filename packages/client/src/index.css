@@ -7,8 +7,20 @@
 
 /* No theme yet: the page waits for a view to set data-theme on <html> (from
    the deck, the runtime config, or attributes the server rendered into the
-   HTML). Until then it keeps the browser's own blank canvas and hides the app,
-   so no guessed theme flashes before the deck's. theme.css paints each theme. */
+   HTML). Until then it hides the app, so no guessed theme flashes before the
+   deck's, and shows a plain neutral that follows the system colour scheme so
+   neither a light nor a dark deck opens on a strong flash. theme.css paints
+   each theme. */
+html:not([data-theme]) {
+  background: #ffffff;
+}
+
+@media (prefers-color-scheme: dark) {
+  html:not([data-theme]) {
+    background: #262625;
+  }
+}
+
 html:not([data-theme]) #root {
   visibility: hidden;
 }
@@ -595,7 +607,7 @@ html[data-palette="gruvbox"]:not([data-theme="light"]) {
   --mdq-timer-ok: #b8bb26;
   --mdq-timer-warn: #fabd2f;
   --mdq-timer-urgent: #fb7b60;
-  --mdq-timer-track: rgba(235, 219, 178, 0.16);
+  --mdq-timer-track: #877a6c;
   background: #282828;
 }
 
@@ -708,7 +720,7 @@ html[data-palette="gruvbox"][data-theme="light"] {
   --mdq-timer-ok: #66620d;
   --mdq-timer-warn: #8a5a0a;
   --mdq-timer-urgent: #9d0006;
-  --mdq-timer-track: #d5d8d0;
+  --mdq-timer-track: #897d73;
   --mdq-rank-first: #6f4807;
   --mdq-rank-second: #504945;
   --mdq-rank-third: #8f3002;
@@ -4809,6 +4821,17 @@ html[data-theme] .open-response-entry .open-response-text {
    presentation generous, but switch phones, tablets, and short laptop windows
    to safe-area-aware top flow with compact scan-first controls.
    ============================================================ */
+/* The lobby groups the join details and the room status (count, names,
+   notices, Start Session). They stack in the shell's flow and share its gap. */
+.instructor-lobby-body,
+.instructor-lobby-side {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: inherit;
+  width: 100%;
+}
+
 @media (max-width: 760px), (max-height: 820px) {
   .instructor-phase-shell {
     justify-content: flex-start;
@@ -4898,6 +4921,26 @@ html[data-theme] .open-response-entry .open-response-text {
     padding: 0.78rem 2rem;
     font-size: 1rem;
     line-height: 1.25;
+  }
+}
+
+/* On a landscape screen the stacked lobby is taller than a 900px laptop
+   window once names and a notice appear, so the join details sit beside the
+   room status and Start Session stays in view. */
+@media (min-width: 900px) and (orientation: landscape) {
+  .instructor-lobby-body {
+    flex-direction: row;
+    justify-content: center;
+    column-gap: clamp(2rem, 5vw, 4.5rem);
+  }
+
+  .instructor-lobby-join {
+    flex: 0 0 auto;
+  }
+
+  .instructor-lobby-side {
+    flex: 0 1 32rem;
+    min-width: 0;
   }
 }
 

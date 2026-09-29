@@ -155,7 +155,11 @@ export function apply(input: Session, quiz: Quiz, command: Command, now: number)
     case "close":
     case "timeout":
       if (command.type === "close" && getQuestionType(questionAt(session, quiz)) === "slide") throw new EngineCommandError("Slides do not close; advance to the next item.");
-      if (command.type === "timeout" && (session.state !== "QUESTION_OPEN" || getQuestionType(questionAt(session, quiz)) === "slide" || now < (command.deadline ?? deadline(session, quiz) ?? Infinity))) break;
+      if (command.type === "timeout") {
+        const due = deadline(session, quiz);
+        // An alarm set for an earlier question or opening carries a different deadline and is ignored.
+        if (due === null || (command.deadline !== undefined && command.deadline !== due) || now < due) break;
+      }
       transition(session, "QUESTION_CLOSED");
       emit(SocketEvents.QUESTION_CLOSE, { questionIndex: session.currentQuestionIndex }); state();
       emit(SocketEvents.RESULTS_DISTRIBUTION, { questionIndex: session.currentQuestionIndex, distribution: getDistribution(session, session.currentQuestionIndex) }, "staff");
@@ -247,7 +251,8 @@ export function apply(input: Session, quiz: Quiz, command: Command, now: number)
     }
     case "disconnect": {
       const participant = session.participants.get(command.studentId);
-      if (participant) {
+      // A socket replaced by a rejoin can time out later; only the current socket marks the student offline.
+      if (participant && participant.socketId === command.socketId) {
         participant.connected = false;
         emit(SocketEvents.SESSION_PARTICIPANTS, participantsPayload(session), "staff");
         if (session.state === "QUESTION_OPEN" && session.currentQuestionIndex >= 0) emit(SocketEvents.ANSWER_COUNT, countPayload(session, quiz), "staff");

@@ -19,10 +19,11 @@ export type SessionState = (typeof SESSION_STATES)[number];
 /**
  * Valid state transitions. Key = current state, value = set of allowed next states.
  * Transitions are instructor-controlled except QUESTION_OPEN -> QUESTION_CLOSED
- * which also happens automatically when the timer expires.
+ * which also happens automatically when the timer expires. A session can be
+ * ended from the lobby before it starts.
  */
 export const STATE_TRANSITIONS: Record<SessionState, readonly SessionState[]> = {
-  LOBBY: ["QUESTION_OPEN"],
+  LOBBY: ["QUESTION_OPEN", "ENDED"],
   QUESTION_OPEN: ["QUESTION_CLOSED", "ENDED"],
   QUESTION_CLOSED: ["REVEAL"],
   REVEAL: ["QUESTION_OPEN", "LEADERBOARD"],

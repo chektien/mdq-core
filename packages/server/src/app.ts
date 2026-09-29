@@ -692,6 +692,8 @@ export function createApp(quizDirOrOpts?: string | AppOptions) {
         const quiz = getQuizForSession(current.week);
         if (!quiz) return res.status(500).json({ error: "Quiz data not found" });
         try {
+          // A session ended from the lobby has no results, so it must not replace saved ones.
+          const endedUnstarted = action.type === "end" && current.state === "LOBBY";
           const result = apply(current, quiz, { type: action.type } as Command, Date.now());
           const session = current;
           Object.assign(session, result.session);
@@ -713,7 +715,7 @@ export function createApp(quizDirOrOpts?: string | AppOptions) {
               console.error(`Failed to persist reveal progress for ${session.sessionId}:`, e);
             }
           }
-          if (action.type === "end") persistSessionOnEnd(session, quiz, dataDir);
+          if (action.type === "end" && !endedUnstarted) persistSessionOnEnd(session, quiz, dataDir);
           notifyStateChange(session, req.params.id, quiz, result);
           logActivity(`instructor ${action.type} session=${req.params.id} q=${session.currentQuestionIndex} state=${session.state}`);
           if (action.type === "end" || action.type === "leaderboardShow") return res.json({ state: session.state });
