@@ -831,22 +831,664 @@ html[data-palette="gruvbox"][data-theme="light"] .leaderboard-row.rank-standard 
 }
 
 /* ── Rosé Pine palette (deck palette: rose-pine) ── */
-/* Rules follow. */
+/* Rosé Pine follows the rose-pine/rose-pine-palette colours (MIT,
+   https://github.com/rose-pine/rose-pine-palette): dark is Rosé Pine (main),
+   light is Rosé Pine Dawn, with the canonical Dawn text #575279 from that
+   repository's source/index.ts. Rosé Pine has no green, so success uses pine:
+   Dawn keeps #286983 as is, and dark lightens pine #31748f by 40 percent
+   toward the foreground (#779eb7) so it holds 4.5:1 as text on the dark
+   surfaces. Dark headings are rose #ebbcba, Dawn headings are pine because
+   every lightness-lowered rose is a saturated red. Secondary text sits on
+   tinted cards, pills and leaderboard rows, so it is moved further from the
+   page: dark subtle #908caa to #a4a0bc (25 percent toward text), Dawn subtle
+   #797593 to #5f5b7a (both still #908caa and #797593 for outlines and the
+   timer track). Where another Dawn colour misses 4.5:1 on the cream surfaces
+   its lightness is lowered, keeping the hue: iris #907aa9 to #765e92 (ink
+   #6a5482), love #b4637a to #a34e66 (ink #90455a), gold #ea9d34 to #945c0f
+   (ink #84520e), foam #56949f to #416f77 (ink #39636a) and pine ink #286983
+   to #26637b. The Dawn attendee and presenter note colours use the ink
+   shades, which hold 4.5:1 on their own tint. The Dawn slide gradient runs
+   from base #faf4ed to highlight low #f4ede8.
+   Dark is the default theme, so the dark variant also applies when
+   data-theme is absent. Selectors out-rank the theme rules by specificity. */
+html[data-palette="rose-pine"]:not([data-theme="light"]) {
+  --mdq-slide-bg: #191724;
+  --mdq-slide-bg-soft: #1f1d2e;
+  --mdq-slide-frame: rgba(224, 222, 244, 0.16);
+  --mdq-slide-heading: #ebbcba;
+  --mdq-slide-ink: #e0def4;
+  --mdq-slide-ink-soft: #a4a0bc;
+  --mdq-slide-eyebrow: #a4a0bc;
+  --mdq-slide-rule: rgba(224, 222, 244, 0.16);
+  --mdq-slide-accent: #c4a7e7;
+  --mdq-slide-accent-strong: #c4a7e7;
+  --mdq-slide-accent-warm: #f6c177;
+  --mdq-slide-accent-cool: #9ccfd8;
+  --mdq-slide-blue: #9ccfd8;
+  --mdq-slide-scene: #f6c177;
+  --mdq-slide-maroon: #eb6f92;
+  --mdq-slide-glass: #26233a;
+  --mdq-slide-glass-strong: #26233a;
+  --mdq-slide-glass-line: rgba(224, 222, 244, 0.16);
+  --mdq-note-attendee: #c4a7e7;
+  --mdq-note-attendee-tint: rgba(196, 167, 231, 0.12);
+  --mdq-note-presenter: #9ccfd8;
+  --mdq-note-presenter-tint: rgba(156, 207, 216, 0.12);
+  --mdq-paper: #191724;
+  --mdq-paper-strong: #1f1d2e;
+  --mdq-card: rgba(31, 29, 46, 0.92);
+  --mdq-card-strong: #26233a;
+  --mdq-line: rgba(224, 222, 244, 0.14);
+  --mdq-line-strong: rgba(224, 222, 244, 0.28);
+  --mdq-control-border: #908caa;
+  --mdq-ink: #e0def4;
+  --mdq-ink-strong: #e0def4;
+  --mdq-ink-soft: #e0def4;
+  --mdq-muted: #a4a0bc;
+  --mdq-soft: #a4a0bc;
+  --mdq-accent: #c4a7e7;
+  --mdq-accent-hover: #c4a7e7;
+  --mdq-accent-text: #c4a7e7;
+  --mdq-on-accent: #191724;
+  --mdq-accent-soft: rgba(196, 167, 231, 0.14);
+  --mdq-accent-soft-strong: rgba(196, 167, 231, 0.22);
+  --mdq-accent-ink: #e0def4;
+  --mdq-secondary: #9ccfd8;
+  --mdq-secondary-text: #9ccfd8;
+  --mdq-on-secondary: #191724;
+  --mdq-secondary-soft: rgba(156, 207, 216, 0.14);
+  --mdq-success: #779eb7;
+  --mdq-success-text: #779eb7;
+  --mdq-on-success: #191724;
+  --mdq-success-soft: rgba(119, 158, 183, 0.14);
+  --mdq-success-ink: #e0def4;
+  --mdq-success-line: #779eb7;
+  --mdq-warning: #f6c177;
+  --mdq-warning-text: #f6c177;
+  --mdq-on-warning: #191724;
+  --mdq-warning-soft: rgba(246, 193, 119, 0.14);
+  --mdq-warning-ink: #e0def4;
+  --mdq-danger: #eb6f92;
+  --mdq-danger-text: #eb6f92;
+  --mdq-on-danger: #191724;
+  --mdq-danger-soft: rgba(235, 111, 146, 0.16);
+  --mdq-danger-ink: #e0def4;
+  --mdq-danger-line: #eb6f92;
+  --mdq-info: #9ccfd8;
+  --mdq-info-text: #9ccfd8;
+  --mdq-on-info: #191724;
+  --mdq-info-soft: rgba(156, 207, 216, 0.16);
+  --mdq-info-ink: #e0def4;
+  --mdq-info-line: #9ccfd8;
+  --mdq-bar: #c4a7e7;
+  --mdq-on-bar: #191724;
+  --mdq-bar-muted: #908caa;
+  --mdq-on-bar-muted: #191724;
+  --mdq-bar-wash: rgba(196, 167, 231, 0.26);
+  --mdq-timer-ok: #779eb7;
+  --mdq-timer-warn: #f6c177;
+  --mdq-timer-urgent: #eb6f92;
+  --mdq-timer-track: #6e6a86;
+  background: #191724;
+}
 
-/* placeholder */
+html[data-palette="rose-pine"]:not([data-theme="light"]) body {
+  background: #191724;
+}
 
-/* placeholder */
+html[data-palette="rose-pine"]:not([data-theme="light"]) .slide-surface {
+  background: linear-gradient(180deg, #1f1d2e 0%, #191724 100%);
+}
 
-/* placeholder */
+html[data-palette="rose-pine"]:not([data-theme="light"]) .slide-surface .quiz-html code,
+html[data-palette="rose-pine"]:not([data-theme="light"]) .slide-surface .quiz-html pre {
+  background: #26233a;
+  color: #e0def4;
+}
+
+/* Bold text: theme.css colours .quiz-html strong per theme, which out-ranks
+   the slide rule, so name the Rosé Pine foreground explicitly. */
+html[data-palette="rose-pine"]:not([data-theme="light"]) .slide-surface .quiz-html strong {
+  color: #e0def4;
+}
+
+/* Link on the white join QR panel (theme.css). */
+html[data-palette="rose-pine"][data-theme="dark"] .instructor-qr-panel,
+html[data-palette="rose-pine"][data-theme="light"] .instructor-qr-panel {
+  --mdq-qr-link: #286983;
+}
+
+html[data-palette="rose-pine"][data-theme="light"] {
+  --mdq-slide-bg: #faf4ed;
+  --mdq-slide-bg-soft: #f4ede8;
+  --mdq-slide-frame: rgba(87, 82, 121, 0.18);
+  --mdq-slide-heading: #286983;
+  --mdq-slide-ink: #575279;
+  --mdq-slide-ink-soft: #5f5b7a;
+  --mdq-slide-eyebrow: #5f5b7a;
+  --mdq-slide-rule: rgba(87, 82, 121, 0.18);
+  --mdq-slide-accent: #765e92;
+  --mdq-slide-accent-strong: #765e92;
+  --mdq-slide-accent-warm: #945c0f;
+  --mdq-slide-accent-cool: #416f77;
+  --mdq-slide-blue: #286983;
+  --mdq-slide-scene: #945c0f;
+  --mdq-slide-maroon: #a34e66;
+  --mdq-slide-glass: #fffaf3;
+  --mdq-slide-glass-strong: #fffaf3;
+  --mdq-slide-glass-line: rgba(87, 82, 121, 0.18);
+  --mdq-note-attendee: #6a5482;
+  --mdq-note-attendee-tint: rgba(106, 84, 130, 0.09);
+  --mdq-note-presenter: #39636a;
+  --mdq-note-presenter-tint: rgba(57, 99, 106, 0.09);
+  --mdq-paper: #faf4ed;
+  --mdq-paper-strong: #fffaf3;
+  --mdq-card: rgba(255, 250, 243, 0.92);
+  --mdq-card-strong: #fffaf3;
+  --mdq-dialog: #fffaf3;
+  --mdq-field: #fffaf3;
+  --mdq-line: rgba(87, 82, 121, 0.14);
+  --mdq-line-strong: rgba(87, 82, 121, 0.26);
+  --mdq-control-border: #797593;
+  --mdq-ink: #575279;
+  --mdq-ink-strong: #575279;
+  --mdq-ink-soft: #575279;
+  --mdq-muted: #5f5b7a;
+  --mdq-soft: #5f5b7a;
+  --mdq-accent: #765e92;
+  --mdq-accent-hover: #6a5482;
+  --mdq-accent-text: #765e92;
+  --mdq-on-accent: #faf4ed;
+  --mdq-accent-soft: rgba(118, 94, 146, 0.1);
+  --mdq-accent-soft-strong: rgba(118, 94, 146, 0.16);
+  --mdq-accent-ink: #6a5482;
+  --mdq-accent-wash: linear-gradient(135deg, #f5efec, #e8dfe0);
+  --mdq-secondary: #416f77;
+  --mdq-secondary-text: #39636a;
+  --mdq-on-secondary: #faf4ed;
+  --mdq-secondary-soft: rgba(86, 148, 159, 0.1);
+  --mdq-success: #286983;
+  --mdq-success-text: #286983;
+  --mdq-on-success: #faf4ed;
+  --mdq-success-soft: rgba(40, 105, 131, 0.12);
+  --mdq-success-ink: #26637b;
+  --mdq-success-line: #286983;
+  --mdq-success-wash: linear-gradient(135deg, #f0f0eb, #dde1de);
+  --mdq-warning: #945c0f;
+  --mdq-warning-text: #945c0f;
+  --mdq-on-warning: #faf4ed;
+  --mdq-warning-soft: rgba(234, 157, 52, 0.14);
+  --mdq-warning-ink: #84520e;
+  --mdq-danger: #a34e66;
+  --mdq-danger-text: #a34e66;
+  --mdq-on-danger: #faf4ed;
+  --mdq-danger-soft: rgba(180, 99, 122, 0.1);
+  --mdq-danger-ink: #90455a;
+  --mdq-danger-line: #a34e66;
+  --mdq-danger-wash: linear-gradient(135deg, #f9eee9, #eeddda);
+  --mdq-info: #416f77;
+  --mdq-info-text: #416f77;
+  --mdq-on-info: #faf4ed;
+  --mdq-info-soft: rgba(86, 148, 159, 0.1);
+  --mdq-info-ink: #39636a;
+  --mdq-info-line: #416f77;
+  --mdq-bar: #765e92;
+  --mdq-on-bar: #faf4ed;
+  --mdq-bar-muted: #6a6683;
+  --mdq-on-bar-muted: #faf4ed;
+  --mdq-bar-wash: rgba(118, 94, 146, 0.16);
+  --mdq-timer-ok: #286983;
+  --mdq-timer-warn: #945c0f;
+  --mdq-timer-urgent: #a34e66;
+  --mdq-timer-track: #797593;
+  --mdq-rank-first: #84520e;
+  --mdq-rank-second: #5d5a73;
+  --mdq-rank-third: #39636a;
+  --mdq-page-glow-top: transparent;
+  --mdq-page-glow-cool: transparent;
+  --mdq-page-glow-warm: transparent;
+  background: #faf4ed;
+}
+
+/* The reference footer dims its text to 78 percent, which drops Dawn's soft
+   ink below 4.5:1 on the slide, so keep it solid. */
+html[data-palette="rose-pine"][data-theme="light"] .slide-references {
+  color: var(--mdq-slide-ink-soft);
+}
+
+html[data-palette="rose-pine"][data-theme="light"] .slide-surface {
+  background: linear-gradient(180deg, #faf4ed 0%, #f4ede8 100%);
+}
+
+html[data-palette="rose-pine"][data-theme="light"] .slide-surface .quiz-html code,
+html[data-palette="rose-pine"][data-theme="light"] .slide-surface .quiz-html pre {
+  background: #f2e9e1;
+  color: #575279;
+}
+
+html[data-palette="rose-pine"][data-theme="light"] .slide-surface .quiz-html strong {
+  color: #575279;
+}
+
+/* The tinted status pills on the slide use the deeper ink shades, which hold
+   4.5:1 on their own tint over the lower slide gradient stop. */
+html[data-palette="rose-pine"][data-theme="light"] .slide-status-pill-success {
+  color: var(--mdq-success-ink);
+}
+
+html[data-palette="rose-pine"][data-theme="light"] .slide-status-pill-warning {
+  color: var(--mdq-warning-ink);
+}
+
+/* Question and reveal text outside the slide canvas. */
+html[data-palette="rose-pine"]:not([data-theme="light"]) .quiz-html code,
+html[data-palette="rose-pine"]:not([data-theme="light"]) .quiz-html pre {
+  background: #26233a;
+  color: #e0def4;
+}
+
+html[data-palette="rose-pine"][data-theme="light"] .quiz-html code,
+html[data-palette="rose-pine"][data-theme="light"] .quiz-html pre {
+  background: #f2e9e1;
+  color: #575279;
+}
+
+/* The dark selection-mode card and chips carry classic purple and green in
+   their base rules; the light theme already reads the tokens. */
+html[data-palette="rose-pine"]:not([data-theme="light"]) .selection-mode-card-single {
+  border-color: rgba(196, 167, 231, 0.34);
+  background: linear-gradient(135deg, #26233a, #1f1d2e);
+}
+
+html[data-palette="rose-pine"]:not([data-theme="light"]) .selection-mode-card-single::after {
+  background: rgba(196, 167, 231, 0.22);
+}
+
+html[data-palette="rose-pine"]:not([data-theme="light"]) .selection-mode-card-multi {
+  border-color: rgba(156, 207, 216, 0.32);
+  background: linear-gradient(135deg, #26233a, #1f1d2e);
+}
+
+html[data-palette="rose-pine"]:not([data-theme="light"]) .selection-mode-card-multi::after {
+  background: rgba(156, 207, 216, 0.2);
+}
+
+html[data-palette="rose-pine"]:not([data-theme="light"]) .selection-mode-label {
+  color: #e0def4;
+}
+
+html[data-palette="rose-pine"]:not([data-theme="light"]) .selection-mode-text {
+  color: #a4a0bc;
+}
+
+html[data-palette="rose-pine"]:not([data-theme="light"]) .selection-mode-chip-single {
+  color: #c4a7e7;
+  border-color: rgba(196, 167, 231, 0.4);
+  background: #191724;
+}
+
+html[data-palette="rose-pine"]:not([data-theme="light"]) .selection-mode-chip-multi {
+  color: #9ccfd8;
+  border-color: rgba(156, 207, 216, 0.4);
+  background: #191724;
+}
+
+html[data-palette="rose-pine"]:not([data-theme="light"]) .leaderboard-row.rank-first {
+  --leaderboard-rank-color: #f6c177;
+}
+
+html[data-palette="rose-pine"]:not([data-theme="light"]) .leaderboard-row.rank-second {
+  --leaderboard-rank-color: #9ccfd8;
+}
+
+html[data-palette="rose-pine"]:not([data-theme="light"]) .leaderboard-row.rank-third {
+  --leaderboard-rank-color: #ebbcba;
+}
+
+/* Below the podium the row keeps a neutral tint, so fourth place does not
+   pick up the accent that the podium places use. */
+html[data-palette="rose-pine"]:not([data-theme="light"]) .leaderboard-row.rank-standard {
+  --leaderboard-rank-color: #e0def4;
+}
+
+/* The viewer's own row adds an accent wash. Third place keeps its own
+   colour there, which holds 4.5:1 on that wash. */
+html[data-palette="rose-pine"]:not([data-theme="light"]) .leaderboard-row.leaderboard-row-highlight.rank-third {
+  --leaderboard-rank-color: #ebbcba;
+}
+
+html[data-palette="rose-pine"][data-theme="light"] .leaderboard-row.rank-standard {
+  --leaderboard-rank-color: #5d5a73;
+}
+
 
 /* ── Catppuccin palette (deck palette: catppuccin) ── */
-/* Rules follow. */
+/* Catppuccin follows the catppuccin/palette colours (MIT,
+   https://github.com/catppuccin/palette): dark is Mocha, light is Latte.
+   Mocha uses its colours as published. Latte's accents are bright pastels
+   that miss 4.5:1 on Latte's base and mantle, so their lightness is lowered,
+   keeping the hue. Official -> used (ink is the deeper shade for text on a
+   tint): mauve #8839ef to #8534ef (ink #7113ec), red #d20f39 to #cd0f38
+   (ink #b10d30), peach #fe640b to #b44201 (ink #a03b01), green #40a02b to
+   #2f7620 (ink #29681c, also used for success text), sapphire #209fb5 to
+   #177181 (ink #146472), blue #1e66f5 to #0d5af4 (ink #0a4ed6, also used for
+   secondary text), maroon #e64553 to #cb1b2b, subtext1 #5c5f77 to #545770 for
+   secondary text on tinted cards, and subtext0 #6c6f85 to #64677b. Leaderboard
+   ranks use yellow #df8e1d darkened to #774c10, second place #525465 (subtext1
+   darkened) and third place #933601 (peach darkened). Latte has no white, so
+   light cards use mantle #e6e9ef and fields use base.
+   Dark is the default theme, so the dark variant also applies when
+   data-theme is absent. Selectors out-rank the theme rules by specificity. */
+html[data-palette="catppuccin"]:not([data-theme="light"]) {
+  --mdq-slide-bg: #1e1e2e;
+  --mdq-slide-bg-soft: #181825;
+  --mdq-slide-frame: rgba(205, 214, 244, 0.16);
+  --mdq-slide-heading: #cba6f7;
+  --mdq-slide-ink: #cdd6f4;
+  --mdq-slide-ink-soft: #bac2de;
+  --mdq-slide-eyebrow: #a6adc8;
+  --mdq-slide-rule: rgba(205, 214, 244, 0.16);
+  --mdq-slide-accent: #cba6f7;
+  --mdq-slide-accent-strong: #cba6f7;
+  --mdq-slide-accent-warm: #fab387;
+  --mdq-slide-accent-cool: #74c7ec;
+  --mdq-slide-blue: #89b4fa;
+  --mdq-slide-scene: #a6e3a1;
+  --mdq-slide-maroon: #eba0ac;
+  --mdq-slide-glass: #11111b;
+  --mdq-slide-glass-strong: #11111b;
+  --mdq-slide-glass-line: rgba(205, 214, 244, 0.16);
+  --mdq-note-attendee: #cba6f7;
+  --mdq-note-attendee-tint: rgba(203, 166, 247, 0.12);
+  --mdq-note-presenter: #f5c2e7;
+  --mdq-note-presenter-tint: rgba(245, 194, 231, 0.12);
+  --mdq-paper: #1e1e2e;
+  --mdq-paper-strong: #313244;
+  --mdq-card: rgba(49, 50, 68, 0.92);
+  --mdq-card-strong: #313244;
+  --mdq-line: rgba(205, 214, 244, 0.14);
+  --mdq-line-strong: rgba(205, 214, 244, 0.28);
+  --mdq-control-border: #7f849c;
+  --mdq-ink: #cdd6f4;
+  --mdq-ink-strong: #cdd6f4;
+  --mdq-ink-soft: #cdd6f4;
+  --mdq-muted: #bac2de;
+  --mdq-soft: #a6adc8;
+  --mdq-accent: #cba6f7;
+  --mdq-accent-hover: #cba6f7;
+  --mdq-accent-text: #cba6f7;
+  --mdq-on-accent: #1e1e2e;
+  --mdq-accent-soft: rgba(203, 166, 247, 0.14);
+  --mdq-accent-soft-strong: rgba(203, 166, 247, 0.22);
+  --mdq-accent-ink: #cdd6f4;
+  --mdq-secondary: #89b4fa;
+  --mdq-secondary-text: #89b4fa;
+  --mdq-on-secondary: #1e1e2e;
+  --mdq-secondary-soft: rgba(137, 180, 250, 0.14);
+  --mdq-success: #a6e3a1;
+  --mdq-success-text: #a6e3a1;
+  --mdq-on-success: #1e1e2e;
+  --mdq-success-soft: rgba(166, 227, 161, 0.14);
+  --mdq-success-ink: #cdd6f4;
+  --mdq-success-line: #a6e3a1;
+  --mdq-warning: #fab387;
+  --mdq-warning-text: #fab387;
+  --mdq-on-warning: #1e1e2e;
+  --mdq-warning-soft: rgba(250, 179, 135, 0.14);
+  --mdq-warning-ink: #cdd6f4;
+  --mdq-danger: #f38ba8;
+  --mdq-danger-text: #f38ba8;
+  --mdq-on-danger: #1e1e2e;
+  --mdq-danger-soft: rgba(243, 139, 168, 0.16);
+  --mdq-danger-ink: #cdd6f4;
+  --mdq-danger-line: #f38ba8;
+  --mdq-info: #74c7ec;
+  --mdq-info-text: #74c7ec;
+  --mdq-on-info: #1e1e2e;
+  --mdq-info-soft: rgba(116, 199, 236, 0.16);
+  --mdq-info-ink: #cdd6f4;
+  --mdq-info-line: #74c7ec;
+  --mdq-bar: #cba6f7;
+  --mdq-on-bar: #1e1e2e;
+  --mdq-bar-muted: #a6adc8;
+  --mdq-on-bar-muted: #1e1e2e;
+  --mdq-bar-wash: rgba(203, 166, 247, 0.26);
+  --mdq-timer-ok: #a6e3a1;
+  --mdq-timer-warn: #fab387;
+  --mdq-timer-urgent: #f38ba8;
+  --mdq-timer-track: #7f849c;
+  background: #1e1e2e;
+}
 
-/* placeholder */
+html[data-palette="catppuccin"]:not([data-theme="light"]) body {
+  background: #1e1e2e;
+}
 
-/* placeholder */
+html[data-palette="catppuccin"]:not([data-theme="light"]) .slide-surface {
+  background: linear-gradient(180deg, #1e1e2e 0%, #181825 100%);
+}
 
-/* placeholder */
+html[data-palette="catppuccin"]:not([data-theme="light"]) .slide-surface .quiz-html code,
+html[data-palette="catppuccin"]:not([data-theme="light"]) .slide-surface .quiz-html pre {
+  background: #11111b;
+  color: #cdd6f4;
+}
+
+/* Bold text: theme.css colours .quiz-html strong per theme, which out-ranks
+   the slide rule, so name the Catppuccin Mocha foreground explicitly. */
+html[data-palette="catppuccin"]:not([data-theme="light"]) .slide-surface .quiz-html strong {
+  color: #cdd6f4;
+}
+
+/* Link on the white join QR panel (theme.css). */
+html[data-palette="catppuccin"][data-theme="dark"] .instructor-qr-panel,
+html[data-palette="catppuccin"][data-theme="light"] .instructor-qr-panel {
+  --mdq-qr-link: #0d5af4;
+}
+
+html[data-palette="catppuccin"][data-theme="light"] {
+  --mdq-slide-bg: #eff1f5;
+  --mdq-slide-bg-soft: #e6e9ef;
+  --mdq-slide-frame: rgba(76, 79, 105, 0.18);
+  --mdq-slide-heading: #8534ef;
+  --mdq-slide-ink: #4c4f69;
+  --mdq-slide-ink-soft: #545770;
+  --mdq-slide-eyebrow: #545770;
+  --mdq-slide-rule: rgba(76, 79, 105, 0.18);
+  --mdq-slide-accent: #8534ef;
+  --mdq-slide-accent-strong: #8534ef;
+  --mdq-slide-accent-warm: #b44201;
+  --mdq-slide-accent-cool: #177181;
+  --mdq-slide-blue: #0d5af4;
+  --mdq-slide-scene: #2f7620;
+  --mdq-slide-maroon: #cb1b2b;
+  --mdq-slide-glass: #eff1f5;
+  --mdq-slide-glass-strong: #eff1f5;
+  --mdq-slide-glass-line: rgba(76, 79, 105, 0.18);
+  --mdq-note-attendee: #7113ec;
+  --mdq-note-attendee-tint: rgba(113, 19, 236, 0.09);
+  --mdq-note-presenter: #146472;
+  --mdq-note-presenter-tint: rgba(20, 100, 114, 0.09);
+  --mdq-paper: #eff1f5;
+  --mdq-paper-strong: #e6e9ef;
+  --mdq-card: rgba(230, 233, 239, 0.92);
+  --mdq-card-strong: #e6e9ef;
+  --mdq-dialog: #e6e9ef;
+  --mdq-field: #eff1f5;
+  --mdq-line: rgba(76, 79, 105, 0.14);
+  --mdq-line-strong: rgba(76, 79, 105, 0.26);
+  --mdq-control-border: #7c7f93;
+  --mdq-ink: #4c4f69;
+  --mdq-ink-strong: #4c4f69;
+  --mdq-ink-soft: #4c4f69;
+  --mdq-muted: #545770;
+  --mdq-soft: #64677b;
+  --mdq-accent: #8534ef;
+  --mdq-accent-hover: #7113ec;
+  --mdq-accent-text: #8534ef;
+  --mdq-on-accent: #eff1f5;
+  --mdq-accent-soft: rgba(133, 52, 239, 0.1);
+  --mdq-accent-soft-strong: rgba(133, 52, 239, 0.16);
+  --mdq-accent-ink: #7113ec;
+  --mdq-accent-wash: linear-gradient(135deg, #dfdcef, #e0d7f4);
+  --mdq-secondary: #0d5af4;
+  --mdq-secondary-text: #0a4ed6;
+  --mdq-on-secondary: #eff1f5;
+  --mdq-secondary-soft: rgba(30, 102, 245, 0.1);
+  --mdq-success: #2f7620;
+  --mdq-success-text: #29681c;
+  --mdq-on-success: #eff1f5;
+  --mdq-success-soft: rgba(64, 160, 43, 0.12);
+  --mdq-success-ink: #29681c;
+  --mdq-success-line: #2f7620;
+  --mdq-success-wash: linear-gradient(135deg, #d9e1e1, #d4e0d7);
+  --mdq-warning: #b44201;
+  --mdq-warning-text: #b44201;
+  --mdq-on-warning: #eff1f5;
+  --mdq-warning-soft: rgba(254, 100, 11, 0.14);
+  --mdq-warning-ink: #a03b01;
+  --mdq-danger: #cd0f38;
+  --mdq-danger-text: #cd0f38;
+  --mdq-on-danger: #eff1f5;
+  --mdq-danger-soft: rgba(210, 15, 57, 0.1);
+  --mdq-danger-ink: #b10d30;
+  --mdq-danger-line: #cd0f38;
+  --mdq-danger-wash: linear-gradient(135deg, #e4dae2, #ead1db);
+  --mdq-info: #177181;
+  --mdq-info-text: #177181;
+  --mdq-on-info: #eff1f5;
+  --mdq-info-soft: rgba(32, 159, 181, 0.1);
+  --mdq-info-ink: #146472;
+  --mdq-info-line: #177181;
+  --mdq-bar: #8534ef;
+  --mdq-on-bar: #eff1f5;
+  --mdq-bar-muted: #64677b;
+  --mdq-on-bar-muted: #eff1f5;
+  --mdq-bar-wash: rgba(133, 52, 239, 0.16);
+  --mdq-timer-ok: #2f7620;
+  --mdq-timer-warn: #b44201;
+  --mdq-timer-urgent: #cd0f38;
+  --mdq-timer-track: #7c7f93;
+  --mdq-rank-first: #774c10;
+  --mdq-rank-second: #525465;
+  --mdq-rank-third: #933601;
+  --mdq-page-glow-top: transparent;
+  --mdq-page-glow-cool: transparent;
+  --mdq-page-glow-warm: transparent;
+  background: #eff1f5;
+}
+
+/* The reference footer dims its text to 78 percent, which drops Latte's soft
+   ink below 4.5:1 on the slide, so keep it solid. */
+html[data-palette="catppuccin"][data-theme="light"] .slide-references {
+  color: var(--mdq-slide-ink-soft);
+}
+
+html[data-palette="catppuccin"][data-theme="light"] .slide-surface {
+  background: linear-gradient(180deg, #eff1f5 0%, #e6e9ef 100%);
+}
+
+html[data-palette="catppuccin"][data-theme="light"] .slide-surface .quiz-html code,
+html[data-palette="catppuccin"][data-theme="light"] .slide-surface .quiz-html pre {
+  background: #dce0e8;
+  color: #4c4f69;
+}
+
+html[data-palette="catppuccin"][data-theme="light"] .slide-surface .quiz-html strong {
+  color: #4c4f69;
+}
+
+/* The tinted status pills on the slide use the deeper ink shades, which hold
+   4.5:1 on their own tint over the lower slide gradient stop. */
+html[data-palette="catppuccin"][data-theme="light"] .slide-status-pill-success {
+  color: var(--mdq-success-ink);
+}
+
+html[data-palette="catppuccin"][data-theme="light"] .slide-status-pill-warning {
+  color: var(--mdq-warning-ink);
+}
+
+/* Question and reveal text outside the slide canvas. */
+html[data-palette="catppuccin"]:not([data-theme="light"]) .quiz-html code,
+html[data-palette="catppuccin"]:not([data-theme="light"]) .quiz-html pre {
+  background: #11111b;
+  color: #cdd6f4;
+}
+
+html[data-palette="catppuccin"][data-theme="light"] .quiz-html code,
+html[data-palette="catppuccin"][data-theme="light"] .quiz-html pre {
+  background: #dce0e8;
+  color: #4c4f69;
+}
+
+/* The dark selection-mode card and chips carry classic purple and green in
+   their base rules; the light theme already reads the tokens. */
+html[data-palette="catppuccin"]:not([data-theme="light"]) .selection-mode-card-single {
+  border-color: rgba(203, 166, 247, 0.34);
+  background: linear-gradient(135deg, #313244, #1e1e2e);
+}
+
+html[data-palette="catppuccin"]:not([data-theme="light"]) .selection-mode-card-single::after {
+  background: rgba(203, 166, 247, 0.22);
+}
+
+html[data-palette="catppuccin"]:not([data-theme="light"]) .selection-mode-card-multi {
+  border-color: rgba(137, 180, 250, 0.32);
+  background: linear-gradient(135deg, #313244, #1e1e2e);
+}
+
+html[data-palette="catppuccin"]:not([data-theme="light"]) .selection-mode-card-multi::after {
+  background: rgba(137, 180, 250, 0.2);
+}
+
+html[data-palette="catppuccin"]:not([data-theme="light"]) .selection-mode-label {
+  color: #cdd6f4;
+}
+
+html[data-palette="catppuccin"]:not([data-theme="light"]) .selection-mode-text {
+  color: #a6adc8;
+}
+
+html[data-palette="catppuccin"]:not([data-theme="light"]) .selection-mode-chip-single {
+  color: #cba6f7;
+  border-color: rgba(203, 166, 247, 0.4);
+  background: #11111b;
+}
+
+html[data-palette="catppuccin"]:not([data-theme="light"]) .selection-mode-chip-multi {
+  color: #89b4fa;
+  border-color: rgba(137, 180, 250, 0.4);
+  background: #11111b;
+}
+
+html[data-palette="catppuccin"]:not([data-theme="light"]) .leaderboard-row.rank-first {
+  --leaderboard-rank-color: #f9e2af;
+}
+
+html[data-palette="catppuccin"]:not([data-theme="light"]) .leaderboard-row.rank-second {
+  --leaderboard-rank-color: #bac2de;
+}
+
+html[data-palette="catppuccin"]:not([data-theme="light"]) .leaderboard-row.rank-third {
+  --leaderboard-rank-color: #fab387;
+}
+
+/* Below the podium the row keeps a neutral tint, so fourth place does not
+   pick up the accent that the podium places use. */
+html[data-palette="catppuccin"]:not([data-theme="light"]) .leaderboard-row.rank-standard {
+  --leaderboard-rank-color: #a6adc8;
+}
+
+/* The viewer's own row adds an accent wash. Third place keeps its own
+   colour there, which holds 4.5:1 on that wash. */
+html[data-palette="catppuccin"]:not([data-theme="light"]) .leaderboard-row.leaderboard-row-highlight.rank-third {
+  --leaderboard-rank-color: #fab387;
+}
+
+html[data-palette="catppuccin"][data-theme="light"] .leaderboard-row.rank-standard {
+  --leaderboard-rank-color: #525465;
+}
+
 
 /* ── seoul256 palette (deck palette: seoul256) ── */
 /* Rules follow. */

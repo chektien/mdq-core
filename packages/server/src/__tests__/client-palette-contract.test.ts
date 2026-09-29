@@ -113,7 +113,7 @@ describe("client slide palette contract", () => {
       expect(css).not.toMatch(/data-palette="classic"/);
       expect(themeCss).not.toMatch(/data-palette/);
       for (const [, selector] of paletteRules) {
-        expect(selector).toContain('data-palette="gruvbox"');
+        expect(selector).toMatch(/data-palette="(gruvbox|rose-pine|catppuccin|seoul256|ayu|tokyo-night)"/);
       }
     });
 
