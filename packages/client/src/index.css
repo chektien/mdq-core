@@ -814,6 +814,16 @@ html[data-palette="gruvbox"]:not([data-theme="light"]) .leaderboard-row.rank-sta
   --leaderboard-rank-color: #bdae93;
 }
 
+html[data-palette="gruvbox"][data-theme="light"] .leaderboard-row.rank-standard {
+  --leaderboard-rank-color: var(--mdq-muted);
+}
+
+/* The viewer's own row adds an accent wash, so a dark theme lightens the
+   third-place orange to hold 4.5:1 on it. */
+html:not([data-theme="light"]) .leaderboard-row.leaderboard-row-highlight.rank-third {
+  --leaderboard-rank-color: #ffa552;
+}
+
 /* ── Light-theme media canvas ───────────── */
 html[data-theme="light"] .slide-media-figure {
   border-color: rgba(100, 116, 139, 0.3);
@@ -1201,6 +1211,10 @@ html[data-theme="light"] .slide-action-button-warning {
   color: var(--mdq-slide-ink-soft);
   box-shadow: none;
   cursor: not-allowed;
+}
+
+html[data-theme="light"] .slide-action-button-warning:disabled {
+  border-color: var(--mdq-control-border);
 }
 
 .slide-status-pill {
@@ -4603,7 +4617,6 @@ html[data-theme="light"] .open-response-list {
 }
 
 html[data-theme="light"] .open-response-entry {
-  border-color: #59574f;
   background: #41413f;
 }
 

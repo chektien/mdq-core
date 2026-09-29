@@ -565,7 +565,7 @@ html[data-theme="light"] .leaderboard-row.rank-third {
 }
 
 html[data-theme="light"] .leaderboard-row.rank-standard {
-  --leaderboard-rank-color: var(--mdq-muted);
+  --leaderboard-rank-color: var(--mdq-accent-ink);
 }
 
 html[data-theme="light"] [class*="bg-[#0f1117]/90"] {
