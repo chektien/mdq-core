@@ -586,9 +586,69 @@ function renderGruvboxTokens(theme: PrintTheme): string {
     `;
 }
 
+// Rosé Pine follows the rose-pine/rose-pine-palette colours (MIT,
+// https://github.com/rose-pine/rose-pine-palette) and mirrors the live slide
+// palette in packages/client/src/index.css: dark is Rosé Pine, light is Rosé
+// Pine Dawn with text #575279. Dawn hues that miss 4.5:1 on the cream page
+// are lowered in lightness (iris #907aa9 to #6a5482, foam #56949f to #39636a,
+// pine #286983 to #26637b), and dark pine #31748f is lightened to #779eb7 for
+// answer text. Secondary text is moved off subtle (#908caa to #a4a0bc in dark,
+// #797593 to #5f5b7a in Dawn) as in the live palette. Attendee notes and
+// explanations use iris, presenter notes foam.
 function renderRosePineTokens(theme: PrintTheme): string {
-  // TODO(palette-values): rose-pine
-  return renderThemeTokens(theme, "classic");
+  if (theme === "light") {
+    return `
+      --page-bg: #faf4ed;
+      --ink: #575279;
+      --body: #575279;
+      --muted: #5f5b7a;
+      --line: rgba(87, 82, 121, 0.28);
+      --soft-line: rgba(87, 82, 121, 0.14);
+      --paper: #faf4ed;
+      --wash: #f4ede8;
+      --option-bg: #faf4ed;
+      --media-bg: #f2e9e1;
+      --accent: #6a5482;
+      --accent-soft: rgba(106, 84, 130, 0.1);
+      --teal: #6a5482;
+      --teal-line: rgba(106, 84, 130, 0.35);
+      --teal-soft: rgba(106, 84, 130, 0.09);
+      --amber: #39636a;
+      --amber-line: rgba(57, 99, 106, 0.38);
+      --amber-soft: rgba(57, 99, 106, 0.09);
+      --green: #26637b;
+      --green-line: rgba(38, 99, 123, 0.45);
+      --green-soft: rgba(38, 99, 123, 0.12);
+      --reference: #5f5b7a;
+      --shadow: rgba(87, 82, 121, 0.05);
+    `;
+  }
+
+  return `
+      --page-bg: #191724;
+      --ink: #e0def4;
+      --body: #e0def4;
+      --muted: #a4a0bc;
+      --line: rgba(224, 222, 244, 0.32);
+      --soft-line: rgba(224, 222, 244, 0.16);
+      --paper: #1f1d2e;
+      --wash: #26233a;
+      --option-bg: #1f1d2e;
+      --media-bg: #191724;
+      --accent: #c4a7e7;
+      --accent-soft: rgba(196, 167, 231, 0.12);
+      --teal: #c4a7e7;
+      --teal-line: rgba(196, 167, 231, 0.42);
+      --teal-soft: rgba(196, 167, 231, 0.12);
+      --amber: #9ccfd8;
+      --amber-line: rgba(156, 207, 216, 0.42);
+      --amber-soft: rgba(156, 207, 216, 0.12);
+      --green: #779eb7;
+      --green-line: rgba(119, 158, 183, 0.46);
+      --green-soft: rgba(119, 158, 183, 0.12);
+      --reference: #a4a0bc;
+      --shadow: rgba(0, 0, 0, 0.18);
+    `;
 }
 
 function renderCatppuccinTokens(theme: PrintTheme): string {
@@ -617,8 +677,7 @@ function printPageBackground(theme: PrintTheme, palette: PrintPalette): string {
       return theme === "dark" ? "#282828" : "#eff0ec";
 
     case "rose-pine":
-      // TODO(palette-values): rose-pine
-      return printPageBackground(theme, "classic");
+      return theme === "dark" ? "#191724" : "#faf4ed";
 
     case "catppuccin":
       // TODO(palette-values): catppuccin
