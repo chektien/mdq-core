@@ -9,7 +9,7 @@ const SLIDE = "## Media\n\ntype: slide\nmedia-group: Before\nslide-background: .
 const OPEN = "## Reflect\n\nquestion-type: open-response\n\nShare one takeaway.";
 const LIVE = "## Live\n\ntype: slide\nlive-url: https://example.edu/demo\nlive-title-overlay: true\nlive-interactive: false\n\nText.";
 const VIDEO = "## Video\n\ntype: slide\nvideo-card: https://example.edu/v.mp4\nvideo-thumbnail: ../images/thumb.png\nvideo-caption: A caption\nvideo-label: Watch\n\nText.";
-const HEADER = "presenter-notes: false\npresenter-notes-default-open: true";
+const HEADER = "presenter-notes: false\npresenter-notes-default-open: true\nstudent-id: false";
 
 const underscored = (text: string) => text.replace(/^(\s*[A-Za-z]+(?:-[A-Za-z]+)+)(\s*:)/gm, (_all, key: string, colon: string) => key.replace(/-/g, "_") + colon)
   .replace(/open-response/g, "open_response");
@@ -26,6 +26,7 @@ describe("dashed setting keys", () => {
     const [quiz, slide, open, live, video] = fromDashed.quiz!.questions;
     expect(fromDashed.quiz!.presenterNotes).toBe(false);
     expect(fromDashed.quiz!.presenterNotesDefaultOpen).toBe(true);
+    expect(fromDashed.quiz!.studentId).toBe(false);
     expect([quiz.timeLimitSec, quiz.allowsMultiple, quiz.correctOptions]).toEqual([45, true, ["A", "B"]]);
     expect(slide.slideMedia ?? []).toEqual([]);
     expect(slide.slideBackground).toEqual({ src: "/data/images/bg.png", position: "top", size: "contain" });

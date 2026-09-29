@@ -77,6 +77,7 @@ export function parseQuizMarkdown(source: string, sourceFile: string): ParseResu
     sourceFile,
     errors,
   );
+  const studentId = extractDeckBooleanMetadata(markdown, "student_id", sourceFile, errors);
 
   // Extract deck key from filename (e.g., "week01.md" -> "week01", "featured-demo.md" -> "featured-demo")
   const sourceStem = sourceFile.replace(/^.*[\\/]/, "").replace(/\.md$/i, "").toLowerCase();
@@ -116,6 +117,7 @@ export function parseQuizMarkdown(source: string, sourceFile: string): ParseResu
     palette,
     presenterNotes,
     presenterNotesDefaultOpen,
+    studentId,
     questions,
     sourceFile,
   };
@@ -228,7 +230,7 @@ function extractDeckPaletteMetadata(
 
 function extractDeckBooleanMetadata(
   markdown: string,
-  key: "presenter_notes" | "presenter_notes_default_open",
+  key: "presenter_notes" | "presenter_notes_default_open" | "student_id",
   sourceFile: string,
   errors: QuizParseError[],
 ): boolean | undefined {

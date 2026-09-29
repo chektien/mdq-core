@@ -375,6 +375,11 @@ export interface Quiz {
   presenterNotes?: boolean;
   /** Optional per-deck override for the panel's initial expanded state. */
   presenterNotesDefaultOpen?: boolean;
+  /**
+   * Whether the join form asks for a Student ID (`student-id:` in the deck
+   * header). Absent means on; `false` asks for a name only and uses it as the ID.
+   */
+  studentId?: boolean;
   questions: Question[];
   sourceFile: string;
 }
