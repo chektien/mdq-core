@@ -107,6 +107,10 @@ export interface QuestionState {
   isPoll: boolean;
   timeLimitSec: number;
   startedAt: number;
+  /** Position among the deck's questions, slides not counted; absent on a slide or from an older server. */
+  questionNumber?: number;
+  /** How many questions the deck has, slides not counted. */
+  questionTotal?: number;
 }
 
 /**
@@ -184,11 +188,15 @@ export interface UseSocketReturn {
   /** The name others see for this participant, and why it may differ from what they typed. */
   label: string | null;
   labelNote: string | null;
+  /** The deck's title, when the deck has one. */
+  deckTitle: string | null;
   answeredQuestions: number[];
 
   // Question
   currentQuestion: QuestionState | null;
   remainingSec: number;
+  /** True when the open question closed because its time ran out, false when the instructor closed it early. */
+  closedByTimer: boolean;
   answerCount: AnswerCountPayload | null;
   submitted: boolean;
   submittedOptions: string[];
@@ -229,6 +237,7 @@ export function useSocket(
   const pendingAnswerRef = useRef<StudentAnswer | null>(null);
   // Server clock minus this device's, so the countdown can run on while offline.
   const clockOffsetRef = useRef(0);
+  const remainingSecRef = useRef(0);
   const [connected, setConnected] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -238,10 +247,12 @@ export function useSocket(
   const [publicKey, setPublicKey] = useState<string | null>(null);
   const [label, setLabel] = useState<string | null>(null);
   const [labelNote, setLabelNote] = useState<string | null>(null);
+  const [deckTitle, setDeckTitle] = useState<string | null>(null);
   const [answeredQuestions, setAnsweredQuestions] = useState<number[]>([]);
 
   const [currentQuestion, setCurrentQuestion] = useState<QuestionState | null>(null);
   const [remainingSec, setRemainingSec] = useState(0);
+  const [closedByTimer, setClosedByTimer] = useState(false);
   const [answerCount, setAnswerCount] = useState<AnswerCountPayload | null>(null);
   const [submitted, setSubmitted] = useState(false);
   const [submittedOptions, setSubmittedOptions] = useState<string[]>([]);
@@ -258,6 +269,10 @@ export function useSocket(
   useEffect(() => {
     currentQuestionRef.current = currentQuestion;
   }, [currentQuestion]);
+
+  useEffect(() => {
+    remainingSecRef.current = remainingSec;
+  }, [remainingSec]);
 
   useEffect(() => {
     studentIdRef.current = studentIdState;
@@ -322,6 +337,7 @@ export function useSocket(
       setPublicKey(data.publicKey ?? null);
       setLabel(data.label ?? null);
       setLabelNote(data.labelNote ?? null);
+      setDeckTitle(data.deckTitle?.trim() || null);
       setSessionState(data.sessionState);
       setAnsweredQuestions(data.answeredQuestions || []);
       answeredQuestionsRef.current = data.answeredQuestions || [];
@@ -385,6 +401,8 @@ export function useSocket(
         isPoll: data.isPoll ?? false,
         timeLimitSec: data.timeLimitSec,
         startedAt: data.startedAt,
+        questionNumber: data.questionNumber,
+        questionTotal: data.questionTotal,
       };
       // A snapshot that repeats the opening on screen keeps the same object, so
       // the student view does not clear an option chosen while offline.
@@ -412,19 +430,25 @@ export function useSocket(
       setSubmittedOptions(seeded.selectedOptions);
       setSubmittedResponseText(seeded.responseText);
       setRemainingSec(data.timeLimitSec);
+      remainingSecRef.current = data.timeLimitSec;
+      setClosedByTimer(false);
       // A live open arrives as the question starts; a replayed one is followed by a tick that corrects this.
       clockOffsetRef.current = data.startedAt - Date.now();
     });
 
     socket.on(SocketEvents.QUESTION_TICK, (data: QuestionTickPayload) => {
       setRemainingSec(data.remainingSec);
+      remainingSecRef.current = data.remainingSec;
       const shown = currentQuestionRef.current;
       if (shown) clockOffsetRef.current = clockOffsetFromTick(shown, data.remainingSec, Date.now());
     });
 
     socket.on(SocketEvents.QUESTION_CLOSE, () => {
+      // The last tick and the close can arrive in either order, so one second left still counts as the timer running out.
+      setClosedByTimer(remainingSecRef.current <= 1);
       setSessionState("QUESTION_CLOSED");
       setRemainingSec(0);
+      remainingSecRef.current = 0;
     });
 
     socket.on(SocketEvents.ANSWER_ACCEPTED, (data: { questionIndex: number }) => {
@@ -646,6 +670,7 @@ export function useSocket(
     setPublicKey(null);
     setLabel(null);
     setLabelNote(null);
+    setDeckTitle(null);
   }, []);
 
   return {
@@ -657,9 +682,11 @@ export function useSocket(
     publicKey,
     label,
     labelNote,
+    deckTitle,
     answeredQuestions,
     currentQuestion,
     remainingSec,
+    closedByTimer,
     answerCount,
     submitted,
     submittedOptions,

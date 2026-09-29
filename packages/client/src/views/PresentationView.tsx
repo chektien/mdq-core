@@ -5,6 +5,7 @@ import { fetchPresentationSession, type PresentationSessionResponse } from "../h
 import { useSocket, type QuestionState, type RevealState } from "../hooks/useSocket";
 import Timer from "../components/Timer";
 import Leaderboard from "../components/Leaderboard";
+import { deckLabel, resultsHeading } from "../deckLabel";
 import OpenResponseList, { OpenResponseCount } from "../components/OpenResponseList";
 import QRPanel from "../components/QRPanel";
 import SessionCodeCard from "../components/SessionCodeCard";
@@ -18,13 +19,6 @@ import { getQuestionModeText } from "../questionMode";
 import { applyClientPalette, applyClientTheme } from "../theme";
 
 const EMPTY_QUESTION_HEADINGS: string[] = [];
-
-function formatQuizLabel(quizKey: string): string {
-  const normalized = quizKey.trim();
-  if (!normalized) return "MDQ";
-  if (/\bmdq\b/i.test(normalized)) return normalized;
-  return `${normalized} MDQ`;
-}
 
 function formatPositionLabel(questionIndex: number, totalQuestions: number): string {
   return totalQuestions > 0 ? `${questionIndex + 1}/${totalQuestions}` : `${questionIndex + 1}`;
@@ -100,7 +94,7 @@ export default function PresentationView({
   }
 
   const state = (sock.sessionState || meta?.state || null) as SessionState | null;
-  const quizLabel = formatQuizLabel(meta?.week || "");
+  const quizLabel = deckLabel(meta?.title, meta?.week || "");
   const accessInfo = meta?.accessInfo || null;
   const questionHeadings = meta?.questionHeadings || EMPTY_QUESTION_HEADINGS;
   const totalQuestions = meta?.questionCount || 0;
@@ -241,7 +235,7 @@ export default function PresentationView({
   }
 
   const liveSurfaceStatusLabel = isLeaderboardDisplay
-    ? quizLabel ? `Leaderboard for ${quizLabel.toUpperCase()}` : "Leaderboard"
+    ? resultsHeading("leaderboard", quizLabel)
     : quizStatusLabel;
   const liveSurfaceContent = (() => {
     if (currentQuestion && (state === "QUESTION_OPEN" || state === "QUESTION_CLOSED")) {

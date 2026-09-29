@@ -21,10 +21,12 @@ function getImageLabel(image: HTMLImageElement): string {
 function QuizHtml({
   html,
   className,
+  id,
   as = "div",
 }: {
   html: string;
   className: string;
+  id?: string;
   as?: "div" | "span";
 }) {
   const containerRef = useRef<HTMLElement | null>(null);
@@ -87,6 +89,7 @@ function QuizHtml({
   }, [html]);
 
   const htmlProps = {
+    id,
     className,
     dangerouslySetInnerHTML: { __html: html },
   };

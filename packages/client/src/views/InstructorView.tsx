@@ -27,6 +27,7 @@ import type { AccessInfo, DeckPalette, DeckTheme, FoldoutNote, OpenResponseEntry
 import { applyClientPalette, applyClientTheme } from "../theme";
 import Timer from "../components/Timer";
 import Leaderboard from "../components/Leaderboard";
+import { deckLabel, resultsHeading } from "../deckLabel";
 import OpenResponseList from "../components/OpenResponseList";
 import QRPanel from "../components/QRPanel";
 import SessionCodeCard from "../components/SessionCodeCard";
@@ -48,13 +49,6 @@ interface StoredInstructorRestore {
   sessionCode: string;
   week: string;
   createdAt: number;
-}
-
-function formatQuizLabel(quizKey: string): string {
-  const normalized = quizKey.trim();
-  if (!normalized) return "MDQ";
-  if (/\bmdq\b/i.test(normalized)) return normalized;
-  return `${normalized} MDQ`;
 }
 
 function formatPositionLabel(questionIndex: number, totalQuestions: number): string {
@@ -242,7 +236,7 @@ export default function InstructorView({
       setTotalQuestionsInQuiz(snapshot.questionCount);
       setQuestionHeadings(snapshot.questionHeadings || []);
       setQuestionSummaries(snapshot.questionSummaries || []);
-      setQuizLabel(formatQuizLabel(snapshot.week));
+      setQuizLabel(deckLabel(snapshot.title, snapshot.week));
       setSessionTheme(snapshot.theme);
       setSessionPalette(snapshot.palette);
       setHoldAppearance(false);
@@ -347,7 +341,7 @@ export default function InstructorView({
       if (deck) setTotalQuestionsInQuiz(deck.questionCount);
       setQuestionHeadings(info.questionHeadings || []);
       setQuestionSummaries(info.questionSummaries || []);
-      setQuizLabel(formatQuizLabel(deck?.week || selectedWeek));
+      setQuizLabel(deckLabel(deck?.title, deck?.week || selectedWeek));
       setSessionTheme(info.theme);
       setSessionPalette(info.palette);
       setRestoreNotice(null);
@@ -645,7 +639,7 @@ export default function InstructorView({
         <h1 className="text-3xl font-bold text-white">Session Ended</h1>
         {quizLabel && (
           <h2 className="text-xl font-semibold text-zinc-300 text-center">
-            Leaderboard for {quizLabel.toUpperCase()}
+            {resultsHeading("leaderboard", quizLabel)}
           </h2>
         )}
         <Leaderboard
@@ -1103,7 +1097,7 @@ function LiveView({
   ) : null;
 
   const liveSurfaceStatusLabel = isLeaderboardDisplay
-    ? quizLabel ? `Leaderboard for ${quizLabel.toUpperCase()}` : "Leaderboard"
+    ? resultsHeading("leaderboard", quizLabel)
     : isSlideDisplay
       ? slideStatusLabel
       : quizStatusLabel;
@@ -1611,7 +1605,7 @@ function LiveView({
             joinUrl={accessInfo?.shortUrl || accessInfo?.fullUrl}
             shortUrl={accessInfo?.shortUrl}
             joinCardDefaultExpanded={false}
-            statusLabel={quizLabel ? `Leaderboard for ${quizLabel.toUpperCase()}` : "Leaderboard"}
+            statusLabel={resultsHeading("leaderboard", quizLabel)}
             navActions={liveSurfaceNavActions}
             actions={liveSurfaceActions}
           >

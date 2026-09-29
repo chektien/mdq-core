@@ -45,9 +45,9 @@ export default function DistributionChart({
               {label}
             </span>
             <DistributionBar
-              widthPct={Math.max(pct, 2)}
+              widthPct={count > 0 ? Math.max(pct, 2) : 0}
               barColor={barColor}
-              text={count > 0 ? `${count} (${percentageBase > 0 ? Math.round((count / percentageBase) * 100) : 0}%)` : null}
+              text={`${count} (${percentageBase > 0 ? Math.round((count / percentageBase) * 100) : 0}%)`}
             />
           </div>
         );
