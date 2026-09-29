@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import { useSocket } from "../hooks/useSocket";
 import type { QuestionState, RevealState } from "../hooks/useSocket";
-import { API } from "@mdq/shared";
+import { API, MAX_OPEN_RESPONSE_LENGTH } from "@mdq/shared";
 import type { DeckPalette, DeckTheme, SessionState } from "@mdq/shared";
 import Timer from "../components/Timer";
 import Leaderboard from "../components/Leaderboard";
@@ -841,12 +841,21 @@ function QuestionView({
             onChange={(e) => setResponseText(e.target.value)}
             disabled={isClosed}
             placeholder="Type your response here"
+            maxLength={MAX_OPEN_RESPONSE_LENGTH}
+            aria-describedby={`open-response-note-${question.questionIndex}`}
             rows={8}
             className="min-h-[220px] w-full resize-y rounded-2xl border border-zinc-700 bg-zinc-800/80 px-4 py-4 text-base leading-relaxed text-white placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-70"
           />
-          <p className="mt-3 text-sm text-zinc-400">
+          <p id={`open-response-note-${question.questionIndex}`} className="mt-3 text-sm text-zinc-400">
             Your response is unscored and won&apos;t affect the leaderboard.
           </p>
+          {responseText.length >= MAX_OPEN_RESPONSE_LENGTH - 200 && (
+            <p role="status" className="open-response-length mt-1 text-sm text-zinc-400">
+              {responseText.length >= MAX_OPEN_RESPONSE_LENGTH
+                ? "That is the longest a response can be."
+                : `${MAX_OPEN_RESPONSE_LENGTH - responseText.length} characters left`}
+            </p>
+          )}
         </div>
       ) : (
         <div className="space-y-3 flex-1">

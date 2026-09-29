@@ -13,6 +13,8 @@ import {
   endSession,
   showLeaderboard,
   hideLeaderboard,
+  setResponseHidden,
+  resultsCsvUrl,
   fetchSessionAccessInfo,
   fetchSessionStateForRestore,
   fetchPresenterNotes,
@@ -21,7 +23,7 @@ import {
   type CreateSessionResponse,
   type SessionRestoreResponse,
 } from "../hooks/api";
-import type { AccessInfo, DeckPalette, DeckTheme, FoldoutNote, QuestionType, SessionState } from "@mdq/shared";
+import type { AccessInfo, DeckPalette, DeckTheme, FoldoutNote, OpenResponseEntry, QuestionType, SessionState } from "@mdq/shared";
 import { applyClientPalette, applyClientTheme } from "../theme";
 import Timer from "../components/Timer";
 import Leaderboard from "../components/Leaderboard";
@@ -652,12 +654,23 @@ export default function InstructorView({
           maxRows={15}
           showStudentIds={!autoGenerateStudentIds}
         />
-        <a
-          href="#/"
-          className="bg-zinc-800 hover:bg-zinc-700 text-white font-semibold py-3 px-8 rounded-xl transition-colors"
-        >
-          Back to Home
-        </a>
+        <div className="flex flex-wrap items-center justify-center gap-3">
+          {sid && (
+            <a
+              href={resultsCsvUrl(sid)}
+              download
+              className="instructor-results-download bg-zinc-800 hover:bg-zinc-700 text-white font-semibold py-3 px-8 rounded-xl transition-colors"
+            >
+              Download results (CSV)
+            </a>
+          )}
+          <a
+            href="#/"
+            className="bg-zinc-800 hover:bg-zinc-700 text-white font-semibold py-3 px-8 rounded-xl transition-colors"
+          >
+            Back to Home
+          </a>
+        </div>
       </div>
     );
   }
@@ -737,6 +750,7 @@ function LiveView({
 
   const [reviewQuestionIndex, setReviewQuestionIndex] = useState<number | null>(null);
   const [showEndConfirm, setShowEndConfirm] = useState(false);
+  const [moderationNotice, setModerationNotice] = useState<string | null>(null);
   const [questionCache, setQuestionCache] = useState<Record<number, QuestionState>>({});
   const [revealCache, setRevealCache] = useState<Record<number, RevealState>>({});
 
@@ -806,6 +820,19 @@ function LiveView({
     ? getQuestionModeText(displayQuestion.questionType, displayQuestion.allowsMultiple)
     : "";
   const liveRevealActionLabel = getRevealActionLabel(q?.questionType ?? "multiple_choice");
+  // Hide or show one response on the projector; the server sends back the new state.
+  const toggleResponseHidden = useCallback(async (response: OpenResponseEntry, hidden: boolean) => {
+    if (!displayQuestion) return;
+    setModerationNotice(null);
+    try {
+      await setResponseHidden(sessionId, displayQuestion.questionIndex, response.publicKey, hidden);
+    } catch (e) {
+      setModerationNotice(e instanceof Error ? e.message : "That did not work. Please try again.");
+    }
+  }, [displayQuestion, sessionId]);
+  const moderationProps = isReviewing || !sock.connected
+    ? {}
+    : { onToggleHidden: toggleResponseHidden, notice: moderationNotice };
   const liveOpenResponses = displayQuestion?.questionType === "open_response"
     ? sock.answerCount?.openResponses ?? []
     : [];
@@ -1012,6 +1039,7 @@ function LiveView({
         tone: "primary",
       });
     }
+    actions.push({ label: "Download results (CSV)", href: resultsCsvUrl(sessionId) });
     actions.push({
       label: "End Session",
       onClick: requestEndSession,
@@ -1127,6 +1155,7 @@ function LiveView({
               responses={liveOpenResponses}
               title={state === "QUESTION_CLOSED" ? "Submitted Responses" : "Live Responses"}
               showStudentIds={!autoGenerateStudentIds}
+              {...moderationProps}
             />
           ) : (
             (() => {
@@ -1178,7 +1207,7 @@ function LiveView({
           />
 
           {displayQuestion.questionType === "open_response" ? (
-            <OpenResponseList responses={revealOpenResponses} title="Responses" emptyLabel="No responses were submitted." showStudentIds={!autoGenerateStudentIds} />
+            <OpenResponseList responses={revealOpenResponses} title="Responses" emptyLabel="No responses were submitted." showStudentIds={!autoGenerateStudentIds} {...moderationProps} />
           ) : showDetailedRevealChoices && (() => {
             const dist = displayReveal.distribution;
             const maxCount = Math.max(1, ...Object.values(dist));
@@ -1431,6 +1460,7 @@ function LiveView({
                       responses={liveOpenResponses}
                       title={state === "QUESTION_CLOSED" ? "Submitted Responses" : "Live Responses"}
                       showStudentIds={!autoGenerateStudentIds}
+                      {...moderationProps}
                     />
                   ) : (
                     (() => {
@@ -1500,7 +1530,7 @@ function LiveView({
               />
 
               {displayQuestion.questionType === "open_response" ? (
-                <OpenResponseList responses={revealOpenResponses} title="Responses" emptyLabel="No responses were submitted." showStudentIds={!autoGenerateStudentIds} />
+                <OpenResponseList responses={revealOpenResponses} title="Responses" emptyLabel="No responses were submitted." showStudentIds={!autoGenerateStudentIds} {...moderationProps} />
               ) : showDetailedRevealChoices && (() => {
                 const dist = displayReveal.distribution;
                 const maxCount = Math.max(1, ...Object.values(dist));

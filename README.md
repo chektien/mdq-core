@@ -473,6 +473,8 @@ Rules:
 - Use `type: poll` when you want a non-scored poll question. Poll questions must not include `> Correct Answer:` or `> Correct Answers:` lines.
 - Poll questions still respect `multi-select:`. Omit it for a single-choice poll, or set `multi-select: true` for a multi-select poll.
 - Use `type: open_response` for a written, non-scored response prompt.
+- Open responses can be up to 1000 characters. The instructor sees every response live, each with a Hide / Show button. While the question is open the projector shows only how many responses are in; once you reveal, it shows the responses that are not hidden, and hiding or showing one updates it at once. Phones never receive other participants' responses. The same control is available as `POST /api/session/:id/response-visibility` with `{ "questionIndex": 2, "publicKey": "...", "hidden": true }` (instructor login when one is configured).
+- `GET /api/session/:id/results.csv` downloads the results as a CSV file, while the session runs and after it ends (instructor login when one is configured). The instructor view links to it as "Download results (CSV)".
 - Use `type: slide` for non-interactive slide content. Slides have no timer, answer choices, correct answers, submissions, or leaderboard weight.
 - Add standard markdown images to slide bodies when you want MDQ to arrange media beside the text. Images are scaled proportionately and never cropped or stretched.
 - Use `live-url: https://...` on a slide when you want the instructor/projector surface to embed a live website as the slide itself. Add `live-title-overlay: true` to keep the slide title and body text over the live surface, and keep a normal markdown image in the slide as the static fallback for PDF exports and non-live surfaces.

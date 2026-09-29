@@ -5,7 +5,7 @@ import { fetchPresentationSession, type PresentationSessionResponse } from "../h
 import { useSocket, type QuestionState, type RevealState } from "../hooks/useSocket";
 import Timer from "../components/Timer";
 import Leaderboard from "../components/Leaderboard";
-import OpenResponseList from "../components/OpenResponseList";
+import OpenResponseList, { OpenResponseCount } from "../components/OpenResponseList";
 import QRPanel from "../components/QRPanel";
 import SessionCodeCard from "../components/SessionCodeCard";
 import InlineMarkdownText from "../components/InlineMarkdownText";
@@ -110,9 +110,8 @@ export default function PresentationView({
     reveal && currentQuestion && reveal.questionIndex === currentQuestion.questionIndex
       ? reveal
       : null;
-  const liveOpenResponses = currentQuestion?.questionType === "open_response"
-    ? sock.answerCount?.openResponses ?? []
-    : [];
+  // While a question is open the projector only knows how many responses are in; the text comes with the reveal.
+  const liveResponseCount = sock.answerCount?.submitted ?? 0;
 
   const currentHeading = useMemo(() => {
     if (!currentQuestion) return null;
@@ -279,11 +278,7 @@ export default function PresentationView({
           </div>
 
           {currentQuestion.questionType === "open_response" ? (
-            <OpenResponseList
-              responses={liveOpenResponses}
-              title={state === "QUESTION_CLOSED" ? "Submitted Responses" : "Live Responses"}
-              showStudentIds={false}
-            />
+            <OpenResponseCount count={liveResponseCount} />
           ) : (() => {
             const dist = state === "QUESTION_CLOSED" ? sock.distribution?.distribution : null;
             const totalResponses = sock.answerCount?.submitted ?? 0;
@@ -532,11 +527,7 @@ export default function PresentationView({
                   </div>
 
                   {currentQuestion.questionType === "open_response" ? (
-                    <OpenResponseList
-                      responses={liveOpenResponses}
-                      title={state === "QUESTION_CLOSED" ? "Submitted Responses" : "Live Responses"}
-                      showStudentIds={false}
-                    />
+                    <OpenResponseCount count={liveResponseCount} />
                   ) : (() => {
                     const dist = state === "QUESTION_CLOSED" ? sock.distribution?.distribution : null;
                     const totalResponses = sock.answerCount?.submitted ?? 0;
