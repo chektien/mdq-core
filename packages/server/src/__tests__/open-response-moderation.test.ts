@@ -1,6 +1,6 @@
 import { Quiz, Session, SocketEvents, AnswerCountPayload, ResultsRevealPayload, MAX_OPEN_RESPONSE_LENGTH } from "@mdq/shared";
 import { apply, EngineCommandError, type Command, type EngineMessage } from "../engine";
-import { createSession, serializeSession, deserializeSession } from "../session";
+import { createSession, serializeSession, deserializeSession, getOpenResponses } from "../session";
 import { parseQuizMarkdown } from "../parser";
 
 const DECK = `# Moderation check
@@ -208,12 +208,40 @@ describe("open response moderation", () => {
     expect(accepted.some((m) => m.event === SocketEvents.ANSWER_ACCEPTED)).toBe(true);
   });
 
-  it("counts characters, not bytes, so multibyte text has the same cap", () => {
+  it("counts characters, not bytes or UTF-16 units, so an emoji counts as one", () => {
     const { step } = openSession();
     const accepted = step({ type: "answerSubmit", studentId: IDS[0], payload: { questionIndex: 1, responseText: "é字".repeat(MAX_OPEN_RESPONSE_LENGTH / 2) } });
     expect(accepted.some((m) => m.event === SocketEvents.ANSWER_ACCEPTED)).toBe(true);
     const rejected = step({ type: "answerSubmit", studentId: IDS[1], payload: { questionIndex: 1, responseText: "字".repeat(MAX_OPEN_RESPONSE_LENGTH + 1) } });
     expect(rejected.some((m) => m.event === SocketEvents.ANSWER_REJECTED)).toBe(true);
     expect(rejected.some((m) => m.event === SocketEvents.ANSWER_ACCEPTED)).toBe(false);
+  });
+
+  it("accepts a full response of emoji and rejects one more", () => {
+    const { step } = openSession();
+    const emoji = "\u{1F600}";
+    expect(emoji.length).toBe(2);
+    const accepted = step({ type: "answerSubmit", studentId: IDS[0], payload: { questionIndex: 1, responseText: emoji.repeat(MAX_OPEN_RESPONSE_LENGTH) } });
+    expect(accepted.some((m) => m.event === SocketEvents.ANSWER_ACCEPTED)).toBe(true);
+    const rejected = step({ type: "answerSubmit", studentId: IDS[1], payload: { questionIndex: 1, responseText: emoji.repeat(MAX_OPEN_RESPONSE_LENGTH + 1) } });
+    expect(rejected.some((m) => m.event === SocketEvents.ANSWER_REJECTED)).toBe(true);
+    expect(rejected.some((m) => m.event === SocketEvents.ANSWER_ACCEPTED)).toBe(false);
+  });
+
+  it("lists responses from the same millisecond in the same order whatever the submit order", () => {
+    const orderFor = (submitOrder: number[]): string[] => {
+      let session: Session = createSession("tiebreak", "open");
+      const step = (command: Command, at: number) => { session = apply(session, quiz, command, at).session; };
+      IDS.forEach((id, i) => step({ type: "join", socketId: `sock-${i}`, newToken: `tok-${i}`, newPublicKey: `key-${i}`, payload: { studentId: id } }, 100 + i));
+      step({ type: "start" }, 1000);
+      step({ type: "close" }, 1500);
+      step({ type: "reveal" }, 1600);
+      step({ type: "next" }, 2000);
+      submitOrder.forEach((i) => step({ type: "answerSubmit", studentId: IDS[i], payload: { questionIndex: 1, responseText: TEXTS[i] } }, 2100));
+      return getOpenResponses(session, 1).map((r) => r.publicKey);
+    };
+    expect(orderFor([0, 1, 2])).toEqual(["key-0", "key-1", "key-2"]);
+    expect(orderFor([2, 0, 1])).toEqual(["key-0", "key-1", "key-2"]);
+    expect(orderFor([1, 2, 0])).toEqual(["key-0", "key-1", "key-2"]);
   });
 });

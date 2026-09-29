@@ -1,5 +1,6 @@
 import fs from "fs";
 import path from "path";
+import { clampOpenResponse, countCharacters, sentenceStop } from "../../../client/src/responseText";
 import { checkJoinValues, errorField, fieldElementId, joinFormSpec, joinIdentity } from "../../../client/src/joinForm";
 
 const clientSrc = path.resolve(__dirname, "..", "..", "..", "client", "src");
@@ -115,5 +116,23 @@ describe("join form in the student view", () => {
     const presentation = read("views/PresentationView.tsx");
     expect(presentation).not.toMatch(/showStudentIds=\{(?!false)/);
     expect(presentation).not.toContain("studentId");
+  });
+});
+
+describe("response text helpers on the phone", () => {
+  it("puts a full stop after a name unless it already ends in punctuation", () => {
+    expect(sentenceStop("Alex Tan")).toBe(".");
+    expect(sentenceStop("Alex Tan B.")).toBe("");
+    expect(sentenceStop("Alex (2)")).toBe(".");
+    expect(`You are in as Alex Tan B${sentenceStop("Alex Tan B.")}`).not.toContain("..");
+  });
+
+  it("counts an emoji as one character and clamps without splitting it", () => {
+    const emoji = "\u{1F600}";
+    expect(countCharacters(emoji.repeat(3))).toBe(3);
+    expect(countCharacters("é字")).toBe(2);
+    expect(countCharacters(clampOpenResponse(emoji.repeat(1200)))).toBe(1000);
+    expect(clampOpenResponse(emoji.repeat(1200))).toBe(emoji.repeat(1000));
+    expect(clampOpenResponse("short")).toBe("short");
   });
 });

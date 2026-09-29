@@ -10,6 +10,7 @@ import InlineMarkdownText from "../components/InlineMarkdownText";
 import QuizHtml from "../components/QuizHtml";
 import SlideContent from "../components/SlideContent";
 import { getQuestionModeText } from "../questionMode";
+import { clampOpenResponse, countCharacters, sentenceStop } from "../responseText";
 import { checkJoinValues, errorField, fieldElementId, joinFormSpec, joinIdentity } from "../joinForm";
 import type { JoinFieldName, JoinFieldSpec } from "../joinForm";
 import { applyClientPalette, applyClientTheme, resolveClientPalette, resolveClientTheme } from "../theme";
@@ -590,7 +591,7 @@ export default function StudentView({
         <p className="text-zinc-400 text-sm">The instructor will begin shortly</p>
         {sock.label && (
           <p className="student-lobby-label text-zinc-300 text-sm">
-            You are in as <strong className="font-semibold text-white">{sock.label}</strong>.
+            You are in as <strong className="font-semibold text-white">{sock.label}</strong>{sentenceStop(sock.label)}
           </p>
         )}
         {sock.labelNote && (
@@ -838,10 +839,9 @@ function QuestionView({
             id={`open-response-${question.questionIndex}`}
             name={`open-response-${question.questionIndex}`}
             value={responseText}
-            onChange={(e) => setResponseText(e.target.value)}
+            onChange={(e) => setResponseText(clampOpenResponse(e.target.value))}
             disabled={isClosed}
             placeholder="Type your response here"
-            maxLength={MAX_OPEN_RESPONSE_LENGTH}
             aria-describedby={`open-response-note-${question.questionIndex}`}
             rows={8}
             className="min-h-[220px] w-full resize-y rounded-2xl border border-zinc-700 bg-zinc-800/80 px-4 py-4 text-base leading-relaxed text-white placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-70"
@@ -849,11 +849,11 @@ function QuestionView({
           <p id={`open-response-note-${question.questionIndex}`} className="mt-3 text-sm text-zinc-400">
             Your response is unscored and won&apos;t affect the leaderboard.
           </p>
-          {responseText.length >= MAX_OPEN_RESPONSE_LENGTH - 200 && (
+          {countCharacters(responseText) >= MAX_OPEN_RESPONSE_LENGTH - 200 && (
             <p role="status" className="open-response-length mt-1 text-sm text-zinc-400">
-              {responseText.length >= MAX_OPEN_RESPONSE_LENGTH
+              {countCharacters(responseText) >= MAX_OPEN_RESPONSE_LENGTH
                 ? "That is the longest a response can be."
-                : `${MAX_OPEN_RESPONSE_LENGTH - responseText.length} characters left`}
+                : `${MAX_OPEN_RESPONSE_LENGTH - countCharacters(responseText)} characters left`}
             </p>
           )}
         </div>

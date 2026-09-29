@@ -294,7 +294,7 @@ export function getOpenResponses(
       submittedAt: sub.submittedAt,
     }))
     .map((entry) => ({ ...entry, hidden: isResponseHidden(session, questionIndex, entry.publicKey) }))
-    .sort((a, b) => b.submittedAt - a.submittedAt);
+    .sort((a, b) => b.submittedAt - a.submittedAt || (a.publicKey < b.publicKey ? -1 : a.publicKey > b.publicKey ? 1 : 0));
 }
 
 /**
