@@ -291,6 +291,24 @@ Tip for classroom privacy and mobility: project a separate presentation view fro
 - Student QR codes resolve to `/#/join/<SESSION_CODE>` and do not need instructor login.
 - Student join flow does not depend on `VITE_INSTRUCTOR_ROUTE_SEGMENT`.
 
+#### Student join form and privacy
+
+The deck's `student-id` header setting decides what the join form asks for. The form learns it from the session code before it shows any fields.
+
+| Setting | Join form |
+| --- | --- |
+| `student-id: true` (or absent) | Student ID (required, up to 64 characters) and Name (optional, up to 60) |
+| `student-id: false` | Name only (required, up to 60), and the name is the participant's ID |
+
+Either way, each participant has one ID that is unique in the session.
+
+- **Names as IDs.** With `student-id: false` the name is normalised (Unicode NFC, trimmed, runs of whitespace collapsed to one space) and compared without regard to case. A name another seat holds is refused straight away, with a message such as `Someone here is already using the name "Alex Tan". Add an initial or your surname, for example "Alex Tan B."`. A name stays held for the whole session, even after its holder leaves.
+- **Student IDs.** An ID that is already in the session follows the usual seat rules: the same session token, or the same browser after it went offline, takes the seat back; anyone else is told `The Student ID "..." is already in this session on another device. Use that device, or check that you typed your own ID.`
+- **Your own seat is never a clash.** Rejoining with your session token (a reload, a dropped connection) always works.
+- **Labels.** Everyone gets a public label, fixed when they join and never reused in that session: their name (`Alex`), `Alex (2)` for the next participant with the same name (ignoring case), or `Participant 3` (in join order) when a participant with IDs on gave no name. A participant whose label differs from what they typed is told why on the waiting screen (`Another participant is also called Alex, so you appear as Alex (2).`).
+- **Who sees IDs.** The projector, the leaderboard on phones and on the projector, and other students see labels only, never Student IDs. Each participant also gets a random per-session public key (not derived from the ID) which public payloads use in place of the ID, so a phone can still highlight its own leaderboard row. The instructor's view, and the results CSV, show Student IDs and names. `GET /api/session/:id/leaderboard` is public, so it returns labels and public keys only, and `GET /api/leaderboard/cumulative` (saved results by Student ID) needs the instructor login when one is configured.
+- **`autoGenerateStudentIds`.** The runtime option keeps working exactly as before for decks that use Student IDs: the ID field is hidden, the name is required, and an ID generated on the device is sent. A deck with `student-id: false` takes priority: it asks for a name only and the name is the ID, so no ID is generated, whether or not `autoGenerateStudentIds` is on.
+
 Port fallback retries default to 10 attempts (`PORT_FALLBACKS=10`).
 
 For off-LAN access during class, expose your local server with Tailscale Funnel (or an equivalent secure tunnel):
@@ -328,6 +346,7 @@ Student QR behavior:
 - Open the session-scoped `Presentation view` link from the authenticated instructor screen when you want a second display that mirrors the instructor presentation without controls.
 - The presentation route is intentionally not linked from the public home page. A code-based public entry point would let students discover the live projector feed and monitor the session outside the instructor flow.
 - The presentation screen stays read-only. It never renders instructor action buttons or calls instructor REST actions.
+- The projector names participants by label only (lobby, leaderboard and open responses). It never receives Student IDs.
 - A common classroom setup is to connect the laptop to the projector, open the `Presentation view` there, then open the authenticated instructor view on a phone. Advancing, reviewing, revealing feedback, and ending the session from the phone updates the projected laptop view in real time.
 - This keeps instructor-only controls and route details off the projector while still allowing the instructor to move around the room.
 
@@ -412,6 +431,17 @@ title: Demo Presentation Session
 ```
 
 If the preamble title is omitted, MDQ falls back to the first `# ...` heading for backward compatibility.
+
+A deck can also choose what its join form asks for with `student-id:` in the same preamble (see [Student join form and privacy](#student-join-form-and-privacy)):
+
+```markdown
+title: Demo Presentation Session
+student-id: false
+
+---
+```
+
+`student-id` accepts `true` or `false` (case-insensitive, with optional quotes) and defaults to `true` when it is omitted. `student_id` works too. Any other value is a deck parse error.
 
 Each interactive question supports the existing `time-limit:` metadata plus optional `multi-select:` and `type:` flags. `question-type:` remains accepted as a backward-compatible alias. Questions default to multiple choice when `type:` is omitted, and `type: multiple_choice` can be written explicitly. Type values also accept hyphens in place of underscores, such as `open-response` for `open_response`. Question stems, slide bodies, and option text can also include standard markdown images.
 
@@ -648,6 +678,14 @@ Design notes:
 - completed session artifacts are persisted to local flat files
 - access URL and QR generation are runtime concerns, not committed artifacts
 
+Adapters that call the engine's `apply()` route its messages by audience:
+
+- `all`: every socket; `staff`: control and display sockets. These payloads never carry a Student ID.
+- `control`: the instructor only, with Student IDs and names. `display`: the projector only. `public`: the projector and participants. Their payloads carry `label` and `publicKey` in place of the ID.
+- `participant:<id>`: that participant's own socket.
+
+`audienceReaches(audience, role)` answers whether a socket of role `"control"`, `"display"` or `"participant"` should receive a message. For a connecting socket, `apply(..., { type: "snapshot", view: "control" | "display" })` builds the messages for that role, and `{ type: "snapshot", participantId }` builds a participant's. A `join` command may carry `newPublicKey` (a random key); without it the engine makes one. `leaderboardRows(session, quiz, "public" | "control")` gives the same rows for REST responses.
+
 ## Media Scope
 
 Image attachments are supported for quiz stems, option text, and slide bodies through standard markdown syntax. Slide images are automatically arranged into a media layout and keep their original aspect ratio while scaling to fit. Rendered quiz and slide images can be expanded into an overlay for closer inspection without changing their aspect ratio.
@@ -661,7 +699,7 @@ The primary protection model is instructor authentication plus session scoping a
 Worst-case scenarios and realistic impact:
 
 - **Link sharing outside class**: Someone with the join URL could submit answers, mitigated by short-lived sessions, visible participant counts, and per-session closure. Likelihood low, impact low to medium.
-- **Student impersonation (same room)**: A student could type another student ID. This affects fairness, not host compromise. Token-based reconnect protection prevents easy socket hijack after first join. Likelihood low, impact medium for grading integrity.
+- **Student impersonation (same room)**: A student could type another student ID. This affects fairness, not host compromise. Token-based reconnect protection prevents easy socket hijack after first join, and a second device using a joined ID is refused with a clear message. Only the instructor's view sees Student IDs; other students and the projector see labels. Likelihood low, impact medium for grading integrity.
 - **DoS on a session URL**: Spam joins/submits could disrupt one session, but does not expose host secrets by design. Likelihood low in typical classroom context, impact medium for that class period.
 - **Accidental data exposure from git push**: If runtime files were tracked, URLs/session data could leak. This repo structure avoids that by keeping `data/` local-only and gitignored. Likelihood low when workflow is followed, impact medium if ignored.
 

@@ -109,6 +109,13 @@ exports[`captures existing outbound transition payloads 1`] = `
     },
   },
   {
+    "event": "leaderboard:update",
+    "payload": {
+      "entries": [],
+      "totalQuestions": 1,
+    },
+  },
+  {
     "event": "session:state",
     "payload": {
       "state": "LEADERBOARD",

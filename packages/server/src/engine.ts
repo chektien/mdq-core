@@ -1,24 +1,65 @@
 import {
   Quiz, Session, SessionState, SocketEvents, QuestionOpenPayload, FoldoutNote,
   StudentJoinPayload, AnswerSubmitPayload, Participant, STATE_TRANSITIONS, StudentAnswer,
+  LeaderboardRow, OpenResponseEntry, SessionParticipantsPayload, SocketRole,
+  MAX_DISPLAY_NAME_LENGTH, MAX_STUDENT_ID_LENGTH, normalizeDisplayName, usesStudentIds,
 } from "@mdq/shared";
 import {
   StateTransitionError, computeLeaderboard, getAnsweredQuestions, getDistribution,
   getOpenResponses, getSubmissionCount,
 } from "./session";
 import { buildScoredCorrectAnswersMap, getQuestionType, getScoredQuestionCount, isOpenResponseQuestion } from "./scoring";
+import {
+  assignLabel, ensureParticipantIdentity, findSeatByName, idTakenMessage, nameTakenMessage, newPublicKey,
+} from "./identity";
 
 export class EngineCommandError extends Error {}
 
-export type Audience = "all" | "staff" | `participant:${string}`;
+/**
+ * Who a message is for. An adapter decides which of its sockets get a message
+ * with `audienceReaches`, so every adapter routes the same way:
+ *
+ * - `all`: control, display and participant sockets. Never carries a Student ID.
+ * - `staff`: control and display sockets. Never carries a Student ID.
+ * - `control`: control sockets only (the instructor). May carry Student IDs and names.
+ * - `display`: display sockets only (the projector). Carries labels, never Student IDs.
+ * - `public`: display and participant sockets. Carries labels, never Student IDs.
+ * - `participant:<id>`: one participant's own socket.
+ *
+ * An event that carries who said what is sent twice: the full payload as
+ * `control`, and the same event with labels and public keys as `display`
+ * (or `public` when phones get it too).
+ */
+export type Audience = "all" | "staff" | "control" | "display" | "public" | `participant:${string}`;
 export interface EngineMessage { audience: Audience; event: string; payload: unknown }
+
+const AUDIENCE_ROLES: Record<Exclude<Audience, `participant:${string}`>, readonly SocketRole[]> = {
+  all: ["control", "display", "participant"],
+  staff: ["control", "display"],
+  control: ["control"],
+  display: ["display"],
+  public: ["display", "participant"],
+};
+
+/**
+ * Whether a socket of `role` should receive a message sent to `audience`.
+ * A `participant:<id>` message reaches only that participant's own socket, so
+ * the adapter resolves the socket and this answers true for the participant role.
+ */
+export function audienceReaches(audience: Audience, role: SocketRole): boolean {
+  if (audience.startsWith("participant:")) return role === "participant";
+  return AUDIENCE_ROLES[audience as keyof typeof AUDIENCE_ROLES].includes(role);
+}
+
+/** Which payload a view gets: `control` has Student IDs and names, `public` has labels only. */
+export type PayloadView = "control" | "public";
 export type Command =
   | { type: "start" | "next" | "previous" | "open" | "close" | "reveal" | "end" | "leaderboardShow" | "leaderboardHide" | "broadcastOpen" | "broadcastReveal" | "broadcastLeaderboard" | "participants" | "repairClosedSlide" }
   | { type: "timeout"; deadline?: number }
-  | { type: "join"; payload: StudentJoinPayload; socketId: string; newToken: string }
+  | { type: "join"; payload: StudentJoinPayload; socketId: string; newToken: string; newPublicKey?: string }
   | { type: "answerSubmit"; studentId?: string; payload: AnswerSubmitPayload }
   | { type: "disconnect"; studentId: string; socketId: string }
-  | { type: "snapshot"; participantId?: string; isReconnect?: boolean }
+  | { type: "snapshot"; participantId?: string; isReconnect?: boolean; view?: "control" | "display" }
   | { type: "tick"; remainingSec: number };
 export interface EngineResult { session: Session; messages: EngineMessage[]; nextDeadline: number | null }
 
@@ -49,19 +90,23 @@ const questionPayload = (session: Session, quiz: Quiz, now: number): QuestionOpe
     timeLimitSec: q.timeLimitSec, startedAt: session.questionStartedAt || now,
   };
 };
-const countPayload = (session: Session, quiz: Quiz) => ({
+/** Open responses for one view: the instructor gets IDs and names, everyone else labels only. */
+const responsesFor = (responses: OpenResponseEntry[], view: PayloadView): OpenResponseEntry[] => view === "control"
+  ? responses
+  : responses.map(({ publicKey, label, responseText, submittedAt }) => ({ publicKey, label, responseText, submittedAt }));
+const countPayload = (session: Session, quiz: Quiz, view: PayloadView) => ({
   questionIndex: session.currentQuestionIndex,
   ...getSubmissionCount(session, session.currentQuestionIndex),
   openResponses: isOpenResponseQuestion(questionAt(session, quiz))
-    ? getOpenResponses(session, session.currentQuestionIndex) : undefined,
+    ? responsesFor(getOpenResponses(session, session.currentQuestionIndex), view) : undefined,
 });
-const revealPayload = (session: Session, quiz: Quiz) => {
+const revealPayload = (session: Session, quiz: Quiz, view: PayloadView) => {
   const q = questionAt(session, quiz);
   return {
     questionIndex: session.currentQuestionIndex, questionType: getQuestionType(q),
     correctOptions: q.correctOptions, explanation: q.explanation,
     distribution: getDistribution(session, session.currentQuestionIndex), isPoll: q.isPoll === true,
-    openResponses: isOpenResponseQuestion(q) ? getOpenResponses(session, session.currentQuestionIndex) : undefined,
+    openResponses: isOpenResponseQuestion(q) ? responsesFor(getOpenResponses(session, session.currentQuestionIndex), view) : undefined,
   };
 };
 /** One student's own submissions, with option labels turned into option positions. */
@@ -76,13 +121,29 @@ const ownAnswers = (session: Session, quiz: Quiz, studentId: string): StudentAns
     };
   })
   .sort((a, b) => a.questionIndex - b.questionIndex);
-const leaderboardPayload = (session: Session, quiz: Quiz) => ({
-  entries: computeLeaderboard(session, buildScoredCorrectAnswersMap(quiz)),
+/**
+ * The ranked rows for one view. `public` rows name people by label and public
+ * key only, so they are safe for phones and the projector.
+ */
+export function leaderboardRows(session: Session, quiz: Quiz, view: PayloadView): LeaderboardRow[] {
+  return computeLeaderboard(session, buildScoredCorrectAnswersMap(quiz)).map((entry) => {
+    const participant = session.participants.get(entry.studentId);
+    const row = {
+      rank: entry.rank, publicKey: participant?.publicKey ?? "", label: participant?.label ?? "",
+      correctCount: entry.correctCount, totalTimeMs: entry.totalTimeMs,
+    };
+    return view === "control" ? { ...row, studentId: entry.studentId, displayName: entry.displayName } : row;
+  });
+}
+const leaderboardPayload = (session: Session, quiz: Quiz, view: PayloadView) => ({
+  entries: leaderboardRows(session, quiz, view),
   totalQuestions: getScoredQuestionCount(quiz),
 });
-const participantsPayload = (session: Session) => {
+const participantsPayload = (session: Session, view: PayloadView): SessionParticipantsPayload => {
   const participants = [...session.participants.values()].filter((p) => p.connected)
-    .map((p) => ({ studentId: p.studentId, displayName: p.displayName }));
+    .map((p) => view === "control"
+      ? { publicKey: p.publicKey, label: p.label, studentId: p.studentId, displayName: p.displayName }
+      : { publicKey: p.publicKey, label: p.label });
   return { count: participants.length, participants };
 };
 const deadline = (session: Session, quiz: Quiz): number | null => {
@@ -94,8 +155,30 @@ const deadline = (session: Session, quiz: Quiz): number | null => {
 /** Calculate a session change without mutating its input or using a clock or transport. */
 export function apply(input: Session, quiz: Quiz, command: Command, now: number): EngineResult {
   const session = clone(input);
+  ensureParticipantIdentity(session);
   const messages: EngineMessage[] = [];
   const emit = (event: string, payload: unknown, audience: Audience = "all") => messages.push(message(event, payload, audience));
+  // Events that say who submitted what go out twice: in full to control, and by label to the projector.
+  const emitCount = () => {
+    if (isOpenResponseQuestion(questionAt(session, quiz))) {
+      emit(SocketEvents.ANSWER_COUNT, countPayload(session, quiz, "control"), "control");
+      emit(SocketEvents.ANSWER_COUNT, countPayload(session, quiz, "public"), "display");
+    } else emit(SocketEvents.ANSWER_COUNT, countPayload(session, quiz, "public"), "staff");
+  };
+  const emitReveal = () => {
+    if (isOpenResponseQuestion(questionAt(session, quiz))) {
+      emit(SocketEvents.RESULTS_REVEAL, revealPayload(session, quiz, "control"), "control");
+      emit(SocketEvents.RESULTS_REVEAL, revealPayload(session, quiz, "public"), "public");
+    } else emit(SocketEvents.RESULTS_REVEAL, revealPayload(session, quiz, "public"));
+  };
+  const emitLeaderboard = () => {
+    emit(SocketEvents.LEADERBOARD_UPDATE, leaderboardPayload(session, quiz, "control"), "control");
+    emit(SocketEvents.LEADERBOARD_UPDATE, leaderboardPayload(session, quiz, "public"), "public");
+  };
+  const emitParticipants = () => {
+    emit(SocketEvents.SESSION_PARTICIPANTS, participantsPayload(session, "control"), "control");
+    emit(SocketEvents.SESSION_PARTICIPANTS, participantsPayload(session, "public"), "display");
+  };
   const openContext = () => {
     const payload = questionPayload(session, quiz, now);
     if (payload) emit(SocketEvents.QUESTION_OPEN, payload);
@@ -112,7 +195,7 @@ export function apply(input: Session, quiz: Quiz, command: Command, now: number)
       session.currentQuestionIndex = 0;
       session.questionStartedAt = now;
       openContext(); state();
-      if (getQuestionType(questionAt(session, quiz)) !== "slide") emit(SocketEvents.ANSWER_COUNT, countPayload(session, quiz), "staff");
+      if (getQuestionType(questionAt(session, quiz)) !== "slide") emitCount();
       break;
     case "previous": {
       const prev = session.currentQuestionIndex - 1;
@@ -124,7 +207,7 @@ export function apply(input: Session, quiz: Quiz, command: Command, now: number)
         session.questionStartedAt = now;
         openContext(); state();
       } else {
-        review(); openContext(); emit(SocketEvents.RESULTS_REVEAL, revealPayload(session, quiz)); state();
+        review(); openContext(); emitReveal(); state();
       }
       break;
     }
@@ -139,9 +222,9 @@ export function apply(input: Session, quiz: Quiz, command: Command, now: number)
       if (getQuestionType(questionAt(session, quiz)) !== "slide" && session.revealedQuestionIndexes?.has(next)) session.state = "REVEAL";
       if (session.state === "QUESTION_OPEN") {
         session.questionStartedAt = now; openContext(); state();
-        if (getQuestionType(questionAt(session, quiz)) !== "slide") emit(SocketEvents.ANSWER_COUNT, countPayload(session, quiz), "staff");
+        if (getQuestionType(questionAt(session, quiz)) !== "slide") emitCount();
       } else {
-        openContext(); emit(SocketEvents.RESULTS_REVEAL, revealPayload(session, quiz)); state();
+        openContext(); emitReveal(); state();
       }
       break;
     }
@@ -150,7 +233,7 @@ export function apply(input: Session, quiz: Quiz, command: Command, now: number)
       if (session.currentQuestionIndex < 0) session.currentQuestionIndex = 0;
       session.questionStartedAt = now;
       openContext(); state();
-      if (getQuestionType(questionAt(session, quiz)) !== "slide") emit(SocketEvents.ANSWER_COUNT, countPayload(session, quiz), "staff");
+      if (getQuestionType(questionAt(session, quiz)) !== "slide") emitCount();
       break;
     case "close":
     case "timeout":
@@ -167,7 +250,7 @@ export function apply(input: Session, quiz: Quiz, command: Command, now: number)
     case "reveal":
       if (getQuestionType(questionAt(session, quiz)) === "slide") throw new EngineCommandError("Slides do not reveal answers; advance to the next item.");
       transition(session, "REVEAL"); review();
-      openContext(); emit(SocketEvents.RESULTS_REVEAL, revealPayload(session, quiz)); state();
+      openContext(); emitReveal(); state();
       break;
     case "end":
       if (session.state === "QUESTION_CLOSED") transition(session, "REVEAL");
@@ -177,46 +260,52 @@ export function apply(input: Session, quiz: Quiz, command: Command, now: number)
     case "leaderboardShow":
       if (session.state === "QUESTION_CLOSED") transition(session, "REVEAL");
       transition(session, "LEADERBOARD");
-      emit(SocketEvents.LEADERBOARD_UPDATE, leaderboardPayload(session, quiz)); state(false);
+      emitLeaderboard(); state(false);
       break;
     case "leaderboardHide":
       if (session.currentQuestionIndex >= quiz.questions.length - 1) break;
       transition(session, "REVEAL");
-      openContext(); emit(SocketEvents.RESULTS_REVEAL, revealPayload(session, quiz)); state();
+      openContext(); emitReveal(); state();
       break;
     case "join": {
       const { payload, socketId } = command;
-      if (session.state === "ENDED") {
-        emit(SocketEvents.STUDENT_REJECTED, { reason: "Session has ended" }, `participant:${socketId}`);
-        break;
-      }
-      const id = payload.studentId?.trim();
-      if (!id) { emit(SocketEvents.STUDENT_REJECTED, { reason: "Student ID is required" }, `participant:${socketId}`); break; }
-      const existing = session.participants.get(id);
+      const reject = (reason: string) => emit(SocketEvents.STUDENT_REJECTED, { reason }, `participant:${socketId}`);
+      if (session.state === "ENDED") { reject("Session has ended"); break; }
+      // The name is normalised for everyone; where Student IDs are off it is also the ID.
+      const usesIds = usesStudentIds(quiz);
+      const typedName = normalizeDisplayName(payload.displayName);
+      const id = usesIds
+        ? (typeof payload.studentId === "string" ? payload.studentId.trim() : "")
+        : typedName || normalizeDisplayName(payload.studentId);
+      if (!id) { reject(usesIds ? "Student ID is required" : "Please enter your name to join."); break; }
+      if (usesIds && id.length > MAX_STUDENT_ID_LENGTH) { reject(`Student ID can be at most ${MAX_STUDENT_ID_LENGTH} characters.`); break; }
+      if (typedName.length > MAX_DISPLAY_NAME_LENGTH) { reject(`Name can be at most ${MAX_DISPLAY_NAME_LENGTH} characters.`); break; }
+      const existing = usesIds ? session.participants.get(id) : findSeatByName(session, id);
       let participant: Participant;
       let isReconnect = false;
       if (existing) {
+        // Your own seat is never a clash: the same session token, or the same browser after it went offline.
         const validToken = !!payload.sessionToken && payload.sessionToken === existing.sessionToken;
         const validClient = !existing.connected && !!payload.clientInstanceId && !!existing.clientInstanceId && payload.clientInstanceId === existing.clientInstanceId;
-        if (!validToken && !validClient) {
-          emit(SocketEvents.STUDENT_REJECTED, { reason: `Student ID "${id}" is already in use with a different session token.` }, `participant:${socketId}`);
-          break;
-        }
+        if (!validToken && !validClient) { reject(usesIds ? idTakenMessage(id) : nameTakenMessage(id)); break; }
         existing.socketId = socketId; existing.connected = true;
-        if (payload.displayName?.trim()) existing.displayName = payload.displayName.trim();
+        if (usesIds && typedName) existing.displayName = typedName;
         if (validToken && payload.clientInstanceId) existing.clientInstanceId = payload.clientInstanceId;
         participant = existing; isReconnect = true;
       } else {
-        participant = { studentId: id, displayName: payload.displayName?.trim(), sessionToken: command.newToken,
-          clientInstanceId: payload.clientInstanceId, socketId, joinedAt: now, connected: true };
-        session.participants.set(id, participant);
+        const { label, labelNote } = assignLabel(session, typedName);
+        participant = { studentId: id, displayName: usesIds ? typedName || undefined : id,
+          publicKey: command.newPublicKey ?? newPublicKey(), label, labelNote,
+          sessionToken: command.newToken, clientInstanceId: payload.clientInstanceId, socketId, joinedAt: now, connected: true };
+        session.participants.set(participant.studentId, participant);
       }
-      emit(SocketEvents.STUDENT_JOINED, { participantId: id, sessionToken: participant.sessionToken,
+      emit(SocketEvents.STUDENT_JOINED, { participantId: participant.studentId, sessionToken: participant.sessionToken,
         sessionState: session.state, currentQuestion: session.currentQuestionIndex >= 0 ? session.currentQuestionIndex : undefined,
-        answeredQuestions: getAnsweredQuestions(session, id), answers: ownAnswers(session, quiz, id) }, `participant:${id}`);
-      emit(SocketEvents.SESSION_PARTICIPANTS, participantsPayload(session), "staff");
-      if (session.state === "QUESTION_OPEN" && session.currentQuestionIndex >= 0) emit(SocketEvents.ANSWER_COUNT, countPayload(session, quiz), "staff");
-      messages.push(...snapshotMessages(session, quiz, now, `participant:${id}`, false, isReconnect));
+        answeredQuestions: getAnsweredQuestions(session, participant.studentId), answers: ownAnswers(session, quiz, participant.studentId),
+        publicKey: participant.publicKey, label: participant.label, labelNote: participant.labelNote }, `participant:${participant.studentId}`);
+      emitParticipants();
+      if (session.state === "QUESTION_OPEN" && session.currentQuestionIndex >= 0) emitCount();
+      messages.push(...snapshotMessages(session, quiz, now, `participant:${participant.studentId}`, "participant", isReconnect));
       break;
     }
     case "answerSubmit": {
@@ -246,7 +335,7 @@ export function apply(input: Session, quiz: Quiz, command: Command, now: number)
       if (existing) Object.assign(existing, submission);
       else session.submissions.push(submission);
       emit(SocketEvents.ANSWER_ACCEPTED, { questionIndex: payload.questionIndex }, target);
-      emit(SocketEvents.ANSWER_COUNT, countPayload(session, quiz), "staff");
+      emitCount();
       break;
     }
     case "disconnect": {
@@ -254,26 +343,28 @@ export function apply(input: Session, quiz: Quiz, command: Command, now: number)
       // A socket replaced by a rejoin can time out later; only the current socket marks the student offline.
       if (participant && participant.socketId === command.socketId) {
         participant.connected = false;
-        emit(SocketEvents.SESSION_PARTICIPANTS, participantsPayload(session), "staff");
-        if (session.state === "QUESTION_OPEN" && session.currentQuestionIndex >= 0) emit(SocketEvents.ANSWER_COUNT, countPayload(session, quiz), "staff");
+        emitParticipants();
+        if (session.state === "QUESTION_OPEN" && session.currentQuestionIndex >= 0) emitCount();
       }
       break;
     }
     case "snapshot":
-      messages.push(...snapshotMessages(session, quiz, now, command.participantId ? `participant:${command.participantId}` : "staff", !command.participantId, !!command.isReconnect));
+      messages.push(...command.participantId
+        ? snapshotMessages(session, quiz, now, `participant:${command.participantId}`, "participant", !!command.isReconnect)
+        : snapshotMessages(session, quiz, now, command.view === "display" ? "display" : "control", command.view === "display" ? "display" : "control", !!command.isReconnect));
       break;
     case "broadcastOpen":
       session.questionStartedAt = now;
       openContext(); state();
-      if (getQuestionType(questionAt(session, quiz)) !== "slide") emit(SocketEvents.ANSWER_COUNT, countPayload(session, quiz), "staff");
+      if (getQuestionType(questionAt(session, quiz)) !== "slide") emitCount();
       break;
     case "broadcastReveal":
-      openContext(); emit(SocketEvents.RESULTS_REVEAL, revealPayload(session, quiz)); state();
+      openContext(); emitReveal(); state();
       break;
     case "broadcastLeaderboard":
-      emit(SocketEvents.LEADERBOARD_UPDATE, leaderboardPayload(session, quiz)); state(false);
+      emitLeaderboard(); state(false);
       break;
-    case "participants": emit(SocketEvents.SESSION_PARTICIPANTS, participantsPayload(session), "staff"); break;
+    case "participants": emitParticipants(); break;
     case "repairClosedSlide":
       if (session.state === "QUESTION_CLOSED" && getQuestionType(questionAt(session, quiz)) === "slide") {
         session.state = "QUESTION_OPEN";
@@ -286,9 +377,18 @@ export function apply(input: Session, quiz: Quiz, command: Command, now: number)
   return { session, messages, nextDeadline: deadline(session, quiz) };
 }
 
-function snapshotMessages(session: Session, quiz: Quiz, now: number, audience: Audience, staff: boolean, isReconnect: boolean): EngineMessage[] {
+/**
+ * What one socket is sent when it connects or rejoins. `view` picks the
+ * payloads: control gets IDs and names, display and participant get labels.
+ * Each message is addressed to that view's own audience, so an adapter that
+ * routes by audience sends it no further than the socket it was built for.
+ */
+function snapshotMessages(session: Session, quiz: Quiz, now: number, audience: Audience, view: "control" | "display" | "participant", isReconnect: boolean): EngineMessage[] {
   const messages: EngineMessage[] = [];
+  const staff = view !== "participant";
+  const payloadView: PayloadView = view === "control" ? "control" : "public";
   const emit = (event: string, payload: unknown, target: Audience = audience) => messages.push(message(event, payload, target));
+  const emitCount = () => emit(SocketEvents.ANSWER_COUNT, countPayload(session, quiz, payloadView));
   if (staff) emit(SocketEvents.SESSION_STATE, { state: session.state, questionIndex: session.currentQuestionIndex >= 0 ? session.currentQuestionIndex : undefined });
   const q = questionAt(session, quiz);
   const payload = questionPayload(session, quiz, now);
@@ -296,18 +396,18 @@ function snapshotMessages(session: Session, quiz: Quiz, now: number, audience: A
   if (session.state === "QUESTION_OPEN") {
     emit(SocketEvents.QUESTION_OPEN, payload);
     if (session.questionStartedAt) emit(SocketEvents.QUESTION_TICK, { remainingSec: Math.max(0, q.timeLimitSec - Math.floor((now - session.questionStartedAt) / 1000)) });
-    if (staff) emit(SocketEvents.ANSWER_COUNT, countPayload(session, quiz), "staff");
+    if (staff) emitCount();
   } else if (session.state === "QUESTION_CLOSED") {
     emit(SocketEvents.QUESTION_OPEN, payload);
     emit(SocketEvents.QUESTION_CLOSE, { questionIndex: session.currentQuestionIndex });
     if (staff) {
-      emit(SocketEvents.RESULTS_DISTRIBUTION, { questionIndex: session.currentQuestionIndex, distribution: getDistribution(session, session.currentQuestionIndex) }, "staff");
-      emit(SocketEvents.ANSWER_COUNT, countPayload(session, quiz), "staff");
+      emit(SocketEvents.RESULTS_DISTRIBUTION, { questionIndex: session.currentQuestionIndex, distribution: getDistribution(session, session.currentQuestionIndex) });
+      emitCount();
     }
   } else if (session.state === "REVEAL" && (staff || isReconnect)) {
     emit(SocketEvents.QUESTION_OPEN, payload);
-    emit(SocketEvents.RESULTS_REVEAL, revealPayload(session, quiz));
-    if (staff) emit(SocketEvents.ANSWER_COUNT, countPayload(session, quiz), "staff");
-  } else if (session.state === "LEADERBOARD") emit(SocketEvents.LEADERBOARD_UPDATE, leaderboardPayload(session, quiz));
+    emit(SocketEvents.RESULTS_REVEAL, revealPayload(session, quiz, payloadView));
+    if (staff) emitCount();
+  } else if (session.state === "LEADERBOARD") emit(SocketEvents.LEADERBOARD_UPDATE, leaderboardPayload(session, quiz, payloadView));
   return messages;
 }

@@ -8,6 +8,7 @@ export const DECK_SETTING_KEYS = [
   "theme",
   "presenter-notes",
   "presenter-notes-default-open",
+  "student-id",
   "type",
   "question-type",
   "time-limit",

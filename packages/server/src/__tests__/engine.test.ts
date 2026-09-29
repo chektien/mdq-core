@@ -1,5 +1,5 @@
 import { Quiz, Session, SessionState, SocketEvents } from "@mdq/shared";
-import { apply, type Command } from "../engine";
+import { apply, type Audience, type Command } from "../engine";
 import { emitMessages } from "../socket";
 import { storeSession, clearAllSessions } from "../session";
 import { Server } from "socket.io";
@@ -26,7 +26,7 @@ const openPayload = (index: number) => ({
 const count = (index: number) => ({ questionIndex: index, submitted: 0, total: 0, openResponses: undefined });
 const reveal = (index: number) => ({ questionIndex: index, questionType: "multiple_choice", correctOptions: ["A"],
   explanation: "Correct", distribution: {}, isPoll: false, openResponses: undefined });
-const msg = (event: string, payload: unknown, audience: "all" | "staff" = "all") => ({ audience, event, payload });
+const msg = (event: string, payload: unknown, audience: Audience = "all") => ({ audience, event, payload });
 const opened = (index: number) => [
   msg(SocketEvents.QUESTION_OPEN, openPayload(index)),
   msg(SocketEvents.SESSION_STATE, { state: "QUESTION_OPEN", questionIndex: index }),
@@ -41,8 +41,12 @@ const closed = [
   msg(SocketEvents.SESSION_STATE, { state: "QUESTION_CLOSED", questionIndex: 0 }),
   msg(SocketEvents.RESULTS_DISTRIBUTION, { questionIndex: 0, distribution: {} }, "staff"),
 ];
-const leaders = [msg(SocketEvents.LEADERBOARD_UPDATE, { entries: [], totalQuestions: 2 }),
+// The leaderboard names people, so control gets it in full and everyone else by label only.
+const leaders = [msg(SocketEvents.LEADERBOARD_UPDATE, { entries: [], totalQuestions: 2 }, "control"),
+  msg(SocketEvents.LEADERBOARD_UPDATE, { entries: [], totalQuestions: 2 }, "public"),
   msg(SocketEvents.SESSION_STATE, { state: "LEADERBOARD" })];
+const seat = (studentId: string, socketId: string, extra: object = {}) => ({
+  studentId, publicKey: `key-${studentId}`, label: `Participant ${studentId}`, sessionToken: "token", socketId, joinedAt: 0, connected: true, ...extra });
 const ended = [msg(SocketEvents.SESSION_STATE, { state: "ENDED" })];
 const cases: Record<string, { state: SessionState; messages: ReturnType<typeof msg>[] } | { error: string }> = {
   "LOBBY:start": { state: "QUESTION_OPEN", messages: opened(0) },
@@ -94,10 +98,11 @@ for (const state of states) for (const type of commands) {
 
 it("joins, answers and disconnects without changing the supplied session", () => {
   const input = base("QUESTION_OPEN");
-  const joined = apply(input, quiz, { type: "join", socketId: "socket-1", newToken: "token-1", payload: { studentId: "S1", displayName: "Sam" } }, 2000);
+  const joined = apply(input, quiz, { type: "join", socketId: "socket-1", newToken: "token-1", newPublicKey: "key-1", payload: { studentId: "S1", displayName: "Sam" } }, 2000);
   expect(input.participants.size).toBe(0);
   expect(joined.messages[0]).toEqual({ audience: "participant:S1", event: SocketEvents.STUDENT_JOINED,
-    payload: { participantId: "S1", sessionToken: "token-1", sessionState: "QUESTION_OPEN", currentQuestion: 0, answeredQuestions: [], answers: [] } });
+    payload: { participantId: "S1", sessionToken: "token-1", sessionState: "QUESTION_OPEN", currentQuestion: 0, answeredQuestions: [], answers: [],
+      publicKey: "key-1", label: "Sam", labelNote: undefined } });
   const answered = apply(joined.session, quiz, { type: "answerSubmit", studentId: "S1", payload: { questionIndex: 0, selectedOptions: ["A"] } }, 3000);
   expect(joined.session.submissions).toHaveLength(0);
   expect(answered.messages).toEqual([
@@ -119,13 +124,16 @@ it("ignores a late disconnect from a socket the student has already replaced", (
   expect(stale.messages).toEqual([]);
   const current = apply(stale.session, quiz, { type: "disconnect", studentId: "S1", socketId: "socket-2" }, 5000);
   expect(current.session.participants.get("S1")?.connected).toBe(false);
-  expect(current.messages[0]).toEqual(msg(SocketEvents.SESSION_PARTICIPANTS, { count: 0, participants: [] }, "staff"));
+  expect(current.messages.slice(0, 2)).toEqual([
+    msg(SocketEvents.SESSION_PARTICIPANTS, { count: 0, participants: [] }, "control"),
+    msg(SocketEvents.SESSION_PARTICIPANTS, { count: 0, participants: [] }, "display"),
+  ]);
 });
 
 for (const state of states) {
   it(`${state} accepts a join and preserves its current state`, () => {
     const input = base(state);
-    const result = apply(input, quiz, { type: "join", socketId: "socket", newToken: "token", payload: { studentId: "S1" } }, 2000);
+    const result = apply(input, quiz, { type: "join", socketId: "socket", newToken: "token", newPublicKey: "key-1", payload: { studentId: "S1" } }, 2000);
     expect(result.session.state).toBe(state);
     if (state === "ENDED") {
       expect(result.session.participants.size).toBe(0);
@@ -136,13 +144,14 @@ for (const state of states) {
     expect(result.session.participants.get("S1")?.sessionToken).toBe("token");
     expect(result.messages[0]).toEqual({ audience: "participant:S1", event: SocketEvents.STUDENT_JOINED,
       payload: { participantId: "S1", sessionToken: "token", sessionState: state,
-        currentQuestion: state === "LOBBY" ? undefined : 0, answeredQuestions: [], answers: [] } });
+        currentQuestion: state === "LOBBY" ? undefined : 0, answeredQuestions: [], answers: [],
+        publicKey: "key-1", label: "Participant 1", labelNote: "You appear as Participant 1." } });
     expect(input.participants.size).toBe(0);
   });
 
   it(`${state} returns the original submission outcome`, () => {
     const input = base(state);
-    input.participants.set("S1", { studentId: "S1", sessionToken: "token", socketId: "socket", joinedAt: 0, connected: true });
+    input.participants.set("S1", seat("S1", "socket"));
     const result = apply(input, quiz, { type: "answerSubmit", studentId: "S1", payload: { questionIndex: 0, selectedOptions: ["A"] } }, 2000);
     const event = state === "QUESTION_OPEN" ? SocketEvents.ANSWER_ACCEPTED : SocketEvents.ANSWER_REJECTED;
     expect(result.messages[0].event).toBe(event);
@@ -185,12 +194,12 @@ it("ignores a stale alarm whose deadline belongs to an earlier opening", () => {
   expect(apply(reopened, quiz, { type: "timeout", deadline: 25000 }, 25000).session.state).toBe("QUESTION_CLOSED");
 });
 
-it("routes participant messages to their socket and keeps staff in the session room", () => {
+it("routes participant messages to their socket and staff messages to the control and display rooms", () => {
   const session = base("QUESTION_OPEN");
-  session.participants.set("S1", { studentId: "S1", sessionToken: "token", socketId: "socket-1", joinedAt: 0, connected: true });
+  session.participants.set("S1", seat("S1", "socket-1"));
   storeSession(session);
-  const sent: { room: string; event: string; payload: unknown }[] = [];
-  const io = { to: (room: string) => ({ emit: (event: string, payload: unknown) => sent.push({ room, event, payload }) }) };
+  const sent: { room: string | string[]; event: string; payload: unknown }[] = [];
+  const io = { to: (room: string | string[]) => ({ emit: (event: string, payload: unknown) => sent.push({ room, event, payload }) }) };
   emitMessages(io as unknown as Server, session.sessionId, [
     { audience: "participant:S1", event: SocketEvents.ANSWER_ACCEPTED, payload: { questionIndex: 0 } },
     { audience: "staff", event: SocketEvents.ANSWER_COUNT, payload: count(0) },
@@ -198,7 +207,7 @@ it("routes participant messages to their socket and keeps staff in the session r
   ]);
   expect(sent).toEqual([
     { room: "socket-1", event: SocketEvents.ANSWER_ACCEPTED, payload: { questionIndex: 0 } },
-    { room: "session:session", event: SocketEvents.ANSWER_COUNT, payload: count(0) },
+    { room: ["session:session:control", "session:session:display"], event: SocketEvents.ANSWER_COUNT, payload: count(0) },
     { room: "session:session", event: SocketEvents.SESSION_STATE, payload: { state: "QUESTION_OPEN", questionIndex: 0 } },
   ]);
   clearAllSessions();

@@ -11,7 +11,7 @@ import type {
   LeaderboardUpdatePayload,
   SessionStatePayload,
   SessionParticipantsPayload,
-  LeaderboardEntry,
+  LeaderboardRow,
   QuestionType,
   OpenResponseEntry,
   FoldoutNote,
@@ -179,6 +179,11 @@ export interface UseSocketReturn {
   sessionState: SessionState | null;
   sessionToken: string | null;
   studentId: string | null;
+  /** This participant's random key; leaderboard and response rows carry it instead of the Student ID. */
+  publicKey: string | null;
+  /** The name others see for this participant, and why it may differ from what they typed. */
+  label: string | null;
+  labelNote: string | null;
   answeredQuestions: number[];
 
   // Question
@@ -194,14 +199,14 @@ export interface UseSocketReturn {
   distribution: ResultsDistributionPayload | null;
 
   // Leaderboard
-  leaderboard: LeaderboardEntry[];
+  leaderboard: LeaderboardRow[];
   totalQuestions: number;
 
   // Participants
   participants: SessionParticipantsPayload | null;
 
   // Actions
-  joinSession: (studentId: string, displayName?: string) => void;
+  joinSession: (studentId: string | undefined, displayName?: string) => void;
   submitAnswer: (payload: AnswerSubmitPayload) => void;
   reconnect: () => void;
   disconnect: () => void;
@@ -215,6 +220,7 @@ export function useSocket(
   const answeredQuestionsRef = useRef<number[]>([]);
   const currentQuestionRef = useRef<QuestionState | null>(null);
   const studentIdRef = useRef<string | null>(null);
+  const publicKeyRef = useRef<string | null>(null);
   const submittedOptionsRef = useRef<string[]>([]);
   const submittedResponseTextRef = useRef<string | null>(null);
   // This student's own answers by question index, from the server on join and
@@ -229,6 +235,9 @@ export function useSocket(
   const [sessionState, setSessionState] = useState<SessionState | null>(null);
   const [sessionToken, setSessionToken] = useState<string | null>(null);
   const [studentIdState, setStudentIdState] = useState<string | null>(null);
+  const [publicKey, setPublicKey] = useState<string | null>(null);
+  const [label, setLabel] = useState<string | null>(null);
+  const [labelNote, setLabelNote] = useState<string | null>(null);
   const [answeredQuestions, setAnsweredQuestions] = useState<number[]>([]);
 
   const [currentQuestion, setCurrentQuestion] = useState<QuestionState | null>(null);
@@ -241,7 +250,7 @@ export function useSocket(
   const [reveal, setReveal] = useState<RevealState | null>(null);
   const [distribution, setDistribution] = useState<ResultsDistributionPayload | null>(null);
 
-  const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
+  const [leaderboard, setLeaderboard] = useState<LeaderboardRow[]>([]);
   const [totalQuestions, setTotalQuestions] = useState(0);
 
   const [participants, setParticipants] = useState<SessionParticipantsPayload | null>(null);
@@ -253,6 +262,10 @@ export function useSocket(
   useEffect(() => {
     studentIdRef.current = studentIdState;
   }, [studentIdState]);
+
+  useEffect(() => {
+    publicKeyRef.current = publicKey;
+  }, [publicKey]);
 
   useEffect(() => {
     submittedOptionsRef.current = submittedOptions;
@@ -306,6 +319,9 @@ export function useSocket(
     socket.on(SocketEvents.STUDENT_JOINED, (data: StudentJoinedPayload) => {
       setSessionToken(data.sessionToken);
       setStudentIdState(data.participantId);
+      setPublicKey(data.publicKey ?? null);
+      setLabel(data.label ?? null);
+      setLabelNote(data.labelNote ?? null);
       setSessionState(data.sessionState);
       setAnsweredQuestions(data.answeredQuestions || []);
       answeredQuestionsRef.current = data.answeredQuestions || [];
@@ -436,9 +452,9 @@ export function useSocket(
       setAnswerCount(data);
       setAnsweredQuestions((prev) => {
         const current = currentQuestionRef.current;
-        const participantId = studentIdRef.current;
+        const ownKey = publicKeyRef.current;
         if (
-          !participantId
+          !ownKey
           || !current
           || current.questionType !== "open_response"
           || current.questionIndex !== data.questionIndex
@@ -446,7 +462,7 @@ export function useSocket(
           return prev;
         }
 
-        const ownResponse = data.openResponses?.find((entry) => entry.studentId === participantId);
+        const ownResponse = data.openResponses?.find((entry) => entry.publicKey === ownKey);
         if (!ownResponse) {
           return prev;
         }
@@ -564,17 +580,19 @@ export function useSocket(
   }, [connected, sessionState, currentQuestion]);
 
   const joinSession = useCallback(
-    (studentId: string, displayName?: string) => {
+    (studentId: string | undefined, displayName?: string) => {
       if (!socketRef.current) return;
       const stored = loadStoredSession();
       const token = stored?.sessionId === sessionId ? stored.sessionToken : undefined;
+      // Clear the last refusal first, so a second refusal for the same reason is shown again.
+      setError(null);
       socketRef.current.emit(SocketEvents.STUDENT_JOIN, {
-        studentId: studentId.trim(),
+        studentId: studentId?.trim() || undefined,
         displayName: displayName?.trim() || undefined,
         sessionToken: token,
         clientInstanceId: getClientInstanceId(),
       });
-      setStudentIdState(studentId.trim());
+      if (studentId?.trim()) setStudentIdState(studentId.trim());
     },
     [sessionId],
   );
@@ -625,6 +643,9 @@ export function useSocket(
     setSessionState(null);
     setSessionToken(null);
     setStudentIdState(null);
+    setPublicKey(null);
+    setLabel(null);
+    setLabelNote(null);
   }, []);
 
   return {
@@ -633,6 +654,9 @@ export function useSocket(
     sessionState,
     sessionToken,
     studentId: studentIdState,
+    publicKey,
+    label,
+    labelNote,
     answeredQuestions,
     currentQuestion,
     remainingSec,

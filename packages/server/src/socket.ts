@@ -1,15 +1,21 @@
 import { Server as HttpServer } from "http";
 import { Server, Socket } from "socket.io";
-import { SocketEvents, StudentJoinPayload, AnswerSubmitPayload, TICK_INTERVAL_MS, Quiz, Session } from "@mdq/shared";
+import { SocketEvents, StudentJoinPayload, StudentJoinedPayload, AnswerSubmitPayload, TICK_INTERVAL_MS, Quiz, Session, SOCKET_ROLES, type SocketRole } from "@mdq/shared";
 import { getSession } from "./session";
-import { apply, type EngineMessage, type EngineResult } from "./engine";
+import { apply, audienceReaches, type Audience, type EngineMessage, type EngineResult } from "./engine";
 import { getQuestionType } from "./scoring";
 import { isInstructorAuthEnabled, getInstructorSessionFromCookie, hasValidInstructorSession } from "./instructor-auth";
 
 const sessionTimers = new Map<string, NodeJS.Timeout>();
 const tickTimers = new Map<string, NodeJS.Timeout>();
 let quizStore: Map<string, Quiz>;
+/** Every socket of a session: the instructor's, the projector's and the participants'. */
 const sessionRoom = (id: string) => `session:${id}`;
+/** The sockets of one role, so a message goes only to the roles its audience reaches. */
+const roleRoom = (id: string, role: SocketRole) => `session:${id}:${role}`;
+const audienceRooms = (id: string, audience: Audience): string[] => audience === "all"
+  ? [sessionRoom(id)]
+  : SOCKET_ROLES.filter((role) => audienceReaches(audience, role)).map((role) => roleRoom(id, role));
 const logActivity = (message: string) => console.log(`[mdq activity] ${message}`);
 
 export function clearSessionTimers(sessionId: string): void {
@@ -21,7 +27,12 @@ export function clearSessionTimers(sessionId: string): void {
   tickTimers.delete(sessionId);
 }
 
-/** The room is the current recipient for both staff and all messages. */
+/**
+ * Send each message to the sockets its audience reaches: `all` to the whole
+ * session, the others to the role rooms they name, and a participant message
+ * to that participant's own socket. A socket passed as `directSocket` (a
+ * snapshot for one connection) gets every message, already built for its role.
+ */
 export function emitMessages(io: Server, sessionId: string, messages: EngineMessage[], directSocket?: Socket): void {
   for (const { audience, event, payload } of messages) {
     if (audience.startsWith("participant:")) {
@@ -30,7 +41,8 @@ export function emitMessages(io: Server, sessionId: string, messages: EngineMess
     } else if (directSocket) {
       directSocket.emit(event, payload);
     } else {
-      io.to(sessionRoom(sessionId)).emit(event, payload);
+      const rooms = audienceRooms(sessionId, audience);
+      io.to(rooms.length === 1 ? rooms[0] : rooms).emit(event, payload);
     }
   }
 }
@@ -82,18 +94,23 @@ export function setupSocket(httpServer: HttpServer, quizzes: Map<string, Quiz>):
           socket.disconnect(); return;
         }
       }
+      // The projector is a display socket; everything else that gets this far is the instructor's control socket.
+      const view = role === "presentation" ? "display" : "control";
       socket.join(sessionRoom(sessionId));
+      socket.join(roleRoom(sessionId, view === "display" ? "display" : "control"));
       if (quiz) emitMessages(io, sessionId, apply(session, quiz, { type: "participants" }, Date.now()).messages);
-      if (quiz) emitMessages(io, sessionId, apply(session, quiz, { type: "snapshot" }, Date.now()).messages, socket);
+      if (quiz) emitMessages(io, sessionId, apply(session, quiz, { type: "snapshot", view }, Date.now()).messages, socket);
       socket.on("disconnect", () => logActivity(`${role} disconnected session=${sessionId} socket=${socket.id}`));
     }
     socket.on(SocketEvents.STUDENT_JOIN, (payload: StudentJoinPayload) => {
       if (!quiz) return;
-      const result = apply(session, quiz, { type: "join", payload, socketId: socket.id, newToken: crypto.randomUUID() }, Date.now());
+      const result = apply(session, quiz, { type: "join", payload, socketId: socket.id, newToken: crypto.randomUUID(), newPublicKey: crypto.randomUUID() }, Date.now());
       Object.assign(session, result.session);
-      if (result.messages.some((m) => m.event === SocketEvents.STUDENT_JOINED)) {
+      const joined = result.messages.find((m) => m.event === SocketEvents.STUDENT_JOINED)?.payload as StudentJoinedPayload | undefined;
+      if (joined) {
         socket.join(sessionRoom(sessionId));
-        (socket as Socket & { _studentId?: string })._studentId = payload.studentId.trim();
+        socket.join(roleRoom(sessionId, "participant"));
+        (socket as Socket & { _studentId?: string })._studentId = joined.participantId;
       }
       emitMessages(io, sessionId, result.messages);
     });

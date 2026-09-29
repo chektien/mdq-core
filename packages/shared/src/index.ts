@@ -60,7 +60,12 @@ export const SocketEvents = {
 // ── Socket.IO Payload Types ─────────────────
 
 export interface StudentJoinPayload {
-  studentId: string;
+  /**
+   * The Student ID. A deck that turns Student IDs off (`student-id: false`)
+   * takes the name as the ID, so a first join carries only `displayName`; a
+   * rejoin may send the `participantId` it was given here instead.
+   */
+  studentId?: string;
   displayName?: string;
   sessionToken?: string;
   clientInstanceId?: string;
@@ -87,6 +92,23 @@ export interface StudentJoinedPayload {
    * they chose. Sent only to that student; never includes anyone else's.
    */
   answers?: StudentAnswer[];
+  /**
+   * The random key public payloads use for this participant instead of the
+   * Student ID. A phone matches it against leaderboard and response rows to
+   * find its own.
+   */
+  publicKey: string;
+  /**
+   * The name shown for this participant to everyone else: their name, made
+   * unique in the session (`Alex`, then `Alex (2)`), or `Participant 3` when
+   * they gave no name. It never changes once assigned.
+   */
+  label: string;
+  /**
+   * Set when the label is not simply what the participant typed, and says
+   * why in a sentence for the waiting screen.
+   */
+  labelNote?: string;
 }
 
 export interface StudentRejectedPayload {
@@ -205,8 +227,14 @@ export interface SlideLiveEmbed {
   interactive?: boolean;
 }
 
+/**
+ * One open response. Only control sockets (the instructor) get `studentId`
+ * and `displayName`; every other audience sees `publicKey` and `label`.
+ */
 export interface OpenResponseEntry {
-  studentId: string;
+  publicKey: string;
+  label: string;
+  studentId?: string;
   displayName?: string;
   responseText: string;
   submittedAt: number;
@@ -285,8 +313,23 @@ export interface LeaderboardEntry {
   totalTimeMs: number;
 }
 
+/**
+ * One leaderboard row as sent to sockets. Only control sockets (the
+ * instructor) get `studentId` and `displayName`; every other audience sees
+ * `publicKey` and `label`.
+ */
+export interface LeaderboardRow {
+  rank: number;
+  publicKey: string;
+  label: string;
+  studentId?: string;
+  displayName?: string;
+  correctCount: number;
+  totalTimeMs: number;
+}
+
 export interface LeaderboardUpdatePayload {
-  entries: LeaderboardEntry[];
+  entries: LeaderboardRow[];
   totalQuestions: number;
 }
 
@@ -295,9 +338,13 @@ export interface SessionStatePayload {
   questionIndex?: number;
 }
 
+/**
+ * The joined participants. Control sockets also get each `studentId` and
+ * `displayName`; the projector sees `publicKey` and `label` only.
+ */
 export interface SessionParticipantsPayload {
   count: number;
-  participants: { studentId: string; displayName?: string }[];
+  participants: { publicKey: string; label: string; studentId?: string; displayName?: string }[];
 }
 
 // ── REST API Paths ──────────────────────────
@@ -375,6 +422,11 @@ export interface Quiz {
   presenterNotes?: boolean;
   /** Optional per-deck override for the panel's initial expanded state. */
   presenterNotesDefaultOpen?: boolean;
+  /**
+   * Whether the join form asks for a Student ID (`student-id:` in the deck
+   * header). Absent means on; `false` asks for a name only and uses it as the ID.
+   */
+  studentId?: boolean;
   questions: Question[];
   sourceFile: string;
 }
@@ -384,6 +436,12 @@ export type SessionMode = "strict" | "open";
 export interface Participant {
   studentId: string;
   displayName?: string;
+  /** Random per-session key that public payloads use instead of `studentId`. */
+  publicKey: string;
+  /** Public name, unique in the session, fixed when the participant first joins. */
+  label: string;
+  /** Why the label differs from what the participant typed, when it does. */
+  labelNote?: string;
   sessionToken: string;
   clientInstanceId?: string;
   socketId: string;
@@ -471,3 +529,4 @@ export const TICK_INTERVAL_MS = 1000;
 export const DATA_DIR = "data";
 
 export * from "./setting-keys";
+export * from "./identity";

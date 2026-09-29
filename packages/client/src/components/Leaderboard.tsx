@@ -1,24 +1,26 @@
-import type { LeaderboardEntry } from "@mdq/shared";
+import type { LeaderboardRow } from "@mdq/shared";
 
-/** Leaderboard table with staggered animation */
+/**
+ * Leaderboard table with staggered animation. Rows are named by label; a row
+ * that carries a Student ID (the instructor's) shows it under the label when
+ * `showStudentIds` is on. `highlightPublicKey` marks the viewer's own row.
+ */
 export default function Leaderboard({
   entries,
   totalQuestions,
-  highlightStudentId,
+  highlightPublicKey,
   maxRows = 10,
   showStudentIds = true,
 }: {
-  entries: LeaderboardEntry[];
+  entries: LeaderboardRow[];
   totalQuestions: number;
-  highlightStudentId?: string;
+  highlightPublicKey?: string;
   maxRows?: number;
   showStudentIds?: boolean;
 }) {
   const visible = entries.slice(0, maxRows);
   const hasScoredQuestions = totalQuestions > 0;
-  const getParticipantLabel = (entry: LeaderboardEntry) => (
-    entry.displayName || (showStudentIds ? entry.studentId : "Anonymous")
-  );
+  const getParticipantLabel = (entry: LeaderboardRow) => entry.label || entry.displayName || "Participant";
 
   const rankLabel = (rank: number) => {
     if (rank === 1) return "1st";
@@ -32,7 +34,7 @@ export default function Leaderboard({
       {visible.length > 0 ? (
         <ol className="leaderboard-list" aria-label="Leaderboard rankings">
           {visible.map((entry, i) => {
-            const isHighlighted = entry.studentId === highlightStudentId;
+            const isHighlighted = !!highlightPublicKey && entry.publicKey === highlightPublicKey;
             const medalTone = entry.rank === 1
               ? "rank-first"
               : entry.rank === 2
@@ -42,7 +44,7 @@ export default function Leaderboard({
                   : "rank-standard";
             return (
               <li
-                key={entry.studentId}
+                key={entry.publicKey}
                 className={`leaderboard-row ${medalTone} ${isHighlighted ? "leaderboard-row-highlight" : ""}`}
                 style={{ animationDelay: `${i * 60}ms` }}
               >
@@ -57,7 +59,7 @@ export default function Leaderboard({
                   <span className="leaderboard-name">
                     {getParticipantLabel(entry)}
                   </span>
-                  {showStudentIds && entry.displayName && (
+                  {showStudentIds && entry.studentId && entry.studentId !== getParticipantLabel(entry) && (
                     <span className="leaderboard-id">{entry.studentId}</span>
                   )}
                 </div>

@@ -589,10 +589,13 @@ export default function InstructorView({
                 <div className="flex flex-wrap gap-2">
                   {sock.participants.participants.map((p) => (
                     <span
-                      key={p.studentId}
+                      key={p.publicKey}
                       className="bg-zinc-700 text-zinc-200 px-3 py-1 rounded-full text-sm"
                     >
-                      {p.displayName || p.studentId}
+                      {p.label}
+                      {!autoGenerateStudentIds && p.studentId && p.studentId !== p.label && (
+                        <span className="ml-2 text-xs text-zinc-400">{p.studentId}</span>
+                      )}
                     </span>
                   ))}
                 </div>

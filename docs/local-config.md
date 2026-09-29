@@ -19,7 +19,7 @@ Supported keys:
 - `instanceId`: stable label for this machine or classroom instance
 - `theme`: UI theme, `dark` by default, or set `light` to reuse the optional light palette
 - `palette`: slide colour palette, `classic` by default, or set `gruvbox`, `rose-pine`, `catppuccin`, `seoul256`, `ayu`, or `tokyo-night` (case-insensitive). Each non-classic palette uses one official variant per theme: Rosé Pine Dawn and Rosé Pine, Catppuccin Latte and Mocha, seoul256 light and dark, Ayu Light and Ayu Dark, Tokyo Night Day and Tokyo Night (night style). It applies in both themes, a deck's `palette:` preamble line overrides it, and the `MDQ_PALETTE` environment variable overrides the file value
-- `autoGenerateStudentIds`: set `true` to ask students only for their name and generate a hidden student ID automatically
+- `autoGenerateStudentIds`: set `true` to ask students only for their name and generate a hidden student ID automatically. A deck whose header says `student-id: false` already asks for a name only and uses the name as the ID, so it never generates one, whether this is on or off
 
 Example:
 
@@ -41,4 +41,4 @@ Practical extra customizations you can keep in the same file:
 - reduce `portFallbacks` if you want mdq to fail fast instead of scanning many ports
 - set a memorable `instanceId` so logs and access checks are easier to read on shared teaching machines
 - switch to `theme: "light"` when you want the alternate light presentation for a room or event
-- set `autoGenerateStudentIds: true` when you want a name-only student join form
+- set `autoGenerateStudentIds: true` when you want a name-only student join form for every deck, or write `student-id: false` in one deck's header to make just that deck name-only (the name is then each participant's ID, and two people cannot share a name)

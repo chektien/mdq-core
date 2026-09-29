@@ -1,25 +1,24 @@
 import express, { type Request, type Response } from "express";
 import cors from "cors";
-import { API, AccessInfo, DeckPalette, DeckTheme, Quiz, Session, SessionState } from "@mdq/shared";
+import { API, AccessInfo, DeckPalette, DeckTheme, Quiz, Session, SessionState, usesStudentIds } from "@mdq/shared";
 import {
   createSession,
   storeSession,
   getSession,
   getSessionByCode,
   StateTransitionError,
-  computeLeaderboard,
   getActiveSessions,
   getDistribution,
   getOpenResponses,
 } from "./session";
 import { parseQuizMarkdown } from "./parser";
-import { apply, EngineCommandError, type Command, type EngineResult } from "./engine";
+import { apply, leaderboardRows, EngineCommandError, type Command, type EngineResult } from "./engine";
 import {
   persistSessionOnEnd,
   computeCumulativeLeaderboard,
   persistSessionProgressOnReveal,
 } from "./persistence";
-import { buildScoredCorrectAnswersMap, getQuestionType, getScoredQuestionCount, isOpenResponseQuestion } from "./scoring";
+import { getQuestionType, getScoredQuestionCount, isOpenResponseQuestion } from "./scoring";
 import { getCachedAccessInfo, generateQrDataUrl, generateShortUrl, type ShortUrlProvider } from "./access-info";
 import {
   INSTRUCTOR_SESSION_COOKIE,
@@ -625,6 +624,8 @@ export function createApp(quizDirOrOpts?: string | AppOptions) {
       week: session.week,
       theme: quiz ? resolveDeckTheme(quiz, theme) : theme,
       palette: quiz ? resolveDeckPalette(quiz, palette) : palette,
+      // Whether the join form asks for a Student ID (the deck's `student-id` setting, on by default).
+      studentIds: usesStudentIds(quiz),
     });
   });
 
@@ -734,17 +735,17 @@ export function createApp(quizDirOrOpts?: string | AppOptions) {
       if (!quiz) {
         return res.status(500).json({ error: "Quiz data not found" });
       }
-      const correctAnswersMap = buildScoredCorrectAnswersMap(quiz);
-      const entries = computeLeaderboard(session, correctAnswersMap);
+      // Anyone with the session ID can read this, so it names people by label and public key only.
       res.json({
-        entries,
+        entries: leaderboardRows(session, quiz, "public"),
         totalQuestions: getScoredQuestionCount(quiz),
       });
     });
   });
 
   // ── Cumulative leaderboard ────────────────
-  app.get(API.CUMULATIVE_LEADERBOARD, (_req, res) => {
+  // Saved results name people by Student ID, so only the instructor may read them.
+  app.get(API.CUMULATIVE_LEADERBOARD, requireInstructorAuth, (_req, res) => {
     try {
       const entries = computeCumulativeLeaderboard(dataDir);
       res.json({ entries });

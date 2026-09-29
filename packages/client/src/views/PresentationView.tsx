@@ -37,13 +37,11 @@ function isInstructorLoginRequired(message: string | null): boolean {
 export default function PresentationView({
   sessionId,
   loginHref,
-  autoGenerateStudentIds = false,
   defaultTheme = "dark",
   defaultPalette = "classic",
 }: {
   sessionId: string;
   loginHref: string;
-  autoGenerateStudentIds?: boolean;
   defaultTheme?: DeckTheme;
   defaultPalette?: DeckPalette;
 }) {
@@ -215,8 +213,8 @@ export default function PresentationView({
           <div className="max-h-48 w-full max-w-lg overflow-y-auto rounded-xl bg-zinc-800/50 p-4">
             <div className="flex flex-wrap gap-2">
               {sock.participants.participants.map((participant) => (
-                <span key={participant.studentId} className="rounded-full bg-zinc-700 px-3 py-1 text-sm text-zinc-200">
-                  {participant.displayName || participant.studentId}
+                <span key={participant.publicKey} className="rounded-full bg-zinc-700 px-3 py-1 text-sm text-zinc-200">
+                  {participant.label}
                 </span>
               ))}
             </div>
@@ -237,7 +235,7 @@ export default function PresentationView({
           entries={sock.leaderboard}
           totalQuestions={sock.totalQuestions ?? totalQuestions}
           maxRows={15}
-          showStudentIds={!autoGenerateStudentIds}
+          showStudentIds={false}
         />
       </div>
     );
@@ -284,7 +282,7 @@ export default function PresentationView({
             <OpenResponseList
               responses={liveOpenResponses}
               title={state === "QUESTION_CLOSED" ? "Submitted Responses" : "Live Responses"}
-              showStudentIds={!autoGenerateStudentIds}
+              showStudentIds={false}
             />
           ) : (() => {
             const dist = state === "QUESTION_CLOSED" ? sock.distribution?.distribution : null;
@@ -334,7 +332,7 @@ export default function PresentationView({
           />
 
           {currentQuestion.questionType === "open_response" ? (
-            <OpenResponseList responses={currentReveal.openResponses} title="Responses" emptyLabel="No responses were submitted." showStudentIds={!autoGenerateStudentIds} />
+            <OpenResponseList responses={currentReveal.openResponses} title="Responses" emptyLabel="No responses were submitted." showStudentIds={false} />
           ) : (() => {
             const dist = currentReveal.distribution;
             const maxCount = Math.max(1, ...Object.values(dist));
@@ -412,7 +410,7 @@ export default function PresentationView({
             entries={sock.leaderboard}
             totalQuestions={sock.totalQuestions ?? totalQuestions}
             maxRows={10}
-            showStudentIds={!autoGenerateStudentIds}
+            showStudentIds={false}
           />
         </ResponsiveQuizSurface>
       );
@@ -537,7 +535,7 @@ export default function PresentationView({
                     <OpenResponseList
                       responses={liveOpenResponses}
                       title={state === "QUESTION_CLOSED" ? "Submitted Responses" : "Live Responses"}
-                      showStudentIds={!autoGenerateStudentIds}
+                      showStudentIds={false}
                     />
                   ) : (() => {
                     const dist = state === "QUESTION_CLOSED" ? sock.distribution?.distribution : null;
@@ -600,7 +598,7 @@ export default function PresentationView({
               />
 
               {currentQuestion.questionType === "open_response" ? (
-                <OpenResponseList responses={currentReveal.openResponses} title="Responses" emptyLabel="No responses were submitted." showStudentIds={!autoGenerateStudentIds} />
+                <OpenResponseList responses={currentReveal.openResponses} title="Responses" emptyLabel="No responses were submitted." showStudentIds={false} />
               ) : (() => {
                 const dist = currentReveal.distribution;
                 const maxCount = Math.max(1, ...Object.values(dist));
