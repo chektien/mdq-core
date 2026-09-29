@@ -272,6 +272,22 @@ describe("palette readability, 7 palettes x 2 themes", () => {
       }, { dialog }, 3);
     });
 
+    it("draws Markdown links in a cool palette colour at 4.5:1 on the slide, notes, panel and paper", () => {
+      const link = token(t, mode === "dark" ? "--mdq-slide-accent-cool" : "--mdq-info-ink");
+      const wash = parseColor(token(t, "--mdq-note-attendee-tint"));
+      const paper = token(t, "--mdq-paper");
+      const grounds: Record<string, Rgba> = {
+        paper: over(paper, "#ffffff"),
+        "paper strong": over(token(t, "--mdq-paper-strong"), "#ffffff"),
+        card: over(parseColor(token(t, "--mdq-card")), paper),
+        "presenter notes panel": over(token(t, "--mdq-warning"), token(t, "--mdq-paper-strong"), 0.09),
+      };
+      stops.forEach((stop, i) => {
+        grounds[`slide stop ${i + 1}`] = stop;
+        grounds[`attendee note on slide stop ${i + 1}`] = over(wash, stop);
+      });
+      expectPairs(`${name} links`, { link }, grounds);
+    });
   });
 
   it("draws the presenter notes panel from palette tokens, with no fixed amber", () => {
@@ -301,4 +317,10 @@ describe("palette readability, 7 palettes x 2 themes", () => {
     }
   });
 
+  it("underlines Markdown links and colours them from the palette", () => {
+    const rule = declarationsOf(index, ".quiz-html a");
+    expect(rule["text-decoration"]).toBe("underline");
+    expect(rule.color).toBe("var(--mdq-slide-accent-cool)");
+    expect(declarationsOf(index, 'html[data-theme="light"] .quiz-html a').color).toBe("var(--mdq-info-ink)");
+  });
 });

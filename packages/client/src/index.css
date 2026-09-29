@@ -4169,6 +4169,26 @@ html[data-theme="light"] .mdq-orbit-callout {
   text-decoration-color: currentColor;
 }
 
+/* Links in rendered Markdown (slide bodies, questions, options and fold-out
+   or presenter notes) are underlined and take a cool palette colour, so a link
+   reads as a link and not as body text. The dark theme uses the slide's cool
+   accent and the light theme the info ink, which hold 4.5:1 on the slide, the
+   note and panel washes and the control paper in every palette. */
+.quiz-html a {
+  color: var(--mdq-slide-accent-cool);
+  text-decoration: underline;
+  text-decoration-thickness: 0.08em;
+  text-underline-offset: 0.18em;
+}
+
+html[data-theme="light"] .quiz-html a {
+  color: var(--mdq-info-ink);
+}
+
+.quiz-html a:hover {
+  text-decoration-thickness: 0.14em;
+}
+
 .image-expand-cue {
   position: absolute;
   top: 0.56rem;
