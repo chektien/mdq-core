@@ -884,6 +884,10 @@ function LiveView({
   const nextQuestionHeading = isReviewing
     ? null
     : getQuestionHeading(liveQuestionIndex >= 0 ? liveQuestionIndex + 1 : 0);
+  // Prev names the item before the current one, the way Next names the one after.
+  const previousQuestionHeading = isReviewing || liveQuestionIndex <= 0
+    ? null
+    : getQuestionHeading(liveQuestionIndex - 1);
 
   // Determine which controls to show
   const liveIsSlide = q?.questionType === "slide";
@@ -1052,6 +1056,7 @@ function LiveView({
     return [
       {
         label: "Prev",
+        detail: canPrev && waitingReason ? waitingReason : canPrev ? previousQuestionHeading : null,
         onClick: () => onAction(() => prevQuestion(sessionId), "previous"),
         disabled: !canPrev || controlsUnavailable,
         reason: canPrev ? waitingReason : null,

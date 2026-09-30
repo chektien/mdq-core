@@ -2784,6 +2784,9 @@ html[data-theme="light"] .image-expansion-close:focus-visible {
 }
 
 .slide-nav-button.slide-action-button-with-detail {
+  /* Prev and Next both carry a title, so each may give ground to the other
+     and to the controls on the right instead of running under them. */
+  flex: 0 1 auto;
   min-width: min(20rem, 28cqi);
   max-width: min(30rem, 34cqi);
   align-items: flex-start;
@@ -7243,5 +7246,54 @@ body.image-expansion-lock {
   .slide-status-pill-fades {
     animation-duration: 5s !important;
     animation-timing-function: steps(1, end) !important;
+  }
+}
+
+/* In full screen, iPad Safari draws its own close button over the top-left
+   corner of the page, about 64 by 60 px. LiveSurface marks <html> with
+   data-fullscreen while it is on, and the toolbar's buttons then start clear
+   of that corner: past it on the right in the wide layout, below it in the
+   stacked one. The layout outside full screen does not move. */
+@media (min-width: 761px) {
+  html[data-fullscreen="true"] .slide-toolbar {
+    left: max(clamp(1.2rem, 3.2cqi, 3.5rem), 4.75rem);
+  }
+}
+
+@media (max-width: 760px) {
+  html[data-fullscreen="true"] .slide-toolbar {
+    margin-top: 2.75rem;
+  }
+}
+
+/* Prev and Next both carry a title. A button's own text width is its smallest
+   size as well, so left alone the pair would push past the column and run
+   under the controls on the right. The pair is held to the column, and the
+   titles are cut with an ellipsis where they do not fit. The empty part of the
+   row passes touches through to the slide. */
+@media (min-width: 761px) {
+  .slide-toolbar-nav {
+    width: 100%;
+    pointer-events: none;
+  }
+
+  .slide-toolbar-nav > * {
+    pointer-events: auto;
+  }
+}
+
+/* Wide screens keep the status label in the middle column. It keeps room
+   there by taking it from the two titles, not from the controls. */
+@media (min-width: 1300px) {
+  .slide-toolbar {
+    grid-template-columns: minmax(0, max-content) minmax(0, 1fr) auto;
+  }
+
+  .slide-toolbar:has(.slide-status-pill) {
+    grid-template-columns: minmax(0, max-content) minmax(11rem, 1fr) auto;
+  }
+
+  .slide-nav-button.slide-action-button-with-detail {
+    min-width: min(11rem, 22cqi);
   }
 }

@@ -91,13 +91,21 @@ export default function LiveSurface({
     if (typeof document === "undefined") return;
 
     setFullscreenSupported(document.fullscreenEnabled);
+    // The page also marks <html>, so the stylesheet can keep the toolbar clear
+    // of the close button some browsers draw over the top-left corner in full screen.
     const syncFullscreenState = () => {
-      setIsFullscreen(!!document.fullscreenElement);
+      const active = !!document.fullscreenElement;
+      setIsFullscreen(active);
+      if (active) document.documentElement.setAttribute("data-fullscreen", "true");
+      else document.documentElement.removeAttribute("data-fullscreen");
     };
 
     syncFullscreenState();
     document.addEventListener("fullscreenchange", syncFullscreenState);
-    return () => document.removeEventListener("fullscreenchange", syncFullscreenState);
+    return () => {
+      document.removeEventListener("fullscreenchange", syncFullscreenState);
+      document.documentElement.removeAttribute("data-fullscreen");
+    };
   }, []);
 
   // Swipe navigation belongs to the presenter, the only surface handed Prev and
