@@ -37,6 +37,7 @@ import QRPanel from "../components/QRPanel";
 import SessionCodeCard from "../components/SessionCodeCard";
 import JoinLockToggle from "../components/JoinLockToggle";
 import SettingSwitch from "../components/SettingSwitch";
+import { mountParticipantsDialog } from "../participantsDialog";
 import InlineMarkdownText from "../components/InlineMarkdownText";
 import QuizHtml from "../components/QuizHtml";
 import LiveSurface, { type LiveSurfaceAction } from "../components/LiveSurface";
@@ -839,8 +840,13 @@ function LiveView({
   const [reviewQuestionIndex, setReviewQuestionIndex] = useState<number | null>(null);
   const [showEndConfirm, setShowEndConfirm] = useState(false);
   const [showParticipants, setShowParticipants] = useState(false);
-  const participantsDialogRef = useRef<HTMLDialogElement>(null);
   const participantsOpenerRef = useRef<HTMLElement | null>(null);
+  // React runs this ref's cleanup before detaching the node, including when
+  // a live update replaces the surface while Participants stays open.
+  const participantsDialogRef = useCallback((dialog: HTMLDialogElement | null) => {
+    if (!dialog) return;
+    return mountParticipantsDialog(dialog, participantsOpenerRef.current);
+  }, []);
   const [moderationNotice, setModerationNotice] = useState<string | null>(null);
   const [questionCache, setQuestionCache] = useState<Record<number, QuestionState>>({});
   const [revealCache, setRevealCache] = useState<Record<number, RevealState>>({});
@@ -1004,18 +1010,6 @@ function LiveView({
   const controlsUnavailable = loading || !sock.connected;
   // Why a control is waiting, so a tap that cannot work says so instead of doing nothing.
   const waitingReason = !sock.connected ? "Reconnecting..." : null;
-
-  useEffect(() => {
-    if (!showParticipants) return;
-    const dialog = participantsDialogRef.current;
-    // A modal native dialog makes the live controls inert, including to Tab
-    // and screen readers. Closing or unmounting returns focus to its opener.
-    dialog?.showModal();
-    return () => {
-      dialog?.close();
-      if (participantsOpenerRef.current?.isConnected) participantsOpenerRef.current.focus();
-    };
-  }, [showParticipants]);
 
   useEffect(() => {
     if (!showEndConfirm) return;
