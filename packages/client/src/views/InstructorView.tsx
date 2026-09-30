@@ -37,6 +37,7 @@ import QRPanel from "../components/QRPanel";
 import SessionCodeCard from "../components/SessionCodeCard";
 import JoinLockToggle from "../components/JoinLockToggle";
 import SettingSwitch from "../components/SettingSwitch";
+import { mountParticipantsDialog } from "../participantsDialog";
 import InlineMarkdownText from "../components/InlineMarkdownText";
 import QuizHtml from "../components/QuizHtml";
 import LiveSurface, { type LiveSurfaceAction } from "../components/LiveSurface";
@@ -158,6 +159,11 @@ export default function InstructorView({
   const [sessionInfo, setSessionInfo] = useState<CreateSessionResponse | null>(null);
   const [accessInfo, setAccessInfo] = useState<AccessInfo | null>(null);
   const [phase, setPhase] = useState<InstructorPhase>("setup");
+  // After session end the live opener no longer exists. Focus the new screen
+  // once on attachment rather than leaving focus on the removed dialog/body.
+  const endedHeadingRef = useCallback((heading: HTMLHeadingElement | null) => {
+    heading?.focus({ preventScroll: true });
+  }, []);
   const [totalQuestionsInQuiz, setTotalQuestionsInQuiz] = useState(0);
   const [questionHeadings, setQuestionHeadings] = useState<string[]>([]);
   const [questionSummaries, setQuestionSummaries] = useState<QuestionSummary[]>([]);
@@ -702,7 +708,7 @@ export default function InstructorView({
   if (phase === "ended") {
     return (
       <div className="min-h-dvh flex flex-col items-center justify-center gap-8 p-8">
-        <h1 className="text-3xl font-bold text-white">Session Ended</h1>
+        <h1 ref={endedHeadingRef} tabIndex={-1} className="text-3xl font-bold text-white">Session Ended</h1>
         {quizLabel && (
           <h2 className="text-xl font-semibold text-zinc-300 text-center">
             {resultsHeading("leaderboard", quizLabel)}
@@ -839,6 +845,13 @@ function LiveView({
   const [reviewQuestionIndex, setReviewQuestionIndex] = useState<number | null>(null);
   const [showEndConfirm, setShowEndConfirm] = useState(false);
   const [showParticipants, setShowParticipants] = useState(false);
+  const participantsOpenerRef = useRef<HTMLElement | null>(null);
+  // React runs this ref's cleanup before detaching the node, including when
+  // a live update replaces the surface while Participants stays open.
+  const participantsDialogRef = useCallback((dialog: HTMLDialogElement | null) => {
+    if (!dialog) return;
+    return mountParticipantsDialog(dialog, participantsOpenerRef.current);
+  }, []);
   const [moderationNotice, setModerationNotice] = useState<string | null>(null);
   const [questionCache, setQuestionCache] = useState<Record<number, QuestionState>>({});
   const [revealCache, setRevealCache] = useState<Record<number, RevealState>>({});
@@ -1004,15 +1017,6 @@ function LiveView({
   const waitingReason = !sock.connected ? "Reconnecting..." : null;
 
   useEffect(() => {
-    if (!showParticipants) return;
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setShowParticipants(false);
-    };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [showParticipants]);
-
-  useEffect(() => {
     if (!showEndConfirm) return;
 
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -1107,7 +1111,15 @@ function LiveView({
 
   const participantsAction: LiveSurfaceAction = {
     label: "Participants",
-    onClick: () => setShowParticipants(true),
+    onClick: (event) => {
+      // Existing DOM overlays (QR/end confirm) must not be stranded behind
+      // this native top-layer modal by activation of a background control.
+      if (documentHasOpenDialog(document)) return;
+      // Safari pointer clicks do not always focus buttons. Remember the button
+      // that invoked this action rather than whichever element had focus.
+      participantsOpenerRef.current = event?.currentTarget ?? document.activeElement as HTMLElement | null;
+      setShowParticipants(true);
+    },
   };
   const liveSurfaceActions: LiveSurfaceAction[] = (() => {
     // Offline, the controls stay where they are but wait, each saying why; Reconnect leads.
@@ -1263,18 +1275,17 @@ function LiveView({
   ) : null;
 
   const participantsDialog = showParticipants ? (
-    <div
+    <dialog
+      ref={participantsDialogRef}
       className="end-session-overlay participants-overlay fixed inset-0 z-[10000] flex items-center justify-center bg-[#07060b]/80 px-5 backdrop-blur-sm"
-      role="presentation"
+      aria-labelledby="participants-title"
+      onCancel={(event) => { event.preventDefault(); setShowParticipants(false); }}
       onMouseDown={(event) => {
         if (event.target === event.currentTarget) setShowParticipants(false);
       }}
     >
       <div
         className="participants-card w-full max-w-lg rounded-2xl border border-[color-mix(in_srgb,var(--mdq-line-strong)_60%,transparent)] bg-[var(--mdq-dialog)] p-6 text-white shadow-2xl shadow-black/50"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="participants-title"
       >
         <div className="participants-header">
           <h2 id="participants-title" className="text-2xl font-semibold">
@@ -1324,7 +1335,7 @@ function LiveView({
           )}
         </div>
       </div>
-    </div>
+    </dialog>
   ) : null;
 
   const liveSurfaceStatusLabel = isLeaderboardDisplay

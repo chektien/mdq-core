@@ -184,6 +184,28 @@ describe("Participants dialog", () => {
   const start = tsx.indexOf("const participantsDialog = showParticipants");
   const dialog = tsx.slice(start, tsx.indexOf(") : null;", start));
 
+  it("hides the closed native dialog and avoids adding the UA backdrop shade", () => {
+    const css = read("index.css");
+    expect(lastRule(css, "dialog.participants-overlay:not([open])")).toContain("display: none");
+    expect(lastRule(css, "dialog.participants-overlay::backdrop")).toContain("background: transparent");
+  });
+
+  it("wires native modal lifetime to the dialog node, including node replacement", () => {
+    expect(dialog).toMatch(/<dialog\s+ref=\{participantsDialogRef\}/);
+    expect(dialog).toContain('aria-labelledby="participants-title"');
+    expect(dialog).toContain("onCancel={(event) => { event.preventDefault(); setShowParticipants(false); }}");
+    expect(tsx).toContain("return mountParticipantsDialog(dialog, participantsOpenerRef.current)");
+    expect(tsx).toContain("participantsOpenerRef.current = event?.currentTarget ?? document.activeElement");
+    expect(tsx).toContain('<h1 ref={endedHeadingRef} tabIndex={-1}');
+  });
+
+  it("does not open a top-layer modal over an existing QR or end-confirm dialog", () => {
+    const start = tsx.indexOf("const participantsAction:");
+    const action = tsx.slice(start, tsx.indexOf("const liveSurfaceActions:", start));
+    expect(action).toContain("if (documentHasOpenDialog(document)) return;");
+    expect(action.indexOf("documentHasOpenDialog(document)")).toBeLessThan(action.indexOf("setShowParticipants(true)"));
+  });
+
   it("closes with an icon button named Close, at least 44px square", () => {
     expect(dialog).toMatch(/className="participants-close"\s+aria-label="Close"/);
     expect(dialog).toContain("<svg");
@@ -205,15 +227,37 @@ describe("Participants dialog", () => {
     const row = read("components/SettingSwitch.tsx");
     expect(row).toContain('role="switch"');
     expect(row).toContain("aria-checked={checked}");
+    expect(row).toContain("aria-labelledby={labelId}");
+    expect(row).toContain('<span id={labelId} className="setting-switch-label">{label}</span>');
     expect(row).toContain("aria-describedby={descriptionId}");
   });
 });
 
 describe("open join card", () => {
-  it("is wide enough for the join address to wrap to two lines, with the QR at least as large as before", () => {
+  it("widens the address area, with the QR at least as large as before", () => {
     const css = read("index.css");
-    expect(css).toMatch(/@media \(min-width: 761px\) \{\s*\.slide-join-panel\.session-code-card-expanded,[\s\S]*?width: clamp\(11\.5rem, 16cqi, 16rem\)/);
+    expect(css).toContain("--slide-expanded-join-width: clamp(11.5rem, 16cqi, 16rem)");
+    expect(css).toMatch(/\.slide-join-panel\.session-code-card-expanded,[\s\S]*?width: var\(--slide-expanded-join-width\)/);
     expect(css).toMatch(/\.slide-join-panel\.session-code-card-expanded \.session-code-card-qr \{\s*width: min\(100%, 9rem\)/);
+  });
+
+  it("reserves the widened floating card beside media and references, but adds no inset when it is in flow", () => {
+    const css = read("index.css");
+    expect(css).toMatch(/\.slide-safe:has\(\.slide-join-panel\.session-code-card-expanded\) \{\s*--slide-join-reserve: var\(--slide-expanded-join-width\)/);
+    for (const selector of [
+      ".slide-safe:has(.slide-join-panel) .slide-content-grid-with-media .slide-media-grid",
+      ".slide-safe:has(.slide-join-panel) .slide-content-grid-media-only .slide-media-groups",
+      ".slide-safe:has(.slide-join-panel) .slide-references",
+    ]) expect(lastRule(css, selector)).toContain("var(--slide-join-reserve, 0px)");
+    expect(css).toMatch(/@media \(min-width: 761px\) and \(max-width: 1180px\) \{\s*\.slide-live-shell-controls:has\(\.presenter-notes-panel\) \.slide-safe \{\s*--slide-join-reserve: 0px/);
+  });
+
+  it("reserves beside the complete video block, whose nested still grids bypass the image inset", () => {
+    const css = read("index.css");
+    expect(lastRule(css, "  .slide-safe:has(.slide-join-panel.session-code-card-expanded) .slide-content-grid:has(> .slide-visual-stack, > .slide-video-slot)"))
+      .toContain("width: calc(100% - var(--slide-join-reserve, 0px))");
+    expect(lastRule(css, ".slide-safe:has(.slide-join-panel) .slide-content-grid-with-media .slide-visual-stack .slide-media-grid"))
+      .toContain("width: 100%");
   });
 });
 

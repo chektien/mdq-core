@@ -13,7 +13,8 @@ import {
 
 export interface LiveSurfaceAction {
   label: string;
-  onClick?: () => void | Promise<void>;
+  /** Pointer/keyboard clicks carry the opener; swipe/key navigation has no event. */
+  onClick?: (event?: { currentTarget: HTMLElement }) => void | Promise<void>;
   /** Makes the action a plain link that downloads a file instead of a button. */
   href?: string;
   disabled?: boolean;
