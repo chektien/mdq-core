@@ -270,7 +270,7 @@ export default function PresentationView({
       }
 
       return (
-        <ResponsiveQuizSurface>
+        <ResponsiveQuizSurface answering={state !== "QUESTION_CLOSED"}>
           {state === "QUESTION_OPEN" && (
             <Timer remainingSec={sock.remainingSec} totalSec={currentQuestion.timeLimitSec} size={140} />
           )}
@@ -531,7 +531,7 @@ export default function PresentationView({
                 positionLabel={positionLabel}
                 statusLabel={quizStatusLabel}
               >
-                <ResponsiveQuizSurface>
+                <ResponsiveQuizSurface answering={state !== "QUESTION_CLOSED"}>
                   {state === "QUESTION_OPEN" && (
                     <Timer remainingSec={sock.remainingSec} totalSec={currentQuestion.timeLimitSec} size={140} />
                   )}

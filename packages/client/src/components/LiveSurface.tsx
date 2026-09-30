@@ -177,7 +177,7 @@ export default function LiveSurface({
     if (!safe || !card) return undefined;
     const measure = () => {
       const style = window.getComputedStyle(card);
-      if (style.position !== "absolute") {
+      if (style.position !== "absolute" && style.position !== "fixed") {
         safe.style.removeProperty("--slide-join-clear");
         return;
       }

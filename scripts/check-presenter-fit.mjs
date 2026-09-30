@@ -1,14 +1,20 @@
 #!/usr/bin/env node
 /**
  * Real-browser check that the presenter's controls and join card keep clear of
- * each other and of a question's answer options on a tablet-width window. It
- * starts the built server on a free port with a synthetic deck (long titles on
- * the slides either side of a four-option question), opens the presenter in
- * Chrome at several sizes and asserts that, with the question open and closed
- * and the join card closed up and opened out:
+ * each other and of a question's answer options from 761 px wide up to a
+ * 1920 x 1080 projector. It starts the built server on a free port with a
+ * synthetic deck (long titles on the slides either side of a four-option
+ * question), opens the presenter in Chrome at a range of sizes and asserts
+ * that, with the question open and closed and the join card closed up and
+ * opened out:
  *   - no two toolbar controls, and no control and the join card, overlap;
- *   - the join card never covers an answer option (up to 1099 px wide);
- *   - a window 1280 px wide keeps no control overlap.
+ *   - at 700 px tall and more the join card never covers an answer option, the
+ *     page does not scroll, and the card and every option are inside the
+ *     viewport;
+ *   - at any height the join card is inside the viewport (the cramped
+ *     768 x 600 and 1024 x 500 windows check this and the controls only).
+ * A table of the measured scroll, covered options and what falls outside the
+ * viewport is printed at the end.
  *
  * Run `npm run build` first, then:
  *   node scripts/check-presenter-fit.mjs [--chrome <path>]
@@ -66,11 +72,14 @@ type: slide
 ---
 `;
 
-const SIZES = [];
-for (const width of [768, 800, 820, 860]) for (const height of [600, 768, 1024]) SIZES.push([width, height]);
-SIZES.push([1280, 800]);
+const FULL_HEIGHT = 700; // from this height up the page must not scroll and everything must be in view
+const SIZES = [
+  [768, 700], [800, 800], [820, 1180], [1024, 768], [1180, 820], [1280, 720], [1280, 800], [1366, 768], [1440, 900], [1920, 1080],
+  [768, 600], [1024, 500],
+];
 
 const failures = [];
+const rows = [];
 const check = (ok, message) => { console.log(`${ok ? "ok  " : "FAIL"} ${message}`); if (!ok) failures.push(message); };
 
 function freePort() {
@@ -99,10 +108,22 @@ function scan() {
     }
   }
   const card = document.querySelector(".slide-join-panel");
-  const covered = card && visible(card)
-    ? [...document.querySelectorAll(".quiz-surface-content .grid > div")].filter(visible).filter((option) => overlap(card, option) > 4).map((option) => label(option))
-    : [];
-  return { controlOverlaps, covered };
+  const cardVisible = Boolean(card && visible(card));
+  const options = [...document.querySelectorAll(".quiz-surface-content .grid > div, .quiz-surface-content .space-y-3 > div")].filter(visible);
+  const covered = cardVisible ? options.filter((option) => overlap(card, option) > 4).map((option) => label(option)) : [];
+  const outside = (el) => {
+    const r = el.getBoundingClientRect();
+    return r.top < -1 || r.left < -1 || r.bottom > window.innerHeight + 1 || r.right > window.innerWidth + 1;
+  };
+  const scroller = document.scrollingElement || document.documentElement;
+  return {
+    controlOverlaps,
+    covered,
+    optionCount: options.length,
+    scroll: Math.max(0, scroller.scrollHeight - window.innerHeight),
+    optionsOutside: options.filter(outside).map((option) => label(option)),
+    cardOutside: !cardVisible || outside(card),
+  };
 }
 
 async function main() {
@@ -123,6 +144,7 @@ async function main() {
       await new Promise((resolve) => setTimeout(resolve, 250));
     }
     for (const [width, height] of SIZES) {
+      const full = height >= FULL_HEIGHT;
       // A new page for each size: the question's fit step keeps its density between resizes.
       const context = await browser.newContext({ viewport: { width, height } });
       const page = await context.newPage();
@@ -132,26 +154,32 @@ async function main() {
       await page.getByRole("button", { name: /start session/i }).click();
       await page.waitForSelector(".slide-surface .slide-title");
       const states = [];
-      const read = async (name) => {
+      const read = async (name, question) => {
         for (const expanded of [false, true]) {
           const toggle = page.locator(".slide-join-panel .session-code-card-toggle");
           if (((await toggle.getAttribute("aria-expanded")) === "true") !== expanded) await toggle.click({ force: true });
+          // Clicking the toggle can scroll a tall page. Measure from the top, where the presenter starts.
+          await page.evaluate(() => window.scrollTo(0, 0));
           await page.waitForTimeout(450);
-          states.push({ name: `${name}, join card ${expanded ? "open" : "closed"}`, ...(await page.evaluate(scan)) });
+          states.push({ name: `${name}, join card ${expanded ? "open" : "closed"}`, question, open: name === "question open", ...(await page.evaluate(scan)) });
         }
       };
-      await read("slide");
+      await read("slide", false);
       await page.getByRole("button", { name: /^Next/ }).click();
       await page.waitForSelector(".quiz-surface-content .grid");
-      await read("question open");
+      await read("question open", true);
       await page.getByRole("button", { name: "Close Question" }).click({ force: true });
       await page.waitForTimeout(600);
-      await read("question closed");
+      await read("question closed", true);
       for (const state of states) {
         const where = `${width}x${height} ${state.name}`;
+        rows.push({ size: `${width}x${height}`, ...state });
         check(state.controlOverlaps.length === 0, `${where}: no control overlaps another${state.controlOverlaps.length ? ` (${state.controlOverlaps.join("; ")})` : ""}`);
-        // Above 1099 px the open card is the tall projector card, which this change leaves as it was.
-        if (width < 1100) check(state.covered.length === 0, `${where}: the join card covers no answer option${state.covered.length ? ` (${state.covered.join("; ")})` : ""}`);
+        check(!state.cardOutside, `${where}: the join card is inside the viewport`);
+        if (!full) continue;
+        if (state.open) check(state.covered.length === 0, `${where}: the join card covers no answer option${state.covered.length ? ` (${state.covered.join("; ")})` : ""}`);
+        check(state.scroll <= 1, `${where}: the page does not scroll (${state.scroll} px)`);
+        if (state.open) check(state.optionCount === 4 && state.optionsOutside.length === 0, `${where}: all four answer options are inside the viewport${state.optionsOutside.length ? ` (${state.optionsOutside.join("; ")} outside)` : ""}`);
       }
       await context.close();
     }
@@ -160,6 +188,8 @@ async function main() {
     server.kill();
     fs.rmSync(tmp, { recursive: true, force: true });
   }
+  console.log("\nsize        state                               scroll  covered  options outside  card outside");
+  for (const row of rows) console.log(`${row.size.padEnd(11)} ${row.name.padEnd(35)} ${String(row.scroll).padStart(6)}  ${String(row.covered.length).padStart(7)}  ${String(row.optionsOutside.length).padStart(15)}  ${row.cardOutside ? "yes" : "no"}`);
   if (failures.length > 0) {
     console.error(`\n${failures.length} check(s) failed.`);
     process.exit(1);

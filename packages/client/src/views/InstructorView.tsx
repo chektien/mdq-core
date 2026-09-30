@@ -915,6 +915,8 @@ function LiveView({
   const liveIsSlide = q?.questionType === "slide";
   const canClose = state === "QUESTION_OPEN" && !liveIsSlide;
   const canReveal = state === "QUESTION_CLOSED" && !liveIsSlide;
+  // The options are a grid to answer from, not result bars, unless the question is closed and is not being reviewed.
+  const optionsAnswering = state !== "QUESTION_CLOSED" || isReviewing;
   const canNext =
     (state === "REVEAL" || (state === "QUESTION_OPEN" && liveIsSlide)) &&
     q &&
@@ -1363,7 +1365,7 @@ function LiveView({
       }
 
       return (
-        <ResponsiveQuizSurface>
+        <ResponsiveQuizSurface answering={optionsAnswering}>
           {state === "QUESTION_OPEN" && !isReviewing && (
             <Timer
               remainingSec={sock.remainingSec}
@@ -1681,7 +1683,7 @@ function LiveView({
                 navActions={liveSurfaceNavActions}
                 actions={liveSurfaceActions}
               >
-                <ResponsiveQuizSurface>
+                <ResponsiveQuizSurface answering={optionsAnswering}>
                   {/* Timer */}
                   {state === "QUESTION_OPEN" && !isReviewing && (
                     <Timer

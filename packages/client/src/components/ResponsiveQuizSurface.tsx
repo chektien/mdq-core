@@ -28,10 +28,13 @@ export default function ResponsiveQuizSurface({
   children,
   reveal = false,
   leaderboard = false,
+  answering = false,
 }: {
   children: ReactNode;
   reveal?: boolean;
   leaderboard?: boolean;
+  /** True while the answer options are shown as a grid to choose from (not as results), so the stylesheet keeps the join card clear of them. */
+  answering?: boolean;
 }) {
   const ref = useRef<HTMLDivElement | null>(null);
   const [density, setDensity] = useState<FitDensity>("comfortable");
@@ -48,9 +51,13 @@ export default function ResponsiveQuizSurface({
         const available = getAvailableHeight(element);
         const contentHeight = element.scrollHeight;
         const overflowRatio = contentHeight / available;
+        // The scaled density shrinks the content with a transform, which keeps its
+        // layout height. The stylesheet trims the margins by this height.
+        const layoutHeight = `${element.offsetHeight}px`;
+        if (element.style.getPropertyValue("--quiz-fit-height") !== layoutHeight) element.style.setProperty("--quiz-fit-height", layoutHeight);
 
         setDensity((current) => {
-          if (overflowRatio > 1.03) return nextDensity(current);
+          if (overflowRatio > 1) return nextDensity(current);
           if (overflowRatio < 0.78) return previousDensity(current);
           return current;
         });
@@ -88,6 +95,7 @@ export default function ResponsiveQuizSurface({
         "quiz-surface-content-fit",
         reveal ? "quiz-surface-content-reveal" : "",
         leaderboard ? "quiz-surface-content-leaderboard" : "",
+        answering ? "quiz-surface-content-answering" : "",
       ].filter(Boolean).join(" ")}
       data-fit-density={leaderboard ? undefined : density}
     >
