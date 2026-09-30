@@ -17,6 +17,13 @@ import {
   parseDeckPalette,
   dashedSettingKey,
   normalizeDeckSettingKeys,
+  DECK_STYLE_KEYS,
+  resolveDeckStyleSetting,
+  type ParseDiagnostic,
+  type DeckStyle,
+  type DeckStyleSettings,
+  findVideoLinks,
+  VideoLinkMatch,
 } from "@mdq/shared";
 import { marked } from "marked";
 
@@ -49,6 +56,8 @@ export class QuizParseError extends Error {
 export interface ParseResult {
   quiz: Quiz | null;
   errors: QuizParseError[];
+  /** Notes that do not stop the deck loading, such as an ignored appearance setting. */
+  diagnostics: ParseDiagnostic[];
 }
 
 interface QuestionBlock {
@@ -66,6 +75,7 @@ export function parseQuizMarkdown(source: string, sourceFile: string): ParseResu
   // rules below match one spelling.
   const markdown = normalizeDeckSettingKeys(source);
   const errors: QuizParseError[] = [];
+  const diagnostics: ParseDiagnostic[] = [];
 
   const title = extractDeckTitle(markdown);
   const theme = extractDeckThemeMetadata(markdown, sourceFile, errors);
@@ -78,6 +88,7 @@ export function parseQuizMarkdown(source: string, sourceFile: string): ParseResu
     errors,
   );
   const studentId = extractDeckBooleanMetadata(markdown, "student_id", sourceFile, errors);
+  const deckStyle = extractDeckStyleMetadata(markdown, diagnostics, sourceFile);
 
   // Extract deck key from filename (e.g., "week01.md" -> "week01", "featured-demo.md" -> "featured-demo")
   const sourceStem = sourceFile.replace(/^.*[\\/]/, "").replace(/\.md$/i, "").toLowerCase();
@@ -95,7 +106,15 @@ export function parseQuizMarkdown(source: string, sourceFile: string): ParseResu
     if (!block) continue;
 
     try {
-      const question = parseQuestionBlock(block, i, sourceFile, startLine);
+      const question = parseQuestionBlock(
+        block,
+        i,
+        sourceFile,
+        startLine,
+        diagnostics,
+        // The block is trimmed before parsing, so blank lines at its top shift its first line down.
+        startLine + rawBlock.slice(0, rawBlock.length - rawBlock.trimStart().length).split("\n").length - 1,
+      );
       questions.push(question);
     } catch (e) {
       if (e instanceof QuizParseError) {
@@ -118,11 +137,12 @@ export function parseQuizMarkdown(source: string, sourceFile: string): ParseResu
     presenterNotes,
     presenterNotesDefaultOpen,
     studentId,
+    ...(deckStyle ? { styleSettings: deckStyle.settings, style: deckStyle.style } : {}),
     questions,
     sourceFile,
   };
 
-  return { quiz: questions.length > 0 ? quiz : null, errors };
+  return { quiz: questions.length > 0 ? quiz : null, errors, diagnostics };
 }
 
 /**
@@ -255,9 +275,47 @@ function extractDeckBooleanMetadata(
 }
 
 /**
+ * The appearance settings in the deck header (`title-size: large`,
+ * `accent-color: teal`). A value that is not a preset, a plain length or a
+ * colour adds a diagnostic on the key's line that names the key and what is
+ * allowed, and is left out. It is never a parse error, so the deck still loads.
+ * Undefined when no setting was accepted.
+ */
+function extractDeckStyleMetadata(
+  markdown: string,
+  diagnostics: ParseDiagnostic[],
+  sourceFile: string,
+): { settings: DeckStyleSettings; style: DeckStyle } | undefined {
+  const preamble = markdown.split(/^---+\s*$/m, 1)[0] || markdown;
+  const settings: DeckStyleSettings = {};
+  const style: DeckStyle = {};
+  for (const key of DECK_STYLE_KEYS) {
+    const match = preamble.match(new RegExp(`^${key.replace(/-/g, "_")}:[ \\t]*(.*?)\\s*$`, "im"));
+    if (!match) continue;
+    const result = resolveDeckStyleSetting(key, match[1]);
+    if (result.ok) {
+      settings[key] = result.value;
+      Object.assign(style, result.style);
+      continue;
+    }
+    const lineNumber = preamble.slice(0, match.index).split("\n").length;
+    diagnostics.push({ severity: "warning", sourceFile, questionIndex: -1, lineNumber, message: result.message });
+  }
+  diagnostics.sort((a, b) => (a.lineNumber ?? 0) - (b.lineNumber ?? 0));
+  return Object.keys(settings).length > 0 ? { settings, style } : undefined;
+}
+
+/**
  * Parse a single question block into a Question object.
  */
-function parseQuestionBlock(block: string, index: number, sourceFile: string, blockStartLine: number): Question {
+function parseQuestionBlock(
+  block: string,
+  index: number,
+  sourceFile: string,
+  blockStartLine: number,
+  diagnostics: ParseDiagnostic[] = [],
+  firstLineNumber: number = blockStartLine,
+): Question {
   const lines = block.split("\n");
 
   // 1. Extract topic from H2 heading
@@ -463,7 +521,16 @@ function parseQuestionBlock(block: string, index: number, sourceFile: string, bl
     : { contentLines: textLines, liveEmbed: undefined };
   textLines = liveEmbedExtraction.contentLines;
   const videoExtraction = isSlide
-    ? extractSlideVideo(textLines)
+    ? extractSlideVideo(textLines, (message, at) => {
+      const found = at === undefined ? -1 : indexOfOccurrence(lines, at.text, at.occurrence);
+      diagnostics.push({
+        severity: "info",
+        sourceFile,
+        questionIndex: index,
+        lineNumber: found >= 0 ? firstLineNumber + found : blockStartLine,
+        message,
+      });
+    })
     : { contentLines: textLines, video: undefined };
   textLines = videoExtraction.contentLines;
   const backgroundExtraction = isSlide
@@ -694,7 +761,32 @@ function extractSlideLiveEmbed(lines: string[]): { contentLines: string[]; liveE
   };
 }
 
-function extractSlideVideo(lines: string[]): { contentLines: string[]; video?: SlideVideo } {
+/** A line of text and which repeat of that text it is, so a line can be found again in the original block. */
+interface LineRef {
+  text: string;
+  occurrence: number;
+}
+
+type ReportVideoNote = (message: string, at?: LineRef) => void;
+
+function lineRef(lines: readonly string[], index: number): LineRef {
+  let occurrence = 0;
+  for (let i = 0; i <= index; i++) if (lines[i] === lines[index]) occurrence += 1;
+  return { text: lines[index], occurrence };
+}
+
+function indexOfOccurrence(lines: readonly string[], text: string, occurrence: number): number {
+  let seen = 0;
+  for (let i = 0; i < lines.length; i++) {
+    if (lines[i] === text && ++seen === occurrence) return i;
+  }
+  return -1;
+}
+
+function extractSlideVideo(
+  lines: string[],
+  report: ReportVideoNote = () => {},
+): { contentLines: string[]; video?: SlideVideo } {
   const contentLines: string[] = [];
   let embedUrl = "";
   let thumbnail: string | undefined;
@@ -723,7 +815,17 @@ function extractSlideVideo(lines: string[]): { contentLines: string[]; video?: S
   }
 
   if (!embedUrl) {
+    const linked = extractVideoLink(contentLines, report);
+    if (linked.video) return linked;
     return { contentLines };
+  }
+
+  const shadowed = findVideoLinks(contentLines)[0];
+  if (shadowed) {
+    report(
+      "This slide sets video_card, so its [Video: ...](url) link stays an ordinary link. A slide shows one video.",
+      lineRef(contentLines, shadowed.lineIndex),
+    );
   }
 
   return {
@@ -733,6 +835,46 @@ function extractSlideVideo(lines: string[]): { contentLines: string[]; video?: S
       ...(thumbnail ? { thumbnail } : {}),
       ...(caption ? { caption } : {}),
       ...(label ? { label } : {}),
+    },
+  };
+}
+
+/**
+ * The first `[Video: label](url)` paragraph with a supported address becomes
+ * the slide's video and leaves the text. An unsupported address, or a second
+ * video link, stays in the text as an ordinary link and is reported.
+ */
+function extractVideoLink(
+  lines: string[],
+  report: ReportVideoNote,
+): { contentLines: string[]; video?: SlideVideo } {
+  const matches = findVideoLinks(lines);
+  let chosen: VideoLinkMatch | undefined;
+  for (const match of matches) {
+    if (!match.video) {
+      report(`"${match.url}" stays an ordinary link. ${match.reason}`, lineRef(lines, match.lineIndex));
+    } else if (chosen) {
+      report(`"${match.url}" stays an ordinary link because a slide shows one video, and it already shows the first.`, lineRef(lines, match.lineIndex));
+    } else {
+      chosen = match;
+    }
+  }
+  const descriptor = chosen?.video;
+  if (!chosen || !descriptor) return { contentLines: lines };
+
+  const contentLines = lines.filter((_, index) => index !== chosen!.lineIndex);
+  const isFile = descriptor.provider === "file";
+  return {
+    contentLines,
+    video: {
+      embedUrl: (isFile ? descriptor.fileUrl : descriptor.embedUrl) ?? "",
+      label: descriptor.label,
+      link: {
+        url: descriptor.url,
+        provider: descriptor.provider,
+        mode: isFile ? "file" : "iframe",
+        ...(descriptor.startSeconds ? { startSeconds: descriptor.startSeconds } : {}),
+      },
     },
   };
 }

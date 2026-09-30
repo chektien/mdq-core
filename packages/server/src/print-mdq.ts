@@ -1,6 +1,8 @@
 import { chromium, type Browser } from "playwright";
-import { DECK_PALETTES, DeckPalette, Quiz, Question, QuestionType, describeDeckPalettes, parseDeckPalette } from "@mdq/shared";
+import { DECK_PALETTES, DeckPalette, formatDiagnostic, Quiz, Question, QuestionType, describeDeckPalettes, parseDeckPalette } from "@mdq/shared";
 import { parseQuizMarkdown, QuizParseError } from "./parser";
+import { escapeHtml, renderVideoNote } from "./print-video";
+import { printDeckStyle } from "./print-deck-style";
 import * as fs from "fs";
 import * as path from "path";
 import { pathToFileURL } from "url";
@@ -220,14 +222,6 @@ function parseArgs(argv: string[]): CliResult {
       htmlOut: htmlOut ? path.resolve(htmlOut) : undefined,
     },
   };
-}
-
-function escapeHtml(value: string): string {
-  return value
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
 }
 
 function isExternalUrl(src: string): boolean {
@@ -465,7 +459,8 @@ function renderItem(question: Question, index: number, total: number, options: P
   const body = renderTrustedHtml(question.textHtml, inputDir, options.imagesDir);
   const hasBody = body.trim().length > 0;
   const hasSlideMedia = isSlide && (question.slideMedia?.length ?? 0) > 0;
-  const bodySection = hasBody || !hasSlideMedia
+  const hasSlideVideo = isSlide && !!question.slideVideo;
+  const bodySection = hasBody || (!hasSlideMedia && !hasSlideVideo)
     ? `<section class="body-copy">${hasBody ? body : "<p class=\"empty-copy\">No body text.</p>"}</section>`
     : "";
 
@@ -488,6 +483,7 @@ function renderItem(question: Question, index: number, total: number, options: P
         ${bodySection}
         ${renderSlideMedia(question, inputDir, options.imagesDir)}
       </div>
+      ${isSlide ? renderVideoNote(question) : ""}
       ${renderOptions(question, inputDir, options.imagesDir, options.includeAnswers)}
       ${renderAnswerBlock(question, options.includeAnswers)}
       ${renderExplanation(question, options.includeAnswers)}
@@ -1003,12 +999,19 @@ function renderThemeTokens(theme: PrintTheme, palette: PrintPalette): string {
     `;
 }
 
-function renderStyles(pageSize: PrintOptions["pageSize"], theme: PrintTheme, palette: PrintPalette): string {
+function renderStyles(
+  pageSize: PrintOptions["pageSize"],
+  theme: PrintTheme,
+  palette: PrintPalette,
+  deck: Pick<Quiz, "style" | "styleSettings"> = {},
+): string {
   const pageRule = pageSize === "Letter" ? "size: Letter;" : "size: A4;";
-  const pageBackground = printPageBackground(theme, palette);
+  const deckStyle = printDeckStyle(deck);
+  const pageBackground = deckStyle.pageBackground ?? printPageBackground(theme, palette);
   return `
     :root {
       ${renderThemeTokens(theme, palette)}
+      ${deckStyle.tokens}
     }
 
     @page {
@@ -1181,7 +1184,7 @@ function renderStyles(pageSize: PrintOptions["pageSize"], theme: PrintTheme, pal
     .body-copy {
       min-width: 0;
       color: var(--body);
-      font-size: 11.2pt;
+      font-size: var(--mdq-body-size, calc(11.2pt * var(--mdq-body-scale, 1)));
     }
 
     .body-copy > :first-child {
@@ -1481,8 +1484,39 @@ function renderStyles(pageSize: PrintOptions["pageSize"], theme: PrintTheme, pal
     .answer-block,
     .explanation,
     .foldouts,
-    .references {
+    .references,
+    .video-note {
       margin-top: 3mm;
+    }
+
+    .video-note {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1mm 3mm;
+      align-items: baseline;
+      padding: 2.4mm 3.2mm;
+      border: 1px solid var(--line);
+      break-inside: avoid;
+      font-size: 9.5pt;
+    }
+
+    .video-note-label {
+      font-weight: 800;
+    }
+
+    .video-note-provider {
+      color: var(--muted);
+      font-size: 8pt;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .video-note-link {
+      flex-basis: 100%;
+      color: var(--accent);
+      overflow-wrap: anywhere;
+      word-break: break-all;
     }
 
     .answer-block {
@@ -1563,6 +1597,8 @@ function renderStyles(pageSize: PrintOptions["pageSize"], theme: PrintTheme, pal
         break-after: auto;
       }
     }
+
+    ${deckStyle.rules}
   `;
 }
 
@@ -1575,7 +1611,7 @@ function buildHtml(quiz: Quiz, options: PrintOptions): string {
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>${escapeHtml(title)}</title>
-  <style>${renderStyles(options.pageSize, options.theme, options.palette ?? quiz.palette ?? "classic")}</style>
+  <style>${renderStyles(options.pageSize, options.theme, options.palette ?? quiz.palette ?? "classic", quiz)}</style>
 </head>
 <body>
   <main>
@@ -1647,6 +1683,12 @@ async function main(): Promise<void> {
   }
   if (result.errors.length > 0) {
     throw new Error(`Quiz has parse errors:\n${reportParseErrors(result.errors)}`);
+  }
+
+  if (result.diagnostics.length > 0) {
+    for (const diagnostic of result.diagnostics) {
+      console.warn(`${diagnostic.severity === "warning" ? "Ignored" : "Note"} in ${path.basename(options.inputFile)}, ${formatDiagnostic(diagnostic)}`);
+    }
   }
 
   const html = buildHtml(result.quiz, options);

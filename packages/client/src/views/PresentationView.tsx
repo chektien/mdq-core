@@ -263,6 +263,7 @@ export default function PresentationView({
             slideMediaOpacity={currentQuestion.slideMediaOpacity}
             slideLiveEmbed={currentQuestion.slideLiveEmbed}
             slideVideo={currentQuestion.slideVideo}
+            slideKey={currentQuestion.questionIndex}
             slideReferences={currentQuestion.slideReferences}
           />
         );
@@ -430,6 +431,7 @@ export default function PresentationView({
       <div className="slide-live-shell">
         <div className="slide-live-main">
           <LiveSurface
+            deckStyle={currentQuestion?.deckStyle}
             surfaceClassName={isLiveEmbedSlideDisplay ? "slide-surface-live-embed" : isSlideDisplay ? undefined : "quiz-surface"}
             backgroundLayer={isSlideDisplay && currentQuestion?.slideBackground ? <SlideBackgroundLayer background={currentQuestion.slideBackground} /> : undefined}
             nextLabel={isLeaderboardDisplay ? null : nextHeading}
@@ -499,8 +501,10 @@ export default function PresentationView({
                 slideMediaPosition={currentQuestion.slideMediaPosition}
                 slideMediaOpacity={currentQuestion.slideMediaOpacity}
                 slideBackground={currentQuestion.slideBackground}
+                deckStyle={currentQuestion.deckStyle}
                 slideLiveEmbed={currentQuestion.slideLiveEmbed}
                 slideVideo={currentQuestion.slideVideo}
+                slideKey={currentQuestion.questionIndex}
                 slideReferences={currentQuestion.slideReferences}
                 positionLabel={positionLabel}
                 nextLabel={nextHeading}
@@ -514,6 +518,7 @@ export default function PresentationView({
               />
             ) : (
               <LiveSurface
+                deckStyle={currentQuestion?.deckStyle}
                 surfaceClassName="quiz-surface"
                 nextLabel={nextHeading}
                 qrDataUrl={accessInfo?.qrCodeDataUrl}
@@ -588,6 +593,7 @@ export default function PresentationView({
 
         {currentReveal && currentQuestion && state === "REVEAL" && (
           <LiveSurface
+            deckStyle={currentQuestion?.deckStyle}
             surfaceClassName="quiz-surface"
             nextLabel={nextHeading}
             qrDataUrl={accessInfo?.qrCodeDataUrl}

@@ -428,6 +428,125 @@ npm run print:pdf -- data/decks/week00.md --theme light --palette gruvbox
 
 PDF images keep their source aspect ratio. MDQ only scales images down to fit the print layout, so portrait screenshots and wide diagrams are not stretched, cropped, or reframed.
 
+## Slide Appearance Settings
+
+A deck can change how its slides look from the header, in plain settings with no CSS. Write them in the header above the first `---`, one per line, with dashes like every other key (`title-size:`, and `title_size:` still works):
+
+```markdown
+# My Deck
+theme: light
+title-size: large
+body-size: large
+accent-color: teal
+background-color: #fdf6e3
+slide-padding: roomy
+image-corners: square
+
+---
+```
+
+If a file starts with `---`, it has no header, and MDQ looks for these keys anywhere in the file and takes the first line that matches, so keep them in a header. A deck without these keys looks exactly as it always did. The settings apply to question screens on the presenter and projector, and to slides on the presenter, projector and phone. The phone's own question screen keeps the theme and palette. Theme and palette work as before, and the colour settings below replace the palette's own colours where a deck sets them. `text-color`, `muted-color` and `accent-color` colour the slide's own content and the text that sits straight on the background of a question screen, such as the question, the closed label, the no-votes note, the timer count and the explanation. The answer panels keep their own fills, and correct answers keep their green. The toolbar buttons, status labels that have their own fill and the join card keep the palette's colours, so they stay readable on their own fills. The plain status label and the slide counter follow the deck colours, and the timer count does too until time runs low, when it keeps the ring's warning colour. `background-color` also colours the page behind the slide, and `surface-color` alone leaves that page on the palette's own background, which is where the slide ends.
+
+A value is a preset word, a plain length, or a colour, and nothing else. A length is a number with a unit, such as `4rem`, `18px`, `1.5em`, `60ch` or `80%`, and each setting below lists the units it takes. A colour is a CSS colour name such as `teal` or `navy`, or a hex colour such as `#0f766e` or `#0af`. Functions (`rgb()`, `var()`, `calc()`, `url()`), semicolons, braces and angle brackets are never accepted. A value that does not fit is ignored, never applied. It is reported as a note that gives its place (`header, line 2`), the key, the value and what is allowed. The server and the print command log it, and the instructor's deck list shows it under the deck:
+
+```text
+title-size: huge is not a size. Use small, medium, large, x-large, or a length such as 4rem.
+```
+
+The deck still loads and every other setting still applies, because this is a note and not a parse error. Colour contrast is your choice, so check that text stays readable on the colours you pick.
+
+### Sizes
+
+`title-size`, `heading-size`, `body-size`, `small-size` and `caption-size` take a preset or a length in `px`, `rem` or `em`. A preset scales Core's own size for that text, so `medium` leaves it unchanged. A length sets the exact size on every screen, phones included.
+
+| Preset | Size |
+| --- | --- |
+| `small` | 0.85 times Core's size |
+| `medium` | 1 times, unchanged |
+| `large` | 1.2 times |
+| `x-large` | 1.4 times |
+
+| Key | Text it sizes |
+| --- | --- |
+| `title-size` | The slide title |
+| `heading-size` | The subtitle and `###` headings inside a slide |
+| `body-size` | Slide body text |
+| `small-size` | Fold-out note text and slide references |
+| `caption-size` | Image captions |
+
+### Colours
+
+`accent-color`, `link-color`, `text-color`, `muted-color`, `background-color`, `surface-color` and `bullet-color` take a colour name or a hex colour.
+
+| Key | What it colours |
+| --- | --- |
+| `accent-color` | The accent: top-level bullets, the next-up marker and focus outlines |
+| `link-color` | Links in slide text |
+| `text-color` | Titles and body text |
+| `muted-color` | Quieter text such as notes, references and nested bullets |
+| `background-color` | The slide background, as one flat colour |
+| `surface-color` | The top of the slide, fading down into the background colour. Without `background-color` it fades into the palette's background |
+| `bullet-color` | Every bullet and number, at every list level |
+
+In the printed PDF, the colour settings replace the print colours and `body-size` scales the body text. The other settings describe the slide canvas and do not apply on paper.
+
+### Widths
+
+`content-width`, `slide-width` and `text-width` take a preset or a length in `px`, `rem`, `em`, `ch` or `%`. Percentages of the presets are of the slide's width.
+
+| Preset | `content-width` | `slide-width` | `text-width` |
+| --- | --- | --- | --- |
+| `narrow` | 42%, at most 44rem | 60%, at most 56rem | 36ch |
+| `medium` | 62%, at most 70rem | 82%, at most 92rem | 56ch |
+| `wide` | 80%, at most 90rem | 92%, at most 110rem | 76ch |
+| `full` | 100% | 100% | 100% |
+
+Widths use the slide's own width, so on a phone a narrow setting narrows the text there too. `content-width` is the widest the body text column gets, `slide-width` is the widest the whole slide layout gets, and `text-width` is the widest a single paragraph or list item gets, so long lines wrap sooner.
+
+### Spacing
+
+`slide-padding`, `block-spacing`, `inline-spacing` and `list-spacing` take a preset or a length in `px`, `rem` or `em`. A length of zero is allowed, written with a unit such as `0rem`.
+
+| Key | What it spaces |
+| --- | --- |
+| `slide-padding` | The margin between the slide edge and its content. The top edge keeps its room for the presenter controls |
+| `block-spacing` | The gap between the slide's blocks, such as text and pictures |
+| `inline-spacing` | The gap inside the slide header, between the title and its subtitle |
+| `list-spacing` | Extra space under each list item, added to `list-gap` |
+
+| Preset | `slide-padding`, `block-spacing`, `inline-spacing` | `list-spacing` |
+| --- | --- | --- |
+| `tight` | 0.6 times Core's spacing | 0 |
+| `normal` | 1 times, unchanged | 0, unchanged |
+| `roomy` | 1.5 times | 0.4em |
+
+### Lists
+
+`list-indent` takes `small`, `medium`, `large` or a length in `px`, `rem` or `em`. `list-gap` takes `tight`, `normal`, `roomy` or a length. `bullet-size` takes `small`, `medium`, `large` or a length.
+
+| Preset | `list-indent` | `list-gap` between items (nested lists) | `bullet-size` |
+| --- | --- | --- | --- |
+| `small`, `tight` | 0.9em | 0.25em (0.08em) | 0.8 times Core's size |
+| `medium`, `normal` | 1.3em, unchanged | 0.5em (0.16em), unchanged | 1 times, unchanged |
+| `large`, `roomy` | 1.8em | 0.85em (0.3em) | 1.35 times |
+
+A `list-gap` length sets the gap between top-level items, and nested lists use 0.32 times that length. A `bullet-size` length sets one exact size for the bullets at every level, where a preset scales each level's own size.
+
+### Images
+
+`image-corners` takes `square`, `rounded`, `round` or a length in `px`, `rem` or `em`. `image-spacing` takes `tight`, `normal`, `roomy` or a length. `image-width` takes `narrow`, `medium`, `wide`, `full` or a length in `px`, `rem`, `em`, `ch` or `%`.
+
+| Preset | `image-corners` | `image-spacing` | `image-width` |
+| --- | --- | --- | --- |
+| `square`, `tight`, `narrow` | 0 | 0.6 times Core's gap | 50% of the picture area |
+| `rounded`, `normal`, `medium` | 0.48rem, unchanged | 1 times, unchanged | 75% |
+| `round`, `roomy`, `wide` | 1.4rem | 1.5 times | 90% |
+| `full` | | | 100% |
+
+`image-width` is a maximum, so a small picture stays small, and a narrower picture panel is centred in its space.
+
+To see the settings change the computed styles on the presenter, projector and phone in a real Chrome, build the project and run `npm run check:header-settings`. Pass `--chrome <path>` if Chrome is not in the usual place.
+
 ## Deck Markdown Format
 
 Decks can start with an optional preamble title before the first `---`. This title is used in the instructor deck picker and PDF cover, while the `## ...` headings remain the individual live items.
@@ -457,7 +576,7 @@ Slide bodies take bulleted lists, numbered lists and nested lists in any mix, in
 
 Three CSS custom properties let a stylesheet adjust slide lists: `--mdq-slide-bullet` sets the marker colour when set on `.slide-body li` (it wins at every level, the defaults are the slide accent at the top level and the muted slide ink below), `--mdq-list-gap` sets the space between top-level items (default `0.5em`), and `--mdq-list-gap-nested` sets it between items of a nested list (default `0.16em`). A margin on `li` adds to these gaps.
 
-Setting keys are written with dashes, as above (`time-limit:`, `presenter-notes:`, `slide-background:`). Decks written with the earlier underscored spelling (`time_limit:`, `presenter_notes:`) still work, and so does `type: open_response`; the two spellings can be mixed in one deck.
+Setting keys are written with dashes, as above (`time-limit:`, `presenter-notes:`, `slide-background:`, `title-size:`). Decks written with the earlier underscored spelling (`time_limit:`, `presenter_notes:`) still work, and so does `type: open_response`; the two spellings can be mixed in one deck.
 
 ```markdown
 ---
@@ -708,7 +827,35 @@ Adapters that call the engine's `apply()` route its messages by audience:
 
 Image attachments are supported for quiz stems, option text, and slide bodies through standard markdown syntax. Slide images are automatically arranged into a media layout and keep their original aspect ratio while scaling to fit. Rendered quiz and slide images can be expanded into an overlay for closer inspection without changing their aspect ratio.
 
-Embedded video is still out of scope for now. Keep video context in slides or a separate instructor-controlled window while mdq handles the prompt, options, explanations, and scoring.
+### Video on a slide
+
+Add a video from another site to a slide with an ordinary Markdown link on a line of its own. The link text starts with `Video:` (any case, the space after the colon is optional) and the text after it is the label and the accessible name:
+
+```markdown
+[Video: How a lens focuses light](https://www.youtube.com/watch?v=abc123DEF45)
+```
+
+Because it is a normal link, the line still reads as a usable link in any other Markdown renderer. A `Video:` link that is already alone on its line in an existing deck now becomes a player, so check older decks if you used that wording for a plain link.
+
+Supported forms, https only:
+
+- YouTube: `youtube.com/watch?v=ID`, `youtu.be/ID`, `youtube.com/shorts/ID`, `youtube.com/embed/ID` and the `m.youtube.com` host. A `t=` or `start=` value (`90`, `90s`, `1m30s`) sets where playback starts. Playback uses `youtube-nocookie.com`.
+- Vimeo: `vimeo.com/ID`, `vimeo.com/ID/HASH` for an unlisted video, and `player.vimeo.com/video/ID`. Playback uses `player.vimeo.com` with do-not-track on.
+- A link to a video file on a web address, ending in `.mp4`, `.webm`, `.m4v` or `.mov` (query string allowed), played with the browser's own video controls.
+
+How it behaves:
+
+- The slide shows the label, the provider name and a play button. Nothing is requested from the provider until the viewer presses play, and nothing autoplays.
+- Pressing play swaps the card for the player in place. Moving to another slide, or pressing `Stop video`, stops it. `Escape` also stops it while focus is on the card's own controls, but not while focus is inside the provider's player, which keeps its own keys. The presenter's slide keys and swipe leave a focused player alone, and `Tab` leaves the player.
+- The player is a sandboxed iframe (scripts, same origin and popups only) that sends only the page origin as the referrer.
+- An `Open video` link to the original address is always shown and opens in a new tab.
+- On paper and in PDF exports the video is its label, its provider and the address as a link, with no player.
+- Only a paragraph at the top level of the slide that is just the link counts, so a link inside a list item or quote stays a link. A link to a video site inside a sentence, a link whose text does not start with `Video:`, and anything inside a code span or fenced code block stay ordinary links.
+- Any other host or scheme (including `http:`), a look-alike host, or a bad ID also stays an ordinary link, and the server logs an info note that names the supported forms. The player address is checked again in the browser, and a link that does not pass shows only `Open video`. A slide shows one video, so a second `Video:` link stays a link too.
+- A video link that stays an ordinary link is reported as a `Note` (a diagnostic with severity `info`), using the same `diagnostics` list and format as other deck notes. Its `lineNumber` is the line of the link itself. A note never blocks the deck. The server logs it once when it loads decks, the deck chooser shows it, and the export command logs it.
+- The `video-card:` settings described above keep working unchanged and take priority when both appear on a slide.
+
+Other embedded video, such as a full-slide player or video files uploaded through mdq, is still out of scope. Keep that context in a separate instructor-controlled window while mdq handles the prompt, options, explanations, and scoring.
 
 ## Security and Risk
 

@@ -6,6 +6,7 @@ import type {
   SlideLiveEmbed,
   SlideVideo,
   SlideReference,
+  DeckStyle,
 } from "@mdq/shared";
 import FoldoutNote from "./FoldoutNote";
 import SlideBackgroundLayer from "./SlideBackgroundLayer";
@@ -23,12 +24,16 @@ interface SlideContentBodyProps {
   slideMediaOpacity?: number;
   slideLiveEmbed?: SlideLiveEmbed;
   slideVideo?: SlideVideo;
+  /** Identifies the slide, so a video's player starts over whenever the slide changes. */
+  slideKey?: string | number;
   slideReferences?: SlideReference[];
   chromeLabel?: string | null;
 }
 
 interface SlideContentProps extends SlideContentBodyProps {
   slideBackground?: SlideBackground;
+  /** The deck header's appearance settings, applied to the slide surface. */
+  deckStyle?: DeckStyle;
   positionLabel?: string;
   mode?: "projector" | "review" | "student";
   nextLabel?: string | null;
@@ -96,6 +101,7 @@ export function SlideContentBody({
   slideMediaOpacity,
   slideLiveEmbed,
   slideVideo,
+  slideKey,
   slideReferences = [],
   chromeLabel = null,
 }: SlideContentBodyProps) {
@@ -184,7 +190,7 @@ export function SlideContentBody({
         {stackVisuals ? (
           <div className="slide-visual-stack">
             <div className="slide-video-slot">
-              <VideoCard video={slideVideo!} title={title} />
+              <VideoCard key={`${slideKey ?? ""}:${slideVideo!.embedUrl}`} video={slideVideo!} title={title} />
             </div>
             <div className={`slide-media-grid ${mediaCountClass}`} aria-label="Slide images">
               {slideMedia.map((media, index) => renderMediaFigure(media, index))}
@@ -194,7 +200,7 @@ export function SlideContentBody({
           <>
             {hasVideo && slideVideo && (
               <div className="slide-video-slot">
-                <VideoCard video={slideVideo} title={title} />
+                <VideoCard key={`${slideKey ?? ""}:${slideVideo.embedUrl}`} video={slideVideo} title={title} />
               </div>
             )}
 
@@ -261,8 +267,10 @@ export default function SlideContent({
   slideMediaOpacity,
   slideLiveEmbed,
   slideVideo,
+  slideKey,
   slideReferences = [],
   slideBackground,
+  deckStyle,
   positionLabel,
   mode = "projector",
   nextLabel,
@@ -290,6 +298,7 @@ export default function SlideContent({
       mode={mode}
       surfaceClassName={surfaceClassName}
       backgroundLayer={slideBackground ? <SlideBackgroundLayer background={slideBackground} /> : undefined}
+      deckStyle={deckStyle}
       nextLabel={nextLabel}
       qrDataUrl={qrDataUrl}
       sessionCode={sessionCode}
@@ -317,6 +326,7 @@ export default function SlideContent({
         slideMediaOpacity={slideMediaOpacity}
         slideLiveEmbed={slideLiveEmbed}
         slideVideo={slideVideo}
+        slideKey={slideKey}
         slideReferences={slideReferences}
         chromeLabel={chromeLabel}
       />
