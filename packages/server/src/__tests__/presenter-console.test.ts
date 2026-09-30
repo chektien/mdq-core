@@ -251,6 +251,14 @@ describe("open join card", () => {
     ]) expect(lastRule(css, selector)).toContain("var(--slide-join-reserve, 0px)");
     expect(css).toMatch(/@media \(min-width: 761px\) and \(max-width: 1180px\) \{\s*\.slide-live-shell-controls:has\(\.presenter-notes-panel\) \.slide-safe \{\s*--slide-join-reserve: 0px/);
   });
+
+  it("reserves beside the complete video block, whose nested still grids bypass the image inset", () => {
+    const css = read("index.css");
+    expect(lastRule(css, "  .slide-safe:has(.slide-join-panel.session-code-card-expanded) .slide-content-grid:has(> .slide-visual-stack, > .slide-video-slot)"))
+      .toContain("width: calc(100% - var(--slide-join-reserve, 0px))");
+    expect(lastRule(css, ".slide-safe:has(.slide-join-panel) .slide-content-grid-with-media .slide-visual-stack .slide-media-grid"))
+      .toContain("width: 100%");
+  });
 });
 
 describe("participant list", () => {

@@ -7029,6 +7029,12 @@ html[data-theme="light"] .slide-video-figure .slide-video-action:not(button) {
     --slide-join-reserve: var(--slide-expanded-join-width);
   }
 
+  /* Video/still compositions keep their nested grids full-width. Reserve
+     beside the complete block instead of squeezing the stills inside it. */
+  .slide-safe:has(.slide-join-panel.session-code-card-expanded) .slide-content-grid:has(> .slide-visual-stack, > .slide-video-slot) {
+    width: calc(100% - var(--slide-join-reserve, 0px));
+  }
+
   .slide-join-panel.session-code-card-expanded,
   .slide-live-shell-controls:has(.presenter-notes-panel) .slide-join-panel.session-code-card-expanded {
     width: var(--slide-expanded-join-width);
