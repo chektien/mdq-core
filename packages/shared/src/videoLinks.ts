@@ -60,6 +60,7 @@ export function parseVideoLinkLine(line: string): { label: string; url: string }
 
 const FENCE = /^ {0,3}(`{3,}|~{3,})/;
 const ATX_HEADING = /^ {0,3}#{1,6}(?:[ \t]|$)/;
+const LIST_MARKER = /^ *((?:[-+*]|\d{1,9}[.)])[ \t]+)/;
 const THEMATIC_BREAK = /^ {0,3}([-*_])(?:[ \t]*\1){2,}[ \t]*$/;
 
 /**
@@ -94,9 +95,28 @@ export function findVideoLinks(lines: readonly string[]): VideoLinkMatch[] {
     boundary[index] = !line.trim() || ATX_HEADING.test(line) || THEMATIC_BREAK.test(line);
   });
 
+  // A paragraph inside a list item is not a top-level paragraph of the slide.
+  const inItem = new Array<boolean>(lines.length).fill(false);
+  let itemOffset = -1;
+  lines.forEach((line, index) => {
+    if (code[index] || !line.trim()) return;
+    const indent = line.match(/^ */)![0].length;
+    const marker = line.match(LIST_MARKER);
+    if (marker && indent <= 3 && !THEMATIC_BREAK.test(line)) {
+      itemOffset = indent + marker[1].length;
+      inItem[index] = true;
+    } else if (itemOffset >= 0 && indent >= itemOffset) {
+      inItem[index] = true;
+    } else if (boundary[index] || index === 0 || !lines[index - 1].trim()) {
+      itemOffset = -1;
+    } else if (itemOffset >= 0) {
+      inItem[index] = true; // lazy continuation of the item's paragraph
+    }
+  });
+
   const isBoundary = (index: number) => index < 0 || index >= lines.length || boundary[index];
   lines.forEach((line, index) => {
-    if (code[index] || boundary[index]) return;
+    if (code[index] || boundary[index] || inItem[index]) return;
     if (!isBoundary(index - 1) || !isBoundary(index + 1)) return;
     const link = parseVideoLinkLine(line);
     if (!link) return;
@@ -128,12 +148,14 @@ export function findVideoLinksInMarkdown(markdown: string): VideoLinkMatch[] {
 }
 
 /**
- * The canonical line for a video link. Brackets and backslashes in the label
- * are escaped and spaces and parentheses in the address are percent-encoded,
- * so the line parses back to the same label and address.
+ * The canonical line for a video link. In the label, backslashes, brackets,
+ * asterisks, backticks and less-than signs are escaped so other renderers show
+ * the text as written. In the address, backslashes are escaped and spaces and
+ * parentheses are percent-encoded. The line parses back to the same label and
+ * address.
  */
 export function videoLinkMarkdown(url: string, label: string): string {
-  const text = label.replace(/\s+/g, " ").trim().replace(/[\\[\]]/g, "\\$&");
-  const href = url.trim().replace(/\s/g, "%20").replace(/\(/g, "%28").replace(/\)/g, "%29");
+  const text = label.replace(/\s+/g, " ").trim().replace(/[\\[\]*`<]/g, "\\$&");
+  const href = url.trim().replace(/\\/g, "\\\\").replace(/\s/g, "%20").replace(/\(/g, "%28").replace(/\)/g, "%29");
   return `[Video: ${text}](${href})`;
 }

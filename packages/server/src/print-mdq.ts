@@ -1,6 +1,7 @@
 import { chromium, type Browser } from "playwright";
-import { DECK_PALETTES, DeckPalette, formatDiagnostic, Quiz, Question, QuestionType, describeDeckPalettes, parseDeckPalette, videoProviderName } from "@mdq/shared";
+import { DECK_PALETTES, DeckPalette, formatDiagnostic, Quiz, Question, QuestionType, describeDeckPalettes, parseDeckPalette } from "@mdq/shared";
 import { parseQuizMarkdown, QuizParseError } from "./parser";
+import { escapeHtml, renderVideoNote } from "./print-video";
 import { printDeckStyle } from "./print-deck-style";
 import * as fs from "fs";
 import * as path from "path";
@@ -223,14 +224,6 @@ function parseArgs(argv: string[]): CliResult {
   };
 }
 
-function escapeHtml(value: string): string {
-  return value
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
-}
-
 function isExternalUrl(src: string): boolean {
   return /^(?:https?:|data:|file:|mailto:)/i.test(src);
 }
@@ -382,29 +375,6 @@ function renderSlideMedia(question: Question, inputDir: string, imagesDir: strin
           </figure>
         `;
       }).join("")}
-    </section>
-  `;
-}
-
-/** A slide video prints as its label, its provider and its address as a link. There is no player on paper. */
-function renderVideoNote(question: Question): string {
-  const video = question.slideVideo;
-  if (!video) return "";
-  const label = video.label || "Video";
-  const href = video.link?.url ?? video.embedUrl;
-  const external = /^https?:\/\//i.test(href);
-  const provider = video.link
-    ? videoProviderName(video.link.provider, href)
-    : external
-      ? new URL(href).hostname
-      : "Video file";
-  return `
-    <section class="video-note" aria-label="Video">
-      <span class="video-note-label">${escapeHtml(label)}</span>
-      <span class="video-note-provider">${escapeHtml(provider)}</span>
-      ${external
-        ? `<a class="video-note-link" href="${escapeHtml(href)}">${escapeHtml(href)}</a>`
-        : `<span class="video-note-link">${escapeHtml(href)}</span>`}
     </section>
   `;
 }

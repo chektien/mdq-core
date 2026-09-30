@@ -6214,6 +6214,14 @@ body.image-expansion-lock {
   padding: clamp(0.6rem, 1.6cqi, 1.3rem);
 }
 
+.slide-video-unavailable {
+  margin: 0;
+  padding: 0.5rem;
+  color: var(--mdq-slide-ink);
+  font-weight: 700;
+  text-align: center;
+}
+
 .slide-video-player {
   position: relative;
   width: 100%;

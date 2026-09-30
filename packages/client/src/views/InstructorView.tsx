@@ -1340,6 +1340,7 @@ function LiveView({
             slideMediaOpacity={displayQuestion.slideMediaOpacity}
             slideLiveEmbed={displayQuestion.slideLiveEmbed}
             slideVideo={displayQuestion.slideVideo}
+            slideKey={displayQuestion.questionIndex}
             slideReferences={displayQuestion.slideReferences}
           />
         );
@@ -1626,6 +1627,7 @@ function LiveView({
                 deckStyle={displayQuestion.deckStyle}
                 slideLiveEmbed={displayQuestion.slideLiveEmbed}
                 slideVideo={displayQuestion.slideVideo}
+                slideKey={displayQuestion.questionIndex}
                 slideReferences={displayQuestion.slideReferences}
                 positionLabel={displayPositionLabel}
                 nextLabel={null}

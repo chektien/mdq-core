@@ -1,5 +1,5 @@
 /**
- * Provider adapters for externally hosted video. Each adapter is a small pure
+ * Provider adapters for a video from another site. Each adapter is a small pure
  * function that takes a parsed URL and returns a playable target, or null when
  * the URL is not one of its forms. Only https is accepted, hosts are matched
  * exactly (never by suffix), and every ID is checked against a strict pattern.

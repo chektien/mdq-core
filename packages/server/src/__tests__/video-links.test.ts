@@ -9,6 +9,7 @@ import {
 import fs from "fs";
 import path from "path";
 import { parseQuizMarkdown } from "../parser";
+import { renderVideoNote } from "../print-video";
 
 const YT = "https://www.youtube.com/watch?v=abc123DEF45";
 
@@ -78,6 +79,21 @@ describe("video link detector", () => {
     expect(findVideoLinksInMarkdown(md)).toEqual([]);
   });
 
+  it("leaves a paragraph inside a list item alone, and finds the one after the list", () => {
+    const md = [
+      "- first",
+      "",
+      `  [Video: In an item](${YT})`,
+      "",
+      "1. numbered",
+      "",
+      `   [Video: In a numbered item](${YT})`,
+      "",
+      `[Video: After the list](${YT})`,
+    ].join("\n");
+    expect(findVideoLinksInMarkdown(md).map((m) => m.label)).toEqual(["After the list"]);
+  });
+
   it("leaves code fences, tilde fences and indented code untouched", () => {
     const md = [
       "```md",
@@ -136,6 +152,20 @@ describe("video link writer", () => {
     const [match] = findVideoLinksInMarkdown(line);
     expect(match.video?.provider).toBe("file");
     expect(decodeURI(new URL(match.url).href)).toBe(decodeURI(new URL(url).href));
+  });
+
+  it("escapes backslashes in the address and round-trips", () => {
+    const url = "https://media.example.edu/a\\b.mp4";
+    const line = videoLinkMarkdown(url, "Lens");
+    expect(line).toBe("[Video: Lens](https://media.example.edu/a\\\\b.mp4)");
+    expect(findVideoLinksInMarkdown(line)[0].url).toBe(url);
+  });
+
+  it("escapes asterisks, backticks and less-than signs so other renderers show the label as written", () => {
+    const label = "*Bold* `code` <b>";
+    const line = videoLinkMarkdown(YT, label);
+    expect(line).toBe("[Video: \\*Bold\\* \\`code\\` \\<b>](" + YT + ")");
+    expect(findVideoLinksInMarkdown(line)[0].label).toBe(label);
   });
 
   it("collapses line breaks in the label", () => {
@@ -348,6 +378,13 @@ ${body}
     expect(result.diagnostics[0].message).toContain("youtu.be/ID");
   });
 
+  it("reports the line of the link itself", () => {
+    const md = deck("Line one.\n\nLine two.\n\n[Video: Elsewhere](https://example.com/clip)");
+    const result = parseQuizMarkdown(md, "week01.md");
+    const expected = md.split("\n").findIndex((line) => line.startsWith("[Video: Elsewhere]")) + 1;
+    expect(result.diagnostics[0].lineNumber).toBe(expected);
+  });
+
   it("keeps the first supported video and reports a second", () => {
     const result = parseQuizMarkdown(
       deck(`[Video: One](${YT})\n\n[Video: Two](https://vimeo.com/76979871)`),
@@ -430,7 +467,9 @@ describe("video card contract", () => {
   });
 
   it("sandboxes the iframe and limits what it may send and do", () => {
-    expect(tsx).toContain('"allow-scripts allow-same-origin allow-presentation allow-popups"');
+    expect(tsx).toContain('"allow-scripts allow-same-origin allow-popups"');
+    expect(tsx).not.toContain("allow-presentation");
+    expect(tsx).not.toContain("allow-top-navigation");
     expect(tsx).toContain('"autoplay; encrypted-media; picture-in-picture; fullscreen"');
     expect(tsx).toContain('referrerPolicy="strict-origin-when-cross-origin"');
   });
@@ -439,15 +478,61 @@ describe("video card contract", () => {
     expect(tsx).toContain('target="_blank" rel="noopener noreferrer"');
   });
 
-  it("renders no iframe or video before play and stops on Escape and on leaving", () => {
-    const idle = tsx.slice(tsx.indexOf("function LinkedVideoCard"));
-    expect(idle).toContain("playing ? (");
-    expect(idle).toContain('event.key === "Escape"');
-    expect(idle).toContain("playingVideo === video");
+  it("renders no iframe or video before play and stops on Escape", () => {
+    const card = tsx.slice(tsx.indexOf("function LinkedVideoCard"));
+    expect(card).toContain("playing ? (");
+    expect(card).toContain('event.key === "Escape"');
+  });
+
+  it("checks the link again in the browser and builds the player address from it", () => {
+    const card = tsx.slice(tsx.indexOf("function LinkedVideoCard"), tsx.indexOf("function ModalVideoCard"));
+    expect(card).toContain("resolveVideoUrl(link.url)");
+    expect(card).toContain("videoPlaybackUrl(target.embedUrl");
+    expect(card).toContain("src={target.fileUrl}");
+    expect(card).not.toContain("video.embedUrl");
+    expect(card).toContain("if (!target)");
+  });
+
+  it("keys the card by slide so every slide starts idle", () => {
+    const content = fs.readFileSync(path.join(clientSrc, "components/SlideContent.tsx"), "utf-8");
+    expect(content).toContain("key={`${slideKey");
+    for (const view of ["PresentationView", "StudentView", "InstructorView"]) {
+      const source = fs.readFileSync(path.join(clientSrc, `views/${view}.tsx`), "utf-8");
+      expect(source).toMatch(/slideKey=\{\w+\.questionIndex\}/);
+    }
   });
 
   it("makes every control at least 44 px and prints without a player", () => {
     expect(css).toMatch(/\.slide-video-action \{[^}]*min-height: 44px/);
     expect(css).toMatch(/@media print \{\s*\.slide-video-figure-link \.slide-video-card/);
+  });
+});
+
+describe("print output for a video", () => {
+  const note = (slideVideo: unknown) => renderVideoNote({ slideVideo } as never);
+
+  it("prints the label, provider and link for a video link", () => {
+    const html = note({
+      embedUrl: "https://www.youtube-nocookie.com/embed/abc123DEF45",
+      label: "Lens",
+      link: { url: YT, provider: "youtube", mode: "iframe" },
+    });
+    expect(html).toContain("Lens");
+    expect(html).toContain("YouTube");
+    expect(html).toContain(`href="${YT}"`);
+  });
+
+  it("does not throw for a legacy card with a broken or unusual address", () => {
+    for (const embedUrl of ["https://", "https://exa mple.com/a b", "http://", "/data/videos/demo.mp4", "https://[bad"]) {
+      const html = note({ embedUrl });
+      expect(html).toContain("Video file");
+      expect(html).not.toContain("<a ");
+    }
+  });
+
+  it("prints a legacy card with a web address as a link on its host", () => {
+    const html = note({ embedUrl: "https://example.com/embed/xyz", label: "Play it" });
+    expect(html).toContain("example.com");
+    expect(html).toContain('href="https://example.com/embed/xyz"');
   });
 });

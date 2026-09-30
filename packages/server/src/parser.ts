@@ -106,7 +106,15 @@ export function parseQuizMarkdown(source: string, sourceFile: string): ParseResu
     if (!block) continue;
 
     try {
-      const question = parseQuestionBlock(block, i, sourceFile, startLine, diagnostics);
+      const question = parseQuestionBlock(
+        block,
+        i,
+        sourceFile,
+        startLine,
+        diagnostics,
+        // The block is trimmed before parsing, so blank lines at its top shift its first line down.
+        startLine + rawBlock.slice(0, rawBlock.length - rawBlock.trimStart().length).split("\n").length - 1,
+      );
       questions.push(question);
     } catch (e) {
       if (e instanceof QuizParseError) {
@@ -306,6 +314,7 @@ function parseQuestionBlock(
   sourceFile: string,
   blockStartLine: number,
   diagnostics: ParseDiagnostic[] = [],
+  firstLineNumber: number = blockStartLine,
 ): Question {
   const lines = block.split("\n");
 
@@ -512,8 +521,15 @@ function parseQuestionBlock(
     : { contentLines: textLines, liveEmbed: undefined };
   textLines = liveEmbedExtraction.contentLines;
   const videoExtraction = isSlide
-    ? extractSlideVideo(textLines, (message) => {
-      diagnostics.push({ severity: "info", sourceFile, questionIndex: index, lineNumber: blockStartLine, message });
+    ? extractSlideVideo(textLines, (message, lineText) => {
+      const found = lineText === undefined ? -1 : lines.findIndex((line) => line === lineText);
+      diagnostics.push({
+        severity: "info",
+        sourceFile,
+        questionIndex: index,
+        lineNumber: found >= 0 ? firstLineNumber + found : blockStartLine,
+        message,
+      });
     })
     : { contentLines: textLines, video: undefined };
   textLines = videoExtraction.contentLines;
@@ -747,7 +763,7 @@ function extractSlideLiveEmbed(lines: string[]): { contentLines: string[]; liveE
 
 function extractSlideVideo(
   lines: string[],
-  report: (message: string) => void = () => {},
+  report: (message: string, lineText?: string) => void = () => {},
 ): { contentLines: string[]; video?: SlideVideo } {
   const contentLines: string[] = [];
   let embedUrl = "";
@@ -782,8 +798,12 @@ function extractSlideVideo(
     return { contentLines };
   }
 
-  if (findVideoLinks(contentLines).length > 0) {
-    report("This slide sets video_card, so its [Video: ...](url) link stays an ordinary link. A slide shows one video.");
+  const shadowed = findVideoLinks(contentLines)[0];
+  if (shadowed) {
+    report(
+      "This slide sets video_card, so its [Video: ...](url) link stays an ordinary link. A slide shows one video.",
+      contentLines[shadowed.lineIndex],
+    );
   }
 
   return {
@@ -804,15 +824,15 @@ function extractSlideVideo(
  */
 function extractVideoLink(
   lines: string[],
-  report: (message: string) => void,
+  report: (message: string, lineText?: string) => void,
 ): { contentLines: string[]; video?: SlideVideo } {
   const matches = findVideoLinks(lines);
   let chosen: VideoLinkMatch | undefined;
   for (const match of matches) {
     if (!match.video) {
-      report(`"${match.url}" stays an ordinary link. ${match.reason}`);
+      report(`"${match.url}" stays an ordinary link. ${match.reason}`, lines[match.lineIndex]);
     } else if (chosen) {
-      report(`"${match.url}" stays an ordinary link because a slide shows one video, and it already shows the first.`);
+      report(`"${match.url}" stays an ordinary link because a slide shows one video, and it already shows the first.`, lines[match.lineIndex]);
     } else {
       chosen = match;
     }

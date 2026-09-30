@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { videoPlaybackUrl, videoProviderName, type SlideVideo } from "@mdq/shared";
+import { resolveVideoUrl, videoPlaybackUrl, videoProviderName, type SlideVideo } from "@mdq/shared";
 
 /**
  * A contained, clickable playable-video card that belongs to the same visual
@@ -16,7 +16,7 @@ export default function VideoCard({ video, title }: { video: SlideVideo; title: 
 }
 
 const IFRAME_ALLOW = "autoplay; encrypted-media; picture-in-picture; fullscreen";
-const IFRAME_SANDBOX = "allow-scripts allow-same-origin allow-presentation allow-popups";
+const IFRAME_SANDBOX = "allow-scripts allow-same-origin allow-popups";
 
 /**
  * A video written as a `[Video: label](url)` link. It shows the label, the
@@ -29,10 +29,15 @@ const IFRAME_SANDBOX = "allow-scripts allow-same-origin allow-presentation allow
 function LinkedVideoCard({ video }: { video: SlideVideo }) {
   const link = video.link!;
   const label = video.label || "Video";
-  const provider = videoProviderName(link.provider, link.url);
-  // Playing is tied to this video object, so a new slide never starts loaded.
-  const [playingVideo, setPlayingVideo] = useState<SlideVideo | null>(null);
-  const playing = playingVideo === video;
+  // The payload is checked again here. The player address is rebuilt from the
+  // author's link with the shared rules, and the address in the payload is not
+  // trusted. If the link does not pass, only the Open video link is offered.
+  const resolved = resolveVideoUrl(link.url);
+  const target = resolved.ok ? resolved.target : null;
+  const provider = videoProviderName(target?.provider ?? link.provider, link.url);
+  const openHref = safeOpenHref(link.url);
+  // The parent keys this card by slide, so it starts idle on every slide.
+  const [playing, setPlaying] = useState(false);
   const playRef = useRef<HTMLButtonElement>(null);
   const stopRef = useRef<HTMLButtonElement>(null);
   const focusAfter = useRef<"stop" | "play" | null>(null);
@@ -45,12 +50,27 @@ function LinkedVideoCard({ video }: { video: SlideVideo }) {
 
   const start = () => {
     focusAfter.current = "stop";
-    setPlayingVideo(video);
+    setPlaying(true);
   };
   const stop = () => {
     focusAfter.current = "play";
-    setPlayingVideo(null);
+    setPlaying(false);
   };
+
+  if (!target) {
+    return (
+      <figure className="slide-video-figure slide-video-figure-link" aria-label={label}>
+        <p className="slide-video-unavailable">{label}</p>
+        {openHref && (
+          <figcaption className="slide-video-actions">
+            <a className="slide-video-action" href={openHref} target="_blank" rel="noopener noreferrer">
+              Open video<span className="slide-video-sr"> (opens in a new tab)</span>
+            </a>
+          </figcaption>
+        )}
+      </figure>
+    );
+  }
 
   return (
     <figure
@@ -65,10 +85,10 @@ function LinkedVideoCard({ video }: { video: SlideVideo }) {
     >
       {playing ? (
         <div className="slide-video-player">
-          {link.mode === "file" ? (
+          {target.fileUrl ? (
             <video
               className="slide-video-native"
-              src={video.embedUrl}
+              src={target.fileUrl}
               controls
               playsInline
               autoPlay
@@ -78,7 +98,7 @@ function LinkedVideoCard({ video }: { video: SlideVideo }) {
           ) : (
             <iframe
               className="slide-video-iframe"
-              src={videoPlaybackUrl(video.embedUrl)}
+              src={videoPlaybackUrl(target.embedUrl ?? "")}
               title={label}
               allow={IFRAME_ALLOW}
               sandbox={IFRAME_SANDBOX}
@@ -106,7 +126,7 @@ function LinkedVideoCard({ video }: { video: SlideVideo }) {
         </button>
       )}
       <figcaption className="slide-video-actions">
-        <a className="slide-video-action" href={link.url} target="_blank" rel="noopener noreferrer">
+        <a className="slide-video-action" href={openHref ?? link.url} target="_blank" rel="noopener noreferrer">
           Open video<span className="slide-video-sr"> (opens in a new tab)</span>
         </a>
         {playing && (
@@ -122,6 +142,16 @@ function LinkedVideoCard({ video }: { video: SlideVideo }) {
       </p>
     </figure>
   );
+}
+
+/** The author's address as an https link, or null when it is anything else. */
+function safeOpenHref(url: string): string | null {
+  try {
+    const parsed = new URL(url);
+    return parsed.protocol === "https:" ? parsed.href : null;
+  } catch {
+    return null;
+  }
 }
 
 function PlayGlyph() {
