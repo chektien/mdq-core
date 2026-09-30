@@ -1,6 +1,7 @@
 import { chromium, type Browser } from "playwright";
-import { DECK_PALETTES, DeckPalette, Quiz, Question, QuestionType, describeDeckPalettes, parseDeckPalette } from "@mdq/shared";
+import { DECK_PALETTES, DeckPalette, formatDiagnostic, Quiz, Question, QuestionType, describeDeckPalettes, parseDeckPalette } from "@mdq/shared";
 import { parseQuizMarkdown, QuizParseError } from "./parser";
+import { printDeckStyle } from "./print-deck-style";
 import * as fs from "fs";
 import * as path from "path";
 import { pathToFileURL } from "url";
@@ -1003,12 +1004,19 @@ function renderThemeTokens(theme: PrintTheme, palette: PrintPalette): string {
     `;
 }
 
-function renderStyles(pageSize: PrintOptions["pageSize"], theme: PrintTheme, palette: PrintPalette): string {
+function renderStyles(
+  pageSize: PrintOptions["pageSize"],
+  theme: PrintTheme,
+  palette: PrintPalette,
+  deck: Pick<Quiz, "style" | "styleSettings"> = {},
+): string {
   const pageRule = pageSize === "Letter" ? "size: Letter;" : "size: A4;";
-  const pageBackground = printPageBackground(theme, palette);
+  const deckStyle = printDeckStyle(deck);
+  const pageBackground = deckStyle.pageBackground ?? printPageBackground(theme, palette);
   return `
     :root {
       ${renderThemeTokens(theme, palette)}
+      ${deckStyle.tokens}
     }
 
     @page {
@@ -1181,7 +1189,7 @@ function renderStyles(pageSize: PrintOptions["pageSize"], theme: PrintTheme, pal
     .body-copy {
       min-width: 0;
       color: var(--body);
-      font-size: 11.2pt;
+      font-size: var(--mdq-body-size, calc(11.2pt * var(--mdq-body-scale, 1)));
     }
 
     .body-copy > :first-child {
@@ -1563,6 +1571,8 @@ function renderStyles(pageSize: PrintOptions["pageSize"], theme: PrintTheme, pal
         break-after: auto;
       }
     }
+
+    ${deckStyle.rules}
   `;
 }
 
@@ -1575,7 +1585,7 @@ function buildHtml(quiz: Quiz, options: PrintOptions): string {
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>${escapeHtml(title)}</title>
-  <style>${renderStyles(options.pageSize, options.theme, options.palette ?? quiz.palette ?? "classic")}</style>
+  <style>${renderStyles(options.pageSize, options.theme, options.palette ?? quiz.palette ?? "classic", quiz)}</style>
 </head>
 <body>
   <main>
@@ -1647,6 +1657,12 @@ async function main(): Promise<void> {
   }
   if (result.errors.length > 0) {
     throw new Error(`Quiz has parse errors:\n${reportParseErrors(result.errors)}`);
+  }
+
+  if (result.diagnostics.length > 0) {
+    for (const diagnostic of result.diagnostics) {
+      console.warn(`${diagnostic.severity === "warning" ? "Ignored" : "Note"} in ${path.basename(options.inputFile)}, ${formatDiagnostic(diagnostic)}`);
+    }
   }
 
   const html = buildHtml(result.quiz, options);

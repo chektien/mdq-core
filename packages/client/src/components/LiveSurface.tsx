@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { safeDeckStyle, type DeckStyle } from "@mdq/shared";
 import SessionCodeCard from "./SessionCodeCard";
 import { pickNavAction } from "../presenterKeys";
 import {
@@ -29,6 +30,8 @@ interface LiveSurfaceProps {
   mode?: "projector" | "review" | "student";
   surfaceClassName?: string;
   backgroundLayer?: ReactNode;
+  /** The deck header's appearance settings, applied as custom properties on the slide surface. */
+  deckStyle?: DeckStyle;
   nextLabel?: string | null;
   statusLabel?: string | null;
   statusTone?: "neutral" | "success" | "warning";
@@ -56,6 +59,7 @@ export default function LiveSurface({
   mode = "projector",
   surfaceClassName,
   backgroundLayer,
+  deckStyle,
   nextLabel,
   statusLabel,
   statusTone = "neutral",
@@ -89,6 +93,30 @@ export default function LiveSurface({
     hasNavActions ? "slide-surface-swipe" : null,
     surfaceClassName,
   ].filter(Boolean).join(" ");
+  const appearance = safeDeckStyle(deckStyle);
+  const surfaceStyle = appearance as CSSProperties | undefined;
+  // The stylesheet repaints the slide from its background colour only when the deck sets one.
+  const hasDeckBackground = !!appearance && ("--mdq-slide-bg" in appearance || "--mdq-slide-bg-soft" in appearance);
+  // Text, muted and accent colours reach the slide's own content only. The controls keep the palette's colours.
+  const deckColors = {
+    "data-deck-text": appearance && "--mdq-deck-text" in appearance ? "true" : undefined,
+    "data-deck-muted": appearance && "--mdq-deck-muted" in appearance ? "true" : undefined,
+    "data-deck-accent": appearance && "--mdq-deck-accent" in appearance ? "true" : undefined,
+  };
+  // The page canvas behind the slide matches the colour the slide ends on, so no band of the palette's colour shows past it.
+  // That is the deck's background colour, or the palette's own background when the deck sets only a surface colour.
+  // The phone's own page is not a full-screen slide, so its canvas is left alone.
+  const deckCanvas = appearance?.["--mdq-slide-bg"];
+  useEffect(() => {
+    if (!hasDeckBackground || mode === "student") return undefined;
+    const root = document.documentElement;
+    if (deckCanvas) root.style.setProperty("--mdq-deck-canvas", deckCanvas);
+    root.setAttribute("data-deck-canvas", "true");
+    return () => {
+      root.style.removeProperty("--mdq-deck-canvas");
+      root.removeAttribute("data-deck-canvas");
+    };
+  }, [hasDeckBackground, deckCanvas, mode]);
 
   useEffect(() => {
     if (typeof document === "undefined") return;
@@ -275,7 +303,7 @@ export default function LiveSurface({
   };
 
   return (
-    <section ref={surfaceRef} className={className}>
+    <section ref={surfaceRef} className={className} style={surfaceStyle} data-deck-background={hasDeckBackground ? "true" : undefined} {...deckColors}>
       {backgroundLayer}
       <div ref={safeRef} className="slide-safe">
         <div ref={toolbarRef} className="slide-toolbar">

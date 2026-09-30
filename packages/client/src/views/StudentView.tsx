@@ -843,6 +843,7 @@ function QuestionView({
           slideLiveEmbed={question.slideLiveEmbed}
           slideVideo={question.slideVideo}
           slideReferences={question.slideReferences}
+          deckStyle={question.deckStyle}
           mode="student"
           statusLabel="The instructor will advance shortly"
         />

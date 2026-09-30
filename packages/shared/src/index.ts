@@ -1,3 +1,4 @@
+import type { DeckStyle, DeckStyleSettings } from "./deck-style";
 // ──────────────────────────────────────────────
 // mdq shared contracts
 // Single source of truth for types, events, REST
@@ -285,6 +286,8 @@ export interface QuestionOpenPayload {
   slideLiveEmbed?: SlideLiveEmbed;
   slideVideo?: SlideVideo;
   slideReferences?: SlideReference[];
+  /** The deck's header appearance settings as slide-surface custom properties. Absent when the deck has none. */
+  deckStyle?: DeckStyle;
   options: { label: string; text: string }[];
   allowsMultiple: boolean;
   isPoll?: boolean;
@@ -460,6 +463,30 @@ export interface Question {
   timeLimitSec: number;
 }
 
+/**
+ * A note about a deck that does not stop it loading, such as a header setting
+ * that was ignored. `questionIndex` is -1 for the deck header, like
+ * QuizParseError, and `lineNumber` is the line in the deck file when known.
+ */
+export interface ParseDiagnostic {
+  severity: "info" | "warning";
+  sourceFile: string;
+  questionIndex: number;
+  lineNumber?: number;
+  message: string;
+}
+
+/** Where a diagnostic points: "header, line 2", or "item 3, line 14" (items count from 1). */
+export function diagnosticLocation(diagnostic: Pick<ParseDiagnostic, "questionIndex" | "lineNumber">): string {
+  const place = diagnostic.questionIndex < 0 ? "header" : `item ${diagnostic.questionIndex + 1}`;
+  return diagnostic.lineNumber === undefined ? place : `${place}, line ${diagnostic.lineNumber}`;
+}
+
+/** A diagnostic as one line of text: its location, a colon and its message. */
+export function formatDiagnostic(diagnostic: ParseDiagnostic): string {
+  return `${diagnosticLocation(diagnostic)}: ${diagnostic.message}`;
+}
+
 export interface Quiz {
   week: string;
   title: string;
@@ -476,6 +503,14 @@ export interface Quiz {
    * header). Absent means on; `false` asks for a name only and uses it as the ID.
    */
   studentId?: boolean;
+  /**
+   * The appearance settings the deck header wrote and the parser accepted
+   * (`title-size: large`, `accent-color: teal`), by dashed key. Absent when
+   * the header has none.
+   */
+  styleSettings?: DeckStyleSettings;
+  /** Those settings as CSS custom properties for the slide surface. Absent when the header has none. */
+  style?: DeckStyle;
   questions: Question[];
   sourceFile: string;
 }
@@ -604,4 +639,5 @@ export const TICK_INTERVAL_MS = 1000;
 export const DATA_DIR = "data";
 
 export * from "./setting-keys";
+export * from "./deck-style";
 export * from "./identity";

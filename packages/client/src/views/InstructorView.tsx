@@ -25,6 +25,7 @@ import {
   type CreateSessionResponse,
   type SessionRestoreResponse,
 } from "../hooks/api";
+import { formatDiagnostic } from "@mdq/shared";
 import type { AccessInfo, DeckPalette, DeckTheme, FoldoutNote, OpenResponseEntry, QuestionType, SessionState } from "@mdq/shared";
 import { applyClientPalette, applyClientTheme } from "../theme";
 import Timer from "../components/Timer";
@@ -83,6 +84,7 @@ function questionStateFromRestore(data: NonNullable<SessionRestoreResponse["revi
     slideLiveEmbed: data.slideLiveEmbed,
     slideVideo: data.slideVideo,
     slideReferences: data.slideReferences,
+    deckStyle: data.deckStyle,
     options: data.options,
     allowsMultiple: data.allowsMultiple,
     isPoll: data.isPoll ?? false,
@@ -557,6 +559,11 @@ export default function InstructorView({
                               <span className="mx-2 text-zinc-600">/</span>
                               <span className="font-mono text-xs text-zinc-500">{deck.week}</span>
                             </span>
+                            {deck.diagnostics?.map((note) => (
+                              <span key={`${note.severity}-${note.lineNumber ?? ""}-${note.message}`} className={`mt-1 block text-sm ${note.severity === "warning" ? "text-amber-300" : "text-zinc-400"}`}>
+                                {note.severity === "warning" ? "Ignored" : "Note"}, {formatDiagnostic(note)}
+                              </span>
+                            ))}
                           </span>
                         </span>
                       </button>
@@ -1516,6 +1523,7 @@ function LiveView({
       <div className="slide-live-shell slide-live-shell-controls">
         <div className="slide-live-main">
           <LiveSurface
+            deckStyle={(displayQuestion ?? q)?.deckStyle}
             mode={isReviewing ? "review" : "projector"}
             surfaceClassName={isLiveEmbedSlideDisplay ? "slide-surface-live-embed" : isSlideDisplay ? undefined : "quiz-surface"}
             backgroundLayer={isSlideDisplay && displayQuestion?.slideBackground ? <SlideBackgroundLayer background={displayQuestion.slideBackground} /> : undefined}
@@ -1615,6 +1623,7 @@ function LiveView({
                 slideMediaPosition={displayQuestion.slideMediaPosition}
                 slideMediaOpacity={displayQuestion.slideMediaOpacity}
                 slideBackground={displayQuestion.slideBackground}
+                deckStyle={displayQuestion.deckStyle}
                 slideLiveEmbed={displayQuestion.slideLiveEmbed}
                 slideVideo={displayQuestion.slideVideo}
                 slideReferences={displayQuestion.slideReferences}
@@ -1636,6 +1645,7 @@ function LiveView({
               />
             ) : (
               <LiveSurface
+                deckStyle={(displayQuestion ?? q)?.deckStyle}
                 surfaceClassName="quiz-surface"
                 nextLabel={null}
                 qrDataUrl={accessInfo?.qrCodeDataUrl}
@@ -1734,6 +1744,7 @@ function LiveView({
         {/* Reveal view */}
         {displayReveal && (((state === "REVEAL" && displayQuestion && !isReviewing) || (isReviewing && displayQuestion))) && (
           <LiveSurface
+            deckStyle={(displayQuestion ?? q)?.deckStyle}
             surfaceClassName="quiz-surface"
             nextLabel={null}
             qrDataUrl={accessInfo?.qrCodeDataUrl}
@@ -1833,6 +1844,7 @@ function LiveView({
 
         {isLeaderboardDisplay && (
           <LiveSurface
+            deckStyle={(displayQuestion ?? q)?.deckStyle}
             surfaceClassName="quiz-surface"
             qrDataUrl={accessInfo?.qrCodeDataUrl}
             sessionCode={sessionCode}

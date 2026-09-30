@@ -1,9 +1,11 @@
+import { DECK_STYLE_KEYS } from "./deck-style";
+
 /**
  * Deck setting keys, written with dashes (`presenter-notes: false`,
  * `time-limit: 60`). Earlier decks wrote them with underscores
  * (`presenter_notes`), and both spellings keep working.
  */
-export const DECK_SETTING_KEYS = [
+export const DECK_SETTING_KEYS: readonly string[] = [
   "title",
   "theme",
   "presenter-notes",
@@ -24,7 +26,8 @@ export const DECK_SETTING_KEYS = [
   "slide-background",
   "slide-background-position",
   "slide-background-size",
-] as const;
+  ...DECK_STYLE_KEYS,
+];
 
 const UNDERSCORED = new Set<string>(DECK_SETTING_KEYS.map((key) => key.replace(/-/g, "_")));
 // `[^\n]*`, not `.*`, so a CRLF line's trailing `\r` is kept and still matches.

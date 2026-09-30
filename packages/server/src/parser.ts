@@ -17,6 +17,11 @@ import {
   parseDeckPalette,
   dashedSettingKey,
   normalizeDeckSettingKeys,
+  DECK_STYLE_KEYS,
+  resolveDeckStyleSetting,
+  type ParseDiagnostic,
+  type DeckStyle,
+  type DeckStyleSettings,
 } from "@mdq/shared";
 import { marked } from "marked";
 
@@ -49,6 +54,8 @@ export class QuizParseError extends Error {
 export interface ParseResult {
   quiz: Quiz | null;
   errors: QuizParseError[];
+  /** Notes that do not stop the deck loading, such as an ignored appearance setting. */
+  diagnostics: ParseDiagnostic[];
 }
 
 interface QuestionBlock {
@@ -66,6 +73,7 @@ export function parseQuizMarkdown(source: string, sourceFile: string): ParseResu
   // rules below match one spelling.
   const markdown = normalizeDeckSettingKeys(source);
   const errors: QuizParseError[] = [];
+  const diagnostics: ParseDiagnostic[] = [];
 
   const title = extractDeckTitle(markdown);
   const theme = extractDeckThemeMetadata(markdown, sourceFile, errors);
@@ -78,6 +86,7 @@ export function parseQuizMarkdown(source: string, sourceFile: string): ParseResu
     errors,
   );
   const studentId = extractDeckBooleanMetadata(markdown, "student_id", sourceFile, errors);
+  const deckStyle = extractDeckStyleMetadata(markdown, diagnostics, sourceFile);
 
   // Extract deck key from filename (e.g., "week01.md" -> "week01", "featured-demo.md" -> "featured-demo")
   const sourceStem = sourceFile.replace(/^.*[\\/]/, "").replace(/\.md$/i, "").toLowerCase();
@@ -118,11 +127,12 @@ export function parseQuizMarkdown(source: string, sourceFile: string): ParseResu
     presenterNotes,
     presenterNotesDefaultOpen,
     studentId,
+    ...(deckStyle ? { styleSettings: deckStyle.settings, style: deckStyle.style } : {}),
     questions,
     sourceFile,
   };
 
-  return { quiz: questions.length > 0 ? quiz : null, errors };
+  return { quiz: questions.length > 0 ? quiz : null, errors, diagnostics };
 }
 
 /**
@@ -252,6 +262,37 @@ function extractDeckBooleanMetadata(
     ),
   );
   return undefined;
+}
+
+/**
+ * The appearance settings in the deck header (`title-size: large`,
+ * `accent-color: teal`). A value that is not a preset, a plain length or a
+ * colour adds a diagnostic on the key's line that names the key and what is
+ * allowed, and is left out. It is never a parse error, so the deck still loads.
+ * Undefined when no setting was accepted.
+ */
+function extractDeckStyleMetadata(
+  markdown: string,
+  diagnostics: ParseDiagnostic[],
+  sourceFile: string,
+): { settings: DeckStyleSettings; style: DeckStyle } | undefined {
+  const preamble = markdown.split(/^---+\s*$/m, 1)[0] || markdown;
+  const settings: DeckStyleSettings = {};
+  const style: DeckStyle = {};
+  for (const key of DECK_STYLE_KEYS) {
+    const match = preamble.match(new RegExp(`^${key.replace(/-/g, "_")}:[ \\t]*(.*?)\\s*$`, "im"));
+    if (!match) continue;
+    const result = resolveDeckStyleSetting(key, match[1]);
+    if (result.ok) {
+      settings[key] = result.value;
+      Object.assign(style, result.style);
+      continue;
+    }
+    const lineNumber = preamble.slice(0, match.index).split("\n").length;
+    diagnostics.push({ severity: "warning", sourceFile, questionIndex: -1, lineNumber, message: result.message });
+  }
+  diagnostics.sort((a, b) => (a.lineNumber ?? 0) - (b.lineNumber ?? 0));
+  return Object.keys(settings).length > 0 ? { settings, style } : undefined;
 }
 
 /**
