@@ -515,6 +515,14 @@ html[data-theme="light"] .slide-surface::after {
   content: none;
 }
 
+/* The presenter swipes sideways to change slides, so the browser keeps only
+   vertical panning and pinching here and hands sideways drags to the page.
+   Scrollable tables and code blocks inside are scroll containers that keep
+   their own sideways panning. */
+.slide-surface-swipe {
+  touch-action: pan-y pinch-zoom;
+}
+
 /* ── Slide palettes (deck `palette:` key) ──────────
    `classic` adds no rules: it is the look defined above. `gruvbox` follows
    the morhetz/gruvbox palette (MIT/X11, https://github.com/morhetz/gruvbox).

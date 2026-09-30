@@ -1,5 +1,13 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import SessionCodeCard from "./SessionCodeCard";
+import { pickNavAction } from "../presenterKeys";
+import {
+  SWIPE_BLOCKING_SELECTOR,
+  canBeginSwipe,
+  resolveSwipe,
+  type HorizontalScroller,
+  type SwipeStart,
+} from "../presenterSwipe";
 
 export interface LiveSurfaceAction {
   label: string;
@@ -75,6 +83,7 @@ export default function LiveSurface({
     "slide-surface",
     `slide-surface-${mode}`,
     backgroundLayer ? "slide-surface-has-bg" : null,
+    hasNavActions ? "slide-surface-swipe" : null,
     surfaceClassName,
   ].filter(Boolean).join(" ");
 
@@ -90,6 +99,75 @@ export default function LiveSurface({
     document.addEventListener("fullscreenchange", syncFullscreenState);
     return () => document.removeEventListener("fullscreenchange", syncFullscreenState);
   }, []);
+
+  // Swipe navigation belongs to the presenter, the only surface handed Prev and
+  // Next actions. The phone and the projector never swipe. A swipe calls the
+  // same handlers as the buttons, so a disabled button also stops the swipe.
+  const navActionsRef = useRef(navActions);
+  useEffect(() => {
+    navActionsRef.current = navActions;
+  });
+  useEffect(() => {
+    const surface = surfaceRef.current;
+    if (!surface || !hasNavActions) return undefined;
+
+    const touches = new Set<number>();
+    let gesture: { pointerId: number; start: SwipeStart } | null = null;
+
+    const scrollersAround = (target: Element | null): HorizontalScroller[] => {
+      const found: HorizontalScroller[] = [];
+      for (let el: Element | null = target; el; el = el.parentElement) {
+        const overflowX = getComputedStyle(el).overflowX;
+        if (overflowX === "auto" || overflowX === "scroll") {
+          found.push({ scrollLeft: el.scrollLeft, scrollWidth: el.scrollWidth, clientWidth: el.clientWidth });
+        }
+        if (el === surface) break;
+      }
+      return found;
+    };
+
+    const onPointerDown = (event: PointerEvent) => {
+      touches.add(event.pointerId);
+      // A second finger is a pinch, not a swipe.
+      if (touches.size > 1) {
+        gesture = null;
+        return;
+      }
+      const target = event.target instanceof Element ? event.target : null;
+      const start: SwipeStart = {
+        x: event.clientX,
+        y: event.clientY,
+        pointerType: event.pointerType,
+        viewportWidth: window.innerWidth,
+        onBlockedTarget: !!target?.closest(SWIPE_BLOCKING_SELECTOR),
+        scrollers: scrollersAround(target),
+      };
+      gesture = canBeginSwipe(start) ? { pointerId: event.pointerId, start } : null;
+    };
+
+    const onPointerUp = (event: PointerEvent) => {
+      touches.delete(event.pointerId);
+      const current = gesture;
+      if (!current || current.pointerId !== event.pointerId) return;
+      gesture = null;
+      const direction = resolveSwipe(current.start, event.clientX, event.clientY);
+      if (direction) void pickNavAction(navActionsRef.current, direction)?.onClick?.();
+    };
+
+    const onPointerCancel = (event: PointerEvent) => {
+      touches.delete(event.pointerId);
+      if (gesture?.pointerId === event.pointerId) gesture = null;
+    };
+
+    surface.addEventListener("pointerdown", onPointerDown);
+    surface.addEventListener("pointerup", onPointerUp);
+    surface.addEventListener("pointercancel", onPointerCancel);
+    return () => {
+      surface.removeEventListener("pointerdown", onPointerDown);
+      surface.removeEventListener("pointerup", onPointerUp);
+      surface.removeEventListener("pointercancel", onPointerCancel);
+    };
+  }, [hasNavActions]);
 
   const requestFullscreen = useCallback(async () => {
     if (typeof document === "undefined") return;
