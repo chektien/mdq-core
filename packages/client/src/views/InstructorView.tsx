@@ -839,6 +839,8 @@ function LiveView({
   const [reviewQuestionIndex, setReviewQuestionIndex] = useState<number | null>(null);
   const [showEndConfirm, setShowEndConfirm] = useState(false);
   const [showParticipants, setShowParticipants] = useState(false);
+  const participantsDialogRef = useRef<HTMLDialogElement>(null);
+  const participantsOpenerRef = useRef<HTMLElement | null>(null);
   const [moderationNotice, setModerationNotice] = useState<string | null>(null);
   const [questionCache, setQuestionCache] = useState<Record<number, QuestionState>>({});
   const [revealCache, setRevealCache] = useState<Record<number, RevealState>>({});
@@ -1005,11 +1007,14 @@ function LiveView({
 
   useEffect(() => {
     if (!showParticipants) return;
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setShowParticipants(false);
+    const dialog = participantsDialogRef.current;
+    // A modal native dialog makes the live controls inert, including to Tab
+    // and screen readers. Closing or unmounting returns focus to its opener.
+    dialog?.showModal();
+    return () => {
+      dialog?.close();
+      if (participantsOpenerRef.current?.isConnected) participantsOpenerRef.current.focus();
     };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
   }, [showParticipants]);
 
   useEffect(() => {
@@ -1107,7 +1112,10 @@ function LiveView({
 
   const participantsAction: LiveSurfaceAction = {
     label: "Participants",
-    onClick: () => setShowParticipants(true),
+    onClick: () => {
+      participantsOpenerRef.current = document.activeElement as HTMLElement | null;
+      setShowParticipants(true);
+    },
   };
   const liveSurfaceActions: LiveSurfaceAction[] = (() => {
     // Offline, the controls stay where they are but wait, each saying why; Reconnect leads.
@@ -1263,18 +1271,17 @@ function LiveView({
   ) : null;
 
   const participantsDialog = showParticipants ? (
-    <div
+    <dialog
+      ref={participantsDialogRef}
       className="end-session-overlay participants-overlay fixed inset-0 z-[10000] flex items-center justify-center bg-[#07060b]/80 px-5 backdrop-blur-sm"
-      role="presentation"
+      aria-labelledby="participants-title"
+      onCancel={(event) => { event.preventDefault(); setShowParticipants(false); }}
       onMouseDown={(event) => {
         if (event.target === event.currentTarget) setShowParticipants(false);
       }}
     >
       <div
         className="participants-card w-full max-w-lg rounded-2xl border border-[color-mix(in_srgb,var(--mdq-line-strong)_60%,transparent)] bg-[var(--mdq-dialog)] p-6 text-white shadow-2xl shadow-black/50"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="participants-title"
       >
         <div className="participants-header">
           <h2 id="participants-title" className="text-2xl font-semibold">
@@ -1324,7 +1331,7 @@ function LiveView({
           )}
         </div>
       </div>
-    </div>
+    </dialog>
   ) : null;
 
   const liveSurfaceStatusLabel = isLeaderboardDisplay

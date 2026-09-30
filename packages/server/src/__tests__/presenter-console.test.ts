@@ -184,6 +184,17 @@ describe("Participants dialog", () => {
   const start = tsx.indexOf("const participantsDialog = showParticipants");
   const dialog = tsx.slice(start, tsx.indexOf(") : null;", start));
 
+  it("uses native modal focus isolation and restores the live control on every close path", () => {
+    expect(dialog).toMatch(/<dialog\s+ref=\{participantsDialogRef\}/);
+    expect(dialog).toContain('aria-labelledby="participants-title"');
+    expect(dialog).toContain("onCancel={(event) => { event.preventDefault(); setShowParticipants(false); }}");
+    expect(tsx).toContain("dialog?.showModal()");
+    expect(tsx).toContain("dialog?.close()");
+    expect(tsx).toContain("participantsOpenerRef.current = document.activeElement");
+    expect(tsx).toContain("participantsOpenerRef.current?.isConnected");
+    expect(tsx).toContain("participantsOpenerRef.current.focus()");
+  });
+
   it("closes with an icon button named Close, at least 44px square", () => {
     expect(dialog).toMatch(/className="participants-close"\s+aria-label="Close"/);
     expect(dialog).toContain("<svg");
