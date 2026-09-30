@@ -5,6 +5,8 @@ interface SessionCodeCardProps {
   qrDataUrl?: string;
   sessionCode: string;
   participantCount?: number;
+  /** True while the presenter has closed joining: the card says so instead of showing the code and QR. */
+  joinClosed?: boolean;
   /** True while the screen has lost its connection, so the count may be out of date. */
   offline?: boolean;
   presentationUrl?: string;
@@ -18,6 +20,7 @@ export default function SessionCodeCard({
   qrDataUrl,
   sessionCode,
   participantCount,
+  joinClosed = false,
   offline = false,
   presentationUrl,
   joinUrl,
@@ -28,11 +31,12 @@ export default function SessionCodeCard({
   const [expanded, setExpanded] = useState(defaultExpanded);
   const [enlarged, setEnlarged] = useState(false);
   const displayJoinUrl = shortUrl || joinUrl;
-  const hasBody = qrDataUrl || presentationUrl || displayJoinUrl;
+  const hasBody = !joinClosed && (qrDataUrl || presentationUrl || displayJoinUrl);
   const expandedLabel = shortUrl || "";
   const rootClassName = [
     "session-code-card",
     expanded ? "session-code-card-expanded" : "session-code-card-compact",
+    joinClosed ? "session-code-card-closed" : "",
     className,
   ].filter(Boolean).join(" ");
 
@@ -53,8 +57,8 @@ export default function SessionCodeCard({
         aria-expanded={expanded}
         onClick={() => setExpanded((value) => !value)}
       >
-        {expanded && expandedLabel && <span className="session-code-card-kicker">{expandedLabel}</span>}
-        <strong>{sessionCode}</strong>
+        {expanded && expandedLabel && !joinClosed && <span className="session-code-card-kicker">{expandedLabel}</span>}
+        <strong>{joinClosed ? "Joining is closed" : sessionCode}</strong>
         {participantCount !== undefined && (
           <span
             className={`session-code-card-meta${offline ? " session-code-card-meta-offline" : ""}`}
@@ -88,7 +92,7 @@ export default function SessionCodeCard({
         </div>
       )}
 
-      {enlarged && qrDataUrl && createPortal(
+      {enlarged && qrDataUrl && !joinClosed && createPortal(
         <div
           className="qr-enlarged"
           role="dialog"

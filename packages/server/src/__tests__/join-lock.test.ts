@@ -1,5 +1,8 @@
 import { JOIN_LOCKED_MESSAGE, Quiz, Session, SessionParticipantsPayload, SocketEvents } from "@mdq/shared";
 import { apply, EngineCommandError, type EngineMessage } from "../engine";
+import { readFileSync } from "node:fs";
+import { join as joinPath } from "node:path";
+import { joinRefusalMessage } from "../../../client/src/joinForm";
 import { deserializeSession, serializeSession } from "../session";
 
 const quiz: Quiz = {
@@ -116,5 +119,35 @@ describe("locking joining", () => {
     const older = deserializeSession(serializeSession(lobby()));
     expect(older.joinLocked).toBeUndefined();
     expect(join(older, "S0002", "s2").messages.some((m) => m.event === SocketEvents.STUDENT_JOINED)).toBe(true);
+  });
+});
+
+describe("the lock on the screens", () => {
+  const read = (file: string) => readFileSync(joinPath(__dirname, "../../../client/src", file), "utf8");
+
+  it("shows a phone the plain refusal as it is", () => {
+    expect(joinRefusalMessage(JOIN_LOCKED_MESSAGE)).toBe("This session is not taking new participants. Ask the presenter.");
+  });
+
+  it("gives the instructor a 44px switch that says its state, in the lobby and the Participants dialog", () => {
+    const toggle = read("components/JoinLockToggle.tsx");
+    expect(toggle).toContain("Joining locked");
+    expect(toggle).toContain("Lock joining");
+    expect(toggle).toContain("aria-pressed");
+    expect(read("index.css")).toMatch(/\.join-lock-toggle \{[^}]*min-height: 2\.75rem/);
+    expect(read("hooks/api.ts")).toContain("API.SESSION_JOIN_LOCK");
+    expect(read("views/InstructorView.tsx").match(/<JoinLockToggle/g)).toHaveLength(2);
+  });
+
+  it("shows the projector 'Joining is closed' instead of the code and QR", () => {
+    const card = read("components/SessionCodeCard.tsx");
+    expect(card).toContain("Joining is closed");
+    expect(card).toContain("!joinClosed && (qrDataUrl");
+    expect(read("components/QRPanel.tsx")).toContain("Joining is closed");
+    const view = read("views/PresentationView.tsx");
+    expect(view).toContain("sock.participants?.joinLocked === true");
+    // Every join card on the projector gets the flag.
+    expect(view.match(/joinClosed=\{joinClosed\}/g)!.length).toBeGreaterThanOrEqual(5);
+    expect(view).toContain("closed={joinClosed}");
   });
 });

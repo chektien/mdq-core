@@ -121,6 +121,7 @@ export default function PresentationView({
   // Until the first state arrives the counts and "next up" are not known, so they are held back rather than shown as zero.
   const stateReady = sock.sessionState !== null;
   const participantCount = sock.participants ? sock.participants.count : undefined;
+  const joinClosed = sock.participants?.joinLocked === true;
   // "Time's up" only when the timer ran out; closing early just closes the answers.
   const closedLabel = closedLabelFor(sock.timedOut);
   const noVotesClosed = state === "QUESTION_CLOSED" && currentQuestion?.isPoll === true && (sock.answerCount?.submitted ?? 0) === 0;
@@ -205,6 +206,7 @@ export default function PresentationView({
             fullUrl={accessInfo.fullUrl}
             shortUrl={accessInfo.shortUrl}
             sessionCode={meta.sessionCode}
+            closed={joinClosed}
           />
         )}
 
@@ -434,6 +436,7 @@ export default function PresentationView({
             qrDataUrl={accessInfo?.qrCodeDataUrl}
             sessionCode={meta.sessionCode}
             participantCount={participantCount}
+            joinClosed={joinClosed}
             offline={!sock.connected}
             joinUrl={accessInfo?.shortUrl || accessInfo?.fullUrl}
             shortUrl={accessInfo?.shortUrl}
@@ -504,6 +507,7 @@ export default function PresentationView({
                 qrDataUrl={accessInfo?.qrCodeDataUrl}
                 sessionCode={meta.sessionCode}
                 participantCount={participantCount}
+                joinClosed={joinClosed}
                 joinUrl={accessInfo?.shortUrl || accessInfo?.fullUrl}
                 shortUrl={accessInfo?.shortUrl}
                 joinCardDefaultExpanded={true}
@@ -515,6 +519,7 @@ export default function PresentationView({
                 qrDataUrl={accessInfo?.qrCodeDataUrl}
                 sessionCode={meta.sessionCode}
                 participantCount={participantCount}
+                joinClosed={joinClosed}
                 joinUrl={accessInfo?.shortUrl || accessInfo?.fullUrl}
                 shortUrl={accessInfo?.shortUrl}
                 joinCardDefaultExpanded={true}
@@ -588,6 +593,7 @@ export default function PresentationView({
             qrDataUrl={accessInfo?.qrCodeDataUrl}
             sessionCode={meta.sessionCode}
             participantCount={participantCount}
+            joinClosed={joinClosed}
             offline={!sock.connected}
             joinUrl={accessInfo?.shortUrl || accessInfo?.fullUrl}
             shortUrl={accessInfo?.shortUrl}
@@ -689,6 +695,7 @@ export default function PresentationView({
           qrDataUrl={accessInfo.qrCodeDataUrl}
           sessionCode={meta.sessionCode}
           participantCount={sock.participants?.count ?? 0}
+          joinClosed={joinClosed}
           joinUrl={accessInfo.shortUrl || accessInfo.fullUrl}
           shortUrl={accessInfo.shortUrl}
           defaultExpanded={true}

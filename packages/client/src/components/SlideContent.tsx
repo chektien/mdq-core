@@ -35,6 +35,7 @@ interface SlideContentProps extends SlideContentBodyProps {
   qrDataUrl?: string;
   sessionCode?: string;
   participantCount?: number;
+  joinClosed?: boolean;
   offline?: boolean;
   presentationUrl?: string;
   joinUrl?: string;
@@ -268,6 +269,7 @@ export default function SlideContent({
   qrDataUrl,
   sessionCode,
   participantCount,
+  joinClosed,
   offline,
   presentationUrl,
   joinUrl,
@@ -292,6 +294,7 @@ export default function SlideContent({
       qrDataUrl={qrDataUrl}
       sessionCode={sessionCode}
       participantCount={participantCount}
+      joinClosed={joinClosed}
       offline={offline}
       presentationUrl={presentationUrl}
       joinUrl={joinUrl}

@@ -97,7 +97,6 @@ describe("locking joining over real sockets", () => {
     for (let i = 0; i < 100 && !condition(); i += 1) await new Promise((resolve) => setTimeout(resolve, 30));
     if (!condition()) throw new Error(`Timed out: ${label}`);
   };
-  const post = (sessionId: string, action: string) => request(app).post(`/api/session/${sessionId}/${action}`).expect(200);
   const release = (sessionId: string, publicKey: string) => request(app).post(`/api/session/${sessionId}/release-seat`).send({ publicKey });
   const setLock = (sessionId: string, body: unknown) => request(app).post(`/api/session/${sessionId}/join-lock`).send(body as object);
   const joinAs = async (sessionId: string, payload: object) => {
