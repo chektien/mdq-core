@@ -133,8 +133,8 @@ describe("the lock on the screens", () => {
     const toggle = read("components/JoinLockToggle.tsx");
     expect(toggle).toContain("Joining locked");
     expect(toggle).toContain("Lock joining");
-    expect(toggle).toContain("aria-pressed");
-    expect(read("index.css")).toMatch(/\.join-lock-toggle \{[^}]*min-height: 2\.75rem/);
+    expect(read("components/SettingSwitch.tsx")).toContain("aria-checked");
+    expect(read("index.css")).toMatch(/\.setting-switch \{[^}]*min-height: 2\.75rem/);
     expect(read("hooks/api.ts")).toContain("API.SESSION_JOIN_LOCK");
     expect(read("views/InstructorView.tsx").match(/<JoinLockToggle/g)).toHaveLength(2);
   });

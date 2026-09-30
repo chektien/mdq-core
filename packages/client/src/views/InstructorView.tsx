@@ -35,6 +35,7 @@ import ParticipantList from "../components/ParticipantList";
 import QRPanel from "../components/QRPanel";
 import SessionCodeCard from "../components/SessionCodeCard";
 import JoinLockToggle from "../components/JoinLockToggle";
+import SettingSwitch from "../components/SettingSwitch";
 import InlineMarkdownText from "../components/InlineMarkdownText";
 import QuizHtml from "../components/QuizHtml";
 import LiveSurface, { type LiveSurfaceAction } from "../components/LiveSurface";
@@ -52,6 +53,7 @@ const INSTRUCTOR_RESTORE_KEY = "mdquiz_instructor_session";
 const INSTRUCTOR_RESTORE_SUCCESS_NOTICE = "Resumed active session after refresh.";
 /** How long the "session resumed" notice stays before it fades away. */
 const RESTORE_NOTICE_MS = 5000;
+const STUDENT_IDS_DESCRIPTION = "Show each ID beside the name, on this screen only.";
 
 interface StoredInstructorRestore {
   sessionId: string;
@@ -639,21 +641,21 @@ export default function InstructorView({
                 />
               </div>
             )}
-            <JoinLockToggle
-              locked={sock.participants?.joinLocked === true}
-              onChange={handleJoinLock}
-              disabled={!sock.connected}
-            />
-            {idsAvailable && (
-              <button
-                type="button"
-                className="student-ids-toggle"
-                aria-pressed={showStudentIds}
-                onClick={toggleShowStudentIds}
-              >
-                Show Student IDs
-              </button>
-            )}
+            <div className="session-settings session-settings-lobby" role="group" aria-label="Session settings">
+              <JoinLockToggle
+                locked={sock.participants?.joinLocked === true}
+                onChange={handleJoinLock}
+                disabled={!sock.connected}
+              />
+              {idsAvailable && (
+                <SettingSwitch
+                  label="Show Student IDs"
+                  description={STUDENT_IDS_DESCRIPTION}
+                  checked={showStudentIds}
+                  onToggle={toggleShowStudentIds}
+                />
+              )}
+            </div>
 
             {errorMsg && (
               <div className="bg-red-900/50 border border-red-700 text-red-200 px-4 py-3 rounded-xl">
@@ -1267,23 +1269,26 @@ function LiveView({
         aria-modal="true"
         aria-labelledby="participants-title"
       >
-        <div className="flex items-center justify-between gap-3">
+        <div className="participants-header">
           <h2 id="participants-title" className="text-2xl font-semibold">
             Participants <span className="participants-count tabular-nums">{participantCount} online</span>
           </h2>
           <button
             type="button"
             className="participants-close"
+            aria-label="Close"
             onClick={() => setShowParticipants(false)}
             autoFocus
           >
-            Close
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true" focusable="false">
+              <path d="M6 6l12 12M18 6L6 18" />
+            </svg>
           </button>
         </div>
         <p className="participants-help mt-2 text-sm">
           If someone&apos;s phone stops working, choose Let rejoin. The next time they join with their {nameOnly ? "name" : idsAvailable ? "ID" : "ID or name"} from any device, they carry on with their answers.
         </p>
-        <div className="mt-4 max-h-[50vh] overflow-y-auto">
+        <div className="participants-body">
           {(sock.participants?.count ?? 0) + (sock.participants?.offline?.length ?? 0) === 0 ? (
             <p className="participants-help text-sm">No one has joined yet.</p>
           ) : (
@@ -1295,22 +1300,22 @@ function LiveView({
             />
           )}
         </div>
-        <JoinLockToggle
-          className="mt-4"
-          locked={sock.participants?.joinLocked === true}
-          onChange={onJoinLock}
-          disabled={!sock.connected}
-        />
-        {idsAvailable && (
-          <button
-            type="button"
-            className="student-ids-toggle mt-4"
-            aria-pressed={showStudentIds}
-            onClick={onToggleShowStudentIds}
-          >
-            Show Student IDs
-          </button>
-        )}
+        <div className="session-settings" role="group" aria-labelledby="session-settings-title">
+          <h3 id="session-settings-title" className="session-settings-title">Session settings</h3>
+          <JoinLockToggle
+            locked={sock.participants?.joinLocked === true}
+            onChange={onJoinLock}
+            disabled={!sock.connected}
+          />
+          {idsAvailable && (
+            <SettingSwitch
+              label="Show Student IDs"
+              description={STUDENT_IDS_DESCRIPTION}
+              checked={showStudentIds}
+              onToggle={onToggleShowStudentIds}
+            />
+          )}
+        </div>
       </div>
     </div>
   ) : null;

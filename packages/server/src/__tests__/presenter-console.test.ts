@@ -94,9 +94,11 @@ describe("Student IDs on the instructor's console", () => {
     expect(tsx).toContain("setDeckUsesStudentIds(info.studentIds !== false)");
     expect(tsx).toContain("setDeckUsesStudentIds(snapshot.studentIds !== false)");
     expect(tsx).toContain("const idsAvailable = deckUsesStudentIds && !autoGenerateStudentIds;");
-    // Every toggle sits behind idsAvailable: the lobby, the Participants dialog and the ended screen.
-    expect(tsx.match(/className="student-ids-toggle/g)?.length).toBe(3);
-    expect(tsx.match(/\{idsAvailable && \(\s*<button\s+type="button"\s+className="student-ids-toggle/g)?.length).toBe(3);
+    // Every toggle sits behind idsAvailable: the lobby and the Participants dialog (switch rows) and the ended screen (a button).
+    expect(tsx.match(/className="student-ids-toggle/g)?.length).toBe(1);
+    expect(tsx.match(/\{idsAvailable && \(\s*<button\s+type="button"\s+className="student-ids-toggle/g)?.length).toBe(1);
+    expect(tsx.match(/<SettingSwitch\s+label="Show Student IDs"/g)?.length).toBe(2);
+    expect(tsx.match(/\{idsAvailable && \(\s*<SettingSwitch\s+label="Show Student IDs"/g)?.length).toBe(2);
     // With the toggle gone, idsVisible is false, and that reaches every list.
     expect(tsx).toContain("const idsVisible = idsAvailable && showStudentIds;");
     expect(tsx).toContain('nameOnly ? "name" : idsAvailable ? "ID" : "ID or name"');
@@ -136,7 +138,9 @@ describe("presenter toolbar", () => {
     expect(lastRule(css, ".session-code-card-toggle")).toContain("min-height: 2.75rem");
     expect(lastRule(css, ".session-code-card-link")).toContain("min-height: 2.75rem");
     expect(lastRule(css, ".instructor-ended-link")).toContain("min-height: 2.75rem");
-    expect(lastRule(css, ".participant-action,\n.student-ids-toggle,\n.participants-close")).toContain("min-height: 2.75rem");
+    expect(lastRule(css, ".participant-action,\n.student-ids-toggle")).toContain("min-height: 2.75rem");
+    expect(lastRule(css, ".participants-close")).toMatch(/width: 2\.75rem;\s*height: 2\.75rem/);
+    expect(lastRule(css, ".setting-switch")).toContain("min-height: 2.75rem");
   });
 
   it("tells a waiting control why, and greys the online count when offline", () => {
@@ -172,6 +176,36 @@ describe("projector", () => {
 
   it("grows the question and options on a portrait screen", () => {
     expect(read("index.css")).toMatch(/@media \(orientation: portrait\) and \(min-width: 700px\) \{\s*\.quiz-surface-content-fit \{\s*--quiz-fit-question-size: clamp\(2rem/);
+  });
+});
+
+describe("Participants dialog", () => {
+  const tsx = read("views/InstructorView.tsx");
+  const start = tsx.indexOf("const participantsDialog = showParticipants");
+  const dialog = tsx.slice(start, tsx.indexOf(") : null;", start));
+
+  it("closes with an icon button named Close, at least 44px square", () => {
+    expect(dialog).toMatch(/className="participants-close"\s+aria-label="Close"/);
+    expect(dialog).toContain("<svg");
+    expect(dialog).not.toMatch(/>\s*Close\s*<\/button>/);
+    expect(lastRule(read("index.css"), ".participants-close")).toMatch(/width: 2\.75rem;\s*height: 2\.75rem/);
+  });
+
+  it("groups Lock joining and Show Student IDs under a labelled Session settings area, each with its description", () => {
+    expect(dialog).toContain('aria-labelledby="session-settings-title"');
+    expect(dialog).toContain("Session settings");
+    expect(dialog).toContain("<JoinLockToggle");
+    expect(dialog).toContain('label="Show Student IDs"');
+    expect(dialog).toContain("description={STUDENT_IDS_DESCRIPTION}");
+    // The settings come after the participant list, which stays the main content.
+    expect(dialog.indexOf("<ParticipantList")).toBeLessThan(dialog.indexOf("session-settings-title"));
+    const toggle = read("components/JoinLockToggle.tsx");
+    expect(toggle).toContain("Stop new people joining once everyone is in.");
+    expect(toggle).toContain("<SettingSwitch");
+    const row = read("components/SettingSwitch.tsx");
+    expect(row).toContain('role="switch"');
+    expect(row).toContain("aria-checked={checked}");
+    expect(row).toContain("aria-describedby={descriptionId}");
   });
 });
 
