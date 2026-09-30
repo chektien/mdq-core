@@ -102,6 +102,15 @@ describe("phone question screen deck appearance", () => {
     expect(contrastRatio([Number(line![1]), Number(line![2]), Number(line![3])], hex("#fdf6e3")!)).toBeGreaterThanOrEqual(3);
   });
 
+  it("measures a deck with only surface-color against the palette's slide background, not its page", () => {
+    // The screen is painted from the surface colour down to the palette's own slide background,
+    // here a light one, while the page behind it is dark.
+    const env: PhoneColorEnv = { resolve: (css) => (css === "var(--mdq-slide-bg)" ? hex("#fdf6e3") : hex(css)), page: hex("#1a1b26") };
+    const { style, attributes } = phoneScreenAppearance(styleOf({ "surface-color": "#ffffff", "text-color": "#101820" }), env);
+    expect(attributes["data-deck-background"]).toBe("true");
+    expect(style?.["--student-text"]).toBe("#101820");
+  });
+
   it("changes only the sizes for a deck that sets only a body size", () => {
     const { style, attributes } = phoneScreenAppearance(styleOf({ "body-size": "1.4rem" }), darkPage());
     expect(attributes).toEqual({ "data-deck-size": "true" });
@@ -126,7 +135,14 @@ describe("phone question screen wiring", () => {
   });
 
   it("measures colours through the browser only for a deck that has settings", () => {
-    expect(student).toContain("root && deckStyle ? browserColorEnv(root.ownerDocument) : undefined");
+    expect(student).toContain("deckStyle && typeof document !== \"undefined\" ? browserColorEnv(document) : undefined");
+  });
+
+  it("checks the colours again when the theme or palette changes", () => {
+    expect(student).toContain("useSyncExternalStore(subscribeToLook, readLook");
+    expect(student).toContain('const LOOK_ATTRIBUTES = ["data-theme", "data-palette"];');
+    expect(student).toContain("observer.observe(document.documentElement, { attributes: true, attributeFilter: LOOK_ATTRIBUTES })");
+    expect(student).toContain("[deckStyle, look],");
   });
 
   it("gates every rule on an attribute that only a deck with settings sets", () => {

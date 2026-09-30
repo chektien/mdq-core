@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useMemo, useRef } from "react";
+import { useState, useCallback, useEffect, useMemo, useRef, useSyncExternalStore } from "react";
 import { useSocket } from "../hooks/useSocket";
 import type { QuestionState, RevealState } from "../hooks/useSocket";
 import { API, MAX_OPEN_RESPONSE_LENGTH, SEAT_TAKEN_MESSAGE } from "@mdq/shared";
@@ -703,13 +703,28 @@ export default function StudentView({
  * have (see phoneDeckStyle.ts). A deck with no settings gets nothing back.
  */
 function usePhoneScreenAppearance(deckStyle: unknown): PhoneScreenAppearance {
-  const root = typeof document === "undefined" ? null : document.documentElement;
-  // A different theme or palette changes the colours the settings are checked against.
-  const look = root ? `${root.dataset.theme ?? ""}|${root.dataset.palette ?? ""}` : "";
+  // A different theme or palette changes the colours the settings are checked against,
+  // so a switch re-renders the screen even when nothing else on it changes.
+  const look = useSyncExternalStore(subscribeToLook, readLook, () => "");
   return useMemo(
-    () => phoneScreenAppearance(deckStyle, root && deckStyle ? browserColorEnv(root.ownerDocument) : undefined),
+    () => phoneScreenAppearance(deckStyle, deckStyle && typeof document !== "undefined" ? browserColorEnv(document) : undefined),
     [deckStyle, look],
   );
+}
+
+const LOOK_ATTRIBUTES = ["data-theme", "data-palette"];
+
+function readLook(): string {
+  if (typeof document === "undefined") return "";
+  const { theme, palette } = document.documentElement.dataset;
+  return `${theme ?? ""}|${palette ?? ""}`;
+}
+
+function subscribeToLook(onChange: () => void): () => void {
+  if (typeof MutationObserver === "undefined" || typeof document === "undefined") return () => undefined;
+  const observer = new MutationObserver(onChange);
+  observer.observe(document.documentElement, { attributes: true, attributeFilter: LOOK_ATTRIBUTES });
+  return () => observer.disconnect();
 }
 
 // ── Question sub-view ──────────────────────

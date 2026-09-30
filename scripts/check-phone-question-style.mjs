@@ -197,6 +197,28 @@ async function visit(browser, base, week, bundle) {
   return { states, dumps };
 }
 
+/** The deck's colours are checked against the theme the screen has, so a theme switch on an open question re-checks them. */
+async function switchTheme(browser, base, week) {
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+  const { sessionId, sessionCode } = await (await fetch(`${base}/api/session`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ week }) })).json();
+  const phone = await context.newPage();
+  await phone.goto(`${base}/join/${sessionCode}`);
+  await phone.fill('input[name="studentId"]', "1000001");
+  await phone.fill('input[name="displayName"]', "Check");
+  await phone.getByRole("button", { name: "Join" }).click();
+  await phone.waitForSelector("text=Waiting for quiz");
+  await fetch(`${base}/api/session/${sessionId}/start`, { method: "POST" });
+  await phone.waitForSelector(".option-btn");
+  const questionColor = () => phone.evaluate(() => getComputedStyle(document.querySelector(".student-question-text, .quiz-html")).color);
+  const before = await questionColor();
+  // Nothing on the screen changes but the theme.
+  await phone.evaluate(() => { document.documentElement.dataset.theme = "light"; });
+  await phone.waitForTimeout(700);
+  const after = await questionColor();
+  await context.close();
+  return { before, after };
+}
+
 async function main() {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "mdq-phone-question-"));
   const deckDir = path.join(tmp, "decks");
@@ -216,6 +238,8 @@ async function main() {
     }
     const results = {};
     for (const name of Object.keys(DECKS)) results[name] = await visit(browser, base, name);
+    const switched = await switchTheme(browser, base, "textonly");
+    check(switched.before !== "rgb(16, 24, 32)" && switched.after === "rgb(16, 24, 32)", `textonly deck: dark text is used once the theme switches to light, with no other change (${switched.before} to ${switched.after})`);
     const earlier = baselineDist ? await visit(browser, base, "plain", baselineDist) : null;
 
     const plain = results.plain.states;

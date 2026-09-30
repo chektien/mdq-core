@@ -93,8 +93,9 @@ export function phoneScreenAppearance(deckStyle: unknown, env?: PhoneColorEnv): 
 
   // The colours the deck's background runs between, top and bottom, or the page itself.
   const stopFor = (name: string): Rgb | null => (has(name) ? env.resolve(appearance[name]) : null);
-  const top = stopFor("--mdq-slide-bg-soft") ?? stopFor("--mdq-slide-bg") ?? env.page;
-  const bottom = stopFor("--mdq-slide-bg") ?? env.page;
+  // A deck that sets only surface-color leaves the bottom of the gradient on the palette's own slide background.
+  const bottom = stopFor("--mdq-slide-bg") ?? (backgroundSet ? env.resolve("var(--mdq-slide-bg)") : null) ?? env.page;
+  const top = stopFor("--mdq-slide-bg-soft") ?? bottom;
   const stops = [top, bottom].filter((stop): stop is Rgb => stop !== null);
   if (stops.length === 0) return { style: Object.keys(style).length > 0 ? style : undefined, attributes };
 
