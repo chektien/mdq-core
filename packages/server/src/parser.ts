@@ -17,6 +17,10 @@ import {
   parseDeckPalette,
   dashedSettingKey,
   normalizeDeckSettingKeys,
+  DECK_STYLE_KEYS,
+  resolveDeckStyleSetting,
+  type DeckStyle,
+  type DeckStyleSettings,
 } from "@mdq/shared";
 import { marked } from "marked";
 
@@ -78,6 +82,7 @@ export function parseQuizMarkdown(source: string, sourceFile: string): ParseResu
     errors,
   );
   const studentId = extractDeckBooleanMetadata(markdown, "student_id", sourceFile, errors);
+  const deckStyle = extractDeckStyleMetadata(markdown, sourceFile, errors);
 
   // Extract deck key from filename (e.g., "week01.md" -> "week01", "featured-demo.md" -> "featured-demo")
   const sourceStem = sourceFile.replace(/^.*[\\/]/, "").replace(/\.md$/i, "").toLowerCase();
@@ -118,6 +123,7 @@ export function parseQuizMarkdown(source: string, sourceFile: string): ParseResu
     presenterNotes,
     presenterNotesDefaultOpen,
     studentId,
+    ...(deckStyle ? { styleSettings: deckStyle.settings, style: deckStyle.style } : {}),
     questions,
     sourceFile,
   };
@@ -252,6 +258,35 @@ function extractDeckBooleanMetadata(
     ),
   );
   return undefined;
+}
+
+/**
+ * The appearance settings in the deck header (`title-size: large`,
+ * `accent-color: teal`). A value that is not a preset, a plain length or a
+ * colour adds a parse error that names the key and what is allowed, and is
+ * left out. Undefined when no setting was accepted.
+ */
+function extractDeckStyleMetadata(
+  markdown: string,
+  sourceFile: string,
+  errors: QuizParseError[],
+): { settings: DeckStyleSettings; style: DeckStyle } | undefined {
+  const preamble = markdown.split(/^---+\s*$/m, 1)[0] || markdown;
+  const settings: DeckStyleSettings = {};
+  const style: DeckStyle = {};
+  for (const key of DECK_STYLE_KEYS) {
+    const match = preamble.match(new RegExp(`^${key.replace(/-/g, "_")}:[ \\t]*(.*?)\\s*$`, "im"));
+    if (!match) continue;
+    const result = resolveDeckStyleSetting(key, match[1]);
+    if (result.ok) {
+      settings[key] = result.value;
+      Object.assign(style, result.style);
+      continue;
+    }
+    const lineNumber = preamble.slice(0, match.index).split("\n").length;
+    errors.push(new QuizParseError(sourceFile, -1, result.message, lineNumber));
+  }
+  return Object.keys(settings).length > 0 ? { settings, style } : undefined;
 }
 
 /**

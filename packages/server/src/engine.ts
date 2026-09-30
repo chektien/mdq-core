@@ -131,6 +131,7 @@ const questionPayload = (session: Session, quiz: Quiz, now: number): QuestionOpe
     slideMediaPosition: q.slideMediaPosition, slideMediaOpacity: q.slideMediaOpacity,
     slideBackground: q.slideBackground, slideLiveEmbed: q.slideLiveEmbed,
     slideVideo: q.slideVideo, slideReferences: q.slideReferences,
+    ...(quiz.style ? { deckStyle: quiz.style } : {}),
     options: q.options.map((o) => ({ label: o.label, text: o.textHtml })),
     allowsMultiple: q.allowsMultiple, isPoll: q.isPoll === true,
     timeLimitSec: q.timeLimitSec, startedAt: session.questionStartedAt || now,

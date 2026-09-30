@@ -252,6 +252,7 @@ export function createApp(quizDirOrOpts?: string | AppOptions) {
       slideLiveEmbed: question.slideLiveEmbed,
       slideVideo: question.slideVideo,
       slideReferences: question.slideReferences,
+      ...(quiz.style ? { deckStyle: quiz.style } : {}),
       options: question.options.map((option) => ({ label: option.label, text: option.textHtml })),
       allowsMultiple: question.allowsMultiple,
       isPoll: question.isPoll === true,

@@ -1,3 +1,4 @@
+import type { DeckStyle, DeckStyleSettings } from "./deck-style";
 // ──────────────────────────────────────────────
 // mdq shared contracts
 // Single source of truth for types, events, REST
@@ -285,6 +286,8 @@ export interface QuestionOpenPayload {
   slideLiveEmbed?: SlideLiveEmbed;
   slideVideo?: SlideVideo;
   slideReferences?: SlideReference[];
+  /** The deck's header appearance settings as slide-surface custom properties. Absent when the deck has none. */
+  deckStyle?: DeckStyle;
   options: { label: string; text: string }[];
   allowsMultiple: boolean;
   isPoll?: boolean;
@@ -476,6 +479,14 @@ export interface Quiz {
    * header). Absent means on; `false` asks for a name only and uses it as the ID.
    */
   studentId?: boolean;
+  /**
+   * The appearance settings the deck header wrote and the parser accepted
+   * (`title-size: large`, `accent-color: teal`), by dashed key. Absent when
+   * the header has none.
+   */
+  styleSettings?: DeckStyleSettings;
+  /** Those settings as CSS custom properties for the slide surface. Absent when the header has none. */
+  style?: DeckStyle;
   questions: Question[];
   sourceFile: string;
 }
@@ -604,4 +615,5 @@ export const TICK_INTERVAL_MS = 1000;
 export const DATA_DIR = "data";
 
 export * from "./setting-keys";
+export * from "./deck-style";
 export * from "./identity";
