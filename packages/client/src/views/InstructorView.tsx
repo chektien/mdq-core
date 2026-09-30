@@ -558,6 +558,11 @@ export default function InstructorView({
                               <span className="mx-2 text-zinc-600">/</span>
                               <span className="font-mono text-xs text-zinc-500">{deck.week}</span>
                             </span>
+                            {deck.diagnostics?.map((note) => (
+                              <span key={`${note.lineNumber}-${note.message}`} className="mt-1 block text-sm text-amber-300">
+                                Ignored, line {note.lineNumber}: {note.message}
+                              </span>
+                            ))}
                           </span>
                         </span>
                       </button>

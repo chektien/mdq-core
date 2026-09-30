@@ -1659,6 +1659,10 @@ async function main(): Promise<void> {
     throw new Error(`Quiz has parse errors:\n${reportParseErrors(result.errors)}`);
   }
 
+  if (result.diagnostics.length > 0) {
+    console.warn(`Ignored settings in ${path.basename(options.inputFile)}:\n${result.diagnostics.map((d) => `- line ${d.lineNumber}: ${d.message}`).join("\n")}`);
+  }
+
   const html = buildHtml(result.quiz, options);
   if (options.htmlOut) {
     await fs.promises.mkdir(path.dirname(options.htmlOut), { recursive: true });

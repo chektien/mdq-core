@@ -19,6 +19,7 @@ import {
   normalizeDeckSettingKeys,
   DECK_STYLE_KEYS,
   resolveDeckStyleSetting,
+  type DeckDiagnostic,
   type DeckStyle,
   type DeckStyleSettings,
 } from "@mdq/shared";
@@ -53,6 +54,8 @@ export class QuizParseError extends Error {
 export interface ParseResult {
   quiz: Quiz | null;
   errors: QuizParseError[];
+  /** Notes that do not stop the deck loading, such as an ignored appearance setting. */
+  diagnostics: DeckDiagnostic[];
 }
 
 interface QuestionBlock {
@@ -70,6 +73,7 @@ export function parseQuizMarkdown(source: string, sourceFile: string): ParseResu
   // rules below match one spelling.
   const markdown = normalizeDeckSettingKeys(source);
   const errors: QuizParseError[] = [];
+  const diagnostics: DeckDiagnostic[] = [];
 
   const title = extractDeckTitle(markdown);
   const theme = extractDeckThemeMetadata(markdown, sourceFile, errors);
@@ -82,7 +86,7 @@ export function parseQuizMarkdown(source: string, sourceFile: string): ParseResu
     errors,
   );
   const studentId = extractDeckBooleanMetadata(markdown, "student_id", sourceFile, errors);
-  const deckStyle = extractDeckStyleMetadata(markdown, sourceFile, errors);
+  const deckStyle = extractDeckStyleMetadata(markdown, diagnostics);
 
   // Extract deck key from filename (e.g., "week01.md" -> "week01", "featured-demo.md" -> "featured-demo")
   const sourceStem = sourceFile.replace(/^.*[\\/]/, "").replace(/\.md$/i, "").toLowerCase();
@@ -128,7 +132,7 @@ export function parseQuizMarkdown(source: string, sourceFile: string): ParseResu
     sourceFile,
   };
 
-  return { quiz: questions.length > 0 ? quiz : null, errors };
+  return { quiz: questions.length > 0 ? quiz : null, errors, diagnostics };
 }
 
 /**
@@ -263,13 +267,13 @@ function extractDeckBooleanMetadata(
 /**
  * The appearance settings in the deck header (`title-size: large`,
  * `accent-color: teal`). A value that is not a preset, a plain length or a
- * colour adds a parse error that names the key and what is allowed, and is
- * left out. Undefined when no setting was accepted.
+ * colour adds a diagnostic on the key's line that names the key and what is
+ * allowed, and is left out. It is never a parse error, so the deck still loads.
+ * Undefined when no setting was accepted.
  */
 function extractDeckStyleMetadata(
   markdown: string,
-  sourceFile: string,
-  errors: QuizParseError[],
+  diagnostics: DeckDiagnostic[],
 ): { settings: DeckStyleSettings; style: DeckStyle } | undefined {
   const preamble = markdown.split(/^---+\s*$/m, 1)[0] || markdown;
   const settings: DeckStyleSettings = {};
@@ -284,7 +288,7 @@ function extractDeckStyleMetadata(
       continue;
     }
     const lineNumber = preamble.slice(0, match.index).split("\n").length;
-    errors.push(new QuizParseError(sourceFile, -1, result.message, lineNumber));
+    diagnostics.push({ lineNumber, message: result.message, severity: "warning" });
   }
   return Object.keys(settings).length > 0 ? { settings, style } : undefined;
 }

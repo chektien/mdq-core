@@ -463,6 +463,16 @@ export interface Question {
   timeLimitSec: number;
 }
 
+/**
+ * A note about a deck that does not stop it loading, such as a header setting
+ * that was ignored. `lineNumber` is the line of the setting in the deck file.
+ */
+export interface DeckDiagnostic {
+  lineNumber: number;
+  message: string;
+  severity?: "info" | "warning";
+}
+
 export interface Quiz {
   week: string;
   title: string;

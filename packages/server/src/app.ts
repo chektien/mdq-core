@@ -1,6 +1,6 @@
 import express, { type Request, type Response } from "express";
 import cors from "cors";
-import { API, AccessInfo, CumulativeLeaderboardEntry, PublicCumulativeLeaderboardEntry, DeckPalette, DeckTheme, JoinLockRequest, Quiz, ReleaseSeatRequest, ResponseVisibilityRequest, Session, SessionState, usesStudentIds } from "@mdq/shared";
+import { API, AccessInfo, CumulativeLeaderboardEntry, PublicCumulativeLeaderboardEntry, DeckDiagnostic, DeckPalette, DeckTheme, JoinLockRequest, Quiz, ReleaseSeatRequest, ResponseVisibilityRequest, Session, SessionState, usesStudentIds } from "@mdq/shared";
 import {
   createSession,
   storeSession,
@@ -57,7 +57,7 @@ function resolveDeckPalette(q: Quiz, fallbackPalette: DeckPalette): DeckPalette 
   return q.palette ?? fallbackPalette;
 }
 
-function summarizeQuizForList(q: Quiz, fallbackTheme: DeckTheme, fallbackPalette: DeckPalette) {
+function summarizeQuizForList(q: Quiz, fallbackTheme: DeckTheme, fallbackPalette: DeckPalette, diagnostics: DeckDiagnostic[] = []) {
   const slideCount = q.questions.filter((question) => question.questionType === "slide").length;
   return {
     week: q.week,
@@ -67,6 +67,7 @@ function summarizeQuizForList(q: Quiz, fallbackTheme: DeckTheme, fallbackPalette
     questionCount: q.questions.length,
     liveQuestionCount: q.questions.length - slideCount,
     slideCount,
+    ...(diagnostics.length > 0 ? { diagnostics } : {}),
   };
 }
 
@@ -217,6 +218,8 @@ export function createApp(quizDirOrOpts?: string | AppOptions) {
   // ── Quiz store ──────────────────────────────
   const quizzes = new Map<string, Quiz>();
   let quizValidationErrors: ReturnType<typeof parseQuizMarkdown>["errors"] = [];
+  // Notes that do not stop a deck loading, by deck, such as an ignored header appearance setting.
+  const quizDiagnostics = new Map<string, DeckDiagnostic[]>();
 
   function getQuestionHeading(question: Quiz["questions"][number]): string {
     return question.subtopic ? `${question.topic}: ${question.subtopic}` : question.topic;
@@ -348,6 +351,7 @@ export function createApp(quizDirOrOpts?: string | AppOptions) {
     const next = new Map<string, Quiz>();
     const deckIdByTitle = new Map<string, string>();
     const nextValidationErrors: ReturnType<typeof parseQuizMarkdown>["errors"] = [];
+    const nextDiagnostics = new Map<string, DeckDiagnostic[]>();
 
     for (const file of files) {
       const filePath = path.join(dirPath, file);
@@ -359,7 +363,11 @@ export function createApp(quizDirOrOpts?: string | AppOptions) {
           console.warn(`Parse errors for ${file}:`, result.errors.map((e) => e.message));
           continue;
         }
+        if (result.diagnostics.length > 0) {
+          console.warn(`Ignored settings in ${file}:`, result.diagnostics.map((d) => `line ${d.lineNumber}: ${d.message}`));
+        }
         if (result.quiz) {
+          if (result.diagnostics.length > 0) nextDiagnostics.set(result.quiz.week, result.diagnostics);
           const normalizedTitle = normalizeDeckTitle(result.quiz.title);
           const existingDeckId = normalizedTitle ? deckIdByTitle.get(normalizedTitle) : undefined;
           if (existingDeckId) {
@@ -394,6 +402,10 @@ export function createApp(quizDirOrOpts?: string | AppOptions) {
       quizzes.set(week, quiz);
     }
     quizValidationErrors = nextValidationErrors;
+    quizDiagnostics.clear();
+    for (const [week, diagnostics] of nextDiagnostics.entries()) {
+      if (quizzes.has(week)) quizDiagnostics.set(week, diagnostics);
+    }
     return quizzes.size;
   }
 
@@ -547,7 +559,7 @@ export function createApp(quizDirOrOpts?: string | AppOptions) {
     if (validationMessage) {
       return res.status(409).json({ error: validationMessage });
     }
-    const list = [...quizzes.values()].sort(compareDecksForList).map((quiz) => summarizeQuizForList(quiz, theme, palette));
+    const list = [...quizzes.values()].sort(compareDecksForList).map((quiz) => summarizeQuizForList(quiz, theme, palette, quizDiagnostics.get(quiz.week)));
     return res.json(list);
   };
 
@@ -561,7 +573,7 @@ export function createApp(quizDirOrOpts?: string | AppOptions) {
       if (validationMessage) {
         return res.status(409).json({ error: validationMessage });
       }
-      const list = [...quizzes.values()].sort(compareDecksForList).map((quiz) => summarizeQuizForList(quiz, theme, palette));
+      const list = [...quizzes.values()].sort(compareDecksForList).map((quiz) => summarizeQuizForList(quiz, theme, palette, quizDiagnostics.get(quiz.week)));
       return res.json({ loaded, quizzes: list });
     } catch (e) {
       const message = e instanceof Error ? e.message : "Failed to reload decks";
