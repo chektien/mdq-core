@@ -9,6 +9,10 @@ export interface LiveSurfaceAction {
   disabled?: boolean;
   tone?: "neutral" | "primary" | "warning" | "danger";
   detail?: string | null;
+  /** Why a disabled button is disabled, such as "Reconnecting...". Shown as a tooltip and read out. */
+  reason?: string | null;
+  /** A toggle's state; sets aria-pressed. */
+  pressed?: boolean;
 }
 
 interface LiveSurfaceProps {
@@ -19,10 +23,14 @@ interface LiveSurfaceProps {
   nextLabel?: string | null;
   statusLabel?: string | null;
   statusTone?: "neutral" | "success" | "warning";
+  /** Fades the status label away after a few seconds, for a message that only needs a glance. */
+  statusFades?: boolean;
   positionLabel?: string;
   qrDataUrl?: string;
   sessionCode?: string;
   participantCount?: number;
+  /** True while this screen is disconnected, so the online count is greyed. */
+  offline?: boolean;
   presentationUrl?: string;
   joinUrl?: string;
   shortUrl?: string;
@@ -40,10 +48,12 @@ export default function LiveSurface({
   nextLabel,
   statusLabel,
   statusTone = "neutral",
+  statusFades = false,
   positionLabel,
   qrDataUrl,
   sessionCode,
   participantCount,
+  offline = false,
   presentationUrl,
   joinUrl,
   shortUrl,
@@ -128,7 +138,10 @@ export default function LiveSurface({
         className={className}
         onClick={action.onClick}
         disabled={action.disabled}
+        title={action.disabled && action.reason ? action.reason : undefined}
+        aria-pressed={action.pressed}
         aria-label={hasDetail ? `${action.label}: ${action.detail}` : undefined}
+        aria-description={action.disabled && action.reason ? action.reason : undefined}
       >
         <span className="slide-button-label">{action.label}</span>
         {hasDetail && <span className="slide-button-detail">{action.detail}</span>}
@@ -147,7 +160,7 @@ export default function LiveSurface({
             </div>
           )}
           <div className="slide-toolbar-stack">
-            {statusLabel && <span className={`slide-status-pill slide-status-pill-${statusTone}`}>{statusLabel}</span>}
+            {statusLabel && <span className={`slide-status-pill slide-status-pill-${statusTone}${statusFades ? " slide-status-pill-fades" : ""}`}>{statusLabel}</span>}
             {nextLabel && (
               <div className="slide-next-up" aria-label={`Next up: ${nextLabel}`}>
                 <span>Next up</span>
@@ -179,6 +192,7 @@ export default function LiveSurface({
             qrDataUrl={qrDataUrl}
             sessionCode={sessionCode || ""}
             participantCount={participantCount}
+            offline={offline}
             presentationUrl={presentationUrl}
             joinUrl={joinUrl}
             shortUrl={shortUrl}

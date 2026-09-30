@@ -14,6 +14,7 @@ import {
   showLeaderboard,
   hideLeaderboard,
   setResponseHidden,
+  releaseSeat,
   resultsCsvUrl,
   fetchSessionAccessInfo,
   fetchSessionStateForRestore,
@@ -27,7 +28,9 @@ import type { AccessInfo, DeckPalette, DeckTheme, FoldoutNote, OpenResponseEntry
 import { applyClientPalette, applyClientTheme } from "../theme";
 import Timer from "../components/Timer";
 import Leaderboard from "../components/Leaderboard";
+import { deckLabel, resultsHeading } from "../deckLabel";
 import OpenResponseList from "../components/OpenResponseList";
+import ParticipantList from "../components/ParticipantList";
 import QRPanel from "../components/QRPanel";
 import SessionCodeCard from "../components/SessionCodeCard";
 import InlineMarkdownText from "../components/InlineMarkdownText";
@@ -38,31 +41,20 @@ import SlideContent, { SlideContentBody } from "../components/SlideContent";
 import SlideBackgroundLayer from "../components/SlideBackgroundLayer";
 import PresenterNotesPanel from "../components/PresenterNotesPanel";
 import { getQuestionModeText, getRevealActionLabel } from "../questionMode";
+import { readShowStudentIds, saveShowStudentIds } from "../showStudentIds";
+import { closedLabel as closedLabelFor, formatRemaining, pluralize, positionLabel as positionLabelFor } from "../instructorText";
 
 type InstructorPhase = "setup" | "lobby" | "live" | "ended";
 const INSTRUCTOR_RESTORE_KEY = "mdquiz_instructor_session";
 const INSTRUCTOR_RESTORE_SUCCESS_NOTICE = "Resumed active session after refresh.";
+/** How long the "session resumed" notice stays before it fades away. */
+const RESTORE_NOTICE_MS = 5000;
 
 interface StoredInstructorRestore {
   sessionId: string;
   sessionCode: string;
   week: string;
   createdAt: number;
-}
-
-function formatQuizLabel(quizKey: string): string {
-  const normalized = quizKey.trim();
-  if (!normalized) return "MDQ";
-  if (/\bmdq\b/i.test(normalized)) return normalized;
-  return `${normalized} MDQ`;
-}
-
-function formatPositionLabel(questionIndex: number, totalQuestions: number): string {
-  return totalQuestions > 0 ? `${questionIndex + 1}/${totalQuestions}` : `${questionIndex + 1}`;
-}
-
-function pluralize(count: number, singular: string, plural = `${singular}s`): string {
-  return `${count} ${count === 1 ? singular : plural}`;
 }
 
 function formatDeckChooserSummary(deck: DeckSummary): string {
@@ -93,6 +85,8 @@ function questionStateFromRestore(data: NonNullable<SessionRestoreResponse["revi
     isPoll: data.isPoll ?? false,
     timeLimitSec: data.timeLimitSec,
     startedAt: data.startedAt,
+    questionNumber: data.questionNumber,
+    questionTotal: data.questionTotal,
   };
 }
 
@@ -106,6 +100,19 @@ function revealStateFromRestore(data: NonNullable<SessionRestoreResponse["review
     isPoll: data.isPoll ?? false,
     openResponses: data.openResponses ?? [],
   };
+}
+
+/**
+ * True when this page load is a reload of the tab. Only then is "resumed after
+ * refresh" true; a tab that was opened or duplicated is not resuming anything.
+ */
+function isPageReload(): boolean {
+  try {
+    const [entry] = performance.getEntriesByType("navigation") as PerformanceNavigationTiming[];
+    return entry?.type === "reload";
+  } catch {
+    return false;
+  }
 }
 
 function clearInstructorRestore(): void {
@@ -163,6 +170,7 @@ export default function InstructorView({
       return false;
     }
   });
+  const [showStudentIds, setShowStudentIds] = useState(readShowStudentIds);
   const restoreAttemptedRef = useRef(false);
   const actionInFlightRef = useRef(false);
   // Presenter notes (instructor-only). Populated from the instructor-
@@ -173,6 +181,28 @@ export default function InstructorView({
 
   // Socket connection (instructor role)
   const sock = useSocket(sessionInfo?.sessionId ?? null, "instructor");
+
+  // "Session resumed" is good news, not a lasting notice: it goes after a few seconds.
+  useEffect(() => {
+    if (restoreNotice !== INSTRUCTOR_RESTORE_SUCCESS_NOTICE) return;
+    const timer = window.setTimeout(() => {
+      setRestoreNotice((current) => (current === INSTRUCTOR_RESTORE_SUCCESS_NOTICE ? null : current));
+    }, RESTORE_NOTICE_MS);
+    return () => window.clearTimeout(timer);
+  }, [restoreNotice]);
+
+  const idsAvailable = !autoGenerateStudentIds;
+  const idsVisible = idsAvailable && showStudentIds;
+  const toggleShowStudentIds = useCallback(() => {
+    setShowStudentIds((current) => {
+      saveShowStudentIds(!current);
+      return !current;
+    });
+  }, []);
+  const handleReleaseSeat = useCallback(
+    (publicKey: string) => releaseSeat(sessionInfo?.sessionId ?? "", publicKey),
+    [sessionInfo?.sessionId],
+  );
 
   // Derive phase from socket session state
   useEffect(() => {
@@ -242,7 +272,7 @@ export default function InstructorView({
       setTotalQuestionsInQuiz(snapshot.questionCount);
       setQuestionHeadings(snapshot.questionHeadings || []);
       setQuestionSummaries(snapshot.questionSummaries || []);
-      setQuizLabel(formatQuizLabel(snapshot.week));
+      setQuizLabel(deckLabel(snapshot.title, snapshot.week));
       setSessionTheme(snapshot.theme);
       setSessionPalette(snapshot.palette);
       setHoldAppearance(false);
@@ -273,7 +303,8 @@ export default function InstructorView({
         // Non-critical. The socket and controls can recover without join info.
       }
 
-      setRestoreNotice(INSTRUCTOR_RESTORE_SUCCESS_NOTICE);
+      // Say "resumed" only after a real reload of a running session, not on a first open.
+      setRestoreNotice(isPageReload() ? INSTRUCTOR_RESTORE_SUCCESS_NOTICE : null);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unable to resume previous session.";
       if (/ended|not found|missing/i.test(message)) {
@@ -347,7 +378,7 @@ export default function InstructorView({
       if (deck) setTotalQuestionsInQuiz(deck.questionCount);
       setQuestionHeadings(info.questionHeadings || []);
       setQuestionSummaries(info.questionSummaries || []);
-      setQuizLabel(formatQuizLabel(deck?.week || selectedWeek));
+      setQuizLabel(deckLabel(deck?.title, deck?.week || selectedWeek));
       setSessionTheme(info.theme);
       setSessionPalette(info.palette);
       setRestoreNotice(null);
@@ -586,22 +617,25 @@ export default function InstructorView({
             </div>
 
             {/* Participant list */}
-            {sock.participants && sock.participants.count > 0 && (
-              <div className="bg-zinc-800/50 rounded-xl p-4 max-w-lg w-full max-h-48 overflow-y-auto">
-                <div className="flex flex-wrap gap-2">
-                  {sock.participants.participants.map((p) => (
-                    <span
-                      key={p.publicKey}
-                      className="bg-zinc-700 text-zinc-200 px-3 py-1 rounded-full text-sm"
-                    >
-                      {p.label}
-                      {!autoGenerateStudentIds && p.studentId && p.studentId !== p.label && (
-                        <span className="ml-2 text-xs text-zinc-400">{p.studentId}</span>
-                      )}
-                    </span>
-                  ))}
-                </div>
+            {((sock.participants?.count ?? 0) > 0 || (sock.participants?.offline?.length ?? 0) > 0) && (
+              <div className="instructor-participant-panel rounded-xl p-4 max-w-lg w-full max-h-64 overflow-y-auto">
+                <ParticipantList
+                  participants={sock.participants}
+                  showStudentIds={idsVisible}
+                  onRelease={handleReleaseSeat}
+                  disabled={!sock.connected}
+                />
               </div>
+            )}
+            {idsAvailable && (
+              <button
+                type="button"
+                className="student-ids-toggle"
+                aria-pressed={showStudentIds}
+                onClick={toggleShowStudentIds}
+              >
+                Show Student IDs
+              </button>
             )}
 
             {errorMsg && (
@@ -645,28 +679,38 @@ export default function InstructorView({
         <h1 className="text-3xl font-bold text-white">Session Ended</h1>
         {quizLabel && (
           <h2 className="text-xl font-semibold text-zinc-300 text-center">
-            Leaderboard for {quizLabel.toUpperCase()}
+            {resultsHeading("leaderboard", quizLabel)}
           </h2>
         )}
         <Leaderboard
           entries={sock.leaderboard}
           totalQuestions={sock.totalQuestions ?? totalQuestionsInQuiz}
           maxRows={15}
-          showStudentIds={!autoGenerateStudentIds}
+          showStudentIds={idsVisible}
         />
+        {idsAvailable && (
+          <button
+            type="button"
+            className="student-ids-toggle"
+            aria-pressed={showStudentIds}
+            onClick={toggleShowStudentIds}
+          >
+            Show Student IDs
+          </button>
+        )}
         <div className="flex flex-wrap items-center justify-center gap-3">
           {sid && (
             <a
               href={resultsCsvUrl(sid)}
               download
-              className="instructor-results-download bg-zinc-800 hover:bg-zinc-700 text-white font-semibold py-3 px-8 rounded-xl transition-colors"
+              className="instructor-results-download instructor-ended-link bg-zinc-800 hover:bg-zinc-700 text-white font-semibold py-3 px-8 rounded-xl transition-colors"
             >
               Download results (CSV)
             </a>
           )}
           <a
             href="#/"
-            className="bg-zinc-800 hover:bg-zinc-700 text-white font-semibold py-3 px-8 rounded-xl transition-colors"
+            className="instructor-ended-link bg-zinc-800 hover:bg-zinc-700 text-white font-semibold py-3 px-8 rounded-xl transition-colors"
           >
             Back to Home
           </a>
@@ -691,7 +735,10 @@ export default function InstructorView({
       loading={loading}
       errorMsg={errorMsg}
       restoreNotice={restoreNotice}
-      autoGenerateStudentIds={autoGenerateStudentIds}
+      idsAvailable={idsAvailable}
+      showStudentIds={idsVisible}
+      onToggleShowStudentIds={toggleShowStudentIds}
+      onReleaseSeat={handleReleaseSeat}
       presenterNotesEnabled={presenterNotesEnabled}
       presenterNotesByIndex={presenterNotesByIndex}
       presenterNotesOpen={presenterNotesOpen}
@@ -717,7 +764,10 @@ function LiveView({
   loading,
   errorMsg,
   restoreNotice,
-  autoGenerateStudentIds,
+  idsAvailable,
+  showStudentIds,
+  onToggleShowStudentIds,
+  onReleaseSeat,
   presenterNotesEnabled,
   presenterNotesByIndex,
   presenterNotesOpen,
@@ -737,7 +787,12 @@ function LiveView({
   loading: boolean;
   errorMsg: string | null;
   restoreNotice: string | null;
-  autoGenerateStudentIds: boolean;
+  /** False when the deck hides Student IDs altogether. */
+  idsAvailable: boolean;
+  /** Whether Student IDs show beside names on this console. */
+  showStudentIds: boolean;
+  onToggleShowStudentIds: () => void;
+  onReleaseSeat: (publicKey: string) => Promise<void>;
   presenterNotesEnabled: boolean;
   presenterNotesByIndex: Record<number, FoldoutNote[]>;
   presenterNotesOpen: boolean;
@@ -750,6 +805,7 @@ function LiveView({
 
   const [reviewQuestionIndex, setReviewQuestionIndex] = useState<number | null>(null);
   const [showEndConfirm, setShowEndConfirm] = useState(false);
+  const [showParticipants, setShowParticipants] = useState(false);
   const [moderationNotice, setModerationNotice] = useState<string | null>(null);
   const [questionCache, setQuestionCache] = useState<Record<number, QuestionState>>({});
   const [revealCache, setRevealCache] = useState<Record<number, RevealState>>({});
@@ -814,8 +870,16 @@ function LiveView({
     q &&
     q.questionIndex < totalQuestionsInQuiz - 1;
   const canPrev = !isReviewing && state !== "LOBBY" && state !== "ENDED" && liveQuestionIndex > 0;
-  const canShowLeaderboard = state === "REVEAL" && !liveIsSlide;
+  // A leaderboard ranks scored questions, so it is offered once one has been revealed.
+  const hasRevealedScoredQuestion = Object.values(revealCache).some(
+    (reveal) => reveal.questionType === "multiple_choice" && !reveal.isPoll,
+  );
+  const canShowLeaderboard = state === "REVEAL" && !liveIsSlide && hasRevealedScoredQuestion;
   const isFinalQuestion = liveQuestionIndex >= totalQuestionsInQuiz - 1;
+  // "Time's up" only when the timer ran out; closing early just closes the answers.
+  const closedLabel = closedLabelFor(sock.timedOut);
+  const noVotesClosed = state === "QUESTION_CLOSED" && !isReviewing && displayQuestion?.isPoll === true && (sock.answerCount?.submitted ?? 0) === 0;
+  const noVotesRevealed = displayReveal?.isPoll === true && Object.values(displayReveal.distribution).every((count) => count === 0);
   const displayQuestionModeText = displayQuestion
     ? getQuestionModeText(displayQuestion.questionType, displayQuestion.allowsMultiple)
     : "";
@@ -861,26 +925,26 @@ function LiveView({
     : isReviewing
       ? "warning"
       : "neutral";
+  // Questions are counted without slides, the same as on the phones; a slide shows no number.
+  const displayPositionLabel = positionLabelFor(displayQuestion);
+  const reviewingLabel = displayPositionLabel ? `Reviewing ${displayPositionLabel}` : "Reviewing";
   const slideStatusLabel = liveConnectionNoticeLabel ?? liveRestoreNoticeLabel ?? (isReviewing && reviewQuestionIndex !== null
-    ? `Reviewing ${formatPositionLabel(reviewQuestionIndex, totalQuestionsInQuiz)}; students stay live`
+    ? `${reviewingLabel}; students stay live`
     : null);
   const quizStatusLabel = (() => {
     if (liveConnectionNoticeLabel) return liveConnectionNoticeLabel;
     if (liveRestoreNoticeLabel) return liveRestoreNoticeLabel;
     if (!displayQuestion || displayQuestion.questionType === "slide") return null;
     if (isReviewing && reviewQuestionIndex !== null) {
-      return `Reviewing ${formatPositionLabel(reviewQuestionIndex, totalQuestionsInQuiz)}; students stay live`;
+      return `${reviewingLabel}; students stay live`;
     }
     if (displayReveal) return displayReveal.isPoll ? "Results open" : "Answer revealed";
-    if (state === "QUESTION_CLOSED") return "Time's up";
+    if (state === "QUESTION_CLOSED") return closedLabel;
     if (sock.answerCount && state === "QUESTION_OPEN") {
       return `${sock.answerCount.submitted}/${sock.answerCount.total} answered`;
     }
     return null;
   })();
-  const displayPositionLabel = displayQuestion
-    ? formatPositionLabel(displayQuestion.questionIndex, totalQuestionsInQuiz)
-    : undefined;
   const currentReviewListIndex = isReviewing && reviewQuestionIndex !== null
     ? availableReviewIndices.findIndex((v) => v === reviewQuestionIndex)
     : -1;
@@ -897,9 +961,19 @@ function LiveView({
   const remainingItems = itemSummaries.slice(Math.max(0, Math.min(remainingStartIndex, itemSummaries.length)));
   const remainingSlideCount = remainingItems.filter((item) => item.questionType === "slide").length;
   const remainingQuizQuestionCount = Math.max(remainingItems.length - remainingSlideCount, 0);
-  const remainingItemCount = remainingQuizQuestionCount + remainingSlideCount;
-  const remainingVerb = remainingItemCount === 1 ? "remains" : "remain";
+  const remainingSummary = formatRemaining(remainingQuizQuestionCount, remainingSlideCount);
   const controlsUnavailable = loading || !sock.connected;
+  // Why a control is waiting, so a tap that cannot work says so instead of doing nothing.
+  const waitingReason = !sock.connected ? "Reconnecting..." : null;
+
+  useEffect(() => {
+    if (!showParticipants) return;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setShowParticipants(false);
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [showParticipants]);
 
   useEffect(() => {
     if (!showEndConfirm) return;
@@ -956,37 +1030,45 @@ function LiveView({
         label: "Prev",
         onClick: () => onAction(() => prevQuestion(sessionId), "previous"),
         disabled: !canPrev || controlsUnavailable,
+        reason: canPrev ? waitingReason : null,
       },
       {
         label: "Next",
-        detail: nextQuestionHeading,
+        detail: canNext && waitingReason ? waitingReason : nextQuestionHeading,
         onClick: () => onAction(() => nextQuestion(sessionId), "next"),
         disabled: !canNext || controlsUnavailable,
+        reason: canNext ? waitingReason : null,
         tone: canNext ? "primary" : "neutral",
       },
     ];
   })();
 
+  const participantsAction: LiveSurfaceAction = {
+    label: "Participants",
+    onClick: () => setShowParticipants(true),
+  };
   const liveSurfaceActions: LiveSurfaceAction[] = (() => {
-    if (!sock.connected) {
-      return [{
-        label: "Reconnect",
-        onClick: sock.reconnect,
-        tone: "primary",
-      }];
-    }
+    // Offline, the controls stay where they are but wait, each saying why; Reconnect leads.
+    const reconnect: LiveSurfaceAction[] = sock.connected ? [] : [{
+      label: "Reconnect",
+      onClick: sock.reconnect,
+      tone: "primary",
+    }];
 
     if (isReviewing && reviewQuestionIndex !== null) {
       return [
+        ...reconnect,
         {
           label: "Back to Live",
           onClick: () => setReviewQuestionIndex(null),
           tone: "primary",
         },
+        participantsAction,
         {
           label: "End Session",
           onClick: requestEndSession,
           disabled: controlsUnavailable,
+          reason: waitingReason,
           tone: "danger",
         },
       ];
@@ -994,6 +1076,7 @@ function LiveView({
 
     if (state === "LEADERBOARD") {
       return [
+        ...reconnect,
         {
           label: isFinalQuestion ? "Review Final" : "Back to Quiz",
           onClick: () => {
@@ -1004,22 +1087,26 @@ function LiveView({
             onAction(() => hideLeaderboard(sessionId), "resume");
           },
           disabled: controlsUnavailable,
+          reason: waitingReason,
         },
+        participantsAction,
         {
           label: "End Session",
           onClick: requestEndSession,
           disabled: controlsUnavailable,
+          reason: waitingReason,
           tone: "danger",
         },
       ];
     }
 
-    const actions: LiveSurfaceAction[] = [];
+    const actions: LiveSurfaceAction[] = [...reconnect];
     if (canClose) {
       actions.push({
         label: "Close Question",
         onClick: () => onAction(() => closeQuestion(sessionId), "close"),
         disabled: controlsUnavailable,
+        reason: waitingReason,
         tone: "warning",
       });
     }
@@ -1028,6 +1115,7 @@ function LiveView({
         label: liveRevealActionLabel,
         onClick: () => onAction(() => revealAnswer(sessionId), "reveal"),
         disabled: controlsUnavailable,
+        reason: waitingReason,
         tone: "primary",
       });
     }
@@ -1036,14 +1124,17 @@ function LiveView({
         label: "Show Leaderboard",
         onClick: () => onAction(() => showLeaderboard(sessionId), "leaderboard"),
         disabled: controlsUnavailable,
+        reason: waitingReason,
         tone: "primary",
       });
     }
+    actions.push(participantsAction);
     actions.push({ label: "Download results (CSV)", href: resultsCsvUrl(sessionId) });
     actions.push({
       label: "End Session",
       onClick: requestEndSession,
       disabled: controlsUnavailable,
+      reason: waitingReason,
       tone: "danger",
     });
     return actions;
@@ -1066,20 +1157,27 @@ function LiveView({
         aria-labelledby="end-session-title"
       >
         <p className="end-session-eyebrow text-xs font-semibold uppercase tracking-[0.22em] text-red-200/80">End live session</p>
-        <h2 id="end-session-title" className="mt-3 text-2xl font-semibold">Are you sure?</h2>
+        <h2 id="end-session-title" className="mt-3 text-2xl font-semibold">End this session?</h2>
         <p className="end-session-desc mt-3 text-sm leading-6 text-zinc-300">
-          Ending now will close the live room for everyone. If you continue, {pluralize(remainingQuizQuestionCount, "quiz question")} and {pluralize(remainingSlideCount, "slide")} {remainingVerb}.
+          Everyone&apos;s screen will show the final results.
+          {remainingSummary && ` Still to come: ${remainingSummary}.`}
         </p>
-        <div className="mt-5 grid grid-cols-2 gap-3">
-          <div className="end-session-stat rounded-xl border border-white/10 bg-white/[0.045] px-4 py-3">
-            <p className="end-session-stat-value text-3xl font-semibold tabular-nums text-white">{remainingQuizQuestionCount}</p>
-            <p className="end-session-stat-label mt-1 text-xs uppercase tracking-[0.18em] text-zinc-400">Quiz questions left</p>
+        {remainingSummary && (
+          <div className="mt-5 flex gap-3">
+            {remainingQuizQuestionCount > 0 && (
+              <div className="end-session-stat flex-1 rounded-xl border border-white/10 bg-white/[0.045] px-4 py-3">
+                <p className="end-session-stat-value text-3xl font-semibold tabular-nums text-white">{remainingQuizQuestionCount}</p>
+                <p className="end-session-stat-label mt-1 text-xs uppercase tracking-[0.18em] text-zinc-400">{remainingQuizQuestionCount === 1 ? "Quiz question left" : "Quiz questions left"}</p>
+              </div>
+            )}
+            {remainingSlideCount > 0 && (
+              <div className="end-session-stat flex-1 rounded-xl border border-white/10 bg-white/[0.045] px-4 py-3">
+                <p className="end-session-stat-value text-3xl font-semibold tabular-nums text-white">{remainingSlideCount}</p>
+                <p className="end-session-stat-label mt-1 text-xs uppercase tracking-[0.18em] text-zinc-400">{remainingSlideCount === 1 ? "Slide left" : "Slides left"}</p>
+              </div>
+            )}
           </div>
-          <div className="end-session-stat rounded-xl border border-white/10 bg-white/[0.045] px-4 py-3">
-            <p className="end-session-stat-value text-3xl font-semibold tabular-nums text-white">{remainingSlideCount}</p>
-            <p className="end-session-stat-label mt-1 text-xs uppercase tracking-[0.18em] text-zinc-400">Slides left</p>
-          </div>
-        </div>
+        )}
         <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-end">
           <button
             type="button"
@@ -1102,8 +1200,64 @@ function LiveView({
     </div>
   ) : null;
 
+  const participantsDialog = showParticipants ? (
+    <div
+      className="end-session-overlay participants-overlay fixed inset-0 z-[10000] flex items-center justify-center bg-[#07060b]/80 px-5 backdrop-blur-sm"
+      role="presentation"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) setShowParticipants(false);
+      }}
+    >
+      <div
+        className="participants-card w-full max-w-lg rounded-2xl border border-[color-mix(in_srgb,var(--mdq-line-strong)_60%,transparent)] bg-[var(--mdq-dialog)] p-6 text-white shadow-2xl shadow-black/50"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="participants-title"
+      >
+        <div className="flex items-center justify-between gap-3">
+          <h2 id="participants-title" className="text-2xl font-semibold">
+            Participants <span className="participants-count tabular-nums">{participantCount} online</span>
+          </h2>
+          <button
+            type="button"
+            className="participants-close"
+            onClick={() => setShowParticipants(false)}
+            autoFocus
+          >
+            Close
+          </button>
+        </div>
+        <p className="participants-help mt-2 text-sm">
+          If someone&apos;s phone stops working, choose Let rejoin. The next time they join with their {idsAvailable ? "ID" : "ID or name"} from any device, they carry on with their answers.
+        </p>
+        <div className="mt-4 max-h-[50vh] overflow-y-auto">
+          {(sock.participants?.count ?? 0) + (sock.participants?.offline?.length ?? 0) === 0 ? (
+            <p className="participants-help text-sm">No one has joined yet.</p>
+          ) : (
+            <ParticipantList
+              participants={sock.participants}
+              showStudentIds={showStudentIds}
+              onRelease={onReleaseSeat}
+              disabled={!sock.connected}
+            />
+          )}
+        </div>
+        {idsAvailable && (
+          <button
+            type="button"
+            className="student-ids-toggle mt-4"
+            aria-pressed={showStudentIds}
+            onClick={onToggleShowStudentIds}
+          >
+            Show Student IDs
+          </button>
+        )}
+      </div>
+    </div>
+  ) : null;
+
   const liveSurfaceStatusLabel = isLeaderboardDisplay
-    ? quizLabel ? `Leaderboard for ${quizLabel.toUpperCase()}` : "Leaderboard"
+    ? resultsHeading("leaderboard", quizLabel)
     : isSlideDisplay
       ? slideStatusLabel
       : quizStatusLabel;
@@ -1135,7 +1289,7 @@ function LiveView({
             />
           )}
           {state === "QUESTION_CLOSED" && !isReviewing && (
-            <div className="text-amber-400 text-2xl font-bold">Time's up</div>
+            <div className="text-amber-400 text-2xl font-bold">{closedLabel}</div>
           )}
           {isReviewing && (
             <div className="text-amber-300 text-lg font-semibold">Review Mode</div>
@@ -1150,11 +1304,13 @@ function LiveView({
             {displayQuestionModeText}
           </div>
 
+          {noVotesClosed && <p className="no-votes-note">No votes yet</p>}
+
           {displayQuestion.questionType === "open_response" ? (
             <OpenResponseList
               responses={liveOpenResponses}
               title={state === "QUESTION_CLOSED" ? "Submitted Responses" : "Live Responses"}
-              showStudentIds={!autoGenerateStudentIds}
+              showStudentIds={showStudentIds}
               {...moderationProps}
             />
           ) : (
@@ -1206,8 +1362,10 @@ function LiveView({
             html={displayQuestion.text}
           />
 
+          {noVotesRevealed && <p className="no-votes-note">No votes yet</p>}
+
           {displayQuestion.questionType === "open_response" ? (
-            <OpenResponseList responses={revealOpenResponses} title="Responses" emptyLabel="No responses were submitted." showStudentIds={!autoGenerateStudentIds} {...moderationProps} />
+            <OpenResponseList responses={revealOpenResponses} title="Responses" emptyLabel="No responses were submitted." showStudentIds={showStudentIds} {...moderationProps} />
           ) : showDetailedRevealChoices && (() => {
             const dist = displayReveal.distribution;
             const maxCount = Math.max(1, ...Object.values(dist));
@@ -1285,7 +1443,7 @@ function LiveView({
             entries={sock.leaderboard}
             totalQuestions={sock.totalQuestions ?? totalQuestionsInQuiz}
             maxRows={10}
-            showStudentIds={!autoGenerateStudentIds}
+            showStudentIds={showStudentIds}
           />
         </ResponsiveQuizSurface>
       );
@@ -1306,6 +1464,7 @@ function LiveView({
             qrDataUrl={accessInfo?.qrCodeDataUrl}
             sessionCode={sessionCode}
             participantCount={participantCount}
+            offline={!sock.connected}
             presentationUrl={accessInfo?.presentationUrl}
             joinUrl={accessInfo?.shortUrl || accessInfo?.fullUrl}
             shortUrl={accessInfo?.shortUrl}
@@ -1313,6 +1472,7 @@ function LiveView({
             positionLabel={isLeaderboardDisplay ? undefined : displayPositionLabel}
             statusLabel={liveSurfaceStatusLabel}
             statusTone={liveStatusTone}
+            statusFades={liveStatusTone === "success"}
             navActions={liveSurfaceNavActions}
             actions={liveSurfaceActions}
           >
@@ -1334,6 +1494,7 @@ function LiveView({
           </div>
         )}
         {endSessionConfirmDialog}
+      {participantsDialog}
       </div>
     );
   }
@@ -1344,9 +1505,9 @@ function LiveView({
       {!isLiveSurfaceDisplay && (
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-4">
-          {displayQuestion && (
+          {displayPositionLabel && (
             <span className="text-zinc-400 text-lg font-medium">
-              Q{displayQuestion.questionIndex + 1}/{totalQuestionsInQuiz}
+              Q{displayPositionLabel}
             </span>
           )}
           {displayQuestion && (
@@ -1367,7 +1528,7 @@ function LiveView({
           </span>
           {isReviewing && reviewQuestionIndex !== null && (
             <span className="text-amber-300 text-sm font-medium">
-              Reviewing Q{reviewQuestionIndex + 1} (students stay on live state)
+              {displayPositionLabel ? `Reviewing Q${displayPositionLabel}` : "Reviewing"} (students stay on live state)
             </span>
           )}
         </div>
@@ -1403,12 +1564,14 @@ function LiveView({
                 qrDataUrl={accessInfo?.qrCodeDataUrl}
                 sessionCode={sessionCode}
                 participantCount={participantCount}
+            offline={!sock.connected}
                 presentationUrl={accessInfo?.presentationUrl}
                 joinUrl={accessInfo?.shortUrl || accessInfo?.fullUrl}
                 shortUrl={accessInfo?.shortUrl}
                 joinCardDefaultExpanded={false}
                 statusLabel={slideStatusLabel}
                 statusTone={liveStatusTone}
+            statusFades={liveStatusTone === "success"}
                 navActions={liveSurfaceNavActions}
                 actions={liveSurfaceActions}
               />
@@ -1419,6 +1582,7 @@ function LiveView({
                 qrDataUrl={accessInfo?.qrCodeDataUrl}
                 sessionCode={sessionCode}
                 participantCount={participantCount}
+            offline={!sock.connected}
                 presentationUrl={accessInfo?.presentationUrl}
                 joinUrl={accessInfo?.shortUrl || accessInfo?.fullUrl}
                 shortUrl={accessInfo?.shortUrl}
@@ -1426,6 +1590,7 @@ function LiveView({
                 positionLabel={displayPositionLabel}
                 statusLabel={quizStatusLabel}
                 statusTone={liveStatusTone}
+            statusFades={liveStatusTone === "success"}
                 navActions={liveSurfaceNavActions}
                 actions={liveSurfaceActions}
               >
@@ -1439,7 +1604,7 @@ function LiveView({
                     />
                   )}
                   {state === "QUESTION_CLOSED" && !isReviewing && (
-                    <div className="text-amber-400 text-2xl font-bold">Time's up</div>
+                    <div className="text-amber-400 text-2xl font-bold">{closedLabel}</div>
                   )}
                   {isReviewing && (
                     <div className="text-amber-300 text-lg font-semibold">Review Mode</div>
@@ -1455,11 +1620,13 @@ function LiveView({
                     {displayQuestionModeText}
                   </div>
 
+                  {noVotesClosed && <p className="no-votes-note">No votes yet</p>}
+
                   {displayQuestion.questionType === "open_response" ? (
                     <OpenResponseList
                       responses={liveOpenResponses}
                       title={state === "QUESTION_CLOSED" ? "Submitted Responses" : "Live Responses"}
-                      showStudentIds={!autoGenerateStudentIds}
+                      showStudentIds={showStudentIds}
                       {...moderationProps}
                     />
                   ) : (
@@ -1513,6 +1680,7 @@ function LiveView({
             qrDataUrl={accessInfo?.qrCodeDataUrl}
             sessionCode={sessionCode}
             participantCount={participantCount}
+            offline={!sock.connected}
             presentationUrl={accessInfo?.presentationUrl}
             joinUrl={accessInfo?.shortUrl || accessInfo?.fullUrl}
             shortUrl={accessInfo?.shortUrl}
@@ -1520,6 +1688,7 @@ function LiveView({
             positionLabel={displayPositionLabel}
             statusLabel={quizStatusLabel}
             statusTone={liveStatusTone}
+            statusFades={liveStatusTone === "success"}
             navActions={liveSurfaceNavActions}
             actions={liveSurfaceActions}
           >
@@ -1529,8 +1698,10 @@ function LiveView({
                 html={displayQuestion.text}
               />
 
+              {noVotesRevealed && <p className="no-votes-note">No votes yet</p>}
+
               {displayQuestion.questionType === "open_response" ? (
-                <OpenResponseList responses={revealOpenResponses} title="Responses" emptyLabel="No responses were submitted." showStudentIds={!autoGenerateStudentIds} {...moderationProps} />
+                <OpenResponseList responses={revealOpenResponses} title="Responses" emptyLabel="No responses were submitted." showStudentIds={showStudentIds} {...moderationProps} />
               ) : showDetailedRevealChoices && (() => {
                 const dist = displayReveal.distribution;
                 const maxCount = Math.max(1, ...Object.values(dist));
@@ -1607,11 +1778,12 @@ function LiveView({
             qrDataUrl={accessInfo?.qrCodeDataUrl}
             sessionCode={sessionCode}
             participantCount={participantCount}
+            offline={!sock.connected}
             presentationUrl={accessInfo?.presentationUrl}
             joinUrl={accessInfo?.shortUrl || accessInfo?.fullUrl}
             shortUrl={accessInfo?.shortUrl}
             joinCardDefaultExpanded={false}
-            statusLabel={quizLabel ? `Leaderboard for ${quizLabel.toUpperCase()}` : "Leaderboard"}
+            statusLabel={resultsHeading("leaderboard", quizLabel)}
             navActions={liveSurfaceNavActions}
             actions={liveSurfaceActions}
           >
@@ -1620,7 +1792,7 @@ function LiveView({
                 entries={sock.leaderboard}
                 totalQuestions={sock.totalQuestions ?? totalQuestionsInQuiz}
                 maxRows={10}
-                showStudentIds={!autoGenerateStudentIds}
+                showStudentIds={showStudentIds}
               />
             </ResponsiveQuizSurface>
           </LiveSurface>
@@ -1653,6 +1825,7 @@ function LiveView({
         />
       )}
       {endSessionConfirmDialog}
+      {participantsDialog}
     </div>
   );
 }

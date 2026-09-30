@@ -8,7 +8,7 @@ export function getQuestionModeText(questionType: QuestionType, allowsMultiple: 
   }
 
   if (questionType === "open_response") {
-    return "Open response. Submit one written reply. This does not affect your score.";
+    return "Open response. Write a reply. You can update it until time is up. This does not affect your score.";
   }
 
   if (questionType === "slide") {

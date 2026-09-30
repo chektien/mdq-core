@@ -1,6 +1,6 @@
 import express, { type Request, type Response } from "express";
 import cors from "cors";
-import { API, AccessInfo, CumulativeLeaderboardEntry, PublicCumulativeLeaderboardEntry, DeckPalette, DeckTheme, Quiz, ResponseVisibilityRequest, Session, SessionState, usesStudentIds } from "@mdq/shared";
+import { API, AccessInfo, CumulativeLeaderboardEntry, PublicCumulativeLeaderboardEntry, DeckPalette, DeckTheme, Quiz, ReleaseSeatRequest, ResponseVisibilityRequest, Session, SessionState, usesStudentIds } from "@mdq/shared";
 import {
   createSession,
   storeSession,
@@ -12,7 +12,7 @@ import {
   getOpenResponses,
 } from "./session";
 import { parseQuizMarkdown } from "./parser";
-import { apply, leaderboardRows, responsesFor, EngineCommandError, type Command, type EngineResult } from "./engine";
+import { apply, leaderboardRows, questionPosition, responsesFor, EngineCommandError, type Command, type EngineResult } from "./engine";
 import {
   persistSessionOnEnd,
   computeCumulativeLeaderboard,
@@ -127,6 +127,9 @@ export function resultsFileName(title: string, createdAt: number): string {
   return `${slug || "session"}-results-${date}.csv`;
 }
 
+/** A participant's public key is a UUID; anything much longer is not one. */
+const MAX_PUBLIC_KEY_LENGTH = 128;
+
 export function createApp(quizDirOrOpts?: string | AppOptions) {
   const app = express();
   app.use(cors());
@@ -240,6 +243,7 @@ export function createApp(quizDirOrOpts?: string | AppOptions) {
       topic: question.topic,
       text: question.textHtml,
       questionType: getQuestionType(question),
+      ...questionPosition(quiz, questionIndex),
       attendeeNotes: question.attendeeNotes && question.attendeeNotes.length > 0
         ? question.attendeeNotes
         : undefined,
@@ -659,6 +663,7 @@ export function createApp(quizDirOrOpts?: string | AppOptions) {
       sessionCode: session.sessionCode,
       state: session.state,
       week: session.week,
+      title: quiz?.title || undefined,
       theme: quiz ? resolveDeckTheme(quiz, theme) : theme,
       palette: quiz ? resolveDeckPalette(quiz, palette) : palette,
       // Whether the join form asks for a Student ID (the deck's `student-id` setting, on by default).
@@ -688,6 +693,7 @@ export function createApp(quizDirOrOpts?: string | AppOptions) {
         sessionId: session.sessionId,
         sessionCode: session.sessionCode,
         week: session.week,
+        title: quiz.title || undefined,
         theme: resolveDeckTheme(quiz, theme),
         palette: resolveDeckPalette(quiz, palette),
         state: session.state,
@@ -791,6 +797,27 @@ export function createApp(quizDirOrOpts?: string | AppOptions) {
     });
   });
 
+  // ── Free a participant's seat so they can rejoin from a new device ──
+  app.post(API.SESSION_RELEASE_SEAT, requireInstructorAuth, (req, res) => {
+    withSession(req, res, (session) => {
+      const quiz = getQuizForSession(session.week);
+      if (!quiz) return res.status(500).json({ error: "Quiz data not found" });
+      const { publicKey } = (req.body ?? {}) as Partial<ReleaseSeatRequest>;
+      if (typeof publicKey !== "string" || !publicKey || publicKey.length > MAX_PUBLIC_KEY_LENGTH) return res.status(400).json({ error: "Send publicKey." });
+      try {
+        const result = apply(session, quiz, { type: "releaseSeat", role: "control", publicKey, newToken: crypto.randomUUID() }, Date.now());
+        Object.assign(session, result.session);
+        storeSession(session);
+        onMessages?.(session, req.params.id, result);
+        logActivity(`instructor released a seat session=${req.params.id}`);
+        return res.json({ publicKey, released: true });
+      } catch (e) {
+        if (e instanceof EngineCommandError) return res.status(400).json({ error: e.message });
+        throw e;
+      }
+    });
+  });
+
   // ── Results download ──
   // The file names people by Student ID, so only the instructor may read it.
   app.get(API.SESSION_RESULTS_CSV, requireInstructorAuth, (req, res) => {
@@ -882,6 +909,7 @@ export function createApp(quizDirOrOpts?: string | AppOptions) {
       sessionId: session.sessionId,
       sessionCode: session.sessionCode,
       week: session.week,
+      title: quiz.title || undefined,
       theme: resolveDeckTheme(quiz, theme),
       palette: resolveDeckPalette(quiz, palette),
       state: session.state,

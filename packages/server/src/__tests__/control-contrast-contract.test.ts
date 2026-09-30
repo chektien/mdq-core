@@ -48,7 +48,7 @@ describe("control contrast contract", () => {
     expect(ruleBody(index, ".slide-action-button-primary")).toContain("border-color: var(--mdq-slide-accent)");
     expect(ruleBody(index, ".slide-action-button-danger")).toContain("border-color: var(--mdq-danger-line");
     expect(index).toContain('html[data-theme="light"] .slide-action-button-warning');
-    expect(index).toMatch(/html\[data-theme="dark"\] button\.open-response-entry \{\s*border-color: var\(--mdq-control-border\) !important/);
+    expect(ruleBody(index, ".open-response-entry")).toContain("border-color: var(--mdq-control-border)");
   });
 
   it("shows entered field values in the ink colour, not the placeholder colour", () => {

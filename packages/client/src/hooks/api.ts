@@ -84,6 +84,8 @@ export interface SessionRestoreResponse {
   sessionId: string;
   sessionCode: string;
   week: string;
+  /** The deck's title, when it has one. */
+  title?: string;
   theme: DeckTheme;
   palette: DeckPalette;
   state: string;
@@ -99,6 +101,8 @@ export interface PresentationSessionResponse {
   sessionId: string;
   sessionCode: string;
   week: string;
+  /** The deck's title, when it has one. */
+  title?: string;
   theme: DeckTheme;
   palette: DeckPalette;
   state: string;
@@ -251,6 +255,20 @@ export async function setResponseHidden(sessionId: string, questionIndex: number
     credentials: "same-origin",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ questionIndex, publicKey, hidden }),
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.error || "That did not work. Please try again.");
+  }
+}
+
+/** Free one participant's seat so the next join with their ID (or name) from any device takes it over. */
+export async function releaseSeat(sessionId: string, publicKey: string): Promise<void> {
+  const res = await fetchWithTimeout(apiPath(API.SESSION_RELEASE_SEAT, { id: sessionId }), {
+    method: "POST",
+    credentials: "same-origin",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ publicKey }),
   });
   if (!res.ok) {
     const data = await res.json().catch(() => ({}));

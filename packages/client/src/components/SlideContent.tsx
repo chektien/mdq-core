@@ -35,6 +35,7 @@ interface SlideContentProps extends SlideContentBodyProps {
   qrDataUrl?: string;
   sessionCode?: string;
   participantCount?: number;
+  offline?: boolean;
   presentationUrl?: string;
   joinUrl?: string;
   shortUrl?: string;
@@ -42,6 +43,7 @@ interface SlideContentProps extends SlideContentBodyProps {
   showFullscreenButton?: boolean;
   statusLabel?: string | null;
   statusTone?: "neutral" | "success" | "warning";
+  statusFades?: boolean;
   navActions?: LiveSurfaceAction[];
   actions?: LiveSurfaceAction[];
 }
@@ -266,6 +268,7 @@ export default function SlideContent({
   qrDataUrl,
   sessionCode,
   participantCount,
+  offline,
   presentationUrl,
   joinUrl,
   shortUrl,
@@ -273,6 +276,7 @@ export default function SlideContent({
   showFullscreenButton = true,
   statusLabel,
   statusTone,
+  statusFades,
   chromeLabel = null,
   navActions = [],
   actions = [],
@@ -288,6 +292,7 @@ export default function SlideContent({
       qrDataUrl={qrDataUrl}
       sessionCode={sessionCode}
       participantCount={participantCount}
+      offline={offline}
       presentationUrl={presentationUrl}
       joinUrl={joinUrl}
       shortUrl={shortUrl}
@@ -296,6 +301,7 @@ export default function SlideContent({
       showFullscreenButton={showFullscreenButton}
       statusLabel={statusLabel}
       statusTone={statusTone}
+      statusFades={statusFades}
       navActions={navActions}
       actions={actions}
     >

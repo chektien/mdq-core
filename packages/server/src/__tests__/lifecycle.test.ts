@@ -874,6 +874,8 @@ type: slide
       expect(res.body.currentQuestionIndex).toBe(1);
       expect(res.body.reviewQuestions).toHaveLength(2);
       expect(res.body.reviewQuestions.map((question: { questionIndex: number }) => question.questionIndex)).toEqual([0, 1]);
+      // Each reviewed question keeps its "n of total" position after a reload.
+      expect(res.body.reviewQuestions.map((question: { questionNumber?: number; questionTotal?: number }) => [question.questionNumber, question.questionTotal])).toEqual([[1, 3], [2, 3]]);
       expect(res.body.reviewReveals).toHaveLength(1);
       expect(res.body.reviewReveals[0]).toMatchObject({
         questionIndex: 0,

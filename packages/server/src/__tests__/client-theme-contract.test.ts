@@ -174,10 +174,16 @@ describe("client light-theme contract", () => {
       expect(tsx).toContain("open-response-text");
     });
 
-    it("keeps names and answers light against the dark response card", () => {
-      expect(css).toMatch(/\.open-response-display-name\s*\{[^}]*color:\s*#fffaf1/);
-      expect(css).toMatch(/\.open-response-text\s*\{[^}]*color:\s*#ffffff/);
-      expect(css).toMatch(/html\[data-theme="light"\]\s+\.open-response-entry\s*\{[^}]*background:\s*#41413f/);
+    it("takes the card, ink and outline from the theme tokens, in light and dark", () => {
+      const rule = (selector: string) => css.match(new RegExp(`${selector.replace(/[.[\]]/g, "\\$&")}\\s*\\{([^}]*)\\}`))?.[1] ?? "";
+      expect(rule(".open-response-entry")).toContain("background: var(--mdq-card-strong)");
+      expect(rule(".open-response-entry")).toContain("border-color: var(--mdq-control-border)");
+      expect(rule(".open-response-text")).toContain("color: var(--mdq-ink-strong)");
+      expect(rule(".open-response-display-name")).toContain("color: var(--mdq-muted)");
+      // No fixed dark card colours, and no zinc utilities that the light theme would have to remap.
+      expect(css).not.toMatch(/\.open-response-entry\s*\{[^}]*#(?:343432|41413f)/);
+      expect(css).not.toMatch(/html\[data-theme="light"\]\s+\.open-response-entry\s*\{/);
+      expect(tsx).not.toContain("zinc");
     });
   });
 });

@@ -115,3 +115,29 @@ export function fieldElementId(spec: JoinFormSpec, field: JoinFieldName): string
   if (field === "code") return "join-session-code";
   return field === "studentId" ? spec.studentId?.id ?? spec.displayName.id : spec.displayName.id;
 }
+
+/** Said when a code matches no session, whether it never existed or has ended. */
+export const SESSION_MISSING_MESSAGE = "We could not find a session with that code. It may have ended. Check the code with your instructor.";
+
+const SEAT_TAKEN_HINT = "If that device is not working, ask your instructor to let you join again.";
+
+/**
+ * What to tell a participant about a refused join. The server's own words are
+ * kept, with a next step added where a person would otherwise be stuck.
+ */
+export function joinRefusalMessage(reason: string): string {
+  if (/session has ended|session not found/i.test(reason)) return SESSION_MISSING_MESSAGE;
+  if (/already in this session on another device/i.test(reason) && !/join again/i.test(reason)) return `${reason} ${SEAT_TAKEN_HINT}`;
+  return reason;
+}
+
+/**
+ * The note to show under the waiting screen's "You are in as ..." line. The
+ * server's note for a participant who gave no name only repeats the label, so
+ * it is left out; a note that says why the label differs from what was typed stays.
+ */
+export function extraLabelNote(label: string | null, note: string | null): string | null {
+  if (!note) return null;
+  if (label && note.trim() === `You appear as ${label}.`) return null;
+  return note;
+}

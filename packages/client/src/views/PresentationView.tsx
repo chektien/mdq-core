@@ -5,6 +5,7 @@ import { fetchPresentationSession, type PresentationSessionResponse } from "../h
 import { useSocket, type QuestionState, type RevealState } from "../hooks/useSocket";
 import Timer from "../components/Timer";
 import Leaderboard from "../components/Leaderboard";
+import { deckLabel, resultsHeading } from "../deckLabel";
 import OpenResponseList, { OpenResponseCount } from "../components/OpenResponseList";
 import QRPanel from "../components/QRPanel";
 import SessionCodeCard from "../components/SessionCodeCard";
@@ -15,20 +16,10 @@ import ResponsiveQuizSurface from "../components/ResponsiveQuizSurface";
 import SlideContent, { SlideContentBody } from "../components/SlideContent";
 import SlideBackgroundLayer from "../components/SlideBackgroundLayer";
 import { getQuestionModeText } from "../questionMode";
+import { closedLabel as closedLabelFor, positionLabel as positionLabelFor } from "../instructorText";
 import { applyClientPalette, applyClientTheme } from "../theme";
 
 const EMPTY_QUESTION_HEADINGS: string[] = [];
-
-function formatQuizLabel(quizKey: string): string {
-  const normalized = quizKey.trim();
-  if (!normalized) return "MDQ";
-  if (/\bmdq\b/i.test(normalized)) return normalized;
-  return `${normalized} MDQ`;
-}
-
-function formatPositionLabel(questionIndex: number, totalQuestions: number): string {
-  return totalQuestions > 0 ? `${questionIndex + 1}/${totalQuestions}` : `${questionIndex + 1}`;
-}
 
 function isInstructorLoginRequired(message: string | null): boolean {
   return (message || "").toLowerCase().includes("login required");
@@ -100,7 +91,7 @@ export default function PresentationView({
   }
 
   const state = (sock.sessionState || meta?.state || null) as SessionState | null;
-  const quizLabel = formatQuizLabel(meta?.week || "");
+  const quizLabel = deckLabel(meta?.title, meta?.week || "");
   const accessInfo = meta?.accessInfo || null;
   const questionHeadings = meta?.questionHeadings || EMPTY_QUESTION_HEADINGS;
   const totalQuestions = meta?.questionCount || 0;
@@ -119,7 +110,7 @@ export default function PresentationView({
   }, [currentQuestion, questionHeadings]);
 
   const nextHeading = useMemo(() => {
-    if (!currentQuestion) return questionHeadings[0] || null;
+    if (!currentQuestion) return null;
     return questionHeadings[currentQuestion.questionIndex + 1] || null;
   }, [currentQuestion, questionHeadings]);
   const isSlideDisplay = currentQuestion?.questionType === "slide" && !currentReveal && (state === "QUESTION_OPEN" || state === "QUESTION_CLOSED");
@@ -127,14 +118,19 @@ export default function PresentationView({
   const isLeaderboardDisplay = state === "LEADERBOARD";
   const isLiveSurfaceDisplay = isSlideDisplay || isQuizSurfaceDisplay || isLeaderboardDisplay;
   const isLiveEmbedSlideDisplay = isSlideDisplay && !!currentQuestion?.slideLiveEmbed;
-  const participantCount = sock.participants?.count ?? 0;
-  const positionLabel = currentQuestion
-    ? formatPositionLabel(currentQuestion.questionIndex, totalQuestions)
-    : undefined;
+  // Until the first state arrives the counts and "next up" are not known, so they are held back rather than shown as zero.
+  const stateReady = sock.sessionState !== null;
+  const participantCount = sock.participants ? sock.participants.count : undefined;
+  // "Time's up" only when the timer ran out; closing early just closes the answers.
+  const closedLabel = closedLabelFor(sock.timedOut);
+  const noVotesClosed = state === "QUESTION_CLOSED" && currentQuestion?.isPoll === true && (sock.answerCount?.submitted ?? 0) === 0;
+  const noVotesRevealed = currentReveal?.isPoll === true && Object.values(currentReveal.distribution).every((count) => count === 0);
+  // Questions are counted without slides, the same as on the phones; a slide shows no number.
+  const positionLabel = positionLabelFor(currentQuestion);
   const quizStatusLabel = (() => {
     if (!currentQuestion || currentQuestion.questionType === "slide") return null;
     if (currentReveal) return currentReveal.isPoll ? "Results open" : "Answer revealed";
-    if (state === "QUESTION_CLOSED") return "Time's up";
+    if (state === "QUESTION_CLOSED") return closedLabel;
     if (sock.answerCount && state === "QUESTION_OPEN") {
       return `${sock.answerCount.submitted}/${sock.answerCount.total} answered`;
     }
@@ -185,6 +181,15 @@ export default function PresentationView({
     );
   }
 
+  // A reloaded projector knows the session but not yet what is on screen: wait for the first state.
+  if (!stateReady && !sock.error) {
+    return (
+      <div className="min-h-dvh flex items-center justify-center p-6 text-zinc-300">
+        Connecting...
+      </div>
+    );
+  }
+
   if (state === "LOBBY") {
     return (
       <div className="min-h-dvh flex flex-col items-center justify-center gap-8 p-8">
@@ -204,7 +209,7 @@ export default function PresentationView({
         )}
 
         <div className="text-center">
-          <span className="text-5xl font-bold text-white tabular-nums">{sock.participants?.count ?? 0}</span>
+          <span className="text-5xl font-bold text-white tabular-nums">{participantCount ?? 0}</span>
           <span className="ml-2 text-lg text-zinc-400">students joined</span>
         </div>
 
@@ -241,7 +246,7 @@ export default function PresentationView({
   }
 
   const liveSurfaceStatusLabel = isLeaderboardDisplay
-    ? quizLabel ? `Leaderboard for ${quizLabel.toUpperCase()}` : "Leaderboard"
+    ? resultsHeading("leaderboard", quizLabel)
     : quizStatusLabel;
   const liveSurfaceContent = (() => {
     if (currentQuestion && (state === "QUESTION_OPEN" || state === "QUESTION_CLOSED")) {
@@ -266,7 +271,7 @@ export default function PresentationView({
           {state === "QUESTION_OPEN" && (
             <Timer remainingSec={sock.remainingSec} totalSec={currentQuestion.timeLimitSec} size={140} />
           )}
-          {state === "QUESTION_CLOSED" && <div className="text-2xl font-bold text-amber-400">Time&apos;s up</div>}
+          {state === "QUESTION_CLOSED" && <div className="text-2xl font-bold text-amber-400">{closedLabel}</div>}
 
           <QuizHtml
             className="quiz-html max-w-5xl text-center text-2xl leading-relaxed text-white lg:text-3xl"
@@ -276,6 +281,8 @@ export default function PresentationView({
           <div className={`selection-mode-chip ${currentQuestion.questionType === "open_response" || currentQuestion.allowsMultiple ? "selection-mode-chip-multi" : "selection-mode-chip-single"}`}>
             {getQuestionModeText(currentQuestion.questionType, currentQuestion.allowsMultiple)}
           </div>
+
+          {noVotesClosed && <p className="no-votes-note">No votes yet</p>}
 
           {currentQuestion.questionType === "open_response" ? (
             <OpenResponseCount count={liveResponseCount} />
@@ -325,6 +332,8 @@ export default function PresentationView({
             className="quiz-html max-w-5xl text-center text-xl leading-relaxed text-zinc-300 lg:text-2xl"
             html={currentQuestion.text}
           />
+
+          {noVotesRevealed && <p className="no-votes-note">No votes yet</p>}
 
           {currentQuestion.questionType === "open_response" ? (
             <OpenResponseList responses={currentReveal.openResponses} title="Responses" emptyLabel="No responses were submitted." showStudentIds={false} />
@@ -425,6 +434,7 @@ export default function PresentationView({
             qrDataUrl={accessInfo?.qrCodeDataUrl}
             sessionCode={meta.sessionCode}
             participantCount={participantCount}
+            offline={!sock.connected}
             joinUrl={accessInfo?.shortUrl || accessInfo?.fullUrl}
             shortUrl={accessInfo?.shortUrl}
             joinCardDefaultExpanded={isLiveEmbedSlideDisplay && currentQuestion?.questionIndex === 0}
@@ -449,9 +459,9 @@ export default function PresentationView({
       {!isLiveSurfaceDisplay && (
       <div className="mb-6 flex items-center justify-between gap-4">
         <div className="flex items-center gap-4">
-          {currentQuestion && (
+          {positionLabel && (
             <span className="text-lg font-medium text-zinc-400">
-              Q{currentQuestion.questionIndex + 1}/{totalQuestions}
+              Q{positionLabel}
             </span>
           )}
           {currentHeading && <span className="text-sm text-zinc-600">{currentHeading}</span>}
@@ -515,7 +525,7 @@ export default function PresentationView({
                   {state === "QUESTION_OPEN" && (
                     <Timer remainingSec={sock.remainingSec} totalSec={currentQuestion.timeLimitSec} size={140} />
                   )}
-                  {state === "QUESTION_CLOSED" && <div className="text-2xl font-bold text-amber-400">Time&apos;s up</div>}
+                  {state === "QUESTION_CLOSED" && <div className="text-2xl font-bold text-amber-400">{closedLabel}</div>}
 
                   <QuizHtml
                     className="quiz-html max-w-5xl text-center text-2xl leading-relaxed text-white lg:text-3xl"
@@ -525,6 +535,8 @@ export default function PresentationView({
                   <div className={`selection-mode-chip ${currentQuestion.questionType === "open_response" || currentQuestion.allowsMultiple ? "selection-mode-chip-multi" : "selection-mode-chip-single"}`}>
                     {getQuestionModeText(currentQuestion.questionType, currentQuestion.allowsMultiple)}
                   </div>
+
+                  {noVotesClosed && <p className="no-votes-note">No votes yet</p>}
 
                   {currentQuestion.questionType === "open_response" ? (
                     <OpenResponseCount count={liveResponseCount} />
@@ -576,6 +588,7 @@ export default function PresentationView({
             qrDataUrl={accessInfo?.qrCodeDataUrl}
             sessionCode={meta.sessionCode}
             participantCount={participantCount}
+            offline={!sock.connected}
             joinUrl={accessInfo?.shortUrl || accessInfo?.fullUrl}
             shortUrl={accessInfo?.shortUrl}
             joinCardDefaultExpanded={true}
@@ -587,6 +600,8 @@ export default function PresentationView({
                 className="quiz-html max-w-5xl text-center text-xl leading-relaxed text-zinc-300 lg:text-2xl"
                 html={currentQuestion.text}
               />
+
+              {noVotesRevealed && <p className="no-votes-note">No votes yet</p>}
 
               {currentQuestion.questionType === "open_response" ? (
                 <OpenResponseList responses={currentReveal.openResponses} title="Responses" emptyLabel="No responses were submitted." showStudentIds={false} />

@@ -6195,10 +6195,9 @@ body.image-expansion-lock {
   text-decoration: underline;
 }
 
-/* Open-response cards use semantic classes rather than relying on Tailwind's
-   zinc palette, whose dark-theme utility colours became muddy against the
-   warm light presentation theme. Keep identities and answers unequivocally
-   readable in both themes. */
+/* Open-response cards take the control-surface tokens, so they follow the
+   theme and palette like the rest of the view: a card on the panel, with
+   the ink and control-border tokens that hold their contrast targets. */
 .open-response-list {
   border-color: var(--mdq-slide-glass-line);
   background: var(--mdq-slide-glass-strong);
@@ -6211,54 +6210,33 @@ body.image-expansion-lock {
   color: var(--mdq-slide-ink-soft);
 }
 
-/* The dark theme maps border-zinc-* to its faint line colour, so the entry
-   names the control border directly to keep a 3:1 outline. */
-html[data-theme="dark"] button.open-response-entry {
-  border-color: var(--mdq-control-border) !important;
-}
-
 .open-response-entry {
-  background: #343432;
+  border-color: var(--mdq-control-border);
+  background: var(--mdq-card-strong);
+  color: var(--mdq-ink-strong);
 }
 
-html[data-theme="dark"] button.open-response-entry:hover,
-html[data-theme="dark"] button.open-response-entry:focus-visible {
-  border-color: var(--mdq-slide-accent) !important;
+.open-response-entry:hover,
+.open-response-entry:focus-visible {
+  border-color: var(--mdq-accent);
 }
 
 .open-response-entry:focus-visible {
-  outline: 3px solid color-mix(in srgb, var(--mdq-slide-accent) 72%, white);
+  outline: 3px solid color-mix(in srgb, var(--mdq-accent) 72%, white);
   outline-offset: 2px;
 }
 
 .open-response-identity,
-.open-response-student-id,
 .open-response-display-name {
-  color: #fffaf1;
+  color: var(--mdq-muted);
+}
+
+.open-response-student-id {
+  color: var(--mdq-ink);
 }
 
 .open-response-text {
-  color: #ffffff;
-}
-
-html[data-theme="light"] .open-response-list {
-  border-color: rgba(117, 92, 62, 0.2);
-  background: rgba(255, 252, 246, 0.94);
-}
-
-html[data-theme="light"] .open-response-entry {
-  background: #41413f;
-}
-
-/* The dark entry card keeps light ink in both themes; the light theme's
-   zinc text mapping would otherwise turn it dark-on-dark. */
-html[data-theme] .open-response-entry .open-response-student-id,
-html[data-theme] .open-response-entry .open-response-display-name {
-  color: #fffaf1 !important;
-}
-
-html[data-theme] .open-response-entry .open-response-text {
-  color: #ffffff !important;
+  color: var(--mdq-ink-strong);
 }
 
 /* Instructor moderation: a hidden response stays in the list, dimmed and
@@ -6267,12 +6245,12 @@ html[data-theme] .open-response-entry .open-response-text {
   flex: 1 1 auto;
 }
 
-html[data-theme] .open-response-entry-hidden .open-response-text {
-  color: #b9b4a8 !important;
+.open-response-entry-hidden .open-response-text {
+  color: var(--mdq-muted);
 }
 
-html[data-theme] .open-response-entry-hidden .open-response-hidden-note {
-  color: #ffd9a0 !important;
+.open-response-entry-hidden .open-response-hidden-note {
+  color: var(--mdq-warning-text);
 }
 
 .open-response-toggle {
@@ -6689,5 +6667,519 @@ html[data-theme] .open-response-entry-hidden .open-response-hidden-note {
   .slide-visual-stack .slide-media-figure figcaption {
     font-size: 0.58rem;
     line-height: 1.12;
+  }
+}
+
+/* ── Presenter toolbar ─────────────────────────────────────────────
+   The status label ("2/2 answered", "Answer revealed") is part of the
+   toolbar's flow, so the controls never cover it. Wide screens keep it in
+   the middle column; below 1300px it takes its own row under the controls.
+   Every control is at least 44px tall for touch. */
+.slide-status-pill {
+  position: static;
+  max-width: 100%;
+  transform: none;
+}
+
+.slide-toolbar-stack {
+  align-self: center;
+  justify-self: center;
+  max-width: 100%;
+}
+
+.slide-toolbar-actions {
+  flex-wrap: wrap;
+  max-width: min(52rem, 62vw);
+  row-gap: 0.45rem;
+}
+
+.slide-action-button,
+.slide-fullscreen-button {
+  min-height: 2.75rem;
+}
+
+.slide-fullscreen-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.slide-action-button[aria-pressed="true"] {
+  border-color: var(--mdq-slide-accent);
+  color: var(--mdq-slide-accent);
+}
+
+@media (min-width: 761px) and (max-width: 1299px) {
+  .slide-toolbar {
+    grid-template-columns: minmax(0, 1fr) auto;
+    row-gap: 0.55rem;
+  }
+
+  .slide-toolbar-nav {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  .slide-toolbar-actions {
+    grid-column: 2;
+    grid-row: 1;
+    max-width: min(46rem, 62vw);
+  }
+
+  /* The next item's title gives way to the controls; it is cut with an ellipsis. */
+  .slide-nav-button.slide-action-button-with-detail {
+    min-width: min(11rem, 22cqi);
+    max-width: 100%;
+  }
+
+  .slide-toolbar-stack {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    justify-self: center;
+  }
+
+  .slide-safe:has(.slide-status-pill) {
+    padding-top: clamp(8.4rem, 10cqi, 9.6rem);
+  }
+}
+
+/* The "session resumed" label is a glance, not a notice to dismiss. */
+@keyframes mdq-status-fade {
+  0%, 70% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+.slide-status-pill-fades {
+  animation: mdq-status-fade 5s ease-out forwards;
+}
+
+/* Join chip: the whole toggle is the touch target, and the QR opens large. */
+.session-code-card-toggle {
+  min-height: 2.75rem;
+  align-items: center;
+}
+
+.session-code-card-meta-offline {
+  color: var(--mdq-muted, #78716c);
+  opacity: 0.6;
+}
+
+.session-code-card-qr-button {
+  display: grid;
+  gap: 0.2rem;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: zoom-in;
+  text-align: center;
+}
+
+.session-code-card-qr-hint {
+  color: var(--mdq-join-card-hint);
+  font-size: 0.75rem;
+  font-weight: 800;
+}
+
+.session-code-card-link {
+  display: inline-flex;
+  min-height: 2.75rem;
+  align-items: center;
+}
+
+.qr-enlarged {
+  position: fixed;
+  inset: 0;
+  z-index: 10001;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.25rem;
+  background: rgba(7, 6, 11, 0.88);
+  cursor: zoom-out;
+}
+
+.qr-enlarged-card {
+  display: grid;
+  max-width: 100%;
+  max-height: 100%;
+  justify-items: center;
+  gap: 0.75rem;
+  padding: 1.25rem;
+  border-radius: 1.1rem;
+  background: #ffffff;
+  color: #18181b;
+}
+
+.qr-enlarged-image {
+  width: min(70dvh, 82vw, 40rem);
+  height: auto;
+  image-rendering: pixelated;
+}
+
+.qr-enlarged-code {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: clamp(1.6rem, 5vmin, 3rem);
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  line-height: 1;
+}
+
+.qr-enlarged-url {
+  margin: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  color: #3f3f46;
+  font-size: clamp(0.95rem, 2.4vmin, 1.4rem);
+  font-weight: 700;
+  text-align: center;
+}
+
+.qr-enlarged-close {
+  min-height: 2.75rem;
+  min-width: 6rem;
+  padding: 0 1.25rem;
+  border: 1px solid #52525b;
+  border-radius: 0.6rem;
+  background: #ffffff;
+  color: #18181b;
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.qr-enlarged-close:focus-visible {
+  outline: 3px solid #4f46e5;
+  outline-offset: 2px;
+}
+
+/* Ended screen links are touch targets too. */
+.instructor-ended-link {
+  display: inline-flex;
+  min-height: 2.75rem;
+  align-items: center;
+  justify-content: center;
+}
+
+/* A poll nobody has voted in yet says so, instead of showing empty bars. */
+.no-votes-note {
+  margin: 0;
+  color: var(--mdq-muted, var(--mdq-slide-ink-soft));
+  font-size: 1.15rem;
+  font-weight: 600;
+  text-align: center;
+}
+
+/* ── Instructor participant list ───────────────────────────────────── */
+.instructor-participant-panel {
+  border: 1px solid var(--mdq-line);
+  background: var(--mdq-card);
+}
+
+.participant-list {
+  display: grid;
+  gap: 0.5rem;
+  color: var(--mdq-ink);
+}
+
+.participant-rows {
+  display: grid;
+  gap: 0.4rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.participant-row {
+  display: flex;
+  min-height: 2.75rem;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.2rem 0.25rem 0.2rem 0.8rem;
+  border: 1px solid var(--mdq-line-strong);
+  border-radius: var(--mdq-control-radius, 0.6rem);
+  background: var(--mdq-card-strong);
+}
+
+.participant-row-offline .participant-name {
+  color: var(--mdq-muted);
+}
+
+.participant-name {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.participant-id {
+  margin-left: 0.6rem;
+  color: var(--mdq-muted);
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.participant-group-title {
+  margin: 0.4rem 0 0;
+  color: var(--mdq-muted);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.participant-freed {
+  padding-right: 0.6rem;
+  color: var(--mdq-success-text);
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.participant-confirm {
+  display: flex;
+  flex: 1 1 100%;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.4rem;
+}
+
+.participant-confirm-text {
+  flex: 1 1 14rem;
+  padding: 0.3rem 0.4rem 0.3rem 0;
+  color: var(--mdq-ink);
+  font-size: 0.85rem;
+  line-height: 1.35;
+}
+
+.participant-action,
+.student-ids-toggle,
+.participants-close {
+  min-width: 2.75rem;
+  min-height: 2.75rem;
+  padding: 0 0.9rem;
+  border: 1px solid var(--mdq-control-border);
+  border-radius: var(--mdq-control-radius, 0.6rem);
+  background: transparent;
+  color: var(--mdq-ink);
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.participant-action:hover:not(:disabled),
+.student-ids-toggle:hover,
+.participants-close:hover {
+  background: var(--mdq-accent-soft);
+}
+
+.participant-action:disabled {
+  border-style: dashed;
+  cursor: not-allowed;
+  color: var(--mdq-muted);
+}
+
+.participant-action-confirm {
+  border-color: var(--mdq-accent);
+  color: var(--mdq-accent-text);
+}
+
+.participant-action:focus-visible,
+.student-ids-toggle:focus-visible,
+.participants-close:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--mdq-accent) 72%, white);
+  outline-offset: 2px;
+}
+
+.participant-error {
+  margin: 0;
+  color: var(--mdq-danger-text);
+  font-size: 0.85rem;
+}
+
+.student-ids-toggle::after {
+  content: " (off)";
+  font-weight: 500;
+}
+
+.student-ids-toggle[aria-pressed="true"] {
+  border-color: var(--mdq-accent);
+  color: var(--mdq-accent-text);
+}
+
+.student-ids-toggle[aria-pressed="true"]::after {
+  content: " (on)";
+}
+
+.participants-count {
+  margin-left: 0.5rem;
+  color: var(--mdq-muted);
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.participants-help {
+  color: var(--mdq-muted);
+}
+
+.participants-card {
+  color: var(--mdq-ink);
+}
+
+/* ── Portrait projector ────────────────────────────────────────────
+   A screen held upright (a tablet, or a projector turned on its side) has
+   height to spare and little width, so the question and the options grow
+   and the options stack in one column. The density steps keep their
+   proportions, so a long question still steps down to fit. */
+@media (orientation: portrait) and (min-width: 700px) {
+  .quiz-surface-content-fit {
+    --quiz-fit-question-size: clamp(2rem, 4.8cqi, 3.2rem);
+    --quiz-fit-reveal-question-size: clamp(1.6rem, 3.8cqi, 2.5rem);
+    --quiz-fit-option-size: clamp(1.3rem, 3cqi, 1.9rem);
+    --quiz-fit-explanation-size: clamp(1.2rem, 2.7cqi, 1.7rem);
+  }
+
+  .quiz-surface-content-fit[data-fit-density="compact"] {
+    --quiz-fit-question-size: clamp(1.8rem, 4.1cqi, 2.8rem);
+    --quiz-fit-reveal-question-size: clamp(1.45rem, 3.3cqi, 2.2rem);
+    --quiz-fit-option-size: clamp(1.15rem, 2.6cqi, 1.65rem);
+    --quiz-fit-explanation-size: clamp(1.05rem, 2.4cqi, 1.5rem);
+  }
+
+  .quiz-surface-content-fit[data-fit-density="tight"] {
+    --quiz-fit-question-size: clamp(1.6rem, 3.4cqi, 2.4rem);
+    --quiz-fit-reveal-question-size: clamp(1.3rem, 2.8cqi, 1.9rem);
+    --quiz-fit-option-size: clamp(1.05rem, 2.3cqi, 1.45rem);
+    --quiz-fit-explanation-size: clamp(0.95rem, 2.1cqi, 1.3rem);
+  }
+
+  .quiz-surface-content-fit[data-fit-density="scaled"] {
+    --quiz-fit-question-size: clamp(1.4rem, 3cqi, 2.1rem);
+    --quiz-fit-reveal-question-size: clamp(1.15rem, 2.5cqi, 1.7rem);
+    --quiz-fit-option-size: clamp(0.95rem, 2.05cqi, 1.3rem);
+    --quiz-fit-explanation-size: clamp(0.88rem, 1.9cqi, 1.15rem);
+  }
+
+  .quiz-surface-content-fit:not([data-fit-density="tight"]):not([data-fit-density="scaled"]) [class*="grid-cols"] {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .quiz-surface-content-fit:not([data-fit-density="tight"]):not([data-fit-density="scaled"]) [class*="px-5"][class*="py-4"],
+  .quiz-surface-content-fit:not([data-fit-density="tight"]):not([data-fit-density="scaled"]) [class*="px-4"][class*="py-3"] {
+    padding: clamp(0.9rem, 1.9cqi, 1.3rem) clamp(1.1rem, 2.4cqi, 1.6rem) !important;
+  }
+
+  .quiz-surface-content-fit:not([data-fit-density="tight"]):not([data-fit-density="scaled"]) [class*="w-9"][class*="h-9"],
+  .quiz-surface-content-fit:not([data-fit-density="tight"]):not([data-fit-density="scaled"]) [class*="w-8"][class*="h-8"] {
+    width: clamp(2.3rem, 4.6cqi, 3.1rem) !important;
+    height: clamp(2.3rem, 4.6cqi, 3.1rem) !important;
+    font-size: clamp(1.1rem, 2.4cqi, 1.5rem) !important;
+  }
+
+  .quiz-surface-content-fit .no-votes-note {
+    font-size: clamp(1.2rem, 2.8cqi, 1.6rem);
+  }
+
+  .quiz-surface-content-fit .selection-mode-chip {
+    font-size: clamp(0.85rem, 1.9cqi, 1.05rem);
+  }
+}
+
+/* ── Phone and tablet leaderboard ─────────
+   Rows keep a readable width and stay centred on an iPad, and the small
+   lines (Student ID, time) are never below 14px. */
+.leaderboard-board-compact {
+  width: min(100%, 32rem);
+}
+
+.leaderboard-board-compact .leaderboard-id,
+.leaderboard-board-compact .leaderboard-score small,
+.leaderboard-board-compact .leaderboard-overflow,
+.leaderboard-board-compact .leaderboard-empty {
+  font-size: 0.875rem;
+}
+
+.leaderboard-board-compact .leaderboard-score {
+  font-size: 1rem;
+}
+
+/* ── Phone slide: readable status line and touch-sized controls ───────── */
+.slide-surface-student .slide-status-pill {
+  max-width: 100%;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  line-height: 1.25;
+  text-transform: none;
+  white-space: normal;
+}
+
+.slide-surface-student .slide-fullscreen-button {
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0.6rem 0.9rem;
+  font-size: 0.875rem;
+  letter-spacing: 0.02em;
+  text-transform: none;
+}
+
+/* ── Reduced motion ───────────────────────
+   People who ask their device for less motion get none of the movement here:
+   the loading spinner fades instead of turning, the last-seconds timer pulse
+   and the leaderboard slide-in stop, the resumed label leaves without fading,
+   and bars and buttons change at once. */
+@keyframes reduced-motion-fade {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-spin {
+    animation: reduced-motion-fade 1.6s ease-in-out infinite;
+  }
+
+  .timer-urgent,
+  .leaderboard-row {
+    animation: none;
+  }
+
+  .bar-fill,
+  .option-btn,
+  .quiz-surface-content-fit,
+  .image-expandable-inline,
+  .presenter-notes-summary::before,
+  .slide-video-card {
+    transition: none;
+  }
+
+  .option-btn:active:not(:disabled),
+  [class*="active:scale"]:active {
+    transform: none;
+    scale: none;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    transition-delay: 0s !important;
+    scroll-behavior: auto !important;
+  }
+
+  .animate-spin {
+    animation-duration: 1.6s !important;
+    animation-iteration-count: infinite !important;
+  }
+
+  /* The resumed label still leaves after five seconds, but it disappears at once instead of fading. */
+  .slide-status-pill-fades {
+    animation-duration: 5s !important;
+    animation-timing-function: steps(1, end) !important;
   }
 }

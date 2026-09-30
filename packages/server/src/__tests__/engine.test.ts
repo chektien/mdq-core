@@ -1,5 +1,5 @@
 import { Quiz, Session, SessionState, SocketEvents } from "@mdq/shared";
-import { apply, type Audience, type Command } from "../engine";
+import { apply, questionPosition, type Audience, type Command } from "../engine";
 import { emitMessages } from "../socket";
 import { storeSession, clearAllSessions } from "../session";
 import { Server } from "socket.io";
@@ -22,6 +22,7 @@ const openPayload = (index: number) => ({
   attendeeNotes: undefined, slideMedia: undefined, slideMediaPosition: undefined, slideMediaOpacity: undefined,
   slideBackground: undefined, slideLiveEmbed: undefined, slideVideo: undefined, slideReferences: undefined,
   options: [{ label: "A", text: "One" }], allowsMultiple: false, isPoll: false, timeLimitSec: 20, startedAt: 1000,
+  questionNumber: index + 1, questionTotal: 2,
 });
 const count = (index: number) => ({ questionIndex: index, submitted: 0, total: 0, openResponses: undefined });
 const reveal = (index: number) => ({ questionIndex: index, questionType: "multiple_choice", correctOptions: ["A"],
@@ -77,7 +78,11 @@ for (const state of states) for (const type of commands) {
     if (fixture && "state" in fixture) {
       const result = apply(input, quiz, { type } as Command, type === "timeout" ? 21000 : 1000);
       expect(result.session.state).toBe(fixture.state);
-      expect(result.messages).toEqual(fixture.messages);
+      // The timer running out says so in the close message; the presenter closing early does not.
+      const expected = type === "timeout"
+        ? fixture.messages.map((m) => m.event === SocketEvents.QUESTION_CLOSE ? { ...m, payload: { questionIndex: 0, timedOut: true } } : m)
+        : fixture.messages;
+      expect(result.messages).toEqual(expected);
       expect(result.nextDeadline).toBe(fixture.state === "QUESTION_OPEN" ? 21000 : null);
     } else if (type === "timeout") {
       const result = apply(input, quiz, { type }, 1000);
@@ -102,7 +107,7 @@ it("joins, answers and disconnects without changing the supplied session", () =>
   expect(input.participants.size).toBe(0);
   expect(joined.messages[0]).toEqual({ audience: "participant:S1", event: SocketEvents.STUDENT_JOINED,
     payload: { participantId: "S1", sessionToken: "token-1", sessionState: "QUESTION_OPEN", currentQuestion: 0, answeredQuestions: [], answers: [],
-      publicKey: "key-1", label: "Sam", labelNote: undefined } });
+      publicKey: "key-1", label: "Sam", labelNote: undefined, deckTitle: "Sample" } });
   const answered = apply(joined.session, quiz, { type: "answerSubmit", studentId: "S1", payload: { questionIndex: 0, selectedOptions: ["A"] } }, 3000);
   expect(joined.session.submissions).toHaveLength(0);
   expect(answered.messages).toEqual([
@@ -125,7 +130,7 @@ it("ignores a late disconnect from a socket the student has already replaced", (
   const current = apply(stale.session, quiz, { type: "disconnect", studentId: "S1", socketId: "socket-2" }, 5000);
   expect(current.session.participants.get("S1")?.connected).toBe(false);
   expect(current.messages.slice(0, 2)).toEqual([
-    msg(SocketEvents.SESSION_PARTICIPANTS, { count: 0, participants: [] }, "control"),
+    msg(SocketEvents.SESSION_PARTICIPANTS, { count: 0, participants: [], offline: [{ publicKey: expect.any(String), label: "Participant 1", studentId: "S1" }] }, "control"),
     msg(SocketEvents.SESSION_PARTICIPANTS, { count: 0, participants: [] }, "display"),
   ]);
 });
@@ -145,7 +150,7 @@ for (const state of states) {
     expect(result.messages[0]).toEqual({ audience: "participant:S1", event: SocketEvents.STUDENT_JOINED,
       payload: { participantId: "S1", sessionToken: "token", sessionState: state,
         currentQuestion: state === "LOBBY" ? undefined : 0, answeredQuestions: [], answers: [],
-        publicKey: "key-1", label: "Participant 1", labelNote: "You appear as Participant 1." } });
+        publicKey: "key-1", label: "Participant 1", labelNote: "You appear as Participant 1.", deckTitle: "Sample" } });
     expect(input.participants.size).toBe(0);
   });
 
@@ -211,4 +216,111 @@ it("routes participant messages to their socket and staff messages to the contro
     { room: "session:session", event: SocketEvents.SESSION_STATE, payload: { state: "QUESTION_OPEN", questionIndex: 0 } },
   ]);
   clearAllSessions();
+});
+
+describe("question position", () => {
+  const slide = { ...question(1), questionType: "slide" as const, options: [], correctOptions: [] };
+  const deck: Quiz = { ...quiz, questions: [slide, question(0), slide, question(2)] };
+  it("counts only questions, and gives slides no position", () => {
+    expect(questionPosition(deck, 0)).toEqual({});
+    expect(questionPosition(deck, 1)).toEqual({ questionNumber: 1, questionTotal: 2 });
+    expect(questionPosition(deck, 2)).toEqual({});
+    expect(questionPosition(deck, 3)).toEqual({ questionNumber: 2, questionTotal: 2 });
+    expect(questionPosition(deck, 9)).toEqual({});
+  });
+});
+
+describe("releasing a seat", () => {
+  const joinS1 = () => {
+    const first = apply(base("QUESTION_OPEN"), quiz, { type: "join", socketId: "socket-1", newToken: "token-1", newPublicKey: "key-1", payload: { studentId: "S1", displayName: "Sam", clientInstanceId: "phone-1" } }, 2000);
+    return apply(first.session, quiz, { type: "answerSubmit", studentId: "S1", payload: { questionIndex: 0, selectedOptions: ["A"] } }, 3000).session;
+  };
+
+  it("is a control-only command", () => {
+    const session = joinS1();
+    for (const role of ["display", "participant"] as const) {
+      expect(() => apply(session, quiz, { type: "releaseSeat", role, publicKey: "key-1", newToken: "token-2" }, 4000)).toThrow("Only the presenter");
+    }
+    expect(() => apply(session, quiz, { type: "releaseSeat", role: "control", publicKey: "nobody", newToken: "token-2" }, 4000)).toThrow("not found");
+  });
+
+  it("frees the seat, keeps the answers, label and key, and drops the old token", () => {
+    const released = apply(joinS1(), quiz, { type: "releaseSeat", role: "control", publicKey: "key-1", newToken: "token-2" }, 4000);
+    const seat1 = released.session.participants.get("S1")!;
+    expect(seat1).toMatchObject({ released: true, connected: false, socketId: "", sessionToken: "token-2", publicKey: "key-1", label: "Sam" });
+    expect(released.session.submissions).toHaveLength(1);
+    // The instructor is told the seat is offline and free; the projector sees only who is online.
+    const control = released.messages.find((m) => m.event === SocketEvents.SESSION_PARTICIPANTS && m.audience === "control")!.payload;
+    expect(control).toEqual({ count: 0, participants: [], offline: [{ publicKey: "key-1", label: "Sam", studentId: "S1", displayName: "Sam", released: true }] });
+    const display = released.messages.find((m) => m.event === SocketEvents.SESSION_PARTICIPANTS && m.audience === "display")!.payload;
+    expect(display).toEqual({ count: 0, participants: [] });
+    expect(released.messages.some((m) => m.event === SocketEvents.ANSWER_COUNT)).toBe(true);
+    // The old device's token no longer identifies it, and its socket's late disconnect changes nothing.
+    expect(apply(released.session, quiz, { type: "disconnect", studentId: "S1", socketId: "socket-1" }, 5000).messages).toEqual([]);
+  });
+
+  it("gives the freed seat to the next join, with a new token and the same answers", () => {
+    const released = apply(joinS1(), quiz, { type: "releaseSeat", role: "control", publicKey: "key-1", newToken: "token-2" }, 4000).session;
+    // A different device with no token or browser match is refused before the release and accepted after it.
+    const taken = apply(released, quiz, { type: "join", socketId: "socket-9", newToken: "token-3", payload: { studentId: "S1", clientInstanceId: "phone-2" } }, 6000);
+    const joined = taken.messages.find((m) => m.event === SocketEvents.STUDENT_JOINED)!.payload as { sessionToken: string; publicKey: string; label: string; answers: unknown[] };
+    expect(joined).toMatchObject({ sessionToken: "token-3", publicKey: "key-1", label: "Sam" });
+    expect(joined.answers).toEqual([{ questionIndex: 0, selectedOptions: [0] }]);
+    expect(taken.session.participants.get("S1")).toMatchObject({ released: false, connected: true, socketId: "socket-9", sessionToken: "token-3", clientInstanceId: "phone-2" });
+    expect(taken.session.participants.size).toBe(1);
+    // The seat is taken again: the old token is refused and cannot take it back.
+    const old = apply(taken.session, quiz, { type: "join", socketId: "socket-1", newToken: "token-4", payload: { studentId: "S1", sessionToken: "token-1", clientInstanceId: "phone-1" } }, 7000);
+    expect(old.messages.find((m) => m.event === SocketEvents.STUDENT_REJECTED)).toBeTruthy();
+    // Without a release, a different device is refused.
+    const clash = apply(joinS1(), quiz, { type: "join", socketId: "socket-9", newToken: "token-3", payload: { studentId: "S1", clientInstanceId: "phone-2" } }, 6000);
+    expect(clash.messages.find((m) => m.event === SocketEvents.STUDENT_REJECTED)).toBeTruthy();
+  });
+
+  it("answers by seat token: the current token answers from any tab, a replaced one is refused", () => {
+    // The token the seat holds answers; two tabs of one seat share it (see the socket tests).
+    const seatOnly = apply(base("QUESTION_OPEN"), quiz, { type: "join", socketId: "socket-1", newToken: "token-1", newPublicKey: "key-1", payload: { studentId: "S1", displayName: "Sam" } }, 2000).session;
+    const current = apply(seatOnly, quiz, { type: "answerSubmit", studentId: "S1", sessionToken: "token-1", payload: { questionIndex: 0, selectedOptions: ["A"] } }, 3000);
+    expect(current.messages.map((m) => m.event)).toContain(SocketEvents.ANSWER_ACCEPTED);
+    // A caller that names no token (another adapter's own check) is not refused by this rule.
+    expect(apply(seatOnly, quiz, { type: "answerSubmit", studentId: "S1", payload: { questionIndex: 0, selectedOptions: ["A"] } }, 3000).messages.map((m) => m.event)).toContain(SocketEvents.ANSWER_ACCEPTED);
+    // Freed and taken again: the old device's token is refused with a plain message, the new one answers.
+    const released = apply(seatOnly, quiz, { type: "releaseSeat", role: "control", publicKey: "key-1", newToken: "token-2" }, 4000).session;
+    const taken = apply(released, quiz, { type: "join", socketId: "socket-9", newToken: "token-3", payload: { studentId: "S1", clientInstanceId: "phone-2" } }, 5000).session;
+    const stale = apply(taken, quiz, { type: "answerSubmit", studentId: "S1", sessionToken: "token-1", payload: { questionIndex: 0, selectedOptions: ["A"] } }, 6000);
+    expect(stale.messages).toEqual([msg(SocketEvents.ANSWER_REJECTED, { questionIndex: 0, reason: "This seat is now in use on another device." }, "participant:S1")]);
+    expect(stale.session.submissions).toHaveLength(0);
+    const fresh = apply(taken, quiz, { type: "answerSubmit", studentId: "S1", sessionToken: "token-3", payload: { questionIndex: 0, selectedOptions: ["A"] } }, 6000);
+    expect(fresh.messages.map((m) => m.event)).toContain(SocketEvents.ANSWER_ACCEPTED);
+  });
+
+  it("says which seat a join took over, and only then", () => {
+    const first = apply(base("QUESTION_OPEN"), quiz, { type: "join", socketId: "socket-1", newToken: "token-1", newPublicKey: "key-1", payload: { studentId: "S1", displayName: "Sam" } }, 2000);
+    expect(first.seatTaken).toBeUndefined();
+    const same = apply(first.session, quiz, { type: "join", socketId: "socket-2", newToken: "token-x", payload: { studentId: "S1", sessionToken: "token-1" } }, 2500);
+    expect(same.seatTaken).toBeUndefined();
+    const released = apply(first.session, quiz, { type: "releaseSeat", role: "control", publicKey: "key-1", newToken: "token-2" }, 3000);
+    expect(released.seatTaken).toBeUndefined();
+    const taken = apply(released.session, quiz, { type: "join", socketId: "socket-9", newToken: "token-3", payload: { studentId: "S1" } }, 4000);
+    expect(taken.seatTaken).toEqual({ participantId: "S1", sessionToken: "token-3" });
+  });
+
+  it("frees a seat by name when Student IDs are off", () => {
+    const named: Quiz = { ...quiz, studentId: false };
+    const first = apply(base("QUESTION_OPEN"), named, { type: "join", socketId: "socket-1", newToken: "token-1", newPublicKey: "key-1", payload: { displayName: "Alex Tan" } }, 2000);
+    const released = apply(first.session, named, { type: "releaseSeat", role: "control", publicKey: "key-1", newToken: "token-2" }, 3000).session;
+    const taken = apply(released, named, { type: "join", socketId: "socket-2", newToken: "token-3", payload: { displayName: "alex tan" } }, 4000);
+    expect(taken.session.participants.size).toBe(1);
+    expect(taken.session.participants.get("Alex Tan")).toMatchObject({ connected: true, sessionToken: "token-3", publicKey: "key-1" });
+  });
+});
+
+it("tells screens whether a question closed because the timer ran out", () => {
+  const closedEarly = apply(base("QUESTION_OPEN"), quiz, { type: "close" }, 5000);
+  expect(closedEarly.messages[0]).toEqual(msg(SocketEvents.QUESTION_CLOSE, { questionIndex: 0 }));
+  const timedOut = apply(base("QUESTION_OPEN"), quiz, { type: "timeout" }, 21000);
+  expect(timedOut.messages[0]).toEqual(msg(SocketEvents.QUESTION_CLOSE, { questionIndex: 0, timedOut: true }));
+  // A screen that connects later is told the same.
+  const late = (session: Session) => apply(session, quiz, { type: "snapshot", view: "display" }, 30000).messages.find((m) => m.event === SocketEvents.QUESTION_CLOSE)!.payload;
+  expect(late(closedEarly.session)).toEqual({ questionIndex: 0 });
+  expect(late(timedOut.session)).toEqual({ questionIndex: 0, timedOut: true });
 });

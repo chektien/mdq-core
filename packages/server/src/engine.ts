@@ -1,5 +1,5 @@
 import {
-  Quiz, Session, SessionState, SocketEvents, QuestionOpenPayload, FoldoutNote,
+  Quiz, Session, SessionState, SocketEvents, QuestionOpenPayload, QuestionClosePayload, FoldoutNote,
   StudentJoinPayload, AnswerSubmitPayload, Participant, STATE_TRANSITIONS, StudentAnswer,
   LeaderboardRow, OpenResponseEntry, SessionParticipantsPayload, SocketRole,
   MAX_DISPLAY_NAME_LENGTH, MAX_OPEN_RESPONSE_LENGTH, MAX_STUDENT_ID_LENGTH, normalizeDisplayName, usesStudentIds,
@@ -64,13 +64,33 @@ export type Command =
   | { type: "start" | "next" | "previous" | "open" | "close" | "reveal" | "end" | "leaderboardShow" | "leaderboardHide" | "broadcastOpen" | "broadcastReveal" | "broadcastLeaderboard" | "participants" | "repairClosedSlide" }
   | { type: "timeout"; deadline?: number }
   | { type: "join"; payload: StudentJoinPayload; socketId: string; newToken: string; newPublicKey?: string }
-  | { type: "answerSubmit"; studentId?: string; payload: AnswerSubmitPayload }
+  /**
+   * `sessionToken` is the token the answering connection joined with. When it is given and is no longer
+   * the participant's current token (the seat was freed and taken again), the answer is refused; a
+   * connection with the current token, on any device or tab, still answers.
+   */
+  | { type: "answerSubmit"; studentId?: string; sessionToken?: string; payload: AnswerSubmitPayload }
   /** Hide or show one open response on the projector. `role` is who is asking; only `control` may. */
   | { type: "responseVisibility"; role: SocketRole; questionIndex: number; publicKey: string; hidden: boolean }
+  /** Free one participant's seat so the next join with that ID (or name) takes it over. `role` is who is asking; only `control` may. */
+  | { type: "releaseSeat"; role: SocketRole; publicKey: string; newToken: string }
   | { type: "disconnect"; studentId: string; socketId: string }
   | { type: "snapshot"; participantId?: string; isReconnect?: boolean; view?: "control" | "display" }
   | { type: "tick"; remainingSec: number };
-export interface EngineResult { session: Session; messages: EngineMessage[]; nextDeadline: number | null }
+export interface EngineResult {
+  session: Session;
+  messages: EngineMessage[];
+  nextDeadline: number | null;
+  /**
+   * Set by a `join` that took over a seat the presenter freed. Every connection of that participant
+   * whose token is not `sessionToken` is on a device that has lost the seat, and an adapter should
+   * tell it (the `SEAT_TAKEN` event, `SEAT_TAKEN_MESSAGE` from `@mdq/shared`) and stop sending it session messages.
+   */
+  seatTaken?: { participantId: string; sessionToken: string };
+}
+
+/** Why an answer from a device that has lost its seat is refused. */
+export const SEAT_IN_USE_MESSAGE = "This seat is now in use on another device.";
 
 const message = (event: string, payload: unknown, audience: Audience = "all"): EngineMessage => ({ audience, event, payload });
 const clone = (session: Session): Session => ({
@@ -87,6 +107,18 @@ const transition = (session: Session, to: SessionState): void => {
   session.state = to;
 };
 const questionAt = (session: Session, quiz: Quiz) => quiz.questions[session.currentQuestionIndex];
+/**
+ * "Question 3 of 8" counts only items that ask something: slides have no
+ * position. Shared by the live payload and the instructor's restore.
+ */
+export const questionPosition = (quiz: Quiz, questionIndex: number): { questionNumber?: number; questionTotal?: number } => {
+  const q = quiz.questions[questionIndex];
+  if (!q || getQuestionType(q) === "slide") return {};
+  return {
+    questionNumber: quiz.questions.slice(0, questionIndex + 1).filter((item) => getQuestionType(item) !== "slide").length,
+    questionTotal: quiz.questions.filter((item) => getQuestionType(item) !== "slide").length,
+  };
+};
 const questionPayload = (session: Session, quiz: Quiz, now: number): QuestionOpenPayload | null => {
   const q = questionAt(session, quiz);
   if (!q) return null;
@@ -100,6 +132,7 @@ const questionPayload = (session: Session, quiz: Quiz, now: number): QuestionOpe
     options: q.options.map((o) => ({ label: o.label, text: o.textHtml })),
     allowsMultiple: q.allowsMultiple, isPoll: q.isPoll === true,
     timeLimitSec: q.timeLimitSec, startedAt: session.questionStartedAt || now,
+    ...questionPosition(quiz, session.currentQuestionIndex),
   };
 };
 /**
@@ -168,8 +201,16 @@ const participantsPayload = (session: Session, view: PayloadView): SessionPartic
     .map((p) => view === "control"
       ? { publicKey: p.publicKey, label: p.label, studentId: p.studentId, displayName: p.displayName }
       : { publicKey: p.publicKey, label: p.label });
-  return { count: participants.length, participants };
+  if (view !== "control") return { count: participants.length, participants };
+  const offline = [...session.participants.values()].filter((p) => !p.connected)
+    .map((p) => ({ publicKey: p.publicKey, label: p.label, studentId: p.studentId, displayName: p.displayName,
+      ...(p.released ? { released: true } : {}) }));
+  return offline.length ? { count: participants.length, participants, offline } : { count: participants.length, participants };
 };
+/** The close message: it says so when the timer ran out, so screens can tell that from the presenter closing early. */
+const closePayload = (session: Session): QuestionClosePayload => ({
+  questionIndex: session.currentQuestionIndex, ...(session.closedByTimer ? { timedOut: true as const } : {}),
+});
 const deadline = (session: Session, quiz: Quiz): number | null => {
   const q = questionAt(session, quiz);
   return session.state === "QUESTION_OPEN" && q && getQuestionType(q) !== "slide" && session.questionStartedAt !== undefined
@@ -181,6 +222,7 @@ export function apply(input: Session, quiz: Quiz, command: Command, now: number)
   const session = clone(input);
   ensureParticipantIdentity(session);
   const messages: EngineMessage[] = [];
+  let seatTaken: EngineResult["seatTaken"];
   const emit = (event: string, payload: unknown, audience: Audience = "all") => messages.push(message(event, payload, audience));
   // Open responses go out in full to control only; the projector gets the count, then the visible responses at reveal.
   const emitCount = () => {
@@ -269,7 +311,8 @@ export function apply(input: Session, quiz: Quiz, command: Command, now: number)
         if (due === null || (command.deadline !== undefined && command.deadline !== due) || now < due) break;
       }
       transition(session, "QUESTION_CLOSED");
-      emit(SocketEvents.QUESTION_CLOSE, { questionIndex: session.currentQuestionIndex }); state();
+      session.closedByTimer = command.type === "timeout";
+      emit(SocketEvents.QUESTION_CLOSE, closePayload(session)); state();
       emit(SocketEvents.RESULTS_DISTRIBUTION, { questionIndex: session.currentQuestionIndex, distribution: getDistribution(session, session.currentQuestionIndex) }, "staff");
       break;
     case "reveal":
@@ -312,10 +355,15 @@ export function apply(input: Session, quiz: Quiz, command: Command, now: number)
         // Your own seat is never a clash: the same session token, or the same browser after it went offline.
         const validToken = !!payload.sessionToken && payload.sessionToken === existing.sessionToken;
         const validClient = !existing.connected && !!payload.clientInstanceId && !!existing.clientInstanceId && payload.clientInstanceId === existing.clientInstanceId;
-        if (!validToken && !validClient) { reject(usesIds ? idTakenMessage(id) : nameTakenMessage(id)); break; }
+        // A seat the presenter freed goes to the next join, from any device.
+        const takeover = existing.released === true;
+        if (!validToken && !validClient && !takeover) { reject(usesIds ? idTakenMessage(id) : nameTakenMessage(id)); break; }
         existing.socketId = socketId; existing.connected = true;
         if (usesIds && typedName) existing.displayName = typedName;
-        if (validToken && payload.clientInstanceId) existing.clientInstanceId = payload.clientInstanceId;
+        if (takeover) {
+          existing.released = false; existing.sessionToken = command.newToken; existing.clientInstanceId = payload.clientInstanceId;
+          seatTaken = { participantId: existing.studentId, sessionToken: command.newToken };
+        } else if (validToken && payload.clientInstanceId) existing.clientInstanceId = payload.clientInstanceId;
         participant = existing; isReconnect = true;
       } else {
         const { label, labelNote } = assignLabel(session, typedName);
@@ -327,17 +375,20 @@ export function apply(input: Session, quiz: Quiz, command: Command, now: number)
       emit(SocketEvents.STUDENT_JOINED, { participantId: participant.studentId, sessionToken: participant.sessionToken,
         sessionState: session.state, currentQuestion: session.currentQuestionIndex >= 0 ? session.currentQuestionIndex : undefined,
         answeredQuestions: getAnsweredQuestions(session, participant.studentId), answers: ownAnswers(session, quiz, participant.studentId),
-        publicKey: participant.publicKey, label: participant.label, labelNote: participant.labelNote }, `participant:${participant.studentId}`);
+        publicKey: participant.publicKey, label: participant.label, labelNote: participant.labelNote,
+        ...(quiz.title ? { deckTitle: quiz.title } : {}) }, `participant:${participant.studentId}`);
       emitParticipants();
       if (session.state === "QUESTION_OPEN" && session.currentQuestionIndex >= 0) emitCount();
       messages.push(...snapshotMessages(session, quiz, now, `participant:${participant.studentId}`, "participant", isReconnect));
       break;
     }
     case "answerSubmit": {
-      const { payload, studentId } = command;
+      const { payload, studentId, sessionToken } = command;
       const target: Audience = `participant:${studentId || ""}`;
       const reject = (reason: string) => emit(SocketEvents.ANSWER_REJECTED, { questionIndex: payload.questionIndex, reason }, target);
       if (!studentId) { reject("Not joined to a session"); break; }
+      const seat = session.participants.get(studentId);
+      if (seat && sessionToken !== undefined && sessionToken !== seat.sessionToken) { reject(SEAT_IN_USE_MESSAGE); break; }
       const q = questionAt(session, quiz);
       if (!q) { reject(`Question ${session.currentQuestionIndex + 1} not found.`); break; }
       const options = payload.selectedOptions || [];
@@ -387,6 +438,18 @@ export function apply(input: Session, quiz: Quiz, command: Command, now: number)
       }
       break;
     }
+    case "releaseSeat": {
+      if (command.role !== "control") throw new EngineCommandError("Only the presenter can let someone join again.");
+      const participant = [...session.participants.values()].find((p) => p.publicKey === command.publicKey);
+      if (!participant) throw new EngineCommandError("That participant was not found.");
+      // The old device's token and socket stop working; the seat, its answers, label and public key stay.
+      participant.released = true; participant.connected = false;
+      participant.sessionToken = command.newToken; participant.socketId = "";
+      participant.clientInstanceId = undefined;
+      emitParticipants();
+      if (session.state === "QUESTION_OPEN" && session.currentQuestionIndex >= 0) emitCount();
+      break;
+    }
     case "disconnect": {
       const participant = session.participants.get(command.studentId);
       // A socket replaced by a rejoin can time out later; only the current socket marks the student offline.
@@ -423,7 +486,7 @@ export function apply(input: Session, quiz: Quiz, command: Command, now: number)
       break;
     case "tick": emit(SocketEvents.QUESTION_TICK, { remainingSec: command.remainingSec }); break;
   }
-  return { session, messages, nextDeadline: deadline(session, quiz) };
+  return { session, messages, nextDeadline: deadline(session, quiz), ...(seatTaken ? { seatTaken } : {}) };
 }
 
 /**
@@ -448,7 +511,7 @@ function snapshotMessages(session: Session, quiz: Quiz, now: number, audience: A
     if (staff) emitCount();
   } else if (session.state === "QUESTION_CLOSED") {
     emit(SocketEvents.QUESTION_OPEN, payload);
-    emit(SocketEvents.QUESTION_CLOSE, { questionIndex: session.currentQuestionIndex });
+    emit(SocketEvents.QUESTION_CLOSE, closePayload(session));
     if (staff) {
       emit(SocketEvents.RESULTS_DISTRIBUTION, { questionIndex: session.currentQuestionIndex, distribution: getDistribution(session, session.currentQuestionIndex) });
       emitCount();

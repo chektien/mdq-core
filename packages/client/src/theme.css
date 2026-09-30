@@ -22,6 +22,8 @@ html[data-theme="dark"] {
   --mdq-ink-soft: #ece8f0;
   --mdq-muted: #c6beca;
   --mdq-soft: #a59ba8;
+  /* The join card is a light surface in every theme, so its small text stays dark. */
+  --mdq-join-card-hint: #57534e;
   --mdq-accent: #b366ff;
   --mdq-accent-hover: #ca8cff;
   --mdq-accent-text: #ca8cff;
@@ -241,6 +243,7 @@ html[data-theme="light"] {
   --mdq-ink-soft: #4d4032;
   --mdq-muted: #685848;
   --mdq-soft: #756554;
+  --mdq-join-card-hint: #57534e;
   --mdq-accent: #ad5634;
   --mdq-accent-hover: #9a4a2b;
   --mdq-accent-text: #8c4426;

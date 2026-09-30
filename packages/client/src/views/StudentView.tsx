@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import { useSocket } from "../hooks/useSocket";
 import type { QuestionState, RevealState } from "../hooks/useSocket";
-import { API, MAX_OPEN_RESPONSE_LENGTH } from "@mdq/shared";
+import { API, MAX_OPEN_RESPONSE_LENGTH, SEAT_TAKEN_MESSAGE } from "@mdq/shared";
 import type { DeckPalette, DeckTheme, SessionState } from "@mdq/shared";
 import Timer from "../components/Timer";
 import Leaderboard from "../components/Leaderboard";
@@ -11,16 +11,10 @@ import QuizHtml from "../components/QuizHtml";
 import SlideContent from "../components/SlideContent";
 import { getQuestionModeText } from "../questionMode";
 import { clampOpenResponse, countCharacters, sentenceStop } from "../responseText";
-import { checkJoinValues, errorField, fieldElementId, joinFormSpec, joinIdentity } from "../joinForm";
+import { SESSION_MISSING_MESSAGE, checkJoinValues, errorField, extraLabelNote, fieldElementId, joinFormSpec, joinIdentity, joinRefusalMessage } from "../joinForm";
+import { deckLabel, resultsHeading } from "../deckLabel";
 import type { JoinFieldName, JoinFieldSpec } from "../joinForm";
 import { applyClientPalette, applyClientTheme, resolveClientPalette, resolveClientTheme } from "../theme";
-
-function formatQuizLabel(quizKey: string): string {
-  const normalized = quizKey.trim();
-  if (!normalized) return "MDQ";
-  if (/\bmdq\b/i.test(normalized)) return normalized;
-  return `${normalized} MDQ`;
-}
 
 function clearSessionArtifacts(): void {
   try {
@@ -300,7 +294,7 @@ export default function StudentView({
           setSessionTheme(null);
           setSessionPalette(null);
         }
-        throw new Error(data.error || "Session not found. Check the code and try again.");
+        throw new Error(res.status === 404 || res.status === 410 ? SESSION_MISSING_MESSAGE : data.error || "We could not join that session. Check the code and try again.");
       }
       const data: { sessionId: string; week?: string; theme?: DeckTheme; palette?: DeckPalette } = await res.json();
       const resolvedTheme = resolveClientTheme(data.theme, defaultTheme);
@@ -349,20 +343,19 @@ export default function StudentView({
         }),
       );
 
-      if (window.location.hash !== `#/s/${data.sessionId}`) {
-        window.location.hash = `/s/${data.sessionId}`;
-      } else if (connected && !sessionToken) {
+      if (connected && !sessionToken && sessionId === data.sessionId) {
         // A second try after a refusal: the socket is already open, so nothing else will send the join.
         localStorage.removeItem("mdquiz_pending_join");
         joinSession(identity.studentId, identity.displayName);
       }
+      // The address stays the join address until the join is accepted (see below), so a refusal leaves it as it was.
     } catch (e) {
       const reason = e instanceof Error ? e.message : "Failed to join";
       setJoinError(reason);
       setJoinErrorField(errorField(spec, reason));
       setJoining(false);
     }
-  }, [clearJoinError, code, codeLookup.status, connected, defaultPalette, defaultTheme, displayName, joinSession, normalizeSessionCode, sessionToken, spec, studentId]);
+  }, [clearJoinError, code, codeLookup.status, connected, defaultPalette, defaultTheme, displayName, joinSession, normalizeSessionCode, sessionId, sessionToken, spec, studentId]);
 
   // When socket connects and we have pending join, emit student:join
   useEffect(() => {
@@ -385,6 +378,14 @@ export default function StudentView({
     if (sessionToken) setJoining(false);
   }, [sessionToken]);
 
+  // Once the join is accepted, a reload comes back to this session. Until then
+  // the address stays the join address, so a refused join can be tried again from it.
+  useEffect(() => {
+    if (sessionToken && sessionId && window.location.hash !== `#/s/${sessionId}`) {
+      window.location.hash = `/s/${sessionId}`;
+    }
+  }, [sessionId, sessionToken]);
+
   // Stop waiting for the automatic rejoin once it succeeds, fails, or takes too long.
   useEffect(() => {
     if (!awaitingRejoin) return;
@@ -404,7 +405,8 @@ export default function StudentView({
         setSessionId(null);
         setQuizKey(null);
       }
-      setJoinError(sockError);
+      const message = joinRefusalMessage(sockError);
+      setJoinError(message);
       setJoinErrorField(errorField(spec, sockError));
       setJoining(false);
     }
@@ -425,6 +427,16 @@ export default function StudentView({
     );
   }
 
+  // ── Another device took this seat: nothing here can answer any more ──
+  if (sock.seatTaken) {
+    return (
+      <div className="student-seat-taken min-h-dvh flex flex-col items-center justify-center gap-3 p-6 text-center">
+        <h2 className="text-xl font-semibold text-white">You joined on another device</h2>
+        <p role="status" className="max-w-xs text-zinc-300 text-sm">{SEAT_TAKEN_MESSAGE}</p>
+      </div>
+    );
+  }
+
   // ── Rejoining with a stored seat ──
   if (!sock.sessionToken && awaitingRejoin && !joinError) {
     return (
@@ -439,7 +451,7 @@ export default function StudentView({
   if (!sock.sessionToken) {
     const fieldsReady = codeLookup.status === "found";
     const lookupMessage = codeLookup.status === "missing"
-      ? "We could not find a session with that code. Check the code on the screen and try again."
+      ? SESSION_MISSING_MESSAGE
       : codeLookup.status === "failed"
         ? "We could not reach the server. Check your connection and try again."
         : null;
@@ -466,16 +478,17 @@ export default function StudentView({
       enterKeyHint: f.enterKeyHint,
     });
     const fieldLabel = (f: JoinFieldSpec) => (
-      <label htmlFor={f.id} className="block text-zinc-400 text-xs mb-1 font-medium">
+      <label htmlFor={f.id} className="block text-zinc-400 text-sm mb-1 font-medium">
         {f.label}{" "}
         {f.required ? <span className="text-red-400" aria-hidden="true">*</span> : <span className="text-zinc-600">(optional)</span>}
       </label>
     );
 
     return (
-      <div className="min-h-dvh flex flex-col items-center justify-center gap-6 p-6">
-        {!initialSessionCode && (
-          <a href="#/" className="absolute top-4 left-4 text-zinc-500 hover:text-zinc-300 text-sm">
+      <div className="join-page min-h-dvh flex flex-col items-center justify-start gap-6 px-6 pb-10 pt-[max(3rem,10dvh)]">
+        {/* Back goes to the start page, which only makes sense when the form was opened from it. */}
+        {!initialSessionCode && !initialSessionId && (
+          <a href="#/" className="join-back absolute left-2 top-2 inline-flex min-h-11 min-w-11 items-center px-3 text-zinc-500 hover:text-zinc-300 text-sm">
             &larr; Back
           </a>
         )}
@@ -487,7 +500,7 @@ export default function StudentView({
 
         <form
           noValidate
-          className="join-form w-full max-w-sm space-y-4"
+          className="join-form w-full max-w-md space-y-4"
           data-join-mode={fieldsReady ? spec.mode : undefined}
           onSubmit={(event) => {
             event.preventDefault();
@@ -495,7 +508,7 @@ export default function StudentView({
           }}
         >
           <div>
-            <label htmlFor="join-session-code" className="block text-zinc-400 text-xs mb-1 font-medium">Session Code</label>
+            <label htmlFor="join-session-code" className="block text-zinc-400 text-sm mb-1 font-medium">Session Code</label>
             <input
               id="join-session-code"
               name="sessionCode"
@@ -544,7 +557,7 @@ export default function StudentView({
                 className={inputClass("displayName")}
               />
               {spec.mode === "name" && (
-                <p className="mt-2 text-xs text-zinc-500">Use the name you want to appear as. Nobody else in the session can use the same one.</p>
+                <p className="mt-2 text-sm text-zinc-500">Use the name you want to appear as. Nobody else in the session can use the same one.</p>
               )}
             </div>
           )}
@@ -580,93 +593,105 @@ export default function StudentView({
   }
 
   // ── Joined: show session content based on state ──
-  const state = sock.sessionState as SessionState;
+  // One live region stays mounted while joined, so a screen reader hears the result when its text changes
+  // rather than missing a region that arrives already filled.
+  const resultAnnouncement = sock.sessionState === "REVEAL" && sock.currentQuestion && sock.reveal
+    ? revealBannerText(sock.currentQuestion, sock.reveal, sock.submittedOptions, sock.submittedResponseText)
+    : "";
+  const renderJoined = () => {
+    const state = sock.sessionState as SessionState;
+    const resultsLabel = sock.deckTitle || quizKey ? deckLabel(sock.deckTitle, quizKey || "") : "";
+    const lobbyNote = extraLabelNote(sock.label, sock.labelNote);
 
-  // Waiting in lobby
-  if (state === "LOBBY") {
+    // Waiting in lobby
+    if (state === "LOBBY") {
+      return (
+        <div className="min-h-dvh flex flex-col items-center justify-center gap-4 p-6">
+          <div className="w-16 h-16 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin" />
+          <h2 className="text-xl font-semibold text-white">Waiting for quiz to start...</h2>
+          <p className="text-zinc-400 text-sm">The instructor will begin shortly</p>
+          {sock.label && (
+            <p className="student-lobby-label text-zinc-300 text-sm">
+              You are in as <strong className="font-semibold text-white">{sock.label}</strong>{sentenceStop(sock.label)}
+            </p>
+          )}
+          {lobbyNote && (
+            <p role="status" className="student-lobby-note max-w-xs text-center text-sm text-amber-200">{lobbyNote}</p>
+          )}
+        </div>
+      );
+    }
+
+    // Question open
+    if (state === "QUESTION_OPEN" || state === "QUESTION_CLOSED") {
+      return (
+        <QuestionView
+          key={sock.currentQuestion?.questionIndex ?? 0}
+          question={sock.currentQuestion}
+          state={state}
+          remainingSec={sock.remainingSec}
+          submitted={sock.submitted}
+          submittedOptions={sock.submittedOptions}
+          submittedResponseText={sock.submittedResponseText}
+          timedOut={sock.timedOut}
+          connected={connected}
+          onSubmit={sock.submitAnswer}
+        />
+      );
+    }
+
+    // Reveal
+    if (state === "REVEAL") {
+      return (
+        <RevealView
+          question={sock.currentQuestion}
+          reveal={sock.reveal}
+          submittedOptions={sock.submittedOptions}
+          submittedResponseText={sock.submittedResponseText}
+        />
+      );
+    }
+
+    // Leaderboard
+    if (state === "LEADERBOARD" || state === "ENDED") {
+      return (
+        <div className="min-h-dvh flex flex-col items-center justify-center gap-6 p-6">
+          <h2 className="text-center text-2xl font-bold text-white">
+            {resultsHeading(state === "ENDED" ? "final" : "leaderboard", resultsLabel)}
+          </h2>
+          <Leaderboard
+            entries={sock.leaderboard}
+            totalQuestions={sock.totalQuestions}
+            highlightPublicKey={sock.publicKey ?? undefined}
+            maxRows={15}
+            showStudentIds={!autoGenerateStudentIds}
+            compact
+          />
+          {state === "ENDED" && (
+            <button
+              onClick={handleDone}
+              className="student-done-button bg-zinc-800 hover:bg-zinc-700 text-white font-semibold py-3 px-8 rounded-xl transition-colors text-sm mt-4"
+            >
+              Done
+            </button>
+          )}
+        </div>
+      );
+    }
+
+    // Fallback: connecting state
     return (
       <div className="min-h-dvh flex flex-col items-center justify-center gap-4 p-6">
-        <div className="w-16 h-16 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin" />
-        <h2 className="text-xl font-semibold text-white">Waiting for quiz to start...</h2>
-        <p className="text-zinc-400 text-sm">The instructor will begin shortly</p>
-        {sock.label && (
-          <p className="student-lobby-label text-zinc-300 text-sm">
-            You are in as <strong className="font-semibold text-white">{sock.label}</strong>{sentenceStop(sock.label)}
-          </p>
-        )}
-        {sock.labelNote && (
-          <p role="status" className="student-lobby-note max-w-xs text-center text-sm text-amber-200">{sock.labelNote}</p>
-        )}
+        <div className="w-12 h-12 border-4 border-zinc-600 border-t-transparent rounded-full animate-spin" />
+        <p className="text-zinc-400 text-sm">Connecting to session...</p>
       </div>
     );
-  }
-
-  // Question open
-  if (state === "QUESTION_OPEN" || state === "QUESTION_CLOSED") {
-    return (
-      <QuestionView
-        key={sock.currentQuestion?.questionIndex ?? 0}
-        question={sock.currentQuestion}
-        state={state}
-        remainingSec={sock.remainingSec}
-        submitted={sock.submitted}
-        submittedOptions={sock.submittedOptions}
-        submittedResponseText={sock.submittedResponseText}
-        totalQuestions={sock.totalQuestions}
-        connected={connected}
-        onSubmit={sock.submitAnswer}
-      />
-    );
-  }
-
-  // Reveal
-  if (state === "REVEAL") {
-    return (
-      <RevealView
-        question={sock.currentQuestion}
-        reveal={sock.reveal}
-        submittedOptions={sock.submittedOptions}
-        submittedResponseText={sock.submittedResponseText}
-      />
-    );
-  }
-
-  // Leaderboard
-  if (state === "LEADERBOARD" || state === "ENDED") {
-    return (
-      <div className="min-h-dvh flex flex-col items-center justify-center gap-6 p-6">
-        <h2 className="text-2xl font-bold text-white">
-          {state === "ENDED"
-            ? `Final Results${quizKey ? ` for ${formatQuizLabel(quizKey).toUpperCase()}` : ""}`
-            : quizKey
-              ? `Leaderboard for ${formatQuizLabel(quizKey).toUpperCase()}`
-              : "Leaderboard"}
-        </h2>
-        <Leaderboard
-          entries={sock.leaderboard}
-          totalQuestions={sock.totalQuestions}
-          highlightPublicKey={sock.publicKey ?? undefined}
-          maxRows={15}
-          showStudentIds={!autoGenerateStudentIds}
-        />
-        {state === "ENDED" && (
-          <button
-            onClick={handleDone}
-            className="student-done-button bg-zinc-800 hover:bg-zinc-700 text-white font-semibold py-3 px-8 rounded-xl transition-colors text-sm mt-4"
-          >
-            Done
-          </button>
-        )}
-      </div>
-    );
-  }
-
-  // Fallback: connecting state
+  };
   return (
-    <div className="min-h-dvh flex flex-col items-center justify-center gap-4 p-6">
-      <div className="w-12 h-12 border-4 border-zinc-600 border-t-transparent rounded-full animate-spin" />
-      <p className="text-zinc-400 text-sm">Connecting to session...</p>
-    </div>
+    <>
+      <div role="status" aria-live="polite" aria-atomic="true" className="sr-only student-result-live">{resultAnnouncement}</div>
+      {renderJoined()}
+    </>
   );
 }
 
@@ -679,7 +704,7 @@ function QuestionView({
   submitted,
   submittedOptions,
   submittedResponseText,
-  totalQuestions,
+  timedOut,
   connected,
   onSubmit,
 }: {
@@ -689,7 +714,7 @@ function QuestionView({
   submitted: boolean;
   submittedOptions: string[];
   submittedResponseText: string | null;
-  totalQuestions: number;
+  timedOut: boolean;
   connected: boolean;
   onSubmit: (payload: { questionIndex: number; selectedOptions?: string[]; responseText?: string }) => void;
 }) {
@@ -698,6 +723,17 @@ function QuestionView({
   const lastSubmittedResponseRef = useRef<string>("");
   const questionIndex = question?.questionIndex ?? -1;
   const questionType = question?.questionType;
+  // Something typed or chosen that the server has not been sent, so it can be offered again after a reconnect.
+  const hasUnsent = questionType === "open_response"
+    ? responseText.trim().length > 0 && responseText.trim() !== (submittedResponseText ?? "").trim()
+    : !submitted && selected.length > 0;
+  const [reconnectedNote, setReconnectedNote] = useState(false);
+  const [wasConnected, setWasConnected] = useState(connected);
+  if (connected !== wasConnected) {
+    // Going offline clears the note; coming back offers it when something was left unsent.
+    setWasConnected(connected);
+    setReconnectedNote(connected && hasUnsent);
+  }
 
   useEffect(() => {
     if (!question) {
@@ -733,6 +769,7 @@ function QuestionView({
 
   const toggleOption = (label: string) => {
     if (submitted || state === "QUESTION_CLOSED") return;
+    setReconnectedNote(false);
     setSelected((prev) =>
       question.allowsMultiple
         ? (prev.includes(label) ? prev.filter((l) => l !== label) : [...prev, label])
@@ -742,6 +779,7 @@ function QuestionView({
 
   const handleSubmit = () => {
     if (!connected) return;
+    setReconnectedNote(false);
     if (question.questionType === "open_response") {
       if (!responseText.trim()) return;
       onSubmit({ questionIndex: question.questionIndex, responseText });
@@ -763,9 +801,12 @@ function QuestionView({
   const submittedLabel = question.questionType === "open_response"
     ? "Response submitted"
     : question.isPoll ? "Vote submitted" : "Answer submitted";
-  const positionLabel = totalQuestions > 0
-    ? `${question.questionIndex + 1}/${totalQuestions}`
-    : `${question.questionIndex + 1}`;
+  // Questions are counted without slides, the same on every phone and after a reload; a slide shows no number.
+  const positionLabel = question.questionNumber && question.questionTotal
+    ? `Question ${question.questionNumber} of ${question.questionTotal}`
+    : null;
+  const questionTextId = `question-text-${question.questionIndex}`;
+  const closedNote = timedOut ? "Time's up. Waiting for the instructor." : "Answers are closed. Waiting for the instructor.";
 
   if (question.questionType === "slide") {
     const hasStudentVisibleSlideContent = [
@@ -802,7 +843,6 @@ function QuestionView({
           slideLiveEmbed={question.slideLiveEmbed}
           slideVideo={question.slideVideo}
           slideReferences={question.slideReferences}
-          positionLabel={positionLabel}
           mode="student"
           statusLabel="The instructor will advance shortly"
         />
@@ -816,18 +856,15 @@ function QuestionView({
       {/* Header: timer + question number */}
       <div className="flex items-center justify-between mb-4">
         <span className="text-zinc-400 text-sm font-medium">
-          Q{positionLabel}
+          {positionLabel}
         </span>
         {!isClosed && (
           <Timer remainingSec={remainingSec} totalSec={question.timeLimitSec} size={64} />
         )}
-        {isClosed && (
-          <span className="text-amber-400 text-sm font-medium">Time's up</span>
-        )}
       </div>
 
       {/* Question text */}
-      <QuizHtml className="quiz-html text-lg text-white leading-relaxed mb-6" html={question.text} />
+      <QuizHtml id={questionTextId} className="quiz-html text-lg text-white leading-relaxed mb-6" html={question.text} />
 
       <div className={`selection-mode-card mb-5 rounded-2xl border px-4 py-3 ${question.questionType === "open_response" || question.allowsMultiple ? "selection-mode-card-multi" : "selection-mode-card-single"}`}>
         <div className="selection-mode-text">{selectionModeText}</div>
@@ -839,7 +876,10 @@ function QuestionView({
             id={`open-response-${question.questionIndex}`}
             name={`open-response-${question.questionIndex}`}
             value={responseText}
-            onChange={(e) => setResponseText(clampOpenResponse(e.target.value))}
+            onChange={(e) => {
+              setReconnectedNote(false);
+              setResponseText(clampOpenResponse(e.target.value));
+            }}
             disabled={isClosed}
             placeholder="Type your response here"
             aria-describedby={`open-response-note-${question.questionIndex}`}
@@ -858,7 +898,11 @@ function QuestionView({
           )}
         </div>
       ) : (
-        <div className="space-y-3 flex-1">
+        <div
+          className="space-y-3 flex-1"
+          role={question.allowsMultiple ? "group" : "radiogroup"}
+          aria-labelledby={questionTextId}
+        >
           {question.options.map((opt) => {
             const isSelected = selected.includes(opt.label);
             const wasSubmitted = submittedOptions.includes(opt.label);
@@ -867,6 +911,9 @@ function QuestionView({
             return (
               <button
                 key={opt.label}
+                type="button"
+                role={question.allowsMultiple ? "checkbox" : "radio"}
+                aria-checked={wasSubmitted || isSelected}
                 onClick={() => toggleOption(opt.label)}
                 disabled={disabled}
                 className={`
@@ -912,25 +959,36 @@ function QuestionView({
         {submitted && question.questionType !== "open_response" ? (
           <div className="text-center py-3">
             <span className="text-emerald-400 font-semibold">{submittedLabel}</span>
+            {isClosed && <p className="student-closed-note mt-1 text-sm text-zinc-400">{closedNote}</p>}
           </div>
         ) : question.questionType === "open_response" && isClosed ? (
           <div className="text-center py-3">
-            <span className="text-amber-400 font-semibold">
-              {submittedResponseText ? "Response locked" : "Time expired"}
-            </span>
+            {submittedResponseText ? (
+              <>
+                <span className="text-amber-400 font-semibold">Response locked</span>
+                <p className="student-closed-note mt-1 text-sm text-zinc-400">{closedNote}</p>
+              </>
+            ) : (
+              <span className="student-closed-note text-amber-400 font-semibold">{closedNote}</span>
+            )}
             {submittedResponseText && (
               <p className="mt-2 text-sm text-zinc-400 whitespace-pre-wrap">{submittedResponseText}</p>
             )}
           </div>
         ) : isClosed ? (
           <div className="text-center py-3">
-            <span className="text-amber-400 font-semibold">Time expired</span>
+            <span className="student-closed-note text-amber-400 font-semibold">{closedNote}</span>
           </div>
         ) : (
           <>
             {!connected && (
               <p className="student-reconnecting mb-3 text-center text-sm text-amber-400" role="status" aria-live="polite">
                 Connection lost. Reconnecting&hellip;
+              </p>
+            )}
+            {connected && reconnectedNote && hasUnsent && (
+              <p className="student-reconnected mb-3 text-center text-sm text-emerald-400" role="status" aria-live="polite">
+                Reconnected. Tap Submit to send your answer.
               </p>
             )}
             <button
@@ -940,11 +998,32 @@ function QuestionView({
             >
               {submitLabel}
             </button>
+            {question.questionType !== "open_response" && (
+              <p className="student-submit-note mt-3 text-center text-sm text-zinc-400">
+                {question.isPoll ? "You cannot change your vote after you submit." : "You cannot change your answer after you submit."}
+              </p>
+            )}
           </>
         )}
       </div>
     </div>
   );
+}
+
+/** The result line shown at the top of a reveal ("Correct!", "Poll results", ...). */
+function revealBannerText(
+  question: QuestionState,
+  reveal: RevealState,
+  submittedOptions: string[],
+  submittedResponseText: string | null,
+): string {
+  const didAnswer = submittedOptions.length > 0;
+  if (question.questionType === "open_response") return submittedResponseText ? "Response received" : "No response submitted";
+  if (reveal.isPoll || question.isPoll) return didAnswer ? "Poll results" : "No vote submitted";
+  const isCorrect = didAnswer
+    && submittedOptions.length === reveal.correctOptions.length
+    && submittedOptions.every((o) => reveal.correctOptions.includes(o));
+  return isCorrect ? "Correct!" : didAnswer ? "Incorrect" : "No answer submitted";
 }
 
 // ── Reveal sub-view ──────────────────────
@@ -1001,22 +1080,14 @@ function RevealView({
         ? "text-red-400"
         : "text-zinc-400";
 
-  const bannerText = isOpenResponse
-    ? submittedResponseText ? "Response received" : "No response submitted"
-    : isPoll
-    ? didAnswer ? "Poll results" : "No vote submitted"
-    : isCorrect
-      ? "Correct!"
-      : didAnswer
-        ? "Incorrect"
-        : "No answer submitted";
+  const bannerText = revealBannerText(question, reveal, submittedOptions, submittedResponseText);
 
   return (
     <div className="min-h-dvh flex flex-col p-4 pb-safe">
       {/* Result banner */}
       <div
         className={`
-          text-center py-4 rounded-xl mb-4
+          reveal-banner text-center py-4 rounded-xl mb-4
           ${bannerClass}
         `}
       >
@@ -1027,10 +1098,13 @@ function RevealView({
       <QuizHtml className="quiz-html text-base text-zinc-300 leading-relaxed mb-4" html={question.text} />
 
       {isOpenResponse ? (
-        <div className="mb-6 rounded-2xl border border-sky-500/30 bg-sky-500/10 p-5">
-          <h3 className="mb-2 text-xs font-medium uppercase tracking-wide text-sky-200">Your response</h3>
-          <p className="whitespace-pre-wrap text-zinc-100">{submittedResponseText || "No response submitted."}</p>
-        </div>
+        // With no response, the banner above already says so.
+        submittedResponseText ? (
+          <div className="mb-6 rounded-2xl border border-sky-500/30 bg-sky-500/10 p-5">
+            <h3 className="mb-2 text-sm font-medium uppercase tracking-wide text-sky-200">Your response</h3>
+            <p className="whitespace-pre-wrap text-zinc-100">{submittedResponseText}</p>
+          </div>
+        ) : null
       ) : (
         <div className="space-y-2 mb-6">
           {question.options.map((opt) => {
@@ -1080,7 +1154,7 @@ function RevealView({
 
       {isPoll && !isOpenResponse && (
         <div className="mb-6">
-          <h3 className="mb-3 text-zinc-400 text-xs uppercase tracking-wide font-medium">
+          <h3 className="mb-3 text-zinc-400 text-sm uppercase tracking-wide font-medium">
             Poll distribution
           </h3>
           <DistributionChart
@@ -1094,7 +1168,7 @@ function RevealView({
       {/* Explanation */}
       {reveal.explanation && (
         <div className="bg-zinc-800/80 border border-zinc-700 rounded-xl p-4 text-left">
-          <h3 className="text-zinc-400 text-xs uppercase tracking-wide font-medium mb-2">
+          <h3 className="text-zinc-400 text-sm uppercase tracking-wide font-medium mb-2">
             Explanation
           </h3>
           <InlineMarkdownText text={reveal.explanation} className="text-zinc-200 text-sm leading-relaxed" />
