@@ -7092,15 +7092,17 @@ html[data-theme="light"] .slide-video-figure .slide-video-action:not(button) {
   }
 }
 
-/* Up to a 1440 px laptop the answer options span nearly the whole width, so the
-   join card floating at the bottom right would sit on top of them. LiveSurface
-   measures the card (--slide-join-clear: its height and its distance from the
-   bottom edge). While a question is open for answers it keeps that much room
-   under it, which the fit step already counts because it reads the padding.
-   A closed question and a results screen keep their usual padding. An open card is a short strip, the QR beside the
-   code and the address, instead of the tall projector card. */
+/* Up to a 1440 px laptop the answer options and the result bars of a closed
+   question span nearly the whole width, so the join card floating at the bottom
+   right would sit on top of them. LiveSurface measures the card
+   (--slide-join-clear: its height and its distance from the bottom edge) and a
+   question screen keeps that much room under it, which the fit step already
+   counts because it reads the padding. The room follows the card, so it grows
+   when the card is opened out. A reveal screen has its own layout and keeps its
+   usual padding. An open card is a short strip, the QR beside the code and the
+   address, instead of the tall projector card. */
 @media (min-width: 761px) and (max-width: 1499px) {
-  .quiz-surface .slide-safe:has(.quiz-surface-content-answering) {
+  .quiz-surface .slide-safe:has(.quiz-surface-content-options) {
     padding-bottom: max(clamp(2.8rem, 5cqi, 5.5rem), calc(var(--slide-join-clear, 0px) + 0.6rem));
   }
 

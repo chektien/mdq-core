@@ -1,20 +1,20 @@
 #!/usr/bin/env node
 /**
  * Real-browser check that the presenter's controls and join card keep clear of
- * each other and of a question's answer options from 761 px wide up to a
- * 1920 x 1080 projector. It starts the built server on a free port with a
- * synthetic deck (long titles on the slides either side of a four-option
- * question), opens the presenter in Chrome at a range of sizes and asserts
- * that, with the question open and closed and the join card closed up and
- * opened out:
+ * each other and of a question's answer options and result bars from 761 px
+ * wide up to a 1920 x 1080 projector. It starts the built server on a free
+ * port with a synthetic deck (long titles on the slides either side of a
+ * four-option question), opens the presenter in Chrome at a range of sizes and
+ * asserts that, with the question open (answer options), closed (result bars)
+ * and revealed (answer bars) and the join card closed up and opened out:
  *   - no two toolbar controls, and no control and the join card, overlap;
- *   - at 700 px tall and more the join card never covers an answer option, the
- *     page does not scroll, and the card and every option are inside the
- *     viewport;
+ *   - at 700 px tall and more the join card never covers an option or a bar,
+ *     the page does not scroll, and the card and all four options or bars are
+ *     inside the viewport;
  *   - at any height the join card is inside the viewport (the cramped
  *     768 x 600 and 1024 x 500 windows check this and the controls only).
- * A table of the measured scroll, covered options and what falls outside the
- * viewport is printed at the end.
+ * A table of the measured scroll, covered options or bars and what falls
+ * outside the viewport is printed at the end.
  *
  * Run `npm run build` first, then:
  *   node scripts/check-presenter-fit.mjs [--chrome <path>]
@@ -109,7 +109,7 @@ function scan() {
   }
   const card = document.querySelector(".slide-join-panel");
   const cardVisible = Boolean(card && visible(card));
-  const options = [...document.querySelectorAll(".quiz-surface-content .grid > div, .quiz-surface-content .space-y-3 > div")].filter(visible);
+  const options = [...document.querySelectorAll(".quiz-surface-content .grid > div, .quiz-surface-content .space-y-3 > div, .quiz-surface-content .space-y-2 > div")].filter(visible);
   const covered = cardVisible ? options.filter((option) => overlap(card, option) > 4).map((option) => label(option)) : [];
   const outside = (el) => {
     const r = el.getBoundingClientRect();
@@ -154,32 +154,36 @@ async function main() {
       await page.getByRole("button", { name: /start session/i }).click();
       await page.waitForSelector(".slide-surface .slide-title");
       const states = [];
-      const read = async (name, question) => {
+      const read = async (name, kind) => {
         for (const expanded of [false, true]) {
           const toggle = page.locator(".slide-join-panel .session-code-card-toggle");
           if (((await toggle.getAttribute("aria-expanded")) === "true") !== expanded) await toggle.click({ force: true });
           // Clicking the toggle can scroll a tall page. Measure from the top, where the presenter starts.
           await page.evaluate(() => window.scrollTo(0, 0));
           await page.waitForTimeout(450);
-          states.push({ name: `${name}, join card ${expanded ? "open" : "closed"}`, question, open: name === "question open", ...(await page.evaluate(scan)) });
+          states.push({ name: `${name}, join card ${expanded ? "open" : "closed"}`, kind, ...(await page.evaluate(scan)) });
         }
       };
-      await read("slide", false);
+      await read("slide", "");
       await page.getByRole("button", { name: /^Next/ }).click();
       await page.waitForSelector(".quiz-surface-content .grid");
-      await read("question open", true);
+      await read("question open", "answer option");
       await page.getByRole("button", { name: "Close Question" }).click({ force: true });
       await page.waitForTimeout(600);
-      await read("question closed", true);
+      await read("question closed", "result bar");
+      await page.getByRole("button", { name: /^Reveal/ }).click({ force: true });
+      await page.waitForSelector(".quiz-surface-content-reveal .space-y-2");
+      await page.waitForTimeout(600);
+      await read("question revealed", "answer bar");
       for (const state of states) {
         const where = `${width}x${height} ${state.name}`;
         rows.push({ size: `${width}x${height}`, ...state });
         check(state.controlOverlaps.length === 0, `${where}: no control overlaps another${state.controlOverlaps.length ? ` (${state.controlOverlaps.join("; ")})` : ""}`);
         check(!state.cardOutside, `${where}: the join card is inside the viewport`);
         if (!full) continue;
-        if (state.open) check(state.covered.length === 0, `${where}: the join card covers no answer option${state.covered.length ? ` (${state.covered.join("; ")})` : ""}`);
+        if (state.kind) check(state.covered.length === 0, `${where}: the join card covers no ${state.kind}${state.covered.length ? ` (${state.covered.join("; ")})` : ""}`);
         check(state.scroll <= 1, `${where}: the page does not scroll (${state.scroll} px)`);
-        if (state.open) check(state.optionCount === 4 && state.optionsOutside.length === 0, `${where}: all four answer options are inside the viewport${state.optionsOutside.length ? ` (${state.optionsOutside.join("; ")} outside)` : ""}`);
+        if (state.kind) check(state.optionCount === 4 && state.optionsOutside.length === 0, `${where}: all four ${state.kind}s are inside the viewport${state.optionsOutside.length ? ` (${state.optionsOutside.join("; ")} outside)` : ""}`);
       }
       await context.close();
     }
@@ -188,8 +192,8 @@ async function main() {
     server.kill();
     fs.rmSync(tmp, { recursive: true, force: true });
   }
-  console.log("\nsize        state                               scroll  covered  options outside  card outside");
-  for (const row of rows) console.log(`${row.size.padEnd(11)} ${row.name.padEnd(35)} ${String(row.scroll).padStart(6)}  ${String(row.covered.length).padStart(7)}  ${String(row.optionsOutside.length).padStart(15)}  ${row.cardOutside ? "yes" : "no"}`);
+  console.log("\nsize        state                                 scroll  covered  options outside  card outside");
+  for (const row of rows) console.log(`${row.size.padEnd(11)} ${row.name.padEnd(37)} ${String(row.scroll).padStart(6)}  ${String(row.covered.length).padStart(7)}  ${String(row.optionsOutside.length).padStart(15)}  ${row.cardOutside ? "yes" : "no"}`);
   if (failures.length > 0) {
     console.error(`\n${failures.length} check(s) failed.`);
     process.exit(1);

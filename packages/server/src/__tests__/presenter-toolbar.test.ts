@@ -58,12 +58,12 @@ describe("presenter toolbar", () => {
     expect(surface).toContain('safe.style.removeProperty("--slide-join-clear")');
   });
 
-  it("keeps an open question's options clear of the floating join card up to a 1440 px laptop", () => {
-    const block = index.match(/@media \(min-width: 761px\) and \(max-width: 1499px\) \{\s*\.quiz-surface \.slide-safe:has\(\.quiz-surface-content-answering\) \{[\s\S]*?\n\}\n/);
+  it("keeps a question's options and result bars clear of the floating join card up to a 1440 px laptop", () => {
+    const block = index.match(/@media \(min-width: 761px\) and \(max-width: 1499px\) \{\s*\.quiz-surface \.slide-safe:has\(\.quiz-surface-content-options\) \{[\s\S]*?\n\}\n/);
     expect(block).not.toBeNull();
     // The padding the fit step already subtracts grows to hold the card, never below the usual padding,
-    // and only while the question is open for answers: a closed question and the results keep their own.
-    expect(block?.[0]).toMatch(/:has\(\.quiz-surface-content-answering\) \{\s*padding-bottom: max\(clamp\(2\.8rem, 5cqi, 5\.5rem\), calc\(var\(--slide-join-clear, 0px\) \+ [\d.]+rem\)\);/);
+    // on the question screen, open or closed. A reveal screen keeps its own.
+    expect(block?.[0]).toMatch(/:has\(\.quiz-surface-content-options\) \{\s*padding-bottom: max\(clamp\(2\.8rem, 5cqi, 5\.5rem\), calc\(var\(--slide-join-clear, 0px\) \+ [\d.]+rem\)\);/);
     expect(index).not.toMatch(/\.quiz-surface \.slide-safe \{\s*padding-bottom: max\(clamp\(2\.8rem, 5cqi, 5\.5rem\), calc\(var\(--slide-join-clear/);
     // An open card is a short strip with the QR beside the text and no taller than the text, not the tall projector card.
     expect(block?.[0]).toMatch(/\.session-code-card-expanded \{\s*display: grid;\s*grid-template-columns: minmax\(0, 1fr\) auto 5\.25rem;/);
@@ -71,14 +71,12 @@ describe("presenter toolbar", () => {
     expect(block?.[0]).toMatch(/\.session-code-card-expanded \.session-code-card-qr-hint \{\s*display: none;/);
   });
 
-  it("marks the question surface as answering only while its options are a grid to choose from", () => {
+  it("marks a question screen, open or closed, but not a reveal or a leaderboard", () => {
     const fit = read("components/ResponsiveQuizSurface.tsx");
-    expect(fit).toContain('answering ? "quiz-surface-content-answering" : ""');
-    expect(instructor).toContain('const optionsAnswering = state !== "QUESTION_CLOSED" || isReviewing;');
-    expect(instructor.match(/<ResponsiveQuizSurface answering=\{optionsAnswering\}>/g)).toHaveLength(2);
-    const presentation = read("views/PresentationView.tsx");
-    expect(presentation.match(/<ResponsiveQuizSurface answering=\{state !== "QUESTION_CLOSED"\}>/g)).toHaveLength(2);
-    expect(presentation).not.toMatch(/<ResponsiveQuizSurface>/);
+    expect(fit).toContain('!reveal && !leaderboard ? "quiz-surface-content-options" : ""');
+    expect(instructor).not.toMatch(/ResponsiveQuizSurface answering/);
+    expect(read("views/PresentationView.tsx")).not.toMatch(/ResponsiveQuizSurface answering/);
+    expect(index).not.toContain("quiz-surface-content-answering");
   });
 
   it("gives back the height a scaled question no longer uses, and steps down at any overflow", () => {

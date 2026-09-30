@@ -28,13 +28,10 @@ export default function ResponsiveQuizSurface({
   children,
   reveal = false,
   leaderboard = false,
-  answering = false,
 }: {
   children: ReactNode;
   reveal?: boolean;
   leaderboard?: boolean;
-  /** True while the answer options are shown as a grid to choose from (not as results), so the stylesheet keeps the join card clear of them. */
-  answering?: boolean;
 }) {
   const ref = useRef<HTMLDivElement | null>(null);
   const [density, setDensity] = useState<FitDensity>("comfortable");
@@ -95,7 +92,8 @@ export default function ResponsiveQuizSurface({
         "quiz-surface-content-fit",
         reveal ? "quiz-surface-content-reveal" : "",
         leaderboard ? "quiz-surface-content-leaderboard" : "",
-        answering ? "quiz-surface-content-answering" : "",
+        // A question screen shows its options or result bars, which the join card must not cover.
+        !reveal && !leaderboard ? "quiz-surface-content-options" : "",
       ].filter(Boolean).join(" ")}
       data-fit-density={leaderboard ? undefined : density}
     >
