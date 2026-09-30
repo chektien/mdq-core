@@ -98,10 +98,10 @@ const SPECS: Spec[] = [
   sizeSpec("body-size", "body"),
   sizeSpec("small-size", "small"),
   sizeSpec("caption-size", "caption"),
-  colorSpec("accent-color", ["--mdq-slide-accent"]),
+  colorSpec("accent-color", ["--mdq-deck-accent"]),
   colorSpec("link-color", ["--mdq-link-color"]),
-  colorSpec("text-color", ["--mdq-slide-ink", "--mdq-slide-heading"]),
-  colorSpec("muted-color", ["--mdq-slide-ink-soft"]),
+  colorSpec("text-color", ["--mdq-deck-text"]),
+  colorSpec("muted-color", ["--mdq-deck-muted"]),
   colorSpec("background-color", ["--mdq-slide-bg", "--mdq-slide-bg-soft"]),
   colorSpec("surface-color", ["--mdq-slide-bg-soft"]),
   colorSpec("bullet-color", ["--mdq-bullet-color"]),
@@ -177,11 +177,6 @@ export const DECK_STYLE_KEYS: readonly string[] = SPECS.map((spec) => spec.key);
 
 const SPEC_BY_KEY = new Map(SPECS.map((spec) => [spec.key, spec]));
 
-/** True when `key` (dashed or underscored) is a deck appearance setting. */
-export function isDeckStyleKey(key: string): boolean {
-  return SPEC_BY_KEY.has(key.replace(/_/g, "-").toLowerCase());
-}
-
 /** The presets a key accepts, in order, or none for a colour. */
 export function deckStylePresets(key: string): string[] {
   return Object.keys(SPEC_BY_KEY.get(key)?.presets ?? {});
@@ -199,7 +194,8 @@ const CSS_COLOR_NAMES = new Set(
 );
 
 const HEX_COLOR = /^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/;
-const LENGTH = /^(\d+(?:\.\d+)?|\.\d+)(px|rem|em|ch|%)$/;
+/** A plain length: at most 4 whole digits and 3 decimals, so no value can be absurdly large or long. */
+const LENGTH = /^(\d{1,4}(?:\.\d{1,3})?|\.\d{1,3})(px|rem|em|ch|%)$/;
 
 function describeChoices(spec: Spec): string {
   if (spec.kind === "color") {
@@ -246,20 +242,51 @@ const STYLE_VARS = new Set<string>(
     ...Object.keys(spec.color?.("red") ?? {}),
   ]),
 );
-const SAFE_STYLE_VALUE = /^[a-z0-9#.%,() *+-]+$/i;
+const MAX_STYLE_VALUE_LENGTH = 96;
+const SIMPLE_NUMBER = /^(?:\d{1,2}(?:\.\d{1,3})?|\.\d{1,3})$/;
+const SAFE_LENGTH = /^(?:\d{1,4}(?:\.\d{1,3})?|\.\d{1,3})(?:px|rem|em|ch|%|cqi)$/;
+const TOKEN = /\s*(?:(calc|min|max|clamp)\(|(\d{1,4}(?:\.\d{1,3})?|\.\d{1,3})(?:px|rem|em|ch|%|cqi)?|([*,+-])|(\)))/y;
 
 /**
- * The entries of `style` that are known appearance properties with a plain
- * value, or undefined when none is left. Applied where the value is used, so
- * an unexpected payload can never write any other property or any function.
+ * True when `value` is made only of what the settings emit: a plain number or
+ * length, a colour name or hex colour, `auto`, or `calc`, `min`, `max` and
+ * `clamp` over plain numbers and lengths. Anything else fails.
+ */
+function isSafeStyleValue(value: string): boolean {
+  if (value.length === 0 || value.length > MAX_STYLE_VALUE_LENGTH) return false;
+  if (SIMPLE_NUMBER.test(value) || SAFE_LENGTH.test(value) || value === "auto") return true;
+  if (HEX_COLOR.test(value) || CSS_COLOR_NAMES.has(value)) return true;
+  if (!/^(?:calc|min|max|clamp)\(/.test(value)) return false;
+  let depth = 0;
+  let index = 0;
+  TOKEN.lastIndex = 0;
+  while (index < value.length) {
+    TOKEN.lastIndex = index;
+    const match = TOKEN.exec(value);
+    if (!match) return false;
+    if (match[1]) {
+      depth += 1;
+      if (depth > 3) return false;
+    } else if (match[4]) {
+      depth -= 1;
+      if (depth < 0) return false;
+    }
+    index = TOKEN.lastIndex;
+  }
+  return depth === 0;
+}
+
+/**
+ * The entries of `style` that are known appearance properties with a value the
+ * settings could have produced, or undefined when none is left. Applied where
+ * the value is used, so an unexpected payload can never write another
+ * property, a url, a variable reference or any other function.
  */
 export function safeDeckStyle(style: unknown): DeckStyle | undefined {
   if (!style || typeof style !== "object") return undefined;
   const safe: DeckStyle = {};
   for (const [name, value] of Object.entries(style as Record<string, unknown>)) {
-    if (!STYLE_VARS.has(name) || typeof value !== "string" || !SAFE_STYLE_VALUE.test(value)) continue;
-    if (/url\(|var\(|expression|@|\\/i.test(value)) continue;
-    safe[name] = value;
+    if (STYLE_VARS.has(name) && typeof value === "string" && isSafeStyleValue(value)) safe[name] = value;
   }
   return Object.keys(safe).length > 0 ? safe : undefined;
 }

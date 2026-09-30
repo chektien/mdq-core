@@ -33,7 +33,7 @@ const BODY = `## Alpha: A steady subtitle
 
 type: slide
 
-A paragraph of body text with a [plain link](https://example.org/page) inside it.
+A paragraph of **bold** body text with a [plain link](https://example.org/page) inside it.
 
 ### A small heading
 
@@ -46,6 +46,15 @@ A paragraph of body text with a [plain link](https://example.org/page) inside it
 > Attendee Note: A note.
 
 > Reference: Synthetic source`;
+const QUESTION = `## Pick one
+
+**Which one is **bold** here?**
+
+A. One
+B. Two
+
+> Correct Answer: A
+> Overall Feedback: One.`;
 const HEADER = [
   "title-size: x-large", "body-size: large", "small-size: 1.2rem", "caption-size: large", "heading-size: 2rem",
   "accent-color: teal", "text-color: #101820", "muted-color: #445566", "background-color: #fdf6e3", "surface-color: #eee8d5",
@@ -99,6 +108,32 @@ function measure() {
     imageCorners: px(cs(image).borderTopLeftRadius),
     imageWidth: figure.getBoundingClientRect().width,
     figureMaxWidth: cs(figure).maxWidth,
+    canvas: getComputedStyle(document.documentElement).backgroundColor,
+    strongColor: cs(one(".slide-body strong")) ? cs(one(".slide-body strong")).color : null,
+  };
+}
+
+/** Toolbar and control buttons: text colour, fill and the contrast between them, with translucent fills blended over what is behind. */
+function measureControls() {
+  const parse = (value) => { const m = value.match(/rgba?\(([^)]+)\)/); if (!m) return [0, 0, 0, 0]; const [r, g, b, a = 1] = m[1].split(/[ ,/]+/).filter(Boolean).map(Number); return [r, g, b, a]; };
+  const over = (top, bottom) => { const a = top[3] + bottom[3] * (1 - top[3]); return a === 0 ? [0, 0, 0, 0] : [0, 1, 2].map((i) => (top[i] * top[3] + bottom[i] * bottom[3] * (1 - top[3])) / a).concat(a); };
+  const lum = ([r, g, b]) => { const f = (c) => { c /= 255; return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4; }; return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b); };
+  const fillOf = (el) => { const layers = []; for (let node = el; node; node = node.parentElement) layers.push(parse(getComputedStyle(node).backgroundColor)); return layers.reduceRight((below, layer) => over(layer, below), [255, 255, 255, 1]); };
+  return [...document.querySelectorAll(".slide-surface .slide-toolbar button")].map((button) => {
+    const fill = fillOf(button);
+    const text = over(parse(getComputedStyle(button).color), fill);
+    const [hi, lo] = [lum(text), lum(fill)].sort((a, b) => b - a);
+    return { label: button.textContent.trim(), color: getComputedStyle(button).color, fill: fill.map((n) => Math.round(n * 100) / 100).join(","), ratio: Math.round(((hi + 0.05) / (lo + 0.05)) * 100) / 100 };
+  });
+}
+
+/** The question stem and its bold text, and the page canvas. */
+function measureQuestion() {
+  const stem = document.querySelector(".slide-surface .quiz-html.text-white");
+  return {
+    stemColor: getComputedStyle(stem).color,
+    strongColor: getComputedStyle(stem.querySelector("strong")).color,
+    canvas: getComputedStyle(document.documentElement).backgroundColor,
   };
 }
 
@@ -124,8 +159,12 @@ async function main() {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "mdq-header-settings-"));
   const deckDir = path.join(tmp, "decks");
   fs.mkdirSync(deckDir);
-  fs.writeFileSync(path.join(deckDir, "plain.md"), `# Plain deck\n\n---\n\n${BODY}\n\n---\n`);
-  fs.writeFileSync(path.join(deckDir, "styled.md"), `# Styled deck\n${HEADER}\n\n---\n\n${BODY}\n\n---\n`);
+  // A dark palette under a light deck background is the hard case for the controls, which must keep the palette's own colours.
+  const PALETTE = "theme: dark\npalette: tokyo-night";
+  fs.writeFileSync(path.join(deckDir, "plain.md"), `# Plain deck\n${PALETTE}\n\n---\n\n${BODY}\n\n---\n`);
+  fs.writeFileSync(path.join(deckDir, "styled.md"), `# Styled deck\n${PALETTE}\n${HEADER}\n\n---\n\n${BODY}\n\n---\n`);
+  fs.writeFileSync(path.join(deckDir, "qplain.md"), `# Question plain\n${PALETTE}\n\n---\n\n${QUESTION}\n\n---\n`);
+  fs.writeFileSync(path.join(deckDir, "qstyled.md"), `# Question styled\n${PALETTE}\n${HEADER}\n\n---\n\n${QUESTION}\n\n---\n`);
   const imagesDir = path.join(root, "data", "images");
   const imageFile = path.join(imagesDir, "header-settings-check.png");
   fs.mkdirSync(imagesDir, { recursive: true });
@@ -158,6 +197,7 @@ async function main() {
       const code = (await presenter.locator("button", { hasText: /online/ }).first().innerText()).match(/[A-Z0-9]{6}/)[0];
       await presenter.waitForSelector(".slide-media-figure img");
       results[deck].presenter = await presenter.evaluate(measure);
+      results[deck].presenterControls = await presenter.evaluate(measureControls);
 
       const { sessionId } = await (await fetch(`${base}/api/session/by-code/${code}`)).json();
       const projector = await desktop.newPage();
@@ -165,6 +205,7 @@ async function main() {
       await projector.waitForSelector(".slide-surface .slide-title");
       await projector.waitForSelector(".slide-media-figure img");
       results[deck].projector = await projector.evaluate(measure);
+      results[deck].projectorControls = await projector.evaluate(measureControls);
 
       const phoneContext = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
       const phone = await phoneContext.newPage();
@@ -212,6 +253,27 @@ async function main() {
       await phoneContext.close();
     }
 
+    const questions = {};
+    for (const [deck, title] of [["plain", "Question plain"], ["styled", "Question styled"]]) {
+      const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+      const presenter = await context.newPage();
+      await presenter.goto(`${base}/#/instructor`);
+      await presenter.getByText(title).click();
+      await presenter.getByRole("button", { name: "Create Session" }).click();
+      await presenter.getByRole("button", { name: /start session/i }).click();
+      await presenter.waitForSelector(".slide-surface .quiz-html.text-white strong");
+      const code = (await presenter.locator("button", { hasText: /online/ }).first().innerText()).match(/[A-Z0-9]{6}/)[0];
+      const { sessionId } = await (await fetch(`${base}/api/session/by-code/${code}`)).json();
+      const projector = await context.newPage();
+      await projector.goto(`${base}/present/${sessionId}`);
+      await projector.waitForSelector(".slide-surface .quiz-html.text-white strong");
+      questions[deck] = {};
+      for (const [name, page] of [["presenter", presenter], ["projector", projector]]) {
+        questions[deck][name] = { ...(await page.evaluate(measureQuestion)), controls: await page.evaluate(measureControls) };
+      }
+      await context.close();
+    }
+
     for (const surface of SURFACES) {
       const plain = results.plain[surface];
       const styled = results.styled[surface];
@@ -234,6 +296,15 @@ async function main() {
       check(styled.listGap > plain.listGap && styled.nestedGap > plain.nestedGap, `${surface}: list-gap roomy widens both list gaps (${plain.listGap.toFixed(2)} to ${styled.listGap.toFixed(2)}em)`);
       check(styled.imageCorners === 0 && plain.imageCorners > 0, `${surface}: image-corners square removes the rounding (${plain.imageCorners} to ${styled.imageCorners}px)`);
       check(styled.imageWidth < plain.imageWidth, `${surface}: image-width narrow narrows the picture panel (${Math.round(plain.imageWidth)} to ${Math.round(styled.imageWidth)}px)`);
+      if (surface !== "phone") {
+        const [plainControls, styledControls] = [results.plain[`${surface}Controls`], results.styled[`${surface}Controls`]];
+        check(plainControls.length > 0 && JSON.stringify(plainControls) === JSON.stringify(styledControls), `${surface}: control buttons keep the palette's text colour, fill and contrast with colour keys set (${styledControls.map((c) => `${c.label} ${c.ratio}`).join(", ")})`);
+        check(styled.canvas === "rgb(253, 246, 227)" && plain.canvas !== styled.canvas, `${surface}: the page canvas follows background-color (${plain.canvas} to ${styled.canvas})`);
+        const q = questions.styled[surface];
+        check(q.stemColor === "rgb(16, 24, 32)" && q.strongColor === "rgb(16, 24, 32)" && questions.plain[surface].stemColor !== q.stemColor, `${surface}: question text and its bold text follow text-color (${questions.plain[surface].stemColor} to ${q.stemColor})`);
+        check(JSON.stringify(q.controls) === JSON.stringify(questions.plain[surface].controls), `${surface}: control buttons on a question screen are unchanged too`);
+      }
+      check(surface === "phone" || styled.strongColor === "rgb(16, 24, 32)" || styled.strongColor === null, `${surface}: bold text in the slide body follows text-color (${styled.strongColor})`);
       if (surface !== "phone") check(styled.textWidth !== plain.textWidth, `${surface}: text-width 30ch limits paragraphs (${plain.textWidth} to ${styled.textWidth})`);
     }
     if (baselineDist) {

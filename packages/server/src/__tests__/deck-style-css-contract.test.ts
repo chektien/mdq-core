@@ -17,7 +17,9 @@ for (const key of DECK_STYLE_KEYS) {
 
 // The palette's own properties are defined for every theme and palette, so the surface
 // only has to override them. The others are new and must be read with a fallback.
-const PALETTE_OWNED = new Set(["--mdq-slide-accent", "--mdq-slide-ink", "--mdq-slide-heading", "--mdq-slide-ink-soft", "--mdq-slide-bg", "--mdq-slide-bg-soft"]);
+const PALETTE_OWNED = new Set(["--mdq-slide-bg", "--mdq-slide-bg-soft"]);
+// Text, muted and accent colours are scoped to slide content by a data attribute the surface sets with them.
+const SCOPED = { "--mdq-deck-text": "data-deck-text", "--mdq-deck-muted": "data-deck-muted", "--mdq-deck-accent": "data-deck-accent" } as Record<string, string>;
 const escape = (name: string) => name.replace(/[-]/g, "\\-");
 
 describe("deck style custom properties in the stylesheet", () => {
@@ -27,15 +29,34 @@ describe("deck style custom properties in the stylesheet", () => {
     expect(emitted).toContain("--mdq-image-inset");
   });
 
-  it.each([...emitted].filter((name) => !PALETTE_OWNED.has(name)).sort())("%s is read, always with a fallback", (name) => {
+  it.each([...emitted].filter((name) => !PALETTE_OWNED.has(name) && !SCOPED[name]).sort())("%s is read, always with a fallback", (name) => {
     const reads = css.match(new RegExp(`var\\(${escape(name)}\\s*[,)]`, "g")) ?? [];
     expect(reads.length).toBeGreaterThan(0);
     expect(css).not.toMatch(new RegExp(`var\\(${escape(name)}\\s*\\)`));
     expect(reads.every((read) => read.endsWith(","))).toBe(true);
   });
 
+  it.each(Object.keys(SCOPED))("%s only reaches slide content, never the controls", (name) => {
+    const attribute = SCOPED[name];
+    const rules = [...css.replace(/\/\*[\s\S]*?\*\//g, "").matchAll(new RegExp(`([^{}]*)\\{[^{}]*var\\(${escape(name)}\\)[^{}]*\\}`, "g"))];
+    expect(rules.length).toBeGreaterThan(0);
+    for (const [, selector] of rules) {
+      expect(selector).toContain(`[${attribute}]`);
+      expect(selector).not.toMatch(/toolbar|button|status|join|next-up|counter/);
+    }
+    // No other rule reads it, and the surface only sets the attribute beside the property.
+    expect(surface).toContain(`"${attribute}"`);
+    expect(css).not.toMatch(new RegExp(`\\.slide-surface\\s*\\{[^}]*${escape(name)}`));
+  });
+
+  it("mirrors the deck background on the page canvas", () => {
+    expect(css).toMatch(/html:root:root\[data-theme\]\[data-deck-canvas\]:has\(\.slide-surface:not\(\.slide-surface-student\)\) \{\s*background: var\(--mdq-deck-canvas\);/);
+    expect(surface).toContain("--mdq-deck-canvas");
+    expect(surface).toContain("removeProperty");
+  });
+
   it("gives every fallback a non-empty value", () => {
-    for (const name of emitted) {
+    for (const name of [...emitted].filter((item) => !SCOPED[item])) {
       expect(css).not.toMatch(new RegExp(`var\\(${escape(name)}\\s*,\\s*\\)`));
     }
   });

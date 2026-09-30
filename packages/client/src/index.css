@@ -7382,3 +7382,40 @@ html:root[data-palette="tokyo-night"]:not([data-theme="light"]):has(.slide-surfa
 html:root[data-theme] .slide-surface[data-deck-background="true"] {
   background: linear-gradient(180deg, var(--mdq-slide-bg-soft, var(--mdq-slide-bg)), var(--mdq-slide-bg));
 }
+
+/* Text, muted and accent colours from the deck reach the slide's own content
+   only: the header, body, notes, references and the question text. The
+   toolbar, buttons, status pill and join card keep the palette's colours
+   because they sit on their own fills. A colour name or hex value in
+   `text-color:` also replaces the palette's fixed colour for bold text. */
+.slide-surface[data-deck-text] :is(.slide-header, .slide-content-grid, .slide-notes, .slide-references),
+.slide-surface[data-deck-text] .quiz-html.text-white {
+  --mdq-slide-ink: var(--mdq-deck-text);
+  --mdq-slide-heading: var(--mdq-deck-text);
+}
+
+.slide-surface[data-deck-muted] :is(.slide-header, .slide-content-grid, .slide-notes, .slide-references),
+.slide-surface[data-deck-muted] .quiz-html.text-white {
+  --mdq-slide-ink-soft: var(--mdq-deck-muted);
+}
+
+.slide-surface[data-deck-accent] :is(.slide-header, .slide-content-grid, .slide-notes, .slide-references),
+.slide-surface[data-deck-accent] .quiz-html.text-white {
+  --mdq-slide-accent: var(--mdq-deck-accent);
+}
+
+/* The theme paints every text-white element with !important, so the question
+   text needs the same weight to follow the deck's text colour. */
+html:root[data-theme] .slide-surface[data-deck-text] .quiz-html.text-white {
+  color: var(--mdq-deck-text) !important;
+}
+
+html:root[data-theme] .slide-surface[data-deck-text] :is(.slide-header, .slide-content-grid, .slide-notes, .slide-references) strong,
+html:root[data-theme] .slide-surface[data-deck-text] .quiz-html.text-white strong {
+  color: var(--mdq-deck-text);
+}
+
+/* The page canvas follows the deck's background colour, ahead of the palette's own canvas colour. */
+html:root:root[data-theme][data-deck-canvas]:has(.slide-surface:not(.slide-surface-student)) {
+  background: var(--mdq-deck-canvas);
+}

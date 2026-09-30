@@ -1,12 +1,22 @@
 import { DECK_SETTING_KEYS, DECK_STYLE_KEYS, deckStylePresets, safeDeckStyle } from "@mdq/shared";
 import { parseQuizMarkdown } from "../parser";
 import { printDeckStyle } from "../print-deck-style";
+import fs from "fs";
+import os from "os";
+import path from "path";
+import request from "supertest";
+import { createApp } from "../app";
 import { apply } from "../engine";
 import { createSession } from "../session";
 
 const SLIDE = "## One\n\ntype: slide\n\n- Point.";
 const deck = (header: string) => `# Style deck\n${header}\n\n---\n\n${SLIDE}\n\n---\n`;
-const parse = (header: string) => parseQuizMarkdown(deck(header), "style.md");
+// A setting problem never blocks the deck: it is a diagnostic on the key's line, and the parse result has no error.
+const parse = (header: string) => {
+  const result = parseQuizMarkdown(deck(header), "style.md");
+  expect(result.errors).toEqual([]);
+  return { quiz: result.quiz, errors: result.diagnostics };
+};
 
 const SIZE_PRESETS = ["small", "medium", "large", "x-large"];
 const WIDTH_PRESETS = ["narrow", "medium", "wide", "full"];
@@ -130,13 +140,12 @@ describe("deck header appearance settings", () => {
       }
     });
 
-    it("map onto the palette's own custom properties", () => {
+    it("set the deck colour properties, and the background ones set the palette's own", () => {
       const { quiz } = parse("accent-color: teal\ntext-color: #111\nmuted-color: gray\nbackground-color: navy\nsurface-color: #223\nlink-color: blue\nbullet-color: red");
       expect(quiz!.style).toEqual({
-        "--mdq-slide-accent": "teal",
-        "--mdq-slide-ink": "#111",
-        "--mdq-slide-heading": "#111",
-        "--mdq-slide-ink-soft": "gray",
+        "--mdq-deck-accent": "teal",
+        "--mdq-deck-text": "#111",
+        "--mdq-deck-muted": "gray",
         "--mdq-slide-bg": "navy",
         "--mdq-slide-bg-soft": "#223",
         "--mdq-link-color": "blue",
@@ -208,7 +217,7 @@ describe("deck header appearance settings", () => {
       const { quiz, errors } = parse("title-size: huge\naccent-color: teal\nbody-size: large\ntext-color: #zzz");
       expect(errors).toHaveLength(2);
       expect(quiz!.styleSettings).toEqual({ "accent-color": "teal", "body-size": "large" });
-      expect(quiz!.style).toEqual({ "--mdq-slide-accent": "teal", "--mdq-body-scale": "1.2" });
+      expect(quiz!.style).toEqual({ "--mdq-deck-accent": "teal", "--mdq-body-scale": "1.2" });
     });
 
     it("reports an empty value with the choices", () => {
@@ -230,18 +239,62 @@ describe("deck header appearance settings", () => {
       expect(errors).toEqual([]);
       expect(quiz!.theme).toBe("light");
       expect(quiz!.palette).toBe("gruvbox");
-      expect(quiz!.style).toEqual({ "--mdq-slide-accent": "teal" });
+      expect(quiz!.style).toEqual({ "--mdq-deck-accent": "teal" });
     });
 
     it("carries the style to the slide payload only through the known custom properties", () => {
-      expect(safeDeckStyle({ "--mdq-slide-accent": "teal", "--mdq-title-scale": "1.2", "--mdq-list-gap-nested": "calc(1rem * 0.32)" })).toEqual({
-        "--mdq-slide-accent": "teal",
+      expect(safeDeckStyle({ "--mdq-deck-accent": "teal", "--mdq-title-scale": "1.2", "--mdq-list-gap-nested": "calc(1rem * 0.32)" })).toEqual({
+        "--mdq-deck-accent": "teal",
         "--mdq-title-scale": "1.2",
         "--mdq-list-gap-nested": "calc(1rem * 0.32)",
       });
-      expect(safeDeckStyle({ "--other": "1", "--mdq-slide-accent": "url(x)", color: "red", "--mdq-body-size": "var(--x)", "--mdq-title-size": "1rem;color:red" })).toBeUndefined();
+      expect(safeDeckStyle({ "--other": "1", "--mdq-deck-accent": "url(x)", color: "red", "--mdq-body-size": "var(--x)", "--mdq-title-size": "1rem;color:red" })).toBeUndefined();
+      // Fails closed: only the functions the settings emit, plain numbers and lengths, colours and auto.
+      for (const value of ["var(--x)", "url(a)", "attr(x)", "env(x)", "calc(var(--x) * 2)", "calc(1rem * 2", "calc(1rem) )", "calc(((((1rem)))))", "1rem !important", "rgb(1,2,3)", "12345rem", "1.2345rem", "\\31 rem", "1rem 2rem", "javascript", "teal ", "", "calc(1rem * 2) url(x)", `calc(${"1rem + ".repeat(20)}1rem)`, "expression(1)"]) {
+        expect([value, safeDeckStyle({ "--mdq-title-size": value })]).toEqual([value, undefined]);
+      }
+      for (const value of ["1rem", "0", "1.35", ".5em", "100%", "teal", "#0f766e", "auto", "min(42cqi, 44rem)", "max(1rem, 2cqi)", "clamp(1rem, 2cqi, 3rem)", "calc(1rem * 0.32)"]) {
+        expect(safeDeckStyle({ "--mdq-title-size": value })).toEqual({ "--mdq-title-size": value });
+      }
       expect(safeDeckStyle(null)).toBeUndefined();
       expect(safeDeckStyle("x")).toBeUndefined();
+    });
+  });
+
+  describe("a setting problem never stops the deck", () => {
+    it("reports each ignored setting on its own line and leaves errors empty", () => {
+      const result = parseQuizMarkdown(deck("title-size: huge\nbody-size: large\naccent-color: teel"), "style.md");
+      expect(result.errors).toEqual([]);
+      expect(result.quiz).not.toBeNull();
+      expect(result.diagnostics).toEqual([
+        expect.objectContaining({ lineNumber: 2, severity: "warning", message: expect.stringContaining("title-size: huge is not a size") }),
+        expect.objectContaining({ lineNumber: 4, severity: "warning", message: expect.stringContaining("accent-color: teel is not a colour") }),
+      ]);
+    });
+
+    it("has no diagnostics for a clean deck", () => {
+      expect(parseQuizMarkdown(deck("title-size: large"), "style.md").diagnostics).toEqual([]);
+    });
+
+    it("still lists the deck and reports the ignored setting with it", async () => {
+      const quizDir = fs.mkdtempSync(path.join(os.tmpdir(), "mdq-style-"));
+      fs.writeFileSync(path.join(quizDir, "styled.md"), deck("title-size: huge\nbody-size: large"));
+      fs.writeFileSync(path.join(quizDir, "plain.md"), deck("theme: light").replace("# Style deck", "# Plain deck"));
+      const warn = jest.spyOn(console, "warn").mockImplementation(() => undefined);
+      try {
+        const app = createApp({ quizDir });
+        const listed = await request(app).get("/api/decks").expect(200);
+        const byWeek = Object.fromEntries(listed.body.map((item: { week: string }) => [item.week, item]));
+        expect(Object.keys(byWeek).sort()).toEqual(["plain", "styled"]);
+        expect(byWeek.styled.diagnostics).toEqual([{ lineNumber: 2, severity: "warning", message: expect.stringContaining("title-size: huge is not a size") }]);
+        expect("diagnostics" in byWeek.plain).toBe(false);
+        expect(warn).toHaveBeenCalledWith("Ignored settings in styled.md:", [expect.stringContaining("line 2: title-size: huge")]);
+        const reloaded = await request(app).post("/api/decks/reload").expect(200);
+        expect(reloaded.body.quizzes.find((item: { week: string }) => item.week === "styled").diagnostics).toHaveLength(1);
+      } finally {
+        warn.mockRestore();
+        fs.rmSync(quizDir, { recursive: true, force: true });
+      }
     });
   });
 
@@ -253,7 +306,7 @@ describe("deck header appearance settings", () => {
     };
 
     it("carries the deck's style on the opening of each item", () => {
-      expect(opened("accent-color: teal\ntitle-size: large").deckStyle).toEqual({ "--mdq-slide-accent": "teal", "--mdq-title-scale": "1.2" });
+      expect(opened("accent-color: teal\ntitle-size: large").deckStyle).toEqual({ "--mdq-deck-accent": "teal", "--mdq-title-scale": "1.2" });
     });
 
     it("leaves the field out for a deck without the keys", () => {

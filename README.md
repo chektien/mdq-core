@@ -430,7 +430,7 @@ PDF images keep their source aspect ratio. MDQ only scales images down to fit th
 
 ## Slide Appearance Settings
 
-A deck can change how its slides look from the header, in plain settings with no CSS. Write them before the first `---`, one per line, with dashes like every other key (`title-size:`, and `title_size:` still works):
+A deck can change how its slides look from the header, in plain settings with no CSS. Write them in the header above the first `---`, one per line, with dashes like every other key (`title-size:`, and `title_size:` still works):
 
 ```markdown
 # My Deck
@@ -445,15 +445,15 @@ image-corners: square
 ---
 ```
 
-A deck without these keys looks exactly as it always did. The settings apply to slides and question screens on the presenter, projector and phone. Theme and palette work as before, and the colour settings below replace the palette's own colours where a deck sets them.
+If a file starts with `---`, it has no header, and MDQ looks for these keys anywhere in the file and takes the first line that matches, so keep them in a header. A deck without these keys looks exactly as it always did. The settings apply to slides and question screens on the presenter, projector and phone. Theme and palette work as before, and the colour settings below replace the palette's own colours where a deck sets them. `text-color`, `muted-color` and `accent-color` colour the slide's own content and the question text. The toolbar, buttons, status label and join card keep the palette's colours, so they stay readable on their own fills. `background-color` also colours the page behind the slide.
 
-A value is a preset word, a plain length, or a colour, and nothing else. A length is a number with a unit, such as `4rem`, `18px`, `1.5em`, `60ch` or `80%`, and each setting below lists the units it takes. A colour is a CSS colour name such as `teal` or `navy`, or a hex colour such as `#0f766e` or `#0af`. Functions (`rgb()`, `var()`, `calc()`, `url()`), semicolons, braces and angle brackets are never accepted. A value that does not fit is ignored and reported when the deck loads, naming the key, the value and what is allowed:
+A value is a preset word, a plain length, or a colour, and nothing else. A length is a number with a unit, such as `4rem`, `18px`, `1.5em`, `60ch` or `80%`, and each setting below lists the units it takes. A colour is a CSS colour name such as `teal` or `navy`, or a hex colour such as `#0f766e` or `#0af`. Functions (`rgb()`, `var()`, `calc()`, `url()`), semicolons, braces and angle brackets are never accepted. A value that does not fit is ignored, never applied. It is reported with the key's line number, the key, the value and what is allowed. The server and the print command log it, and the instructor's deck list shows it under the deck:
 
 ```text
 title-size: huge is not a size. Use small, medium, large, x-large, or a length such as 4rem.
 ```
 
-The deck still opens. Colour contrast is your choice, so check that text stays readable on the colours you pick.
+The deck still loads and every other setting still applies, because this is a note and not a parse error. Colour contrast is your choice, so check that text stays readable on the colours you pick.
 
 ### Sizes
 

@@ -97,6 +97,24 @@ export default function LiveSurface({
   const surfaceStyle = appearance as CSSProperties | undefined;
   // The stylesheet repaints the slide from its background colour only when the deck sets one.
   const hasDeckBackground = !!appearance && ("--mdq-slide-bg" in appearance || "--mdq-slide-bg-soft" in appearance);
+  // Text, muted and accent colours reach the slide's own content only. The controls keep the palette's colours.
+  const deckColors = {
+    "data-deck-text": appearance && "--mdq-deck-text" in appearance ? "true" : undefined,
+    "data-deck-muted": appearance && "--mdq-deck-muted" in appearance ? "true" : undefined,
+    "data-deck-accent": appearance && "--mdq-deck-accent" in appearance ? "true" : undefined,
+  };
+  // The page canvas behind the slide takes the deck's background colour too, so no band of the palette's colour shows past the slide.
+  const deckCanvas = appearance?.["--mdq-slide-bg"];
+  useEffect(() => {
+    if (!deckCanvas) return undefined;
+    const root = document.documentElement;
+    root.style.setProperty("--mdq-deck-canvas", deckCanvas);
+    root.setAttribute("data-deck-canvas", "true");
+    return () => {
+      root.style.removeProperty("--mdq-deck-canvas");
+      root.removeAttribute("data-deck-canvas");
+    };
+  }, [deckCanvas]);
 
   useEffect(() => {
     if (typeof document === "undefined") return;
@@ -283,7 +301,7 @@ export default function LiveSurface({
   };
 
   return (
-    <section ref={surfaceRef} className={className} style={surfaceStyle} data-deck-background={hasDeckBackground ? "true" : undefined}>
+    <section ref={surfaceRef} className={className} style={surfaceStyle} data-deck-background={hasDeckBackground ? "true" : undefined} {...deckColors}>
       {backgroundLayer}
       <div ref={safeRef} className="slide-safe">
         <div ref={toolbarRef} className="slide-toolbar">
