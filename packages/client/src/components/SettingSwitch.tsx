@@ -26,6 +26,7 @@ export default function SettingSwitch({
   children?: ReactNode;
 }) {
   const descriptionId = useId();
+  const labelId = useId();
   return (
     <div className={`setting-switch-wrap ${className}`.trim()}>
       <button
@@ -33,13 +34,14 @@ export default function SettingSwitch({
         role="switch"
         className="setting-switch"
         aria-checked={checked}
+        aria-labelledby={labelId}
         aria-describedby={descriptionId}
         disabled={disabled}
         title={title}
         onClick={onToggle}
       >
         <span className="setting-switch-text">
-          <span className="setting-switch-label">{label}</span>
+          <span id={labelId} className="setting-switch-label">{label}</span>
           <span id={descriptionId} className="setting-switch-description">{description}</span>
         </span>
         <span className="setting-switch-state" aria-hidden="true">

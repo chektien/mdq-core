@@ -131,8 +131,8 @@ describe("the lock on the screens", () => {
 
   it("gives the instructor a 44px switch that says its state, in the lobby and the Participants dialog", () => {
     const toggle = read("components/JoinLockToggle.tsx");
-    expect(toggle).toContain("Joining locked");
-    expect(toggle).toContain("Lock joining");
+    expect(toggle).toContain('label="Lock joining"');
+    expect(toggle).not.toContain('label={shown');
     expect(read("components/SettingSwitch.tsx")).toContain("aria-checked");
     expect(read("index.css")).toMatch(/\.setting-switch \{[^}]*min-height: 2\.75rem/);
     expect(read("hooks/api.ts")).toContain("API.SESSION_JOIN_LOCK");

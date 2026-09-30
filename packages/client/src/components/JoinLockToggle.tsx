@@ -3,7 +3,7 @@ import SettingSwitch from "./SettingSwitch";
 
 /**
  * The presenter's switch for stopping new people joining, for example once the class is in. It is a
- * labelled switch row that says its state in words ("Lock joining" / "Joining locked", "Off" / "On") and follows the live list, so it is right after
+ * labelled switch row with a stable name and its state in words ("Off" / "On"), and follows the live list, so it is right after
  * a reload and when it is changed from another screen. Someone who is already in can always rejoin.
  */
 export default function JoinLockToggle({
@@ -43,7 +43,7 @@ export default function JoinLockToggle({
   return (
     <SettingSwitch
       className={`join-lock ${className}`.trim()}
-      label={shown ? "Joining locked" : "Lock joining"}
+      label="Lock joining"
       description={
         shown
           ? "New people cannot join. Anyone already in can still rejoin."

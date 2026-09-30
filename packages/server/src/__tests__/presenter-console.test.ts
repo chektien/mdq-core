@@ -216,6 +216,8 @@ describe("Participants dialog", () => {
     const row = read("components/SettingSwitch.tsx");
     expect(row).toContain('role="switch"');
     expect(row).toContain("aria-checked={checked}");
+    expect(row).toContain("aria-labelledby={labelId}");
+    expect(row).toContain('<span id={labelId} className="setting-switch-label">{label}</span>');
     expect(row).toContain("aria-describedby={descriptionId}");
   });
 });
