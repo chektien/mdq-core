@@ -143,3 +143,13 @@ export function resolveVideoUrl(raw: string): VideoUrlResult {
     reason: `${url.hostname} is not a supported video address, or its video ID is not valid, so this stays an ordinary link. ${supported}`,
   };
 }
+
+/**
+ * The address an iframe loads once the viewer presses play. The provider's
+ * player is asked to start, because the press is the viewer's choice to play.
+ */
+export function videoPlaybackUrl(embedUrl: string): string {
+  const url = new URL(embedUrl);
+  url.searchParams.set("autoplay", "1");
+  return url.toString();
+}

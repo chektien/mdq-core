@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import type { SlideVideo } from "@mdq/shared";
+import { videoPlaybackUrl, videoProviderName, type SlideVideo } from "@mdq/shared";
 
 /**
  * A contained, clickable playable-video card that belongs to the same visual
@@ -12,6 +12,128 @@ import type { SlideVideo } from "@mdq/shared";
  * close control.
  */
 export default function VideoCard({ video, title }: { video: SlideVideo; title: string }) {
+  return video.link ? <LinkedVideoCard video={video} /> : <ModalVideoCard video={video} title={title} />;
+}
+
+const IFRAME_ALLOW = "autoplay; encrypted-media; picture-in-picture; fullscreen";
+const IFRAME_SANDBOX = "allow-scripts allow-same-origin allow-presentation allow-popups";
+
+/**
+ * A video written as a `[Video: label](url)` link. It shows the label, the
+ * provider and a play button, and requests nothing from the provider until the
+ * viewer presses play. The player then replaces the card in place, so the
+ * presenter can still move on. Leaving the slide unmounts it, which stops the
+ * video. A link to the original address is always offered, and on paper the
+ * card is replaced by the label, provider and link.
+ */
+function LinkedVideoCard({ video }: { video: SlideVideo }) {
+  const link = video.link!;
+  const label = video.label || "Video";
+  const provider = videoProviderName(link.provider, link.url);
+  // Playing is tied to this video object, so a new slide never starts loaded.
+  const [playingVideo, setPlayingVideo] = useState<SlideVideo | null>(null);
+  const playing = playingVideo === video;
+  const playRef = useRef<HTMLButtonElement>(null);
+  const stopRef = useRef<HTMLButtonElement>(null);
+  const focusAfter = useRef<"stop" | "play" | null>(null);
+
+  useEffect(() => {
+    if (focusAfter.current === "stop") stopRef.current?.focus();
+    if (focusAfter.current === "play") playRef.current?.focus();
+    focusAfter.current = null;
+  }, [playing]);
+
+  const start = () => {
+    focusAfter.current = "stop";
+    setPlayingVideo(video);
+  };
+  const stop = () => {
+    focusAfter.current = "play";
+    setPlayingVideo(null);
+  };
+
+  return (
+    <figure
+      className="slide-video-figure slide-video-figure-link"
+      aria-label={label}
+      onKeyDown={(event) => {
+        if (event.key === "Escape" && playing) {
+          event.stopPropagation();
+          stop();
+        }
+      }}
+    >
+      {playing ? (
+        <div className="slide-video-player">
+          {link.mode === "file" ? (
+            <video
+              className="slide-video-native"
+              src={video.embedUrl}
+              controls
+              playsInline
+              autoPlay
+              preload="metadata"
+              aria-label={label}
+            />
+          ) : (
+            <iframe
+              className="slide-video-iframe"
+              src={videoPlaybackUrl(video.embedUrl)}
+              title={label}
+              allow={IFRAME_ALLOW}
+              sandbox={IFRAME_SANDBOX}
+              referrerPolicy="strict-origin-when-cross-origin"
+              allowFullScreen
+            />
+          )}
+        </div>
+      ) : (
+        <button
+          ref={playRef}
+          type="button"
+          className="slide-video-card slide-video-card-link"
+          onClick={start}
+          aria-label={`Play video: ${label}, ${provider}`}
+        >
+          <span className="slide-video-card-thumb slide-video-card-thumb-empty" aria-hidden="true" />
+          <span className="slide-video-card-play" aria-hidden="true">
+            <PlayGlyph />
+          </span>
+          <span className="slide-video-card-text" aria-hidden="true">
+            <span className="slide-video-card-label">{label}</span>
+            <span className="slide-video-card-provider">{provider}</span>
+          </span>
+        </button>
+      )}
+      <figcaption className="slide-video-actions">
+        <a className="slide-video-action" href={link.url} target="_blank" rel="noopener noreferrer">
+          Open video<span className="slide-video-sr"> (opens in a new tab)</span>
+        </a>
+        {playing && (
+          <button ref={stopRef} type="button" className="slide-video-action" onClick={stop}>
+            Stop video
+          </button>
+        )}
+      </figcaption>
+      <p className="slide-video-print">
+        <span className="slide-video-print-label">{label}</span>
+        <span className="slide-video-print-provider">{provider}</span>
+        <a className="slide-video-print-link" href={link.url}>{link.url}</a>
+      </p>
+    </figure>
+  );
+}
+
+function PlayGlyph() {
+  return (
+    <svg viewBox="0 0 24 24" width="40" height="40" focusable="false">
+      <circle cx="12" cy="12" r="12" fill="rgba(10,12,20,0.72)" />
+      <path d="M9.5 7.5v9l7-4.5-7-4.5z" fill="#fff" />
+    </svg>
+  );
+}
+
+function ModalVideoCard({ video, title }: { video: SlideVideo; title: string }) {
   const [open, setOpen] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const label = video.label || "Play video";
@@ -37,10 +159,7 @@ export default function VideoCard({ video, title }: { video: SlideVideo; title: 
           <span className="slide-video-card-thumb slide-video-card-thumb-empty" aria-hidden="true" />
         )}
         <span className="slide-video-card-play" aria-hidden="true">
-          <svg viewBox="0 0 24 24" width="40" height="40" focusable="false">
-            <circle cx="12" cy="12" r="12" fill="rgba(10,12,20,0.72)" />
-            <path d="M9.5 7.5v9l7-4.5-7-4.5z" fill="#fff" />
-          </svg>
+          <PlayGlyph />
         </span>
       </button>
       {caption && <figcaption>{caption}</figcaption>}

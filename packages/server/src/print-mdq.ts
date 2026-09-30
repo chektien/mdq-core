@@ -489,7 +489,8 @@ function renderItem(question: Question, index: number, total: number, options: P
   const body = renderTrustedHtml(question.textHtml, inputDir, options.imagesDir);
   const hasBody = body.trim().length > 0;
   const hasSlideMedia = isSlide && (question.slideMedia?.length ?? 0) > 0;
-  const bodySection = hasBody || !hasSlideMedia
+  const hasSlideVideo = isSlide && !!question.slideVideo;
+  const bodySection = hasBody || (!hasSlideMedia && !hasSlideVideo)
     ? `<section class="body-copy">${hasBody ? body : "<p class=\"empty-copy\">No body text.</p>"}</section>`
     : "";
 

@@ -3,8 +3,11 @@ import {
   parseStartSeconds,
   resolveVideoUrl,
   videoLinkMarkdown,
+  videoPlaybackUrl,
   videoProviderName,
 } from "@mdq/shared";
+import fs from "fs";
+import path from "path";
 import { parseQuizMarkdown } from "../parser";
 
 const YT = "https://www.youtube.com/watch?v=abc123DEF45";
@@ -409,5 +412,42 @@ B. two
     expect(q.slideVideo?.link).toBeUndefined();
     expect(q.textHtml).toContain("youtube.com");
     expect(result.diagnostics).toHaveLength(1);
+  });
+});
+
+describe("video card contract", () => {
+  const clientSrc = path.resolve(__dirname, "../../../client/src");
+  const tsx = fs.readFileSync(path.join(clientSrc, "components/VideoCard.tsx"), "utf-8");
+  const css = fs.readFileSync(path.join(clientSrc, "index.css"), "utf-8");
+
+  it("asks the player to start only from the address given at play time", () => {
+    expect(videoPlaybackUrl("https://www.youtube-nocookie.com/embed/abc123DEF45?start=30")).toBe(
+      "https://www.youtube-nocookie.com/embed/abc123DEF45?start=30&autoplay=1",
+    );
+    expect(videoPlaybackUrl("https://player.vimeo.com/video/76979871?dnt=1")).toBe(
+      "https://player.vimeo.com/video/76979871?dnt=1&autoplay=1",
+    );
+  });
+
+  it("sandboxes the iframe and limits what it may send and do", () => {
+    expect(tsx).toContain('"allow-scripts allow-same-origin allow-presentation allow-popups"');
+    expect(tsx).toContain('"autoplay; encrypted-media; picture-in-picture; fullscreen"');
+    expect(tsx).toContain('referrerPolicy="strict-origin-when-cross-origin"');
+  });
+
+  it("opens the original address in a new tab without a referrer or opener", () => {
+    expect(tsx).toContain('target="_blank" rel="noopener noreferrer"');
+  });
+
+  it("renders no iframe or video before play and stops on Escape and on leaving", () => {
+    const idle = tsx.slice(tsx.indexOf("function LinkedVideoCard"));
+    expect(idle).toContain("playing ? (");
+    expect(idle).toContain('event.key === "Escape"');
+    expect(idle).toContain("playingVideo === video");
+  });
+
+  it("makes every control at least 44 px and prints without a player", () => {
+    expect(css).toMatch(/\.slide-video-action \{[^}]*min-height: 44px/);
+    expect(css).toMatch(/@media print \{\s*\.slide-video-figure-link \.slide-video-card/);
   });
 });
