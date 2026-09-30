@@ -576,6 +576,22 @@ Slide bodies take bulleted lists, numbered lists and nested lists in any mix, in
 
 Three CSS custom properties let a stylesheet adjust slide lists: `--mdq-slide-bullet` sets the marker colour when set on `.slide-body li` (it wins at every level, the defaults are the slide accent at the top level and the muted slide ink below), `--mdq-list-gap` sets the space between top-level items (default `0.5em`), and `--mdq-list-gap-nested` sets it between items of a nested list (default `0.16em`). A margin on `li` adds to these gaps.
 
+A contents or agenda slide is written as bold lines, with no list:
+
+```markdown
+## Contents
+
+type: slide
+
+**Why this course**
+
+**What you will learn**
+
+**Assessment and grading**
+```
+
+When a slide is headed `Contents`, `Agenda` or `Table of contents` (a `(continued)` slide too) and its body is only paragraphs that are each one bold line, MDQ shows the lines without markers, larger than the body text and about two lines apart, so they read from the back of the room. The size is in `em` of the body size, so `body-size:` carries through, and the colours and font stay the deck's own. Any other heading, a list, or text beside the bold lines makes it an ordinary slide, and a renderer that does not know the convention shows the same Markdown as plain bold lines. About five lines fit a 1280 by 720 slide, so split a longer list over `Contents (continued)` slides.
+
 Setting keys are written with dashes, as above (`time-limit:`, `presenter-notes:`, `slide-background:`, `title-size:`). Decks written with the earlier underscored spelling (`time_limit:`, `presenter_notes:`) still work, and so does `type: open_response`; the two spellings can be mixed in one deck.
 
 ```markdown

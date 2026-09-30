@@ -5452,6 +5452,37 @@ html[data-theme="light"] .quiz-html a {
   margin-top: 0.2em;
 }
 
+/* Agenda slides. A slide headed Contents, Agenda or Table of contents whose
+   body is only one-line bold paragraphs (see agendaSlide.ts) shows them larger
+   than the body text, with about two lines between them and no markers. Sizes
+   are in em of the body size, so a deck's body-size and the small-screen sizes
+   above carry through, and the colour and font stay the deck's own. */
+.slide-header-agenda,
+.slide-header-agenda .slide-title {
+  max-width: none;
+}
+
+.slide-surface .slide-body.slide-body-agenda p {
+  margin: 0 0 1.15em;
+  font-size: 1.3em;
+  line-height: 1.2;
+}
+
+.slide-surface .slide-body.slide-body-agenda p:first-child {
+  margin-top: 0.4em;
+}
+
+.slide-surface .slide-body.slide-body-agenda p:last-child {
+  margin-bottom: 0;
+}
+
+/* A tall, wide screen (an iPad held upright) has room for larger lines. */
+@media (orientation: portrait) and (min-width: 600px) {
+  .slide-surface .slide-body.slide-body-agenda p {
+    font-size: 1.6em;
+  }
+}
+
 .quiz-html {
   overflow-wrap: anywhere;
   word-break: break-word;

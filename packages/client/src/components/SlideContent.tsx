@@ -14,6 +14,7 @@ import VideoCard from "./VideoCard";
 import { ExpandableImage } from "./ImageExpansion";
 import LiveSurface, { type LiveSurfaceAction } from "./LiveSurface";
 import QuizHtml from "./QuizHtml";
+import { isAgendaSlide } from "../agendaSlide";
 
 interface SlideContentBodyProps {
   title: string;
@@ -111,6 +112,7 @@ export function SlideContentBody({
   const hasVisual = hasMedia || hasVideo;
   const hasReferences = slideReferences.length > 0;
   const hasBody = html.trim().length > 0;
+  const isAgenda = hasBody && isAgendaSlide(title, html);
   const mediaCountClass = slideMedia.length > 3
     ? "slide-media-grid-count-many"
     : `slide-media-grid-count-${slideMedia.length}`;
@@ -171,7 +173,7 @@ export function SlideContentBody({
 
   return (
     <>
-      <header className="slide-header">
+      <header className={isAgenda ? "slide-header slide-header-agenda" : "slide-header"}>
         {chromeLabel && <p className="slide-eyebrow">{chromeLabel}</p>}
         <h1 className="slide-title">{title}</h1>
       </header>
@@ -185,7 +187,7 @@ export function SlideContentBody({
         ].filter(Boolean).join(" ")}
         style={bgStyle}
       >
-        {hasBody && <QuizHtml className="quiz-html slide-body slide-content-text" html={html} />}
+        {hasBody && <QuizHtml className={isAgenda ? "quiz-html slide-body slide-content-text slide-body-agenda" : "quiz-html slide-body slide-content-text"} html={html} />}
 
         {stackVisuals ? (
           <div className="slide-visual-stack">
