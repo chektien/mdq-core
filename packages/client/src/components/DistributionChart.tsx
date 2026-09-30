@@ -38,7 +38,7 @@ export default function DistributionChart({
           <div key={label} className="dist-row-shell flex items-center gap-3">
             <span
               className={`
-                w-10 text-center font-mono font-bold text-lg shrink-0 rounded-lg py-1
+                dist-label student-screen-text w-10 text-center font-mono font-bold text-lg shrink-0 rounded-lg py-1
                 ${isCorrect ? "bg-emerald-500/20 text-emerald-400" : "text-zinc-300"}
               `}
             >

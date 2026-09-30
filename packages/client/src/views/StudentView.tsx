@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useMemo, useRef } from "react";
+import { useState, useCallback, useEffect, useMemo, useRef, useSyncExternalStore } from "react";
 import { useSocket } from "../hooks/useSocket";
 import type { QuestionState, RevealState } from "../hooks/useSocket";
 import { API, MAX_OPEN_RESPONSE_LENGTH, SEAT_TAKEN_MESSAGE } from "@mdq/shared";
@@ -10,6 +10,8 @@ import InlineMarkdownText from "../components/InlineMarkdownText";
 import QuizHtml from "../components/QuizHtml";
 import SlideContent from "../components/SlideContent";
 import { getQuestionModeText } from "../questionMode";
+import { phoneScreenAppearance, type PhoneScreenAppearance } from "../phoneDeckStyle";
+import { browserColorEnv } from "../phoneDeckStyleBrowser";
 import { clampOpenResponse, countCharacters, sentenceStop } from "../responseText";
 import { SESSION_MISSING_MESSAGE, checkJoinValues, errorField, extraLabelNote, fieldElementId, joinFormSpec, joinIdentity, joinRefusalMessage } from "../joinForm";
 import { deckLabel, resultsHeading } from "../deckLabel";
@@ -695,6 +697,36 @@ export default function StudentView({
   );
 }
 
+/**
+ * The deck's header appearance settings for the phone's question and result
+ * screens, checked for contrast against the colours the screen will really
+ * have (see phoneDeckStyle.ts). A deck with no settings gets nothing back.
+ */
+function usePhoneScreenAppearance(deckStyle: unknown): PhoneScreenAppearance {
+  // A different theme or palette changes the colours the settings are checked against,
+  // so a switch re-renders the screen even when nothing else on it changes.
+  const look = useSyncExternalStore(subscribeToLook, readLook, () => "");
+  return useMemo(
+    () => phoneScreenAppearance(deckStyle, deckStyle && typeof document !== "undefined" ? browserColorEnv(document) : undefined),
+    [deckStyle, look],
+  );
+}
+
+const LOOK_ATTRIBUTES = ["data-theme", "data-palette"];
+
+function readLook(): string {
+  if (typeof document === "undefined") return "";
+  const { theme, palette } = document.documentElement.dataset;
+  return `${theme ?? ""}|${palette ?? ""}`;
+}
+
+function subscribeToLook(onChange: () => void): () => void {
+  if (typeof MutationObserver === "undefined" || typeof document === "undefined") return () => undefined;
+  const observer = new MutationObserver(onChange);
+  observer.observe(document.documentElement, { attributes: true, attributeFilter: LOOK_ATTRIBUTES });
+  return () => observer.disconnect();
+}
+
 // ── Question sub-view ──────────────────────
 
 function QuestionView({
@@ -721,6 +753,7 @@ function QuestionView({
   const [selected, setSelected] = useState<string[]>([]);
   const [responseText, setResponseText] = useState("");
   const lastSubmittedResponseRef = useRef<string>("");
+  const appearance = usePhoneScreenAppearance(question?.deckStyle);
   const questionIndex = question?.questionIndex ?? -1;
   const questionType = question?.questionType;
   // Something typed or chosen that the server has not been sent, so it can be offered again after a reconnect.
@@ -854,10 +887,10 @@ function QuestionView({
   }
 
   return (
-    <div className="min-h-dvh flex flex-col p-4 pb-safe">
+    <div className="student-screen min-h-dvh flex flex-col p-4 pb-safe" style={appearance.style} {...appearance.attributes}>
       {/* Header: timer + question number */}
       <div className="flex items-center justify-between mb-4">
-        <span className="text-zinc-400 text-sm font-medium">
+        <span className="student-screen-quiet text-zinc-400 text-sm font-medium">
           {positionLabel}
         </span>
         {!isClosed && (
@@ -866,7 +899,7 @@ function QuestionView({
       </div>
 
       {/* Question text */}
-      <QuizHtml id={questionTextId} className="quiz-html text-lg text-white leading-relaxed mb-6" html={question.text} />
+      <QuizHtml id={questionTextId} className="quiz-html student-question-text text-lg text-white leading-relaxed mb-6" html={question.text} />
 
       <div className={`selection-mode-card mb-5 rounded-2xl border px-4 py-3 ${question.questionType === "open_response" || question.allowsMultiple ? "selection-mode-card-multi" : "selection-mode-card-single"}`}>
         <div className="selection-mode-text">{selectionModeText}</div>
@@ -886,13 +919,14 @@ function QuestionView({
             placeholder="Type your response here"
             aria-describedby={`open-response-note-${question.questionIndex}`}
             rows={8}
-            className="min-h-[220px] w-full resize-y rounded-2xl border border-zinc-700 bg-zinc-800/80 px-4 py-4 text-base leading-relaxed text-white placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-70"
+            data-panel="neutral"
+            className="student-panel-text min-h-[220px] w-full resize-y rounded-2xl border border-zinc-700 bg-zinc-800/80 px-4 py-4 text-base leading-relaxed text-white placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-70"
           />
-          <p id={`open-response-note-${question.questionIndex}`} className="mt-3 text-sm text-zinc-400">
+          <p id={`open-response-note-${question.questionIndex}`} className="student-screen-quiet mt-3 text-sm text-zinc-400">
             Your response is unscored and won&apos;t affect the leaderboard.
           </p>
           {countCharacters(responseText) >= MAX_OPEN_RESPONSE_LENGTH - 200 && (
-            <p role="status" className="open-response-length mt-1 text-sm text-zinc-400">
+            <p role="status" className="open-response-length student-screen-quiet mt-1 text-sm text-zinc-400">
               {countCharacters(responseText) >= MAX_OPEN_RESPONSE_LENGTH
                 ? "That is the longest a response can be."
                 : `${MAX_OPEN_RESPONSE_LENGTH - countCharacters(responseText)} characters left`}
@@ -918,6 +952,7 @@ function QuestionView({
                 aria-checked={wasSubmitted || isSelected}
                 onClick={() => toggleOption(opt.label)}
                 disabled={disabled}
+                data-panel={wasSubmitted || isSelected ? undefined : "neutral"}
                 className={`
                   option-btn w-full text-left flex items-start gap-3 px-4 py-3 rounded-xl border-2 transition-all
                   ${
@@ -931,8 +966,9 @@ function QuestionView({
                 `}
               >
                 <span
+                  data-tone={wasSubmitted || isSelected ? undefined : "neutral"}
                   className={`
-                    option-marker w-8 h-8 flex items-center justify-center shrink-0 font-mono font-bold text-sm
+                    option-marker student-marker w-8 h-8 flex items-center justify-center shrink-0 font-mono font-bold text-sm
                     ${question.allowsMultiple ? "rounded-lg" : "rounded-full"}
                     ${
                       wasSubmitted || isSelected
@@ -943,7 +979,7 @@ function QuestionView({
                 >
                   {opt.label}
                 </span>
-                <QuizHtml className="quiz-html text-zinc-200 pt-0.5" html={opt.text} as="span" />
+                <QuizHtml className="quiz-html student-panel-text text-zinc-200 pt-0.5" html={opt.text} as="span" />
               </button>
             );
           })}
@@ -960,36 +996,36 @@ function QuestionView({
         ) : null}
         {submitted && question.questionType !== "open_response" ? (
           <div className="text-center py-3">
-            <span className="text-emerald-400 font-semibold">{submittedLabel}</span>
-            {isClosed && <p className="student-closed-note mt-1 text-sm text-zinc-400">{closedNote}</p>}
+            <span className="student-screen-text text-emerald-400 font-semibold">{submittedLabel}</span>
+            {isClosed && <p className="student-closed-note student-screen-quiet mt-1 text-sm text-zinc-400">{closedNote}</p>}
           </div>
         ) : question.questionType === "open_response" && isClosed ? (
           <div className="text-center py-3">
             {submittedResponseText ? (
               <>
-                <span className="text-amber-400 font-semibold">Response locked</span>
-                <p className="student-closed-note mt-1 text-sm text-zinc-400">{closedNote}</p>
+                <span className="student-screen-text text-amber-400 font-semibold">Response locked</span>
+                <p className="student-closed-note student-screen-quiet mt-1 text-sm text-zinc-400">{closedNote}</p>
               </>
             ) : (
-              <span className="student-closed-note text-amber-400 font-semibold">{closedNote}</span>
+              <span className="student-closed-note student-screen-text text-amber-400 font-semibold">{closedNote}</span>
             )}
             {submittedResponseText && (
-              <p className="mt-2 text-sm text-zinc-400 whitespace-pre-wrap">{submittedResponseText}</p>
+              <p className="student-screen-quiet mt-2 text-sm text-zinc-400 whitespace-pre-wrap">{submittedResponseText}</p>
             )}
           </div>
         ) : isClosed ? (
           <div className="text-center py-3">
-            <span className="student-closed-note text-amber-400 font-semibold">{closedNote}</span>
+            <span className="student-closed-note student-screen-text text-amber-400 font-semibold">{closedNote}</span>
           </div>
         ) : (
           <>
             {!connected && (
-              <p className="student-reconnecting mb-3 text-center text-sm text-amber-400" role="status" aria-live="polite">
+              <p className="student-reconnecting student-screen-text mb-3 text-center text-sm text-amber-400" role="status" aria-live="polite">
                 Connection lost. Reconnecting&hellip;
               </p>
             )}
             {connected && reconnectedNote && hasUnsent && (
-              <p className="student-reconnected mb-3 text-center text-sm text-emerald-400" role="status" aria-live="polite">
+              <p className="student-reconnected student-screen-text mb-3 text-center text-sm text-emerald-400" role="status" aria-live="polite">
                 Reconnected. Tap Submit to send your answer.
               </p>
             )}
@@ -1001,7 +1037,7 @@ function QuestionView({
               {submitLabel}
             </button>
             {question.questionType !== "open_response" && (
-              <p className="student-submit-note mt-3 text-center text-sm text-zinc-400">
+              <p className="student-submit-note student-screen-quiet mt-3 text-center text-sm text-zinc-400">
                 {question.isPoll ? "You cannot change your vote after you submit." : "You cannot change your answer after you submit."}
               </p>
             )}
@@ -1041,6 +1077,7 @@ function RevealView({
   submittedOptions: string[];
   submittedResponseText: string | null;
 }) {
+  const appearance = usePhoneScreenAppearance(question?.deckStyle);
   if (!question || !reveal) {
     return (
       <div className="min-h-dvh flex items-center justify-center p-6">
@@ -1083,11 +1120,14 @@ function RevealView({
         : "text-zinc-400";
 
   const bannerText = revealBannerText(question, reveal, submittedOptions, submittedResponseText);
+  // A banner on the palette's own card fill, as against one tinted with a status colour.
+  const bannerNeutral = bannerClass.includes("bg-zinc-800");
 
   return (
-    <div className="min-h-dvh flex flex-col p-4 pb-safe">
+    <div className="student-screen min-h-dvh flex flex-col p-4 pb-safe" style={appearance.style} {...appearance.attributes}>
       {/* Result banner */}
       <div
+        data-panel={bannerNeutral ? "neutral" : undefined}
         className={`
           reveal-banner text-center py-4 rounded-xl mb-4
           ${bannerClass}
@@ -1097,14 +1137,14 @@ function RevealView({
       </div>
 
       {/* Question text */}
-      <QuizHtml className="quiz-html text-base text-zinc-300 leading-relaxed mb-4" html={question.text} />
+      <QuizHtml className="quiz-html student-question-text student-question-text-small text-base text-zinc-300 leading-relaxed mb-4" html={question.text} />
 
       {isOpenResponse ? (
         // With no response, the banner above already says so.
         submittedResponseText ? (
           <div className="mb-6 rounded-2xl border border-sky-500/30 bg-sky-500/10 p-5">
-            <h3 className="mb-2 text-sm font-medium uppercase tracking-wide text-sky-200">Your response</h3>
-            <p className="whitespace-pre-wrap text-zinc-100">{submittedResponseText}</p>
+            <h3 className="student-panel-text mb-2 text-sm font-medium uppercase tracking-wide text-sky-200">Your response</h3>
+            <p className="student-panel-text whitespace-pre-wrap text-zinc-100">{submittedResponseText}</p>
           </div>
         ) : null
       ) : (
@@ -1121,6 +1161,7 @@ function RevealView({
                 : chosen
                   ? "border-red-500/50 bg-red-600/10"
                   : "border-zinc-800 bg-zinc-800/50";
+            const neutral = optionClass.includes("bg-zinc-800");
             const markerClass = isPoll
               ? chosen
                 ? "bg-sky-600 text-white"
@@ -1134,20 +1175,22 @@ function RevealView({
             return (
               <div
                 key={opt.label}
+                data-panel={neutral ? "neutral" : undefined}
                 className={`
-                  flex items-start gap-3 px-4 py-3 rounded-xl border-2
+                  student-reveal-option flex items-start gap-3 px-4 py-3 rounded-xl border-2
                   ${optionClass}
                 `}
               >
                 <span
+                  data-tone={neutral ? "neutral" : undefined}
                   className={`
-                    w-8 h-8 rounded-lg flex items-center justify-center shrink-0 font-mono font-bold text-sm
+                    student-marker w-8 h-8 rounded-lg flex items-center justify-center shrink-0 font-mono font-bold text-sm
                     ${markerClass}
                   `}
                 >
                   {opt.label}
                 </span>
-                <QuizHtml className="quiz-html text-zinc-200 pt-0.5" html={opt.text} as="span" />
+                <QuizHtml className="quiz-html student-panel-text text-zinc-200 pt-0.5" html={opt.text} as="span" />
               </div>
             );
           })}
@@ -1156,7 +1199,7 @@ function RevealView({
 
       {isPoll && !isOpenResponse && (
         <div className="mb-6">
-          <h3 className="mb-3 text-zinc-400 text-sm uppercase tracking-wide font-medium">
+          <h3 className="student-screen-quiet mb-3 text-zinc-400 text-sm uppercase tracking-wide font-medium">
             Poll distribution
           </h3>
           <DistributionChart
@@ -1169,11 +1212,11 @@ function RevealView({
 
       {/* Explanation */}
       {reveal.explanation && (
-        <div className="bg-zinc-800/80 border border-zinc-700 rounded-xl p-4 text-left">
-          <h3 className="text-zinc-400 text-sm uppercase tracking-wide font-medium mb-2">
+        <div data-panel="neutral" className="bg-zinc-800/80 border border-zinc-700 rounded-xl p-4 text-left">
+          <h3 className="student-panel-quiet text-zinc-400 text-sm uppercase tracking-wide font-medium mb-2">
             Explanation
           </h3>
-          <InlineMarkdownText text={reveal.explanation} className="text-zinc-200 text-sm leading-relaxed" />
+          <InlineMarkdownText text={reveal.explanation} className="student-panel-text text-zinc-200 text-sm leading-relaxed" />
         </div>
       )}
     </div>
