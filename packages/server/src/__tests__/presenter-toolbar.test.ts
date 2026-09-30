@@ -39,4 +39,20 @@ describe("presenter toolbar", () => {
     expect(index).toMatch(/\.slide-toolbar-nav \{\s*width: 100%;\s*pointer-events: none;/);
     expect(index).toMatch(/\.slide-toolbar-nav > \* \{\s*pointer-events: auto;/);
   });
+
+  it("measures the toolbar's real height and hands it to the stylesheet", () => {
+    expect(surface).toContain("toolbar.offsetTop + height");
+    expect(surface).toContain('safe.style.setProperty("--slide-toolbar-clear"');
+    expect(surface).toContain("new ResizeObserver(measure)");
+    // Before the first paint, so the title does not jump.
+    expect(surface).toContain("useLayoutEffect(() => {\n    const safe = safeRef.current;");
+  });
+
+  it("pads the slide's top by that height plus a 1.25 to 1.5 rem gap, from 761px up", () => {
+    const gap = index.match(/--slide-toolbar-gap: ([\d.]+)rem;/);
+    expect(gap).not.toBeNull();
+    expect(Number(gap?.[1])).toBeGreaterThanOrEqual(1.25);
+    expect(Number(gap?.[1])).toBeLessThanOrEqual(1.5);
+    expect(index).toMatch(/@media \(min-width: 761px\) \{\s*\.slide-surface:not\(\.slide-surface-live-embed\) > \.slide-safe\[data-toolbar="true"\] \{\s*padding-top: calc\(var\(--slide-toolbar-clear\) \+ var\(--slide-toolbar-gap\)\);/);
+  });
 });

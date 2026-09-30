@@ -280,6 +280,7 @@ Tip for classroom privacy and mobility: project a separate presentation view fro
 - The slide palette works the same way: the configured global `palette` applies by default, and a deck-level `palette:` preamble setting (any of the seven palette names) overrides it for that session.
 - `Prev` and `Next` stay pinned together near the top-left of the live surface so their click targets do not drift when other controls appear or disappear.
 - In live mode, `Next` includes the next item's markdown heading inside the button and `Prev` includes the previous item's heading, cut with an ellipsis when the two do not fit beside the other controls. In review mode, both stay plain buttons.
+- The slide's top padding follows the toolbar's measured height plus a gap of 1.4 rem, so the slide title stays clear of the buttons however the toolbar wraps or fills.
 - In full screen, the controls start to the right of the top-left corner (about 64 by 60 px), where iPad Safari draws its own close button. Outside full screen they do not move.
 - `End Session` remains available from the live controls and opens a confirmation dialog before closing the room. The dialog shows how many quiz questions and slides are left.
 - The fullscreen control appears when the browser supports the Fullscreen API, letting the instructor/projector surface fill the display without browser chrome.

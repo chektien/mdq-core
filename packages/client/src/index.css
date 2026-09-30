@@ -7297,3 +7297,19 @@ body.image-expansion-lock {
     min-width: min(11rem, 22cqi);
   }
 }
+
+/* The toolbar floats over the top of the slide from 761px up. LiveSurface
+   measures its real height and sets --slide-toolbar-clear on the safe area,
+   so the top padding is that height plus a clear gap and the title never
+   touches or crowds the buttons, however the toolbar wraps or fills.
+   Below 761px the toolbar is part of the flow and needs no reserve. A live
+   embed fills the whole surface and keeps no padding. */
+.slide-safe {
+  --slide-toolbar-gap: 1.4rem;
+}
+
+@media (min-width: 761px) {
+  .slide-surface:not(.slide-surface-live-embed) > .slide-safe[data-toolbar="true"] {
+    padding-top: calc(var(--slide-toolbar-clear) + var(--slide-toolbar-gap));
+  }
+}
