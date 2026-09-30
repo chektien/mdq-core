@@ -7443,6 +7443,16 @@ dialog.participants-overlay {
   border: 0;
 }
 
+/* Utility display classes must not expose a closed dialog before showModal(). */
+dialog.participants-overlay:not([open]) {
+  display: none;
+}
+
+/* The full-viewport overlay already supplies the theme's dimming and blur. */
+dialog.participants-overlay::backdrop {
+  background: transparent;
+}
+
 .participants-body {
   max-height: 40vh;
   margin: 1rem 0;

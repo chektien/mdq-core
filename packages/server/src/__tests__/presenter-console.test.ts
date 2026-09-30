@@ -184,6 +184,12 @@ describe("Participants dialog", () => {
   const start = tsx.indexOf("const participantsDialog = showParticipants");
   const dialog = tsx.slice(start, tsx.indexOf(") : null;", start));
 
+  it("hides the closed native dialog and avoids adding the UA backdrop shade", () => {
+    const css = read("index.css");
+    expect(lastRule(css, "dialog.participants-overlay:not([open])")).toContain("display: none");
+    expect(lastRule(css, "dialog.participants-overlay::backdrop")).toContain("background: transparent");
+  });
+
   it("uses native modal focus isolation and restores the live control on every close path", () => {
     expect(dialog).toMatch(/<dialog\s+ref=\{participantsDialogRef\}/);
     expect(dialog).toContain('aria-labelledby="participants-title"');
