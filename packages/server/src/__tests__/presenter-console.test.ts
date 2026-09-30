@@ -199,6 +199,13 @@ describe("Participants dialog", () => {
     expect(tsx).toContain('<h1 ref={endedHeadingRef} tabIndex={-1}');
   });
 
+  it("does not open a top-layer modal over an existing QR or end-confirm dialog", () => {
+    const start = tsx.indexOf("const participantsAction:");
+    const action = tsx.slice(start, tsx.indexOf("const liveSurfaceActions:", start));
+    expect(action).toContain("if (documentHasOpenDialog(document)) return;");
+    expect(action.indexOf("documentHasOpenDialog(document)")).toBeLessThan(action.indexOf("setShowParticipants(true)"));
+  });
+
   it("closes with an icon button named Close, at least 44px square", () => {
     expect(dialog).toMatch(/className="participants-close"\s+aria-label="Close"/);
     expect(dialog).toContain("<svg");

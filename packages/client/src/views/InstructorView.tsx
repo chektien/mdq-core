@@ -1112,6 +1112,9 @@ function LiveView({
   const participantsAction: LiveSurfaceAction = {
     label: "Participants",
     onClick: (event) => {
+      // Existing DOM overlays (QR/end confirm) must not be stranded behind
+      // this native top-layer modal by activation of a background control.
+      if (documentHasOpenDialog(document)) return;
       // Safari pointer clicks do not always focus buttons. Remember the button
       // that invoked this action rather than whichever element had focus.
       participantsOpenerRef.current = event?.currentTarget ?? document.activeElement as HTMLElement | null;
