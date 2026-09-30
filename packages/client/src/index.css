@@ -7313,3 +7313,25 @@ body.image-expansion-lock {
     padding-top: calc(var(--slide-toolbar-clear) + var(--slide-toolbar-gap));
   }
 }
+
+/* The page canvas behind a live presenter or projector page is the slide's own
+   colour. A browser can show canvas past the bottom of the layout viewport
+   (iPad Safari does beside the home indicator in full screen), and in the
+   light themes the canvas otherwise differs from the slide surface, so a
+   stripe of another colour showed there. The slide surface ends on the slide
+   background in the classic look and in some palettes, and on the soft
+   background in the others, so the canvas takes the same end colour.
+   The home indicator itself is system UI that a page cannot hide. */
+html:root[data-theme]:has(.slide-surface:not(.slide-surface-student)) {
+  background: var(--mdq-slide-bg);
+}
+
+html:root[data-palette="gruvbox"][data-theme="light"]:has(.slide-surface:not(.slide-surface-student)),
+html:root[data-palette="rose-pine"][data-theme="light"]:has(.slide-surface:not(.slide-surface-student)),
+html:root[data-palette="ayu"][data-theme="light"]:has(.slide-surface:not(.slide-surface-student)),
+html:root[data-palette="catppuccin"][data-theme="light"]:has(.slide-surface:not(.slide-surface-student)),
+html:root[data-palette="catppuccin"]:not([data-theme="light"]):has(.slide-surface:not(.slide-surface-student)),
+html:root[data-palette="seoul256"]:not([data-theme="light"]):has(.slide-surface:not(.slide-surface-student)),
+html:root[data-palette="tokyo-night"]:not([data-theme="light"]):has(.slide-surface:not(.slide-surface-student)) {
+  background: var(--mdq-slide-bg-soft);
+}
