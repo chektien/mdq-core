@@ -4,6 +4,7 @@ import { pickNavAction } from "../presenterKeys";
 import {
   SWIPE_BLOCKING_SELECTOR,
   canBeginSwipe,
+  isSwipePointer,
   resolveSwipe,
   type HorizontalScroller,
   type SwipeStart,
@@ -164,6 +165,10 @@ export default function LiveSurface({
     };
 
     const onPointerDown = (event: PointerEvent) => {
+      // Only a finger or a pen counts. A new primary pointer starts afresh, so
+      // an id left behind by a lost pointerup cannot keep swipes off.
+      if (!isSwipePointer(event.pointerType)) return;
+      if (event.isPrimary) touches.clear();
       touches.add(event.pointerId);
       // A second finger is a pinch, not a swipe.
       if (touches.size > 1) {
@@ -199,10 +204,12 @@ export default function LiveSurface({
     surface.addEventListener("pointerdown", onPointerDown);
     surface.addEventListener("pointerup", onPointerUp);
     surface.addEventListener("pointercancel", onPointerCancel);
+    surface.addEventListener("lostpointercapture", onPointerCancel);
     return () => {
       surface.removeEventListener("pointerdown", onPointerDown);
       surface.removeEventListener("pointerup", onPointerUp);
       surface.removeEventListener("pointercancel", onPointerCancel);
+      surface.removeEventListener("lostpointercapture", onPointerCancel);
     };
   }, [hasNavActions]);
 

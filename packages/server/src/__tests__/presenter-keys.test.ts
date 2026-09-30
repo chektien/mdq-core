@@ -5,6 +5,7 @@ import {
   directionForKey,
   documentHasOpenDialog,
   isEditableTarget,
+  isShieldedTarget,
   pickNavAction,
   type PresenterKeyEvent,
 } from "../../../client/src/presenterKeys";
@@ -97,6 +98,48 @@ describe("editable targets", () => {
   });
 });
 
+describe("widgets that keep their arrow keys", () => {
+  const withRole = (role: string) => ({ tagName: "DIV", getAttribute: (name: string) => (name === "role" ? role : null) });
+
+  it("leaves tabs, radios, menus, sliders, listboxes and comboboxes alone", () => {
+    for (const role of ["tab", "radio", "menu", "menuitem", "slider", "listbox", "combobox"]) {
+      expect(isEditableTarget(withRole(role))).toBe(true);
+      expect(decidePresenterKey(press("ArrowRight"), withRole(role), false).act).toBe(false);
+    }
+    expect(isEditableTarget(withRole("button"))).toBe(false);
+  });
+
+  it("leaves a player with controls and the notes panel to their own keys", () => {
+    const inside = (selectors: string[]) => ({ tagName: "VIDEO", closest: (selector: string) => (selectors.some((s) => selector.includes(s)) ? {} : null) });
+    expect(isShieldedTarget(inside(["video[controls]"]))).toBe(true);
+    expect(isShieldedTarget(inside(["audio[controls]"]))).toBe(true);
+    expect(isShieldedTarget(inside([".presenter-notes-panel"]))).toBe(true);
+    expect(isShieldedTarget(inside([]))).toBe(false);
+    expect(isShieldedTarget(null)).toBe(false);
+    expect(decidePresenterKey(press("ArrowRight"), inside([".presenter-notes-panel"]), false)).toEqual({ direction: null, consume: false, act: false });
+  });
+});
+
+describe("the stacked layout, where the slide scrolls", () => {
+  const scrolling = { arrowsScroll: true };
+
+  it("leaves ArrowUp and ArrowDown to scroll", () => {
+    for (const key of ["ArrowUp", "ArrowDown"]) {
+      expect(decidePresenterKey(press(key), body, false, scrolling)).toEqual({ direction: null, consume: false, act: false });
+    }
+  });
+
+  it("keeps h, j, k, l, ArrowLeft, ArrowRight, PageUp and PageDown for navigation", () => {
+    for (const key of ["h", "j", "k", "l", "ArrowLeft", "ArrowRight", "PageUp", "PageDown"]) {
+      expect(decidePresenterKey(press(key), body, false, scrolling).act).toBe(true);
+    }
+  });
+
+  it("still takes ArrowUp and ArrowDown on the wide layout", () => {
+    expect(decidePresenterKey(press("ArrowDown"), body, false, { arrowsScroll: false }).act).toBe(true);
+  });
+});
+
 describe("Prev and Next actions", () => {
   const onClick = () => undefined;
   const actions = [
@@ -136,6 +179,7 @@ describe("presenter view wiring", () => {
 
   it("runs the same Prev and Next handlers as the buttons", () => {
     expect(instructor).toContain("pickNavAction(navActionsRef.current, decision.direction)");
-    expect(instructor).toContain("decidePresenterKey(event, event.target as Element | null, documentHasOpenDialog(document))");
+    expect(instructor).toContain("documentHasOpenDialog(document),");
+    expect(instructor).toContain('{ arrowsScroll: window.matchMedia("(max-width: 760px)").matches }');
   });
 });

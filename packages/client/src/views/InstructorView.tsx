@@ -1081,7 +1081,12 @@ function LiveView({
   });
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
-      const decision = decidePresenterKey(event, event.target as Element | null, documentHasOpenDialog(document));
+      const decision = decidePresenterKey(
+        event,
+        event.target as Element | null,
+        documentHasOpenDialog(document),
+        { arrowsScroll: window.matchMedia("(max-width: 760px)").matches },
+      );
       if (!decision.consume || !decision.direction) return;
       event.preventDefault();
       if (!decision.act) return;

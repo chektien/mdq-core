@@ -28,10 +28,17 @@ export interface PresenterKeyTarget {
   tagName?: string;
   isContentEditable?: boolean;
   getAttribute?: (name: string) => string | null;
+  closest?: (selector: string) => unknown;
 }
 
 const EDITABLE_TAGS = new Set(["INPUT", "TEXTAREA", "SELECT"]);
-const EDITABLE_ROLES = new Set(["textbox", "searchbox", "combobox", "spinbutton", "listbox", "slider"]);
+// Widgets that keep their own arrow keys.
+const EDITABLE_ROLES = new Set([
+  "textbox", "searchbox", "combobox", "spinbutton", "listbox", "slider",
+  "tab", "radio", "menu", "menuitem", "menuitemcheckbox", "menuitemradio",
+]);
+/** Places whose keys are theirs: a video or audio player with controls, and the presenter notes panel. */
+const SHIELDED_SELECTOR = "video[controls], audio[controls], .presenter-notes-panel";
 
 /** True when a key press is meant for a field, so it must not move the slides. */
 export function isEditableTarget(target: PresenterKeyTarget | null | undefined): boolean {
@@ -42,6 +49,11 @@ export function isEditableTarget(target: PresenterKeyTarget | null | undefined):
   if (contentEditable !== null && contentEditable !== undefined && contentEditable !== "false") return true;
   const role = target.getAttribute?.("role");
   return !!role && EDITABLE_ROLES.has(role);
+}
+
+/** True when focus is inside a player with controls or the notes panel, which keep their arrow keys. */
+export function isShieldedTarget(target: PresenterKeyTarget | null | undefined): boolean {
+  return !!target?.closest?.(SHIELDED_SELECTOR);
 }
 
 /** Which way a key moves the slides, ignoring where focus is. */
@@ -67,18 +79,23 @@ const IGNORE: PresenterKeyDecision = { direction: null, consume: false, act: fal
  * Decides what a key press does. A held key (`repeat`) is consumed but does
  * not act, so it cannot run through slides and open questions. Nothing happens
  * with Ctrl, Meta or Alt held, in a field, while a dialog is open, or during
- * text composition.
+ * text composition. Focus inside a player with controls or the notes panel
+ * leaves the keys to them, and with `arrowsScroll` (the stacked layout, where
+ * the slide scrolls) Up and Down are left to scroll it.
  */
 export function decidePresenterKey(
   event: PresenterKeyEvent,
   target: PresenterKeyTarget | null | undefined,
   dialogOpen: boolean,
+  options: { arrowsScroll?: boolean } = {},
 ): PresenterKeyDecision {
   if (event.defaultPrevented || event.isComposing) return IGNORE;
   if (event.ctrlKey || event.metaKey || event.altKey) return IGNORE;
   const direction = directionForKey(event.key);
   if (!direction) return IGNORE;
-  if (dialogOpen || isEditableTarget(target)) return IGNORE;
+  if (dialogOpen || isEditableTarget(target) || isShieldedTarget(target)) return IGNORE;
+  // On the stacked layout the slide scrolls, so Up and Down keep scrolling it.
+  if (options.arrowsScroll && (event.key === "ArrowUp" || event.key === "ArrowDown")) return IGNORE;
   return { direction, consume: true, act: !event.repeat };
 }
 

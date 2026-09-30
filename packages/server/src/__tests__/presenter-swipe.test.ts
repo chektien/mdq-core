@@ -131,6 +131,13 @@ describe("swipe wiring", () => {
     expect(surface).toContain("touches.size > 1");
   });
 
+  it("counts only fingers and pens, and cannot be left off by a lost pointerup", () => {
+    expect(surface).toContain("if (!isSwipePointer(event.pointerType)) return;");
+    expect(surface).toContain("if (event.isPrimary) touches.clear();");
+    expect(surface).toContain('surface.addEventListener("lostpointercapture", onPointerCancel);');
+    expect(surface).toContain('surface.removeEventListener("lostpointercapture", onPointerCancel);');
+  });
+
   it("keeps vertical scrolling and pinching on the swipe surface only", () => {
     expect(index).toMatch(/\.slide-surface-swipe \{\s*touch-action: pan-y pinch-zoom;\s*\}/);
   });
