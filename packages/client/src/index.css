@@ -102,7 +102,6 @@ body {
 
 .slide-next-up {
   max-width: min(34rem, 38cqi);
-  border-left: 0.24rem solid var(--mdq-slide-accent);
   background: rgba(255, 255, 255, 0.62);
   padding: 0.72rem 0.9rem;
   color: var(--mdq-slide-ink);
@@ -2856,8 +2855,9 @@ html[data-theme="light"] .slide-action-button-warning:disabled {
   max-width: min(48rem, 54cqi);
   align-items: center;
   gap: 0.55rem;
-  border-left: 0.2rem solid var(--mdq-slide-accent);
-  padding: 0.48rem 0.7rem 0.48rem 0.62rem;
+  padding: 0.48rem 0.7rem;
+  /* A quiet label: the hairline all round and the glass tint, without the shadow the buttons carry. */
+  box-shadow: none;
   pointer-events: auto;
 }
 
@@ -2876,7 +2876,7 @@ html[data-theme="light"] .slide-action-button-warning:disabled {
   min-width: 0;
   margin-top: 0;
   overflow: hidden;
-  color: var(--mdq-slide-ink);
+  color: var(--mdq-slide-ink-soft);
   font-size: clamp(0.84rem, 1cqi, 0.98rem);
   line-height: 1.1;
   text-overflow: ellipsis;
@@ -6775,6 +6775,15 @@ body.image-expansion-lock {
     grid-column: 1 / -1;
     grid-row: 2;
     justify-self: center;
+  }
+
+  /* With no Prev and Next to make room for (the projector), the next-up label
+     stays in the top-left corner beside the controls. It is not pushed to a
+     row of its own that the title has to clear as well. */
+  .slide-toolbar:not(:has(.slide-toolbar-nav, .slide-status-pill)) .slide-toolbar-stack {
+    grid-column: 1;
+    grid-row: 1;
+    justify-self: start;
   }
 
   .slide-safe:has(.slide-status-pill) {
