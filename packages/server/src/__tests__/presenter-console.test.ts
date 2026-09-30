@@ -223,10 +223,22 @@ describe("Participants dialog", () => {
 });
 
 describe("open join card", () => {
-  it("is wide enough for the join address to wrap to two lines, with the QR at least as large as before", () => {
+  it("widens the address area, with the QR at least as large as before", () => {
     const css = read("index.css");
-    expect(css).toMatch(/@media \(min-width: 761px\) \{\s*\.slide-join-panel\.session-code-card-expanded,[\s\S]*?width: clamp\(11\.5rem, 16cqi, 16rem\)/);
+    expect(css).toContain("--slide-expanded-join-width: clamp(11.5rem, 16cqi, 16rem)");
+    expect(css).toMatch(/\.slide-join-panel\.session-code-card-expanded,[\s\S]*?width: var\(--slide-expanded-join-width\)/);
     expect(css).toMatch(/\.slide-join-panel\.session-code-card-expanded \.session-code-card-qr \{\s*width: min\(100%, 9rem\)/);
+  });
+
+  it("reserves the widened floating card beside media and references, but adds no inset when it is in flow", () => {
+    const css = read("index.css");
+    expect(css).toMatch(/\.slide-safe:has\(\.slide-join-panel\.session-code-card-expanded\) \{\s*--slide-join-reserve: var\(--slide-expanded-join-width\)/);
+    for (const selector of [
+      ".slide-safe:has(.slide-join-panel) .slide-content-grid-with-media .slide-media-grid",
+      ".slide-safe:has(.slide-join-panel) .slide-content-grid-media-only .slide-media-groups",
+      ".slide-safe:has(.slide-join-panel) .slide-references",
+    ]) expect(lastRule(css, selector)).toContain("var(--slide-join-reserve, 0px)");
+    expect(css).toMatch(/@media \(min-width: 761px\) and \(max-width: 1180px\) \{\s*\.slide-live-shell-controls:has\(\.presenter-notes-panel\) \.slide-safe \{\s*--slide-join-reserve: 0px/);
   });
 });
 

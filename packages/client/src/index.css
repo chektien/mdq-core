@@ -3325,7 +3325,7 @@ html[data-theme="light"] .slide-action-button-warning:disabled {
 }
 
 .slide-safe:has(.slide-join-panel) .slide-content-grid-with-media .slide-media-grid {
-  width: calc(100% - min(9.5rem, 18cqi));
+  width: calc(100% - max(min(9.5rem, 18cqi), var(--slide-join-reserve, 0px)));
   justify-self: start;
 }
 
@@ -3792,7 +3792,7 @@ html[data-theme="light"] .slide-action-button-warning:disabled {
   justify-self: stretch;
 }
 .slide-safe:has(.slide-join-panel) .slide-content-grid-media-only .slide-media-groups {
-  width: calc(100% - min(8rem, 15cqi));
+  width: calc(100% - max(min(8rem, 15cqi), var(--slide-join-reserve, 0px)));
   justify-self: start;
 }
 
@@ -4305,7 +4305,7 @@ html[data-theme="light"] .quiz-html a {
 
 .slide-safe:has(.slide-join-panel) .slide-references {
   max-width: min(40rem, 48cqi);
-  padding-right: min(13rem, 22cqi);
+  padding-right: max(min(13rem, 22cqi), var(--slide-join-reserve, 0px));
 }
 
 .slide-notes {
@@ -7021,15 +7021,30 @@ html[data-theme="light"] .slide-video-figure .slide-video-action:not(button) {
 /* The open join card is wide enough for the join address to wrap to two lines, and the QR is a little
    larger than it was. On a phone the card is a row (QR beside the text) and keeps its own layout. */
 @media (min-width: 761px) {
+  .slide-safe {
+    --slide-expanded-join-width: clamp(11.5rem, 16cqi, 16rem);
+  }
+
+  .slide-safe:has(.slide-join-panel.session-code-card-expanded) {
+    --slide-join-reserve: var(--slide-expanded-join-width);
+  }
+
   .slide-join-panel.session-code-card-expanded,
   .slide-live-shell-controls:has(.presenter-notes-panel) .slide-join-panel.session-code-card-expanded {
-    width: clamp(11.5rem, 16cqi, 16rem);
+    width: var(--slide-expanded-join-width);
     max-width: 100%;
   }
 
   .slide-join-panel.session-code-card-expanded .session-code-card-qr {
     width: min(100%, 9rem);
     justify-self: center;
+  }
+}
+
+/* Here the card is in normal flow; widening it needs no additional inset. */
+@media (min-width: 761px) and (max-width: 1180px) {
+  .slide-live-shell-controls:has(.presenter-notes-panel) .slide-safe {
+    --slide-join-reserve: 0px;
   }
 }
 
