@@ -152,6 +152,18 @@ function dumpAll() {
   return out;
 }
 
+/** Dumps until two dumps in a row agree, so a transition still running does not count as a difference. */
+async function stableDump(page) {
+  let previous = JSON.stringify(await page.evaluate(dumpAll));
+  for (let attempt = 0; attempt < 6; attempt += 1) {
+    await page.waitForTimeout(400);
+    const next = JSON.stringify(await page.evaluate(dumpAll));
+    if (next === previous) return JSON.parse(next);
+    previous = next;
+  }
+  return JSON.parse(previous);
+}
+
 // The presenter view needs a login session to reload, so the earlier-bundle comparison covers the projector and the phone.
 const SURFACES = ["presenter", "projector", "phone"];
 
@@ -223,7 +235,7 @@ async function main() {
         await phone.mouse.move(0, 0);
         await phone.evaluate(() => document.activeElement?.blur());
         await phone.waitForTimeout(600);
-        const currentDump = { projector: await projector.evaluate(dumpAll), phone: await phone.evaluate(dumpAll) };
+        const currentDump = { projector: await stableDump(projector), phone: await stableDump(phone) };
         const swap = async (context, url, ready) => {
           const page = await context.newPage();
           const baselineAssets = fs.readdirSync(path.join(baselineDist, "assets"));
@@ -238,16 +250,16 @@ async function main() {
           return page;
         };
         const oldProjector = await swap(desktop, `${base}/present/${sessionId}`, ".slide-surface .slide-title");
-        dumps.projector = [currentDump.projector, await oldProjector.evaluate(dumpAll)];
+        dumps.projector = [currentDump.projector, await stableDump(oldProjector)];
         const oldPhone = await swap(phoneContext, phone.url(), ".slide-surface-student .slide-title").catch(() => null);
-        if (oldPhone) dumps.phone = [currentDump.phone, await oldPhone.evaluate(dumpAll)];
+        if (oldPhone) dumps.phone = [currentDump.phone, await stableDump(oldPhone)];
         const hasKeys = (page) => page.evaluate(() => [...document.styleSheets].some((sheet) => { try { return [...sheet.cssRules].some((rule) => rule.cssText.includes("--mdq-title-scale")); } catch { return false; } }));
         dumps.bundles = [await hasKeys(projector), await hasKeys(oldProjector)];
         await projector.mouse.move(0, 0);
         await oldProjector.mouse.move(0, 0);
         await projector.waitForTimeout(1500);
-        // The same session and the same window: the two bundles must paint the same pixels.
-        dumps.pixels = [(await projector.screenshot()).equals(await oldProjector.screenshot()), oldPhone ? (await phone.screenshot()).equals(await oldPhone.screenshot()) : null];
+        // The same session and the same window: the two bundles must paint the same pixels. The join card is masked because its online count changes as pages connect.
+        dumps.pixels = [(await projector.screenshot({ animations: "disabled", mask: [projector.locator(".slide-join-panel")] })).equals(await oldProjector.screenshot({ animations: "disabled", mask: [oldProjector.locator(".slide-join-panel")] })), oldPhone ? (await phone.screenshot({ animations: "disabled" })).equals(await oldPhone.screenshot({ animations: "disabled" })) : null];
       }
       await desktop.close();
       await phoneContext.close();
