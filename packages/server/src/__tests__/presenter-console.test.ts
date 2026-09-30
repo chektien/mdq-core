@@ -195,7 +195,8 @@ describe("Participants dialog", () => {
     expect(dialog).toContain('aria-labelledby="participants-title"');
     expect(dialog).toContain("onCancel={(event) => { event.preventDefault(); setShowParticipants(false); }}");
     expect(tsx).toContain("return mountParticipantsDialog(dialog, participantsOpenerRef.current)");
-    expect(tsx).toContain("participantsOpenerRef.current = document.activeElement");
+    expect(tsx).toContain("participantsOpenerRef.current = event?.currentTarget ?? document.activeElement");
+    expect(tsx).toContain('<h1 ref={endedHeadingRef} tabIndex={-1}');
   });
 
   it("closes with an icon button named Close, at least 44px square", () => {

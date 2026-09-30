@@ -159,6 +159,11 @@ export default function InstructorView({
   const [sessionInfo, setSessionInfo] = useState<CreateSessionResponse | null>(null);
   const [accessInfo, setAccessInfo] = useState<AccessInfo | null>(null);
   const [phase, setPhase] = useState<InstructorPhase>("setup");
+  // After session end the live opener no longer exists. Focus the new screen
+  // once on attachment rather than leaving focus on the removed dialog/body.
+  const endedHeadingRef = useCallback((heading: HTMLHeadingElement | null) => {
+    heading?.focus({ preventScroll: true });
+  }, []);
   const [totalQuestionsInQuiz, setTotalQuestionsInQuiz] = useState(0);
   const [questionHeadings, setQuestionHeadings] = useState<string[]>([]);
   const [questionSummaries, setQuestionSummaries] = useState<QuestionSummary[]>([]);
@@ -703,7 +708,7 @@ export default function InstructorView({
   if (phase === "ended") {
     return (
       <div className="min-h-dvh flex flex-col items-center justify-center gap-8 p-8">
-        <h1 className="text-3xl font-bold text-white">Session Ended</h1>
+        <h1 ref={endedHeadingRef} tabIndex={-1} className="text-3xl font-bold text-white">Session Ended</h1>
         {quizLabel && (
           <h2 className="text-xl font-semibold text-zinc-300 text-center">
             {resultsHeading("leaderboard", quizLabel)}
@@ -1106,8 +1111,10 @@ function LiveView({
 
   const participantsAction: LiveSurfaceAction = {
     label: "Participants",
-    onClick: () => {
-      participantsOpenerRef.current = document.activeElement as HTMLElement | null;
+    onClick: (event) => {
+      // Safari pointer clicks do not always focus buttons. Remember the button
+      // that invoked this action rather than whichever element had focus.
+      participantsOpenerRef.current = event?.currentTarget ?? document.activeElement as HTMLElement | null;
       setShowParticipants(true);
     },
   };
