@@ -6,6 +6,7 @@ import type {
   SlideLiveEmbed,
   SlideVideo,
   SlideReference,
+  DeckStyle,
 } from "@mdq/shared";
 import FoldoutNote from "./FoldoutNote";
 import SlideBackgroundLayer from "./SlideBackgroundLayer";
@@ -29,6 +30,8 @@ interface SlideContentBodyProps {
 
 interface SlideContentProps extends SlideContentBodyProps {
   slideBackground?: SlideBackground;
+  /** The deck header's appearance settings, applied to the slide surface. */
+  deckStyle?: DeckStyle;
   positionLabel?: string;
   mode?: "projector" | "review" | "student";
   nextLabel?: string | null;
@@ -263,6 +266,7 @@ export default function SlideContent({
   slideVideo,
   slideReferences = [],
   slideBackground,
+  deckStyle,
   positionLabel,
   mode = "projector",
   nextLabel,
@@ -290,6 +294,7 @@ export default function SlideContent({
       mode={mode}
       surfaceClassName={surfaceClassName}
       backgroundLayer={slideBackground ? <SlideBackgroundLayer background={slideBackground} /> : undefined}
+      deckStyle={deckStyle}
       nextLabel={nextLabel}
       qrDataUrl={qrDataUrl}
       sessionCode={sessionCode}

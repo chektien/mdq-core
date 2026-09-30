@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { safeDeckStyle, type DeckStyle } from "@mdq/shared";
 import SessionCodeCard from "./SessionCodeCard";
 import { pickNavAction } from "../presenterKeys";
 import {
@@ -29,6 +30,8 @@ interface LiveSurfaceProps {
   mode?: "projector" | "review" | "student";
   surfaceClassName?: string;
   backgroundLayer?: ReactNode;
+  /** The deck header's appearance settings, applied as custom properties on the slide surface. */
+  deckStyle?: DeckStyle;
   nextLabel?: string | null;
   statusLabel?: string | null;
   statusTone?: "neutral" | "success" | "warning";
@@ -56,6 +59,7 @@ export default function LiveSurface({
   mode = "projector",
   surfaceClassName,
   backgroundLayer,
+  deckStyle,
   nextLabel,
   statusLabel,
   statusTone = "neutral",
@@ -89,6 +93,10 @@ export default function LiveSurface({
     hasNavActions ? "slide-surface-swipe" : null,
     surfaceClassName,
   ].filter(Boolean).join(" ");
+  const appearance = safeDeckStyle(deckStyle);
+  const surfaceStyle = appearance as CSSProperties | undefined;
+  // The stylesheet repaints the slide from its background colour only when the deck sets one.
+  const hasDeckBackground = !!appearance && ("--mdq-slide-bg" in appearance || "--mdq-slide-bg-soft" in appearance);
 
   useEffect(() => {
     if (typeof document === "undefined") return;
@@ -275,7 +283,7 @@ export default function LiveSurface({
   };
 
   return (
-    <section ref={surfaceRef} className={className}>
+    <section ref={surfaceRef} className={className} style={surfaceStyle} data-deck-background={hasDeckBackground ? "true" : undefined}>
       {backgroundLayer}
       <div ref={safeRef} className="slide-safe">
         <div ref={toolbarRef} className="slide-toolbar">

@@ -83,6 +83,7 @@ function questionStateFromRestore(data: NonNullable<SessionRestoreResponse["revi
     slideLiveEmbed: data.slideLiveEmbed,
     slideVideo: data.slideVideo,
     slideReferences: data.slideReferences,
+    deckStyle: data.deckStyle,
     options: data.options,
     allowsMultiple: data.allowsMultiple,
     isPoll: data.isPoll ?? false,
@@ -1516,6 +1517,7 @@ function LiveView({
       <div className="slide-live-shell slide-live-shell-controls">
         <div className="slide-live-main">
           <LiveSurface
+            deckStyle={(displayQuestion ?? q)?.deckStyle}
             mode={isReviewing ? "review" : "projector"}
             surfaceClassName={isLiveEmbedSlideDisplay ? "slide-surface-live-embed" : isSlideDisplay ? undefined : "quiz-surface"}
             backgroundLayer={isSlideDisplay && displayQuestion?.slideBackground ? <SlideBackgroundLayer background={displayQuestion.slideBackground} /> : undefined}
@@ -1615,6 +1617,7 @@ function LiveView({
                 slideMediaPosition={displayQuestion.slideMediaPosition}
                 slideMediaOpacity={displayQuestion.slideMediaOpacity}
                 slideBackground={displayQuestion.slideBackground}
+                deckStyle={displayQuestion.deckStyle}
                 slideLiveEmbed={displayQuestion.slideLiveEmbed}
                 slideVideo={displayQuestion.slideVideo}
                 slideReferences={displayQuestion.slideReferences}
@@ -1636,6 +1639,7 @@ function LiveView({
               />
             ) : (
               <LiveSurface
+                deckStyle={(displayQuestion ?? q)?.deckStyle}
                 surfaceClassName="quiz-surface"
                 nextLabel={null}
                 qrDataUrl={accessInfo?.qrCodeDataUrl}
@@ -1734,6 +1738,7 @@ function LiveView({
         {/* Reveal view */}
         {displayReveal && (((state === "REVEAL" && displayQuestion && !isReviewing) || (isReviewing && displayQuestion))) && (
           <LiveSurface
+            deckStyle={(displayQuestion ?? q)?.deckStyle}
             surfaceClassName="quiz-surface"
             nextLabel={null}
             qrDataUrl={accessInfo?.qrCodeDataUrl}
@@ -1833,6 +1838,7 @@ function LiveView({
 
         {isLeaderboardDisplay && (
           <LiveSurface
+            deckStyle={(displayQuestion ?? q)?.deckStyle}
             surfaceClassName="quiz-surface"
             qrDataUrl={accessInfo?.qrCodeDataUrl}
             sessionCode={sessionCode}

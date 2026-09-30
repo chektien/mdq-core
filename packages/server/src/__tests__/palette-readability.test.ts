@@ -320,7 +320,8 @@ describe("palette readability, 7 palettes x 2 themes", () => {
   it("underlines Markdown links and colours them from the palette", () => {
     const rule = declarationsOf(index, ".quiz-html a");
     expect(rule["text-decoration"]).toBe("underline");
-    expect(rule.color).toBe("var(--mdq-slide-accent-cool)");
-    expect(declarationsOf(index, 'html[data-theme="light"] .quiz-html a').color).toBe("var(--mdq-info-ink)");
+    // A deck's link-color setting comes first, and the palette colour is the fallback.
+    expect(rule.color).toBe("var(--mdq-link-color, var(--mdq-slide-accent-cool))");
+    expect(declarationsOf(index, 'html[data-theme="light"] .quiz-html a').color).toBe("var(--mdq-link-color, var(--mdq-info-ink))");
   });
 });

@@ -25,6 +25,7 @@ import type {
   SlideReference,
   DeckPalette,
   DeckTheme,
+  DeckStyle,
   StudentAnswer,
 } from "@mdq/shared";
 import { SocketEvents } from "@mdq/shared";
@@ -103,6 +104,8 @@ export interface QuestionState {
   slideLiveEmbed?: SlideLiveEmbed;
   slideVideo?: SlideVideo;
   slideReferences?: SlideReference[];
+  /** The deck's header appearance settings as slide-surface custom properties. */
+  deckStyle?: DeckStyle;
   options: { label: string; text: string }[];
   allowsMultiple: boolean;
   isPoll: boolean;
@@ -414,6 +417,7 @@ export function useSocket(
         slideLiveEmbed: data.slideLiveEmbed,
         slideVideo: data.slideVideo,
         slideReferences: data.slideReferences,
+        deckStyle: data.deckStyle,
         options: data.options,
         allowsMultiple: data.allowsMultiple,
         isPoll: data.isPoll ?? false,

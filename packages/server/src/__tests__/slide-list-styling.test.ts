@@ -68,8 +68,8 @@ describe("slide list styling", () => {
   it("keeps --mdq-slide-bullet as the marker colour hook, accent at the top and muted below", () => {
     expect(block).not.toMatch(/nth-child/);
     expect(rule(".slide-body li::marker")).toContain("color: var(--mdq-slide-bullet)");
-    expect(rule(":where(.slide-body li)")).toContain("--mdq-slide-bullet: var(--mdq-slide-accent)");
-    expect(rule(":where(.slide-body li li)")).toContain("--mdq-slide-bullet: var(--mdq-slide-ink-soft)");
+    expect(rule(":where(.slide-body li)")).toContain("--mdq-slide-bullet: var(--mdq-bullet-color, var(--mdq-slide-accent))");
+    expect(rule(":where(.slide-body li li)")).toContain("--mdq-slide-bullet: var(--mdq-bullet-color, var(--mdq-slide-ink-soft))");
     // The defaults carry no specificity, so an override on li wins at every level.
     expect(block).not.toMatch(/\n\.slide-body li(?: li)? \{[^}]*--mdq-slide-bullet/);
   });
@@ -81,7 +81,8 @@ describe("slide list styling", () => {
   });
 
   it("shrinks bullets at each level and keeps numerals from shrinking below level 3's", () => {
-    const size = (selector: string) => Number(/font-size: ([\d.]+)em/.exec(rule(selector))![1]);
+    // A marker reads the deck's bullet-size setting and falls back to Core's own size scaled by bullet-size presets.
+    const size = (selector: string) => Number(/font-size: var\(--mdq-bullet-size, calc\(([\d.]+)em \* var\(--mdq-bullet-scale, 1\)\)\)/.exec(rule(selector))![1]);
     const step = Number(/font-size: ([\d.]+)em/.exec(rule(".slide-body li > ul,\n.slide-body li > ol"))![1]);
     // Effective size against the body: marker em times the item's own em.
     const bullet1 = size(".slide-body li::marker");
@@ -113,7 +114,7 @@ describe("slide list styling", () => {
   });
 
   it("indents every level by the same amount and keeps wrapped lines under the item text", () => {
-    const indent = /padding-left: ([\d.]+)em/.exec(rule(".slide-body ul,\n.slide-body ol"))![1];
+    const indent = /padding-left: var\(--mdq-list-indent, ([\d.]+)em\)/.exec(rule(".slide-body ul,\n.slide-body ol"))![1];
     expect(Number(indent)).toBeLessThanOrEqual(1.4);
     expect(block).not.toMatch(/\.slide-body li > (?:ul|ol)[^{]*\{[^}]*padding-left/);
     expect(rule(".slide-body li")).toContain("padding: 0");
@@ -150,7 +151,7 @@ describe("slide list styling", () => {
       ["li > ol > li", "0.85em"],
     ]) {
       expect(printSource).toContain(`.body-copy ${selector}::marker {\n      font-size: ${size};`);
-      expect(css).toContain(`.slide-body ${selector}::marker {\n  font-size: ${size};`);
+      expect(css).toContain(`.slide-body ${selector}::marker {\n  font-size: var(--mdq-bullet-size, calc(${size} * var(--mdq-bullet-scale, 1)));`);
     }
   });
 });
