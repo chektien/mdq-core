@@ -189,50 +189,6 @@ body {
   margin: 0 0 1.5cqi;
 }
 
-.slide-body ul,
-.slide-body ol {
-  margin: 0;
-  padding-left: 1.2em;
-}
-
-.slide-body ul {
-  list-style: disc;
-}
-
-.slide-body ol {
-  list-style: decimal;
-}
-
-.slide-body li > ul,
-.slide-body li > ol {
-  margin-top: 0.45cqi;
-  padding-left: 1.72em;
-}
-
-.slide-body li {
-  --mdq-slide-bullet: var(--mdq-slide-accent);
-  display: list-item;
-  margin: 0 0 1.45cqi;
-  padding-left: 0.18em;
-}
-
-.slide-body li::marker {
-  color: var(--mdq-slide-bullet);
-  font-size: 0.78em;
-}
-
-.slide-body li:nth-child(2n) {
-  --mdq-slide-bullet: #38bdf8;
-}
-
-.slide-body li:nth-child(3n) {
-  --mdq-slide-bullet: #fbbf24;
-}
-
-.slide-body li:nth-child(4n) {
-  --mdq-slide-bullet: #a78bfa;
-}
-
 .slide-notes {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 18rem), 1fr));
@@ -2620,6 +2576,10 @@ html[data-theme="light"] .image-expansion-close:focus-visible {
   color: rgba(255, 253, 247, 0.94);
 }
 
+.slide-live-embed-copy li {
+  --mdq-slide-bullet: rgba(255, 253, 247, 0.94);
+}
+
 .slide-live-embed-copy p,
 .slide-live-embed-copy ul {
   margin-bottom: 0;
@@ -3019,12 +2979,36 @@ html[data-theme="light"] .slide-action-button-warning:disabled {
   margin: 0 0 1.3cqi;
 }
 
+/* Slide lists. One accent marker at the top level, quieter and smaller
+   markers below it, and one indent per level so a third level still fits a
+   phone. Top-level items sit further apart than an item and its children, so
+   each group reads as one unit from the back of the room. Wrapped lines hang
+   under the item text because markers sit outside the item box.
+
+   Hooks for a deck or another stylesheet:
+   --mdq-slide-bullet      marker colour, set on .slide-body li (wins at every
+                           level, the defaults below have no specificity)
+   --mdq-list-gap          space between top-level items, default 0.5em
+   --mdq-list-gap-nested   space between items of a nested list, default 0.16em
+   A margin on li adds to these gaps. */
+:where(.slide-body li) {
+  --mdq-slide-bullet: var(--mdq-slide-accent);
+}
+
+:where(.slide-body li li) {
+  --mdq-slide-bullet: var(--mdq-slide-ink-soft);
+}
+
 .slide-body ul,
 .slide-body ol {
   display: grid;
-  gap: 0.85cqi;
+  gap: var(--mdq-list-gap, 0.5em);
   margin: 0;
-  padding-left: 1.18em;
+  padding-left: 1.3em;
+}
+
+.slide-body :is(ul, ol) + :is(ul, ol) {
+  margin-top: var(--mdq-list-gap, 0.5em);
 }
 
 .slide-body ul {
@@ -3037,32 +3021,73 @@ html[data-theme="light"] .slide-action-button-warning:disabled {
 
 .slide-body li > ul,
 .slide-body li > ol {
-  margin-top: 0.45cqi;
-  padding-left: 1.72em;
+  gap: var(--mdq-list-gap-nested, 0.16em);
+  margin-top: 0.2em;
+  /* 0.95 twice is 0.90 at the third level, the floor for child text. */
+  font-size: 0.95em;
+}
+
+.slide-body li li li > ul,
+.slide-body li li li > ol {
+  font-size: 1em;
+}
+
+.slide-body li > ul {
+  list-style-type: circle;
+}
+
+.slide-body li li > ul {
+  list-style-type: square;
 }
 
 .slide-body li {
-  --mdq-slide-bullet: var(--mdq-slide-accent);
   display: list-item;
   margin: 0;
-  padding-left: 0.18em;
+  padding: 0;
 }
 
+/* Marker sizes are by depth. Bullets shrink at each level and numerals stay
+   readable: 0.90 at the top, 0.85 of the nested item (0.81 and 0.77 of the
+   body) below it. */
 .slide-body li::marker {
   color: var(--mdq-slide-bullet);
   font-size: 0.78em;
 }
 
-.slide-body li:nth-child(2n) {
-  --mdq-slide-bullet: var(--mdq-slide-blue);
+.slide-body ol > li::marker {
+  font-size: 0.9em;
+  font-variant-numeric: tabular-nums;
+  font-weight: 650;
 }
 
-.slide-body li:nth-child(3n) {
-  --mdq-slide-bullet: var(--mdq-slide-scene);
+.slide-body li > ul > li::marker {
+  font-size: 0.72em;
 }
 
-.slide-body li:nth-child(4n) {
-  --mdq-slide-bullet: var(--mdq-slide-maroon);
+.slide-body li li > ul > li::marker {
+  font-size: 0.6em;
+}
+
+.slide-body li > ol > li::marker {
+  font-size: 0.85em;
+}
+
+/* An item with no text ("- " in the Markdown) shows nothing, not a bare
+   marker. Numbered items count only the ones that show. */
+.slide-body li:empty {
+  display: none;
+}
+
+/* An item that holds only a nested list ("-" then an indented child) drops
+   its own marker and box, so the children stand one level in with no bare
+   marker above them. */
+.slide-body li.list-parent-only {
+  display: contents;
+}
+
+.slide-body li.list-parent-only > ul,
+.slide-body li.list-parent-only > ol {
+  margin-top: 0;
 }
 
 .slide-surface .quiz-html strong {
@@ -4973,10 +4998,6 @@ html[data-theme="light"] .quiz-html a {
     max-height: min(28dvh, 14rem);
   }
 
-  .slide-body li {
-    padding-left: 1.28em;
-  }
-
   .slide-references {
     max-width: 100%;
     padding-right: 0;
@@ -5414,7 +5435,7 @@ html[data-theme="light"] .quiz-html a {
 .slide-body.quiz-html li > ol:first-child,
 .slide-body.quiz-html li > ul:last-child,
 .slide-body.quiz-html li > ol:last-child {
-  margin-top: 0.45cqi;
+  margin-top: 0.2em;
 }
 
 .quiz-html {
