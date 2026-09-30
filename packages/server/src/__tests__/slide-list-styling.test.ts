@@ -31,6 +31,8 @@ type: slide
     - Attach the map
 -
 - Review
+-
+  - Only child
 
 1. First
    - Detail
@@ -51,22 +53,49 @@ describe("slide list styling", () => {
     expect(html).toMatch(/<li>Second<ol>\s*<li>Sub one<\/li>/);
   });
 
+  it("marks an item that holds only a nested list, and leaves other items alone", () => {
+    const html = parseQuizMarkdown(deck, "lists.md").quiz!.questions[0].textHtml;
+    expect(html).toMatch(/<li class="list-parent-only"><ul>\s*<li>Only child<\/li>/);
+    expect(html).toContain("<li><strong>Plan</strong> the week<ul>");
+    expect(html.match(/list-parent-only/g)).toHaveLength(1);
+  });
+
   it("gives the list block a marker and indent scheme of its own", () => {
     expect(start).toBeGreaterThan(0);
     expect(block).not.toMatch(/!important|@import|url\(/);
   });
 
-  it("uses one accent marker at the top level with no nth-child colour cycling", () => {
+  it("keeps --mdq-slide-bullet as the marker colour hook, accent at the top and muted below", () => {
     expect(block).not.toMatch(/nth-child/);
-    expect(rule(".slide-body li::marker")).toContain("color: var(--mdq-slide-accent)");
+    expect(rule(".slide-body li::marker")).toContain("color: var(--mdq-slide-bullet)");
+    expect(rule(":where(.slide-body li)")).toContain("--mdq-slide-bullet: var(--mdq-slide-accent)");
+    expect(rule(":where(.slide-body li li)")).toContain("--mdq-slide-bullet: var(--mdq-slide-ink-soft)");
+    // The defaults carry no specificity, so an override on li wins at every level.
+    expect(block).not.toMatch(/\n\.slide-body li(?: li)? \{[^}]*--mdq-slide-bullet/);
   });
 
-  it("quiets child markers with an existing token, smaller than the top level", () => {
-    const child = rule(".slide-body li li::marker");
-    expect(child).toContain("color: var(--mdq-slide-ink-soft)");
-    const size = (text: string) => Number(/font-size: ([\d.]+)em/.exec(text)![1]);
-    expect(size(child)).toBeLessThan(size(rule(".slide-body li::marker")));
-    expect(size(rule(".slide-body li li > ul > li::marker"))).toBeLessThan(size(child));
+  it("makes overlay copy markers follow the overlay text colour", () => {
+    const overlay = /\n\.slide-live-embed-copy li \{([^}]*)\}/.exec(css)![1];
+    const text = /\.slide-live-embed-copy li,[^{]*\{\s*color: (rgba\([^)]*\));/.exec(css)![1];
+    expect(overlay).toContain(`--mdq-slide-bullet: ${text}`);
+  });
+
+  it("shrinks bullets at each level and keeps numerals from shrinking below level 3's", () => {
+    const size = (selector: string) => Number(/font-size: ([\d.]+)em/.exec(rule(selector))![1]);
+    const step = Number(/font-size: ([\d.]+)em/.exec(rule(".slide-body li > ul,\n.slide-body li > ol"))![1]);
+    // Effective size against the body: marker em times the item's own em.
+    const bullet1 = size(".slide-body li::marker");
+    const bullet2 = size(".slide-body li > ul > li::marker") * step;
+    const bullet3 = size(".slide-body li li > ul > li::marker") * step * step;
+    expect(bullet1).toBeGreaterThan(bullet2);
+    expect(bullet2).toBeGreaterThan(bullet3);
+    const numeral1 = size(".slide-body ol > li::marker");
+    const numeral2 = size(".slide-body li > ol > li::marker") * step;
+    const numeral3 = size(".slide-body li > ol > li::marker") * step * step;
+    expect(numeral1).toBeGreaterThanOrEqual(numeral2);
+    expect(numeral2).toBeGreaterThanOrEqual(numeral3);
+    expect(numeral3).toBeGreaterThanOrEqual(0.75);
+    expect(bullet2).toBeGreaterThanOrEqual(0.65);
   });
 
   it("marks levels with different shapes in unordered lists and keeps numbers in ordered lists", () => {
@@ -92,18 +121,36 @@ describe("slide list styling", () => {
     expect(block).not.toMatch(/list-style-position:\s*inside/);
   });
 
-  it("separates top-level items more than an item and its children", () => {
-    const em = (text: string, name: string) => Number(new RegExp(`${name}: ([\\d.]+)em`).exec(text)![1]);
-    const top = em(rule(".slide-body ul,\n.slide-body ol"), "--mdq-list-gap");
-    const child = em(rule(".slide-body li > ul,\n.slide-body li > ol"), "--mdq-list-gap");
+  it("separates top-level items more than an item and its children, with overridable gaps", () => {
+    const gap = (text: string, name: string) => Number(new RegExp(`gap: var\\(${name}, ([\\d.]+)em\\)`).exec(text)![1]);
+    const top = gap(rule(".slide-body ul,\n.slide-body ol"), "--mdq-list-gap");
+    const child = gap(rule(".slide-body li > ul,\n.slide-body li > ol"), "--mdq-list-gap-nested");
     expect(top).toBeGreaterThanOrEqual(child * 2);
+    // The variables are read, never redeclared on the lists, so an ancestor can set them.
+    expect(block).not.toMatch(/\n\s+--mdq-list-gap(?:-nested)?:/);
   });
 
   it("hides an item with no text instead of showing a bare marker", () => {
     expect(rule(".slide-body li:empty")).toContain("display: none");
   });
 
-  it("hides empty items in the printed deck too", () => {
+  it("drops the box and marker of an item that holds only a nested list", () => {
+    expect(rule(".slide-body li.list-parent-only")).toContain("display: contents");
+  });
+
+  it("hides empty items in the printed deck too, with the same child markers", () => {
     expect(printSource).toMatch(/\.body-copy li:empty \{\s*display: none;/);
+    expect(printSource).toMatch(/\.body-copy li\.list-parent-only \{\s*display: contents;/);
+    expect(printSource).toMatch(/\.body-copy li > ul \{\s*list-style-type: circle;/);
+    expect(printSource).toMatch(/\.body-copy li li > ul \{\s*list-style-type: square;/);
+    expect(printSource).toMatch(/\.body-copy li li::marker \{\s*color: var\(--muted\);/);
+    for (const [selector, size] of [
+      ["li > ul > li", "0.72em"],
+      ["li li > ul > li", "0.6em"],
+      ["li > ol > li", "0.85em"],
+    ]) {
+      expect(printSource).toContain(`.body-copy ${selector}::marker {\n      font-size: ${size};`);
+      expect(css).toContain(`.slide-body ${selector}::marker {\n  font-size: ${size};`);
+    }
   });
 });

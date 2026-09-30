@@ -2576,6 +2576,10 @@ html[data-theme="light"] .image-expansion-close:focus-visible {
   color: rgba(255, 253, 247, 0.94);
 }
 
+.slide-live-embed-copy li {
+  --mdq-slide-bullet: rgba(255, 253, 247, 0.94);
+}
+
 .slide-live-embed-copy p,
 .slide-live-embed-copy ul {
   margin-bottom: 0;
@@ -2979,18 +2983,32 @@ html[data-theme="light"] .slide-action-button-warning:disabled {
    markers below it, and one indent per level so a third level still fits a
    phone. Top-level items sit further apart than an item and its children, so
    each group reads as one unit from the back of the room. Wrapped lines hang
-   under the item text because markers sit outside the item box. */
+   under the item text because markers sit outside the item box.
+
+   Hooks for a deck or another stylesheet:
+   --mdq-slide-bullet      marker colour, set on .slide-body li (wins at every
+                           level, the defaults below have no specificity)
+   --mdq-list-gap          space between top-level items, default 0.5em
+   --mdq-list-gap-nested   space between items of a nested list, default 0.16em
+   A margin on li adds to these gaps. */
+:where(.slide-body li) {
+  --mdq-slide-bullet: var(--mdq-slide-accent);
+}
+
+:where(.slide-body li li) {
+  --mdq-slide-bullet: var(--mdq-slide-ink-soft);
+}
+
 .slide-body ul,
 .slide-body ol {
-  --mdq-list-gap: 0.5em;
   display: grid;
-  gap: var(--mdq-list-gap);
+  gap: var(--mdq-list-gap, 0.5em);
   margin: 0;
   padding-left: 1.3em;
 }
 
 .slide-body :is(ul, ol) + :is(ul, ol) {
-  margin-top: var(--mdq-list-gap);
+  margin-top: var(--mdq-list-gap, 0.5em);
 }
 
 .slide-body ul {
@@ -3003,7 +3021,7 @@ html[data-theme="light"] .slide-action-button-warning:disabled {
 
 .slide-body li > ul,
 .slide-body li > ol {
-  --mdq-list-gap: 0.16em;
+  gap: var(--mdq-list-gap-nested, 0.16em);
   margin-top: 0.2em;
   /* 0.95 twice is 0.90 at the third level, the floor for child text. */
   font-size: 0.95em;
@@ -3028,8 +3046,11 @@ html[data-theme="light"] .slide-action-button-warning:disabled {
   padding: 0;
 }
 
+/* Marker sizes are by depth. Bullets shrink at each level and numerals stay
+   readable: 0.90 at the top, 0.85 of the nested item (0.81 and 0.77 of the
+   body) below it. */
 .slide-body li::marker {
-  color: var(--mdq-slide-accent);
+  color: var(--mdq-slide-bullet);
   font-size: 0.78em;
 }
 
@@ -3039,16 +3060,15 @@ html[data-theme="light"] .slide-action-button-warning:disabled {
   font-weight: 650;
 }
 
-.slide-body li li::marker {
-  color: var(--mdq-slide-ink-soft);
-  font-size: 0.68em;
+.slide-body li > ul > li::marker {
+  font-size: 0.72em;
 }
 
 .slide-body li li > ul > li::marker {
   font-size: 0.6em;
 }
 
-.slide-body li li > ol > li::marker {
+.slide-body li > ol > li::marker {
   font-size: 0.85em;
 }
 
@@ -3056,6 +3076,18 @@ html[data-theme="light"] .slide-action-button-warning:disabled {
    marker. Numbered items count only the ones that show. */
 .slide-body li:empty {
   display: none;
+}
+
+/* An item that holds only a nested list ("-" then an indented child) drops
+   its own marker and box, so the children stand one level in with no bare
+   marker above them. */
+.slide-body li.list-parent-only {
+  display: contents;
+}
+
+.slide-body li.list-parent-only > ul,
+.slide-body li.list-parent-only > ol {
+  margin-top: 0;
 }
 
 .slide-surface .quiz-html strong {

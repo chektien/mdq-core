@@ -1201,19 +1201,55 @@ function renderStyles(pageSize: PrintOptions["pageSize"], theme: PrintTheme, pal
       margin: 1.2mm 0;
     }
 
-    /* Nested lists sit tight under their item and keep one indent per level. */
+    /* Nested lists sit tight under their item, with the slide's marker shapes,
+       sizes and quieter child colour. */
     .body-copy li > ul,
     .body-copy li > ol {
       margin-top: 0.6mm;
-      padding-left: 5mm;
     }
 
     .body-copy li li {
       margin: 0.6mm 0;
     }
 
+    .body-copy li > ul {
+      list-style-type: circle;
+    }
+
+    .body-copy li li > ul {
+      list-style-type: square;
+    }
+
+    .body-copy li::marker {
+      font-size: 0.78em;
+    }
+
+    .body-copy ol > li::marker {
+      font-size: 0.9em;
+    }
+
+    .body-copy li li::marker {
+      color: var(--muted);
+    }
+
+    .body-copy li > ul > li::marker {
+      font-size: 0.72em;
+    }
+
+    .body-copy li li > ul > li::marker {
+      font-size: 0.6em;
+    }
+
+    .body-copy li > ol > li::marker {
+      font-size: 0.85em;
+    }
+
     .body-copy li:empty {
       display: none;
+    }
+
+    .body-copy li.list-parent-only {
+      display: contents;
     }
 
     .question-layout,

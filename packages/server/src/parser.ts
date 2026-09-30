@@ -1066,6 +1066,13 @@ function createMarkdownRenderer() {
     const titleAttr = title ? ` title="${escapeHtml(title)}"` : "";
     return `<img class="quiz-embedded-image" src="${src}" alt="${alt}"${titleAttr}>`;
   };
+  // An item whose content is only a nested list ("-" then an indented child)
+  // is marked so a slide can drop its bare marker.
+  const listitem = renderer.listitem.bind(renderer);
+  renderer.listitem = (text: string, task: boolean, checked: boolean): string => {
+    const html = listitem(text, task, checked);
+    return /^<li>\s*<(?:ul|ol)[\s>]/.test(html) ? html.replace("<li>", '<li class="list-parent-only">') : html;
+  };
   return renderer;
 }
 
