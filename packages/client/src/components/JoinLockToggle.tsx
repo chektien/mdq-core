@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
+import SettingSwitch from "./SettingSwitch";
 
 /**
- * The presenter's switch for stopping new people joining, for example once the class is in. It shows the
- * state in words ("Lock joining" / "Joining locked") and follows the live list, so it is right after a
- * reload and when it is changed from another screen. Someone who is already in can always rejoin.
+ * The presenter's switch for stopping new people joining, for example once the class is in. It is a
+ * labelled switch row that says its state in words ("Lock joining" / "Joining locked", "Off" / "On") and follows the live list, so it is right after
+ * a reload and when it is changed from another screen. Someone who is already in can always rejoin.
  */
 export default function JoinLockToggle({
   locked,
@@ -40,23 +41,20 @@ export default function JoinLockToggle({
   };
 
   return (
-    <div className={`join-lock ${className}`.trim()}>
-      <button
-        type="button"
-        className="join-lock-toggle"
-        aria-pressed={shown}
-        disabled={disabled || busy}
-        title={disabled ? "Reconnecting..." : undefined}
-        onClick={() => void toggle()}
-      >
-        {shown ? "Joining locked" : "Lock joining"}
-      </button>
-      <p className="join-lock-help">
-        {shown
-          ? "New people cannot join. Anyone already in can still rejoin. Choose again to open joining."
-          : "Stop new people joining once everyone is in."}
-      </p>
+    <SettingSwitch
+      className={`join-lock ${className}`.trim()}
+      label={shown ? "Joining locked" : "Lock joining"}
+      description={
+        shown
+          ? "New people cannot join. Anyone already in can still rejoin."
+          : "Stop new people joining once everyone is in."
+      }
+      checked={shown}
+      disabled={disabled || busy}
+      title={disabled ? "Reconnecting..." : undefined}
+      onToggle={() => void toggle()}
+    >
       {error && <p role="alert" className="participant-error">{error}</p>}
-    </div>
+    </SettingSwitch>
   );
 }

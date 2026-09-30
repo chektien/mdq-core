@@ -60,7 +60,6 @@ body {
   border: 0;
   border-radius: 0;
   background:
-    linear-gradient(90deg, rgba(15, 118, 110, 0.12) 0 0.65cqi, transparent 0.65cqi),
     linear-gradient(180deg, rgba(255, 255, 255, 0.7), rgba(246, 240, 226, 0.42)),
     var(--mdq-slide-bg);
   color: var(--mdq-slide-ink);
@@ -102,7 +101,6 @@ body {
 
 .slide-next-up {
   max-width: min(34rem, 38cqi);
-  border-left: 0.24rem solid var(--mdq-slide-accent);
   background: rgba(255, 255, 255, 0.62);
   padding: 0.72rem 0.9rem;
   color: var(--mdq-slide-ink);
@@ -204,7 +202,6 @@ body {
 
 .foldout-note {
   border: 1px solid rgba(15, 118, 110, 0.2);
-  border-left: 0.34rem solid var(--mdq-note-attendee);
   border-radius: 4px;
   background: var(--mdq-note-attendee-tint);
   color: var(--mdq-slide-ink);
@@ -2853,8 +2850,9 @@ html[data-theme="light"] .slide-action-button-warning:disabled {
   max-width: min(48rem, 54cqi);
   align-items: center;
   gap: 0.55rem;
-  border-left: 0.2rem solid var(--mdq-slide-accent);
-  padding: 0.48rem 0.7rem 0.48rem 0.62rem;
+  padding: 0.48rem 0.7rem;
+  /* A quiet label: the hairline all round and the glass tint, without the shadow the buttons carry. */
+  box-shadow: none;
   pointer-events: auto;
 }
 
@@ -2873,7 +2871,7 @@ html[data-theme="light"] .slide-action-button-warning:disabled {
   min-width: 0;
   margin-top: 0;
   overflow: hidden;
-  color: var(--mdq-slide-ink);
+  color: var(--mdq-slide-ink-soft);
   font-size: clamp(0.84rem, 1cqi, 0.98rem);
   line-height: 1.1;
   text-overflow: ellipsis;
@@ -4325,7 +4323,6 @@ html[data-theme="light"] .quiz-html a {
 
 .foldout-note {
   border: 1px solid color-mix(in srgb, var(--mdq-note-attendee) 32%, transparent);
-  border-left: 0.34rem solid var(--mdq-note-attendee);
   border-radius: var(--mdq-panel-radius);
   background: var(--mdq-note-attendee-tint);
   color: var(--mdq-slide-ink);
@@ -4334,7 +4331,6 @@ html[data-theme="light"] .quiz-html a {
 
 .foldout-note-presenter {
   border-color: color-mix(in srgb, var(--mdq-note-presenter) 34%, transparent);
-  border-left-color: var(--mdq-note-presenter);
   background: var(--mdq-note-presenter-tint);
 }
 
@@ -6963,6 +6959,15 @@ html[data-theme="light"] .slide-video-figure .slide-video-action:not(button) {
     justify-self: center;
   }
 
+  /* With no Prev and Next to make room for (the projector), the next-up label
+     stays in the top-left corner beside the controls. It is not pushed to a
+     row of its own that the title has to clear as well. */
+  .slide-toolbar:not(:has(.slide-toolbar-nav, .slide-status-pill)) .slide-toolbar-stack {
+    grid-column: 1;
+    grid-row: 1;
+    justify-self: start;
+  }
+
   .slide-safe:has(.slide-status-pill) {
     padding-top: clamp(8.4rem, 10cqi, 9.6rem);
   }
@@ -7011,6 +7016,21 @@ html[data-theme="light"] .slide-video-figure .slide-video-action:not(button) {
   display: inline-flex;
   min-height: 2.75rem;
   align-items: center;
+}
+
+/* The open join card is wide enough for the join address to wrap to two lines, and the QR is a little
+   larger than it was. On a phone the card is a row (QR beside the text) and keeps its own layout. */
+@media (min-width: 761px) {
+  .slide-join-panel.session-code-card-expanded,
+  .slide-live-shell-controls:has(.presenter-notes-panel) .slide-join-panel.session-code-card-expanded {
+    width: clamp(11.5rem, 16cqi, 16rem);
+    max-width: 100%;
+  }
+
+  .slide-join-panel.session-code-card-expanded .session-code-card-qr {
+    width: min(100%, 9rem);
+    justify-self: center;
+  }
 }
 
 .qr-enlarged {
@@ -7182,8 +7202,7 @@ html[data-theme="light"] .slide-video-figure .slide-video-action:not(button) {
 }
 
 .participant-action,
-.student-ids-toggle,
-.participants-close {
+.student-ids-toggle {
   min-width: 2.75rem;
   min-height: 2.75rem;
   padding: 0 0.9rem;
@@ -7196,8 +7215,7 @@ html[data-theme="light"] .slide-video-figure .slide-video-action:not(button) {
 }
 
 .participant-action:hover:not(:disabled),
-.student-ids-toggle:hover,
-.participants-close:hover {
+.student-ids-toggle:hover {
   background: var(--mdq-accent-soft);
 }
 
@@ -7213,7 +7231,28 @@ html[data-theme="light"] .slide-video-figure .slide-video-action:not(button) {
 }
 
 .participant-action:focus-visible,
-.student-ids-toggle:focus-visible,
+.student-ids-toggle:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--mdq-accent) 72%, white);
+  outline-offset: 2px;
+}
+
+.participants-close {
+  display: inline-grid;
+  flex: 0 0 auto;
+  width: 2.75rem;
+  height: 2.75rem;
+  place-items: center;
+  border: 1px solid var(--mdq-control-border);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--mdq-ink);
+  cursor: pointer;
+}
+
+.participants-close:hover {
+  background: var(--mdq-accent-soft);
+}
+
 .participants-close:focus-visible {
   outline: 3px solid color-mix(in srgb, var(--mdq-accent) 72%, white);
   outline-offset: 2px;
@@ -7239,51 +7278,168 @@ html[data-theme="light"] .slide-video-figure .slide-video-action:not(button) {
   content: " (on)";
 }
 
-.join-lock {
+/* ── Session settings: labelled switch rows ────────────────────────── */
+.session-settings {
   display: grid;
-  justify-items: start;
+  gap: 0.5rem;
+  width: 100%;
+}
+
+.session-settings-title {
+  margin: 0;
+  color: var(--mdq-muted);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.session-settings-lobby {
+  max-width: 32rem;
+  padding: 0.75rem;
+  border: 1px solid var(--mdq-line);
+  border-radius: 0.75rem;
+  background: var(--mdq-card);
+}
+
+.setting-switch-wrap {
+  display: grid;
   gap: 0.35rem;
 }
 
-.join-lock-toggle {
-  min-width: 2.75rem;
+.setting-switch {
+  display: flex;
+  width: 100%;
   min-height: 2.75rem;
-  padding: 0 1rem;
-  border: 1px solid var(--mdq-control-border);
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.6rem 0.8rem;
+  border: 1px solid var(--mdq-line-strong);
   border-radius: var(--mdq-control-radius, 0.6rem);
-  background: transparent;
+  background: var(--mdq-card-strong);
   color: var(--mdq-ink);
-  font-size: 0.85rem;
-  font-weight: 700;
+  text-align: left;
   cursor: pointer;
 }
 
-.join-lock-toggle:hover:not(:disabled) {
+.setting-switch:hover:not(:disabled) {
   background: var(--mdq-accent-soft);
 }
 
-.join-lock-toggle[aria-pressed="true"] {
-  border-color: var(--mdq-accent);
-  background: var(--mdq-accent-soft);
-  color: var(--mdq-accent-text);
+.setting-switch:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--mdq-accent) 72%, white);
+  outline-offset: 2px;
 }
 
-.join-lock-toggle:disabled {
+.setting-switch:disabled {
   border-style: dashed;
   cursor: not-allowed;
   color: var(--mdq-muted);
 }
 
-.join-lock-toggle:focus-visible {
-  outline: 3px solid color-mix(in srgb, var(--mdq-accent) 72%, white);
-  outline-offset: 2px;
+.setting-switch-text {
+  display: grid;
+  min-width: 0;
+  gap: 0.15rem;
 }
 
-.join-lock-help {
-  margin: 0;
-  max-width: 24rem;
+.setting-switch-label {
+  font-size: 0.95rem;
+  font-weight: 700;
+}
+
+.setting-switch-description {
   color: var(--mdq-muted);
   font-size: 0.8rem;
+  line-height: 1.35;
+}
+
+.setting-switch-state {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.setting-switch-word {
+  min-width: 1.6rem;
+  color: var(--mdq-muted);
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-align: right;
+}
+
+.setting-switch-track {
+  position: relative;
+  display: block;
+  width: 2.75rem;
+  height: 1.5rem;
+  border: 2px solid var(--mdq-control-border);
+  border-radius: 999px;
+  background: transparent;
+}
+
+.setting-switch-thumb {
+  position: absolute;
+  top: 50%;
+  left: 0.2rem;
+  width: 0.9rem;
+  height: 0.9rem;
+  border-radius: 999px;
+  background: var(--mdq-control-border);
+  transform: translateY(-50%);
+}
+
+.setting-switch[aria-checked="true"] {
+  border-color: var(--mdq-accent);
+}
+
+.setting-switch[aria-checked="true"] .setting-switch-word {
+  color: var(--mdq-accent-text);
+}
+
+.setting-switch[aria-checked="true"] .setting-switch-track {
+  border-color: var(--mdq-accent);
+  background: var(--mdq-accent);
+}
+
+.setting-switch[aria-checked="true"] .setting-switch-thumb {
+  left: auto;
+  right: 0.2rem;
+  background: var(--mdq-on-accent);
+}
+
+.participants-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.participants-body {
+  max-height: 40vh;
+  margin: 1rem 0;
+  overflow-y: auto;
+}
+
+.participants-card {
+  display: flex;
+  color: var(--mdq-ink);
+  max-height: calc(100dvh - 2.5rem);
+  flex-direction: column;
+  overflow-y: auto;
+}
+
+.participants-card .participants-body {
+  flex: 0 1 auto;
+  min-height: 0;
+}
+
+.participants-card .session-settings {
+  flex: 0 0 auto;
+  padding-top: 1rem;
+  border-top: 1px solid var(--mdq-line);
 }
 
 .participants-count {
@@ -7295,10 +7451,6 @@ html[data-theme="light"] .slide-video-figure .slide-video-action:not(button) {
 
 .participants-help {
   color: var(--mdq-muted);
-}
-
-.participants-card {
-  color: var(--mdq-ink);
 }
 
 /* ── Portrait projector ────────────────────────────────────────────
