@@ -465,12 +465,26 @@ export interface Question {
 
 /**
  * A note about a deck that does not stop it loading, such as a header setting
- * that was ignored. `lineNumber` is the line of the setting in the deck file.
+ * that was ignored. `questionIndex` is -1 for the deck header, like
+ * QuizParseError, and `lineNumber` is the line in the deck file when known.
  */
-export interface DeckDiagnostic {
-  lineNumber: number;
+export interface ParseDiagnostic {
+  severity: "info" | "warning";
+  sourceFile: string;
+  questionIndex: number;
+  lineNumber?: number;
   message: string;
-  severity?: "info" | "warning";
+}
+
+/** Where a diagnostic points: "header, line 2", or "item 3, line 14" (items count from 1). */
+export function diagnosticLocation(diagnostic: Pick<ParseDiagnostic, "questionIndex" | "lineNumber">): string {
+  const place = diagnostic.questionIndex < 0 ? "header" : `item ${diagnostic.questionIndex + 1}`;
+  return diagnostic.lineNumber === undefined ? place : `${place}, line ${diagnostic.lineNumber}`;
+}
+
+/** A diagnostic as one line of text: its location, a colon and its message. */
+export function formatDiagnostic(diagnostic: ParseDiagnostic): string {
+  return `${diagnosticLocation(diagnostic)}: ${diagnostic.message}`;
 }
 
 export interface Quiz {

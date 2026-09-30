@@ -1,5 +1,5 @@
 import { chromium, type Browser } from "playwright";
-import { DECK_PALETTES, DeckPalette, Quiz, Question, QuestionType, describeDeckPalettes, parseDeckPalette } from "@mdq/shared";
+import { DECK_PALETTES, DeckPalette, formatDiagnostic, Quiz, Question, QuestionType, describeDeckPalettes, parseDeckPalette } from "@mdq/shared";
 import { parseQuizMarkdown, QuizParseError } from "./parser";
 import { printDeckStyle } from "./print-deck-style";
 import * as fs from "fs";
@@ -1660,7 +1660,9 @@ async function main(): Promise<void> {
   }
 
   if (result.diagnostics.length > 0) {
-    console.warn(`Ignored settings in ${path.basename(options.inputFile)}:\n${result.diagnostics.map((d) => `- line ${d.lineNumber}: ${d.message}`).join("\n")}`);
+    for (const diagnostic of result.diagnostics) {
+      console.warn(`${diagnostic.severity === "warning" ? "Ignored" : "Note"} in ${path.basename(options.inputFile)}, ${formatDiagnostic(diagnostic)}`);
+    }
   }
 
   const html = buildHtml(result.quiz, options);

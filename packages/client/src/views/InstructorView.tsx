@@ -25,6 +25,7 @@ import {
   type CreateSessionResponse,
   type SessionRestoreResponse,
 } from "../hooks/api";
+import { formatDiagnostic } from "@mdq/shared";
 import type { AccessInfo, DeckPalette, DeckTheme, FoldoutNote, OpenResponseEntry, QuestionType, SessionState } from "@mdq/shared";
 import { applyClientPalette, applyClientTheme } from "../theme";
 import Timer from "../components/Timer";
@@ -559,8 +560,8 @@ export default function InstructorView({
                               <span className="font-mono text-xs text-zinc-500">{deck.week}</span>
                             </span>
                             {deck.diagnostics?.map((note) => (
-                              <span key={`${note.lineNumber}-${note.message}`} className="mt-1 block text-sm text-amber-300">
-                                Ignored, line {note.lineNumber}: {note.message}
+                              <span key={`${note.severity}-${note.lineNumber ?? ""}-${note.message}`} className={`mt-1 block text-sm ${note.severity === "warning" ? "text-amber-300" : "text-zinc-400"}`}>
+                                {note.severity === "warning" ? "Ignored" : "Note"}, {formatDiagnostic(note)}
                               </span>
                             ))}
                           </span>

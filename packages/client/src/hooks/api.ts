@@ -1,6 +1,6 @@
 import { API } from "@mdq/shared";
 import type {
-  DeckDiagnostic,
+  ParseDiagnostic,
   AccessInfo,
   DeckPalette,
   DeckTheme,
@@ -63,7 +63,7 @@ export interface DeckSummary {
   liveQuestionCount?: number;
   slideCount?: number;
   /** Header settings the deck wrote that were ignored. The deck still loads. */
-  diagnostics?: DeckDiagnostic[];
+  diagnostics?: ParseDiagnostic[];
 }
 
 export type QuizSummary = DeckSummary;

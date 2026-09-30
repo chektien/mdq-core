@@ -19,7 +19,7 @@ import {
   normalizeDeckSettingKeys,
   DECK_STYLE_KEYS,
   resolveDeckStyleSetting,
-  type DeckDiagnostic,
+  type ParseDiagnostic,
   type DeckStyle,
   type DeckStyleSettings,
 } from "@mdq/shared";
@@ -55,7 +55,7 @@ export interface ParseResult {
   quiz: Quiz | null;
   errors: QuizParseError[];
   /** Notes that do not stop the deck loading, such as an ignored appearance setting. */
-  diagnostics: DeckDiagnostic[];
+  diagnostics: ParseDiagnostic[];
 }
 
 interface QuestionBlock {
@@ -73,7 +73,7 @@ export function parseQuizMarkdown(source: string, sourceFile: string): ParseResu
   // rules below match one spelling.
   const markdown = normalizeDeckSettingKeys(source);
   const errors: QuizParseError[] = [];
-  const diagnostics: DeckDiagnostic[] = [];
+  const diagnostics: ParseDiagnostic[] = [];
 
   const title = extractDeckTitle(markdown);
   const theme = extractDeckThemeMetadata(markdown, sourceFile, errors);
@@ -86,7 +86,7 @@ export function parseQuizMarkdown(source: string, sourceFile: string): ParseResu
     errors,
   );
   const studentId = extractDeckBooleanMetadata(markdown, "student_id", sourceFile, errors);
-  const deckStyle = extractDeckStyleMetadata(markdown, diagnostics);
+  const deckStyle = extractDeckStyleMetadata(markdown, diagnostics, sourceFile);
 
   // Extract deck key from filename (e.g., "week01.md" -> "week01", "featured-demo.md" -> "featured-demo")
   const sourceStem = sourceFile.replace(/^.*[\\/]/, "").replace(/\.md$/i, "").toLowerCase();
@@ -273,7 +273,8 @@ function extractDeckBooleanMetadata(
  */
 function extractDeckStyleMetadata(
   markdown: string,
-  diagnostics: DeckDiagnostic[],
+  diagnostics: ParseDiagnostic[],
+  sourceFile: string,
 ): { settings: DeckStyleSettings; style: DeckStyle } | undefined {
   const preamble = markdown.split(/^---+\s*$/m, 1)[0] || markdown;
   const settings: DeckStyleSettings = {};
@@ -288,8 +289,9 @@ function extractDeckStyleMetadata(
       continue;
     }
     const lineNumber = preamble.slice(0, match.index).split("\n").length;
-    diagnostics.push({ lineNumber, message: result.message, severity: "warning" });
+    diagnostics.push({ severity: "warning", sourceFile, questionIndex: -1, lineNumber, message: result.message });
   }
+  diagnostics.sort((a, b) => (a.lineNumber ?? 0) - (b.lineNumber ?? 0));
   return Object.keys(settings).length > 0 ? { settings, style } : undefined;
 }
 

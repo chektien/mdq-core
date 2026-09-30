@@ -1,6 +1,6 @@
 import express, { type Request, type Response } from "express";
 import cors from "cors";
-import { API, AccessInfo, CumulativeLeaderboardEntry, PublicCumulativeLeaderboardEntry, DeckDiagnostic, DeckPalette, DeckTheme, JoinLockRequest, Quiz, ReleaseSeatRequest, ResponseVisibilityRequest, Session, SessionState, usesStudentIds } from "@mdq/shared";
+import { API, AccessInfo, CumulativeLeaderboardEntry, PublicCumulativeLeaderboardEntry, ParseDiagnostic, formatDiagnostic, DeckPalette, DeckTheme, JoinLockRequest, Quiz, ReleaseSeatRequest, ResponseVisibilityRequest, Session, SessionState, usesStudentIds } from "@mdq/shared";
 import {
   createSession,
   storeSession,
@@ -57,7 +57,7 @@ function resolveDeckPalette(q: Quiz, fallbackPalette: DeckPalette): DeckPalette 
   return q.palette ?? fallbackPalette;
 }
 
-function summarizeQuizForList(q: Quiz, fallbackTheme: DeckTheme, fallbackPalette: DeckPalette, diagnostics: DeckDiagnostic[] = []) {
+function summarizeQuizForList(q: Quiz, fallbackTheme: DeckTheme, fallbackPalette: DeckPalette, diagnostics: ParseDiagnostic[] = []) {
   const slideCount = q.questions.filter((question) => question.questionType === "slide").length;
   return {
     week: q.week,
@@ -219,7 +219,8 @@ export function createApp(quizDirOrOpts?: string | AppOptions) {
   const quizzes = new Map<string, Quiz>();
   let quizValidationErrors: ReturnType<typeof parseQuizMarkdown>["errors"] = [];
   // Notes that do not stop a deck loading, by deck, such as an ignored header appearance setting.
-  const quizDiagnostics = new Map<string, DeckDiagnostic[]>();
+  const quizDiagnostics = new Map<string, ParseDiagnostic[]>();
+  let loggedDiagnostics = new Set<string>();
 
   function getQuestionHeading(question: Quiz["questions"][number]): string {
     return question.subtopic ? `${question.topic}: ${question.subtopic}` : question.topic;
@@ -351,7 +352,8 @@ export function createApp(quizDirOrOpts?: string | AppOptions) {
     const next = new Map<string, Quiz>();
     const deckIdByTitle = new Map<string, string>();
     const nextValidationErrors: ReturnType<typeof parseQuizMarkdown>["errors"] = [];
-    const nextDiagnostics = new Map<string, DeckDiagnostic[]>();
+    const nextDiagnostics = new Map<string, ParseDiagnostic[]>();
+    const nextLoggedDiagnostics = new Set<string>();
 
     for (const file of files) {
       const filePath = path.join(dirPath, file);
@@ -363,8 +365,13 @@ export function createApp(quizDirOrOpts?: string | AppOptions) {
           console.warn(`Parse errors for ${file}:`, result.errors.map((e) => e.message));
           continue;
         }
-        if (result.diagnostics.length > 0) {
-          console.warn(`Ignored settings in ${file}:`, result.diagnostics.map((d) => `line ${d.lineNumber}: ${d.message}`));
+        for (const diagnostic of result.diagnostics) {
+          // Each diagnostic is logged once, and again only after it went away and came back.
+          const key = `${file}|${diagnostic.severity}|${formatDiagnostic(diagnostic)}`;
+          nextLoggedDiagnostics.add(key);
+          if (!loggedDiagnostics.has(key)) {
+            console.warn(`${diagnostic.severity === "warning" ? "Ignored" : "Note"} in ${file}, ${formatDiagnostic(diagnostic)}`);
+          }
         }
         if (result.quiz) {
           if (result.diagnostics.length > 0) nextDiagnostics.set(result.quiz.week, result.diagnostics);
@@ -402,6 +409,7 @@ export function createApp(quizDirOrOpts?: string | AppOptions) {
       quizzes.set(week, quiz);
     }
     quizValidationErrors = nextValidationErrors;
+    loggedDiagnostics = nextLoggedDiagnostics;
     quizDiagnostics.clear();
     for (const [week, diagnostics] of nextDiagnostics.entries()) {
       if (quizzes.has(week)) quizDiagnostics.set(week, diagnostics);
