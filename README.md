@@ -283,6 +283,7 @@ Tip for classroom privacy and mobility: project a separate presentation view fro
 - `End Session` remains available from the live controls and opens a confirmation dialog before closing the room. The dialog shows how many quiz questions and slides are left.
 - The fullscreen control appears when the browser supports the Fullscreen API, letting the instructor/projector surface fill the display without browser chrome.
 - Review mode lets the instructor step through previous slides/questions without moving students, then return to the current live item with `Back to Live`.
+- Keyboard shortcuts on the instructor view run the same Prev and Next handlers as the buttons. Next: `Right arrow`, `Down arrow`, `Page Down`, `l` or `j`. Previous: `Left arrow`, `Up arrow`, `Page Up`, `h` or `k`. `Page Up` and `Page Down` are the keys most presentation clickers send. The keys do nothing while a button is disabled or the console is reconnecting, while focus is in a text field, while a dialog is open, or with `Ctrl`, `Cmd` or `Alt` held, and a held key moves one step only. `Space` is not a shortcut, because it presses whichever button has focus.
 - On narrow screens, the same controls stack from the top-left so small-device use keeps the same visual order.
 
 ### 3) student join flow (share this one)
