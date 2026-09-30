@@ -103,18 +103,20 @@ export default function LiveSurface({
     "data-deck-muted": appearance && "--mdq-deck-muted" in appearance ? "true" : undefined,
     "data-deck-accent": appearance && "--mdq-deck-accent" in appearance ? "true" : undefined,
   };
-  // The page canvas behind the slide takes the deck's background colour too, so no band of the palette's colour shows past the slide.
+  // The page canvas behind the slide matches the colour the slide ends on, so no band of the palette's colour shows past it.
+  // That is the deck's background colour, or the palette's own background when the deck sets only a surface colour.
+  // The phone's own page is not a full-screen slide, so its canvas is left alone.
   const deckCanvas = appearance?.["--mdq-slide-bg"];
   useEffect(() => {
-    if (!deckCanvas) return undefined;
+    if (!hasDeckBackground || mode === "student") return undefined;
     const root = document.documentElement;
-    root.style.setProperty("--mdq-deck-canvas", deckCanvas);
+    if (deckCanvas) root.style.setProperty("--mdq-deck-canvas", deckCanvas);
     root.setAttribute("data-deck-canvas", "true");
     return () => {
       root.style.removeProperty("--mdq-deck-canvas");
       root.removeAttribute("data-deck-canvas");
     };
-  }, [deckCanvas]);
+  }, [hasDeckBackground, deckCanvas, mode]);
 
   useEffect(() => {
     if (typeof document === "undefined") return;

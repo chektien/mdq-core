@@ -1,4 +1,4 @@
-import { DECK_SETTING_KEYS, DECK_STYLE_KEYS, deckStylePresets, safeDeckStyle } from "@mdq/shared";
+import { DECK_SETTING_KEYS, DECK_STYLE_KEYS, deckStylePresets, formatDiagnostic, safeDeckStyle } from "@mdq/shared";
 import { parseQuizMarkdown } from "../parser";
 import { printDeckStyle } from "../print-deck-style";
 import fs from "fs";
@@ -267,9 +267,23 @@ describe("deck header appearance settings", () => {
       expect(result.errors).toEqual([]);
       expect(result.quiz).not.toBeNull();
       expect(result.diagnostics).toEqual([
-        expect.objectContaining({ lineNumber: 2, severity: "warning", message: expect.stringContaining("title-size: huge is not a size") }),
-        expect.objectContaining({ lineNumber: 4, severity: "warning", message: expect.stringContaining("accent-color: teel is not a colour") }),
+        { severity: "warning", sourceFile: "style.md", questionIndex: -1, lineNumber: 2, message: expect.stringContaining("title-size: huge is not a size") },
+        { severity: "warning", sourceFile: "style.md", questionIndex: -1, lineNumber: 4, message: expect.stringContaining("accent-color: teel is not a colour") },
       ]);
+    });
+
+    it("lists diagnostics in line order, not in the order the keys are checked", () => {
+      const result = parseQuizMarkdown(deck("accent-color: teel\ntitle-size: huge\nbody-size: nope"), "style.md");
+      expect(result.diagnostics.map((d) => d.lineNumber)).toEqual([2, 3, 4]);
+      expect(result.diagnostics.map((d) => d.message.split(":")[0])).toEqual(["accent-color", "title-size", "body-size"]);
+    });
+
+    it("formats a location for the header, an item, and a missing line", () => {
+      const base = { severity: "warning" as const, sourceFile: "x.md", message: "m" };
+      expect(formatDiagnostic({ ...base, questionIndex: -1, lineNumber: 2 })).toBe("header, line 2: m");
+      expect(formatDiagnostic({ ...base, questionIndex: 2, lineNumber: 14 })).toBe("item 3, line 14: m");
+      expect(formatDiagnostic({ ...base, questionIndex: -1 })).toBe("header: m");
+      expect(formatDiagnostic({ ...base, severity: "info", questionIndex: 0 })).toBe("item 1: m");
     });
 
     it("has no diagnostics for a clean deck", () => {
@@ -286,11 +300,14 @@ describe("deck header appearance settings", () => {
         const listed = await request(app).get("/api/decks").expect(200);
         const byWeek = Object.fromEntries(listed.body.map((item: { week: string }) => [item.week, item]));
         expect(Object.keys(byWeek).sort()).toEqual(["plain", "styled"]);
-        expect(byWeek.styled.diagnostics).toEqual([{ lineNumber: 2, severity: "warning", message: expect.stringContaining("title-size: huge is not a size") }]);
+        expect(byWeek.styled.diagnostics).toEqual([{ severity: "warning", sourceFile: "styled.md", questionIndex: -1, lineNumber: 2, message: expect.stringContaining("title-size: huge is not a size") }]);
         expect("diagnostics" in byWeek.plain).toBe(false);
-        expect(warn).toHaveBeenCalledWith("Ignored settings in styled.md:", [expect.stringContaining("line 2: title-size: huge")]);
+        expect(warn).toHaveBeenCalledTimes(1);
+        expect(warn).toHaveBeenCalledWith(expect.stringMatching(/^Ignored in styled\.md, header, line 2: title-size: huge is not a size/));
         const reloaded = await request(app).post("/api/decks/reload").expect(200);
         expect(reloaded.body.quizzes.find((item: { week: string }) => item.week === "styled").diagnostics).toHaveLength(1);
+        // The same diagnostic is not logged again on reload.
+        expect(warn).toHaveBeenCalledTimes(1);
       } finally {
         warn.mockRestore();
         fs.rmSync(quizDir, { recursive: true, force: true });

@@ -42,7 +42,7 @@ describe("deck style custom properties in the stylesheet", () => {
     expect(rules.length).toBeGreaterThan(0);
     for (const [, selector] of rules) {
       expect(selector).toContain(`[${attribute}]`);
-      expect(selector).not.toMatch(/toolbar|button|status|join|next-up|counter/);
+      expect(selector).not.toMatch(/toolbar|button|join|next-up/);
     }
     // No other rule reads it, and the surface only sets the attribute beside the property.
     expect(surface).toContain(`"${attribute}"`);
@@ -50,9 +50,20 @@ describe("deck style custom properties in the stylesheet", () => {
   });
 
   it("mirrors the deck background on the page canvas", () => {
-    expect(css).toMatch(/html:root:root\[data-theme\]\[data-deck-canvas\]:has\(\.slide-surface:not\(\.slide-surface-student\)\) \{\s*background: var\(--mdq-deck-canvas\);/);
+    expect(css).toMatch(/html:root:root\[data-theme\]\[data-deck-canvas\]:has\(\.slide-surface:not\(\.slide-surface-student\)\) \{\s*background: var\(--mdq-deck-canvas, var\(--mdq-slide-bg\)\);/);
     expect(surface).toContain("--mdq-deck-canvas");
     expect(surface).toContain("removeProperty");
+    expect(surface).toContain('mode === "student"');
+  });
+
+  it("makes question-screen text on the deck background follow the deck's text and muted colours", () => {
+    const bare = css.replace(/\/\*[\s\S]*?\*\//g, "");
+    expect(bare).toMatch(/\[data-deck-text\][^{}]*\.text-zinc-300[^{}]*\{[^}]*color: var\(--mdq-deck-text\) !important/);
+    for (const part of [".quiz-surface-content > .text-amber-400", ".timer-label", "border-emerald-700/50", ".no-votes-note", ".selection-mode-chip", ".slide-status-pill-neutral", ".slide-counter"]) {
+      expect(bare).toContain(part);
+    }
+    expect(bare).toMatch(/\[data-deck-muted\] :is\(\.no-votes-note, \.slide-status-pill-neutral, \.slide-counter\) \{\s*color: var\(--mdq-deck-muted\);/);
+    expect(fs.readFileSync(path.resolve(__dirname, "..", "..", "..", "client", "src", "components", "Timer.tsx"), "utf-8")).toContain("timer-label");
   });
 
   it("gives every fallback a non-empty value", () => {

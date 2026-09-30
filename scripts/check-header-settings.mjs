@@ -137,6 +137,34 @@ function measureQuestion() {
   };
 }
 
+/** Text on the slide with less than 4.5:1 against what is behind it, blending translucent fills over the layers below. */
+function lowContrastText() {
+  const parse = (value) => { const m = value.match(/rgba?\(([^)]+)\)/); if (!m) return [0, 0, 0, 0]; const [r, g, b, a = 1] = m[1].split(/[ ,/]+/).filter(Boolean).map(Number); return [r, g, b, a]; };
+  const over = (top, bottom) => { const a = top[3] + bottom[3] * (1 - top[3]); return a === 0 ? [0, 0, 0, 0] : [0, 1, 2].map((i) => (top[i] * top[3] + bottom[i] * bottom[3] * (1 - top[3])) / a).concat(a); };
+  const lum = ([r, g, b]) => { const f = (c) => { c /= 255; return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4; }; return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b); };
+  const solid = (value) => { const probe = document.createElement("i"); probe.style.color = value; document.body.append(probe); const color = getComputedStyle(probe).color; probe.remove(); return parse(color); };
+  // The slide paints its background as a gradient, so its end colour stands in for the fill.
+  const fillOf = (el) => {
+    const layers = [];
+    for (let node = el; node; node = node.parentElement) {
+      const style = getComputedStyle(node);
+      layers.push(node.classList.contains("slide-surface") && style.backgroundImage !== "none" ? solid(style.getPropertyValue("--mdq-slide-bg")) : parse(style.backgroundColor));
+    }
+    return layers.reduceRight((below, layer) => over(layer, below), [255, 255, 255, 1]);
+  };
+  const failures = [];
+  for (const el of document.querySelectorAll(".slide-surface *")) {
+    const own = [...el.childNodes].filter((node) => node.nodeType === 3 && node.textContent.trim()).map((node) => node.textContent.trim()).join(" ");
+    const style = getComputedStyle(el);
+    if (!own || style.visibility === "hidden" || style.display === "none") continue;
+    const fill = fillOf(el);
+    const [hi, lo] = [lum(over(parse(style.color), fill)), lum(fill)].sort((a, b) => b - a);
+    const ratio = (hi + 0.05) / (lo + 0.05);
+    if (ratio < 4.5) failures.push(`${el.tagName.toLowerCase()} "${own.slice(0, 24)}" ${ratio.toFixed(2)}`);
+  }
+  return failures;
+}
+
 /** Every computed property of every element under the slide surface, for an exact before and after comparison. */
 function dumpAll() {
   const surface = document.querySelector(".slide-surface");
@@ -281,8 +309,17 @@ async function main() {
       await projector.waitForSelector(".slide-surface .quiz-html.text-white strong");
       questions[deck] = {};
       for (const [name, page] of [["presenter", presenter], ["projector", projector]]) {
-        questions[deck][name] = { ...(await page.evaluate(measureQuestion)), controls: await page.evaluate(measureControls) };
+        questions[deck][name] = { ...(await page.evaluate(measureQuestion)), controls: await page.evaluate(measureControls), open: await page.evaluate(lowContrastText) };
       }
+      // Close the question, then reveal it, and read every text on the slide in each state.
+      await fetch(`${base}/api/session/${sessionId}/close`, { method: "POST" });
+      for (const page of [presenter, projector]) await page.waitForSelector(".quiz-surface-content > .text-amber-400");
+      await projector.waitForTimeout(400);
+      for (const [name, page] of [["presenter", presenter], ["projector", projector]]) questions[deck][name].closed = await page.evaluate(lowContrastText);
+      await fetch(`${base}/api/session/${sessionId}/reveal`, { method: "POST" });
+      for (const page of [presenter, projector]) await page.waitForSelector(".quiz-surface-content-reveal");
+      await projector.waitForTimeout(800);
+      for (const [name, page] of [["presenter", presenter], ["projector", projector]]) questions[deck][name].reveal = await page.evaluate(lowContrastText);
       await context.close();
     }
 
@@ -314,6 +351,9 @@ async function main() {
         check(styled.canvas === "rgb(253, 246, 227)" && plain.canvas !== styled.canvas, `${surface}: the page canvas follows background-color (${plain.canvas} to ${styled.canvas})`);
         const q = questions.styled[surface];
         check(q.stemColor === "rgb(16, 24, 32)" && q.strongColor === "rgb(16, 24, 32)" && questions.plain[surface].stemColor !== q.stemColor, `${surface}: question text and its bold text follow text-color (${questions.plain[surface].stemColor} to ${q.stemColor})`);
+        for (const state of ["open", "closed", "reveal"]) {
+          check(q[state].length === 0, `${surface}: every text on the ${state} question screen has at least 4.5:1 contrast on the light deck background${q[state].length ? ` (${q[state].join("; ")})` : ""}`);
+        }
         check(JSON.stringify(q.controls) === JSON.stringify(questions.plain[surface].controls), `${surface}: control buttons on a question screen are unchanged too`);
       }
       check(surface === "phone" || styled.strongColor === "rgb(16, 24, 32)" || styled.strongColor === null, `${surface}: bold text in the slide body follows text-color (${styled.strongColor})`);

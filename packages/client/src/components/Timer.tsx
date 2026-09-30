@@ -57,7 +57,7 @@ export default function Timer({
         />
       </svg>
       <span
-        className="absolute font-mono font-bold"
+        className="timer-label absolute font-mono font-bold"
         style={{ fontSize: labelFontSize, color }}
       >
         {label}

@@ -7411,11 +7411,39 @@ html:root[data-theme] .slide-surface[data-deck-text] .quiz-html.text-white {
 }
 
 html:root[data-theme] .slide-surface[data-deck-text] :is(.slide-header, .slide-content-grid, .slide-notes, .slide-references) strong,
-html:root[data-theme] .slide-surface[data-deck-text] .quiz-html.text-white strong {
+html:root[data-theme] .slide-surface[data-deck-text] .quiz-html:is(.text-white, .text-zinc-300) strong {
   color: var(--mdq-deck-text);
 }
 
 /* The page canvas follows the deck's background colour, ahead of the palette's own canvas colour. */
 html:root:root[data-theme][data-deck-canvas]:has(.slide-surface:not(.slide-surface-student)) {
-  background: var(--mdq-deck-canvas);
+  background: var(--mdq-deck-canvas, var(--mdq-slide-bg));
+}
+
+/* Text that sits straight on the deck's background on a question screen
+   follows the deck's text colour, and quieter text follows its muted colour,
+   whenever the deck sets them: the reveal question, the closed label, the
+   no-votes note, the mode chip, the timer count, the status label, the slide
+   counter and the explanation. The fixed !important text colours of the theme
+   need the same weight. The answer panels keep their own fills and status
+   colours, and the timer ring keeps its warning colours. */
+html:root[data-theme] .slide-surface[data-deck-text] .quiz-html.text-zinc-300,
+html:root[data-theme] .slide-surface[data-deck-text] .quiz-surface-content > .text-amber-400,
+html:root[data-theme] .slide-surface[data-deck-text] .timer-label,
+html:root[data-theme] .slide-surface[data-deck-text] .quiz-surface-content > [class~="border-emerald-700/50"] :is(h3, p, strong) {
+  color: var(--mdq-deck-text) !important;
+}
+
+html:root[data-theme] .slide-surface[data-deck-text] :is(.no-votes-note, .slide-status-pill-neutral, .slide-counter) {
+  color: var(--mdq-deck-text);
+}
+
+html:root[data-theme] .slide-surface[data-deck-text] .selection-mode-chip {
+  border-color: color-mix(in srgb, var(--mdq-deck-text) 45%, transparent);
+  background: transparent;
+  color: var(--mdq-deck-text);
+}
+
+html:root[data-theme] .slide-surface[data-deck-muted] :is(.no-votes-note, .slide-status-pill-neutral, .slide-counter) {
+  color: var(--mdq-deck-muted);
 }
