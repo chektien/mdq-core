@@ -40,6 +40,11 @@ export default function SessionCodeCard({
     className,
   ].filter(Boolean).join(" ");
 
+  // Locking joins closes an enlarged QR, so it does not come back on unlock.
+  useEffect(() => {
+    if (joinClosed) setEnlarged(false);
+  }, [joinClosed]);
+
   useEffect(() => {
     if (!enlarged) return;
     const onKeyDown = (event: KeyboardEvent) => {
