@@ -63,7 +63,12 @@ describe("deck style custom properties in the stylesheet", () => {
       expect(bare).toContain(part);
     }
     expect(bare).toMatch(/\[data-deck-muted\] :is\(\.no-votes-note, \.slide-status-pill-neutral, \.slide-counter\) \{\s*color: var\(--mdq-deck-muted\);/);
-    expect(fs.readFileSync(path.resolve(__dirname, "..", "..", "..", "client", "src", "components", "Timer.tsx"), "utf-8")).toContain("timer-label");
+    // The count takes the deck's text colour only while time is plentiful, so the warning colours still show.
+    expect(bare).toContain('.timer-label[data-timer-state="ok"]');
+    expect(bare).not.toMatch(/\.timer-label[,\s{]/);
+    const timer = fs.readFileSync(path.resolve(__dirname, "..", "..", "..", "client", "src", "components", "Timer.tsx"), "utf-8");
+    expect(timer).toContain("timer-label");
+    expect(timer).toContain("data-timer-state={state}");
   });
 
   it("gives every fallback a non-empty value", () => {

@@ -48,6 +48,8 @@ A paragraph of **bold** body text with a [plain link](https://example.org/page) 
 > Reference: Synthetic source`;
 const QUESTION = `## Pick one
 
+time-limit: 10
+
 **Which one is **bold** here?**
 
 A. One
@@ -163,6 +165,17 @@ function lowContrastText() {
     if (ratio < 4.5) failures.push(`${el.tagName.toLowerCase()} "${own.slice(0, 24)}" ${ratio.toFixed(2)}`);
   }
   return failures;
+}
+
+/** The timer count: its state, its colour, and the palette's warning colour for that state. The ring fades between colours, so it is not compared mid-fade. */
+function measureTimer() {
+  const label = document.querySelector(".slide-surface .timer-label");
+  const probe = document.createElement("i");
+  probe.style.color = `var(--mdq-timer-${label.dataset.timerState})`;
+  label.parentElement.append(probe);
+  const expected = getComputedStyle(probe).color;
+  probe.remove();
+  return { state: label.dataset.timerState, color: getComputedStyle(label).color, expected };
 }
 
 /** Every computed property of every element under the slide surface, for an exact before and after comparison. */
@@ -311,6 +324,11 @@ async function main() {
       for (const [name, page] of [["presenter", presenter], ["projector", projector]]) {
         questions[deck][name] = { ...(await page.evaluate(measureQuestion)), controls: await page.evaluate(measureControls), open: await page.evaluate(lowContrastText) };
       }
+      // Near the end of the time, the count takes the ring's warning colour, not the deck's text colour.
+      for (const [name, page] of [["presenter", presenter], ["projector", projector]]) {
+        await page.waitForSelector('.timer-label[data-timer-state="urgent"]', { timeout: 20000 });
+        questions[deck][name].timerLow = await page.evaluate(measureTimer);
+      }
       // Close the question, then reveal it, and read every text on the slide in each state.
       await fetch(`${base}/api/session/${sessionId}/close`, { method: "POST" });
       for (const page of [presenter, projector]) await page.waitForSelector(".quiz-surface-content > .text-amber-400");
@@ -351,6 +369,8 @@ async function main() {
         check(styled.canvas === "rgb(253, 246, 227)" && plain.canvas !== styled.canvas, `${surface}: the page canvas follows background-color (${plain.canvas} to ${styled.canvas})`);
         const q = questions.styled[surface];
         check(q.stemColor === "rgb(16, 24, 32)" && q.strongColor === "rgb(16, 24, 32)" && questions.plain[surface].stemColor !== q.stemColor, `${surface}: question text and its bold text follow text-color (${questions.plain[surface].stemColor} to ${q.stemColor})`);
+        const low = q.timerLow;
+        check(low.state === "urgent" && low.color === low.expected && low.color !== "rgb(16, 24, 32)", `${surface}: the timer count keeps the palette's warning colour at low time (${low.color}, expected ${low.expected})`);
         for (const state of ["open", "closed", "reveal"]) {
           check(q[state].length === 0, `${surface}: every text on the ${state} question screen has at least 4.5:1 contrast on the light deck background${q[state].length ? ` (${q[state].join("; ")})` : ""}`);
         }

@@ -368,8 +368,9 @@ export function createApp(quizDirOrOpts?: string | AppOptions) {
         for (const diagnostic of result.diagnostics) {
           // Each diagnostic is logged once, and again only after it went away and came back.
           const key = `${file}|${diagnostic.severity}|${formatDiagnostic(diagnostic)}`;
+          const repeated = nextLoggedDiagnostics.has(key);
           nextLoggedDiagnostics.add(key);
-          if (!loggedDiagnostics.has(key)) {
+          if (!repeated && !loggedDiagnostics.has(key)) {
             console.warn(`${diagnostic.severity === "warning" ? "Ignored" : "Note"} in ${file}, ${formatDiagnostic(diagnostic)}`);
           }
         }

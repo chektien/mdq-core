@@ -7423,13 +7423,13 @@ html:root:root[data-theme][data-deck-canvas]:has(.slide-surface:not(.slide-surfa
 /* Text that sits straight on the deck's background on a question screen
    follows the deck's text colour, and quieter text follows its muted colour,
    whenever the deck sets them: the reveal question, the closed label, the
-   no-votes note, the mode chip, the timer count, the status label, the slide
+   no-votes note, the mode chip, the timer count while plenty of time is left, the status label, the slide
    counter and the explanation. The fixed !important text colours of the theme
    need the same weight. The answer panels keep their own fills and status
-   colours, and the timer ring keeps its warning colours. */
+   colours, and the timer ring and its count keep their warning colours once time runs low. */
 html:root[data-theme] .slide-surface[data-deck-text] .quiz-html.text-zinc-300,
 html:root[data-theme] .slide-surface[data-deck-text] .quiz-surface-content > .text-amber-400,
-html:root[data-theme] .slide-surface[data-deck-text] .timer-label,
+html:root[data-theme] .slide-surface[data-deck-text] .timer-label[data-timer-state="ok"],
 html:root[data-theme] .slide-surface[data-deck-text] .quiz-surface-content > [class~="border-emerald-700/50"] :is(h3, p, strong) {
   color: var(--mdq-deck-text) !important;
 }

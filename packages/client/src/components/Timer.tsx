@@ -21,12 +21,8 @@ export default function Timer({
 
   // Color transitions: green -> yellow -> red. The theme and palette set
   // these tokens (theme.css, index.css) so the ring and count keep contrast.
-  const color =
-    remainingSec > totalSec * 0.5
-      ? "var(--mdq-timer-ok, #22c55e)"
-      : remainingSec > totalSec * 0.2
-        ? "var(--mdq-timer-warn, #eab308)"
-        : "var(--mdq-timer-urgent, #ef4444)";
+  const state = remainingSec > totalSec * 0.5 ? "ok" : remainingSec > totalSec * 0.2 ? "warn" : "urgent";
+  const color = `var(--mdq-timer-${state}, ${state === "ok" ? "#22c55e" : state === "warn" ? "#eab308" : "#ef4444"})`;
 
   return (
     <div
@@ -58,6 +54,7 @@ export default function Timer({
       </svg>
       <span
         className="timer-label absolute font-mono font-bold"
+        data-timer-state={state}
         style={{ fontSize: labelFontSize, color }}
       >
         {label}

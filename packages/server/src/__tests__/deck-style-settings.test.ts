@@ -1,4 +1,5 @@
 import { DECK_SETTING_KEYS, DECK_STYLE_KEYS, deckStylePresets, formatDiagnostic, safeDeckStyle } from "@mdq/shared";
+import * as parserModule from "../parser";
 import { parseQuizMarkdown } from "../parser";
 import { printDeckStyle } from "../print-deck-style";
 import fs from "fs";
@@ -284,6 +285,24 @@ describe("deck header appearance settings", () => {
       expect(formatDiagnostic({ ...base, questionIndex: 2, lineNumber: 14 })).toBe("item 3, line 14: m");
       expect(formatDiagnostic({ ...base, questionIndex: -1 })).toBe("header: m");
       expect(formatDiagnostic({ ...base, severity: "info", questionIndex: 0 })).toBe("item 1: m");
+    });
+
+    it("logs two identical diagnostics from one file once", async () => {
+      const quizDir = fs.mkdtempSync(path.join(os.tmpdir(), "mdq-style-dup-"));
+      fs.writeFileSync(path.join(quizDir, "dup.md"), deck("body-size: large"));
+      const note = { severity: "info" as const, sourceFile: "dup.md", questionIndex: -1, lineNumber: 2, message: "Same note." };
+      const real = parseQuizMarkdown(deck("body-size: large"), "dup.md");
+      const parse = jest.spyOn(parserModule, "parseQuizMarkdown").mockReturnValue({ ...real, diagnostics: [note, { ...note }] });
+      const warn = jest.spyOn(console, "warn").mockImplementation(() => undefined);
+      try {
+        createApp({ quizDir });
+        expect(warn).toHaveBeenCalledTimes(1);
+        expect(warn).toHaveBeenCalledWith("Note in dup.md, header, line 2: Same note.");
+      } finally {
+        parse.mockRestore();
+        warn.mockRestore();
+        fs.rmSync(quizDir, { recursive: true, force: true });
+      }
     });
 
     it("has no diagnostics for a clean deck", () => {
