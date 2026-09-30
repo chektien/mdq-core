@@ -15,6 +15,7 @@ import {
   hideLeaderboard,
   setResponseHidden,
   releaseSeat,
+  setJoinLocked,
   resultsCsvUrl,
   fetchSessionAccessInfo,
   fetchSessionStateForRestore,
@@ -33,6 +34,7 @@ import OpenResponseList from "../components/OpenResponseList";
 import ParticipantList from "../components/ParticipantList";
 import QRPanel from "../components/QRPanel";
 import SessionCodeCard from "../components/SessionCodeCard";
+import JoinLockToggle from "../components/JoinLockToggle";
 import InlineMarkdownText from "../components/InlineMarkdownText";
 import QuizHtml from "../components/QuizHtml";
 import LiveSurface, { type LiveSurfaceAction } from "../components/LiveSurface";
@@ -199,6 +201,10 @@ export default function InstructorView({
       return !current;
     });
   }, []);
+  const handleJoinLock = useCallback(
+    (locked: boolean) => setJoinLocked(sessionInfo?.sessionId ?? "", locked),
+    [sessionInfo?.sessionId],
+  );
   const handleReleaseSeat = useCallback(
     (publicKey: string) => releaseSeat(sessionInfo?.sessionId ?? "", publicKey),
     [sessionInfo?.sessionId],
@@ -627,6 +633,11 @@ export default function InstructorView({
                 />
               </div>
             )}
+            <JoinLockToggle
+              locked={sock.participants?.joinLocked === true}
+              onChange={handleJoinLock}
+              disabled={!sock.connected}
+            />
             {idsAvailable && (
               <button
                 type="button"
@@ -739,6 +750,7 @@ export default function InstructorView({
       showStudentIds={idsVisible}
       onToggleShowStudentIds={toggleShowStudentIds}
       onReleaseSeat={handleReleaseSeat}
+      onJoinLock={handleJoinLock}
       presenterNotesEnabled={presenterNotesEnabled}
       presenterNotesByIndex={presenterNotesByIndex}
       presenterNotesOpen={presenterNotesOpen}
@@ -768,6 +780,7 @@ function LiveView({
   showStudentIds,
   onToggleShowStudentIds,
   onReleaseSeat,
+  onJoinLock,
   presenterNotesEnabled,
   presenterNotesByIndex,
   presenterNotesOpen,
@@ -793,6 +806,7 @@ function LiveView({
   showStudentIds: boolean;
   onToggleShowStudentIds: () => void;
   onReleaseSeat: (publicKey: string) => Promise<void>;
+  onJoinLock: (locked: boolean) => Promise<void>;
   presenterNotesEnabled: boolean;
   presenterNotesByIndex: Record<number, FoldoutNote[]>;
   presenterNotesOpen: boolean;
@@ -1242,6 +1256,12 @@ function LiveView({
             />
           )}
         </div>
+        <JoinLockToggle
+          className="mt-4"
+          locked={sock.participants?.joinLocked === true}
+          onChange={onJoinLock}
+          disabled={!sock.connected}
+        />
         {idsAvailable && (
           <button
             type="button"

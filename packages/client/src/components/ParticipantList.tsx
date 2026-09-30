@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { SessionParticipantsPayload } from "@mdq/shared";
+import { type FreedSeats, isSeatFreed, pruneFreedSeats } from "../participantSeats";
 
 type OnlineEntry = SessionParticipantsPayload["participants"][number];
 type OfflineEntry = NonNullable<SessionParticipantsPayload["offline"]>[number];
@@ -24,8 +25,13 @@ export default function ParticipantList({
 }) {
   const [confirmKey, setConfirmKey] = useState<string | null>(null);
   const [busyKey, setBusyKey] = useState<string | null>(null);
-  const [freed, setFreed] = useState<Record<string, true>>({});
+  const [freed, setFreed] = useState<FreedSeats>({});
   const [error, setError] = useState<string | null>(null);
+
+  // The row follows the live list: once a phone takes a freed seat the person is online and the local mark goes.
+  useEffect(() => {
+    setFreed((prev) => pruneFreedSeats(prev, participants));
+  }, [participants]);
 
   const online = participants?.participants ?? [];
   const offline = participants?.offline ?? [];
@@ -49,7 +55,7 @@ export default function ParticipantList({
   const renderRow = (person: OnlineEntry | OfflineEntry, isOffline: boolean) => {
     const label = person.label || "Participant";
     const id = "studentId" in person ? person.studentId : undefined;
-    const isFreed = ("released" in person && person.released === true) || freed[person.publicKey] === true;
+    const isFreed = isSeatFreed(isOffline, "released" in person ? person.released : undefined, freed, person.publicKey);
     const confirming = confirmKey === person.publicKey;
     const busy = busyKey === person.publicKey;
     return (

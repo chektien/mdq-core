@@ -276,6 +276,20 @@ export async function releaseSeat(sessionId: string, publicKey: string): Promise
   }
 }
 
+/** Stop new participants joining (or allow them again). Anyone who already has a seat can still rejoin it. */
+export async function setJoinLocked(sessionId: string, locked: boolean): Promise<void> {
+  const res = await fetchWithTimeout(apiPath(API.SESSION_JOIN_LOCK, { id: sessionId }), {
+    method: "POST",
+    credentials: "same-origin",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ locked }),
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.error || "That did not work. Please try again.");
+  }
+}
+
 /** Where the instructor downloads the session's results as a CSV file. */
 export function resultsCsvUrl(sessionId: string): string {
   return apiPath(API.SESSION_RESULTS_CSV, { id: sessionId });

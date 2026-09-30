@@ -264,6 +264,14 @@ export interface ReleaseSeatRequest {
   publicKey: string;
 }
 
+/** The body of the presenter's request to stop (or allow again) new participants joining. */
+export interface JoinLockRequest {
+  locked: boolean;
+}
+
+/** What a new participant is told while joining is locked. Someone who already has a seat can still rejoin it. */
+export const JOIN_LOCKED_MESSAGE = "This session is not taking new participants. Ask the presenter.";
+
 export interface QuestionOpenPayload {
   questionIndex: number;
   topic: string;
@@ -380,6 +388,8 @@ export interface SessionParticipantsPayload {
    * connected now, so the presenter can free one for a new device. `released` is true once freed.
    */
   offline?: { publicKey: string; label: string; studentId: string; displayName?: string; released?: boolean }[];
+  /** Control and display: present and true while the presenter has stopped new participants from joining. */
+  joinLocked?: true;
 }
 
 // ── REST API Paths ──────────────────────────
@@ -407,6 +417,7 @@ export const API = {
   SESSION_LEADERBOARD_HIDE: "/api/session/:id/leaderboard-hide",
   SESSION_RESPONSE_VISIBILITY: "/api/session/:id/response-visibility",
   SESSION_RELEASE_SEAT: "/api/session/:id/release-seat",
+  SESSION_JOIN_LOCK: "/api/session/:id/join-lock",
   SESSION_RESULTS_CSV: "/api/session/:id/results.csv",
   SESSION_STATE_RESTORE: "/api/session/:id/state",
   SESSION_ACCESS_INFO: "/api/session/:id/access-info",
@@ -515,6 +526,11 @@ export interface Session {
   hiddenResponses?: Record<string, string[]>;
   /** Whether the question now closed was closed by its timer running out, not by the presenter. */
   closedByTimer?: boolean;
+  /**
+   * The presenter has stopped new participants from joining (absent or false when joining is open).
+   * A join that would make a new seat is refused; a rejoin to an existing seat still works.
+   */
+  joinLocked?: boolean;
   participants: Map<string, Participant>;
   submissions: Submission[];
   createdAt: number;

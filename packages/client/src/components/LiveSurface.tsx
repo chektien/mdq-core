@@ -29,6 +29,8 @@ interface LiveSurfaceProps {
   qrDataUrl?: string;
   sessionCode?: string;
   participantCount?: number;
+  /** True while the presenter has closed joining: the join card says so instead of showing the code and QR. */
+  joinClosed?: boolean;
   /** True while this screen is disconnected, so the online count is greyed. */
   offline?: boolean;
   presentationUrl?: string;
@@ -53,6 +55,7 @@ export default function LiveSurface({
   qrDataUrl,
   sessionCode,
   participantCount,
+  joinClosed = false,
   offline = false,
   presentationUrl,
   joinUrl,
@@ -192,6 +195,7 @@ export default function LiveSurface({
             qrDataUrl={qrDataUrl}
             sessionCode={sessionCode || ""}
             participantCount={participantCount}
+            joinClosed={joinClosed}
             offline={offline}
             presentationUrl={presentationUrl}
             joinUrl={joinUrl}

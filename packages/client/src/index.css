@@ -4576,6 +4576,13 @@ html[data-theme="light"] .quiz-html a {
   margin-left: 0.08rem;
 }
 
+/* Joining is closed: the card says so in plain words, not in the spaced letters of a code. */
+.session-code-card-closed .session-code-card-toggle strong {
+  font-family: inherit;
+  letter-spacing: 0;
+  font-weight: 800;
+}
+
 .session-code-card-qr {
   width: 100%;
   height: auto;
@@ -7012,6 +7019,53 @@ body.image-expansion-lock {
 
 .student-ids-toggle[aria-pressed="true"]::after {
   content: " (on)";
+}
+
+.join-lock {
+  display: grid;
+  justify-items: start;
+  gap: 0.35rem;
+}
+
+.join-lock-toggle {
+  min-width: 2.75rem;
+  min-height: 2.75rem;
+  padding: 0 1rem;
+  border: 1px solid var(--mdq-control-border);
+  border-radius: var(--mdq-control-radius, 0.6rem);
+  background: transparent;
+  color: var(--mdq-ink);
+  font-size: 0.85rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.join-lock-toggle:hover:not(:disabled) {
+  background: var(--mdq-accent-soft);
+}
+
+.join-lock-toggle[aria-pressed="true"] {
+  border-color: var(--mdq-accent);
+  background: var(--mdq-accent-soft);
+  color: var(--mdq-accent-text);
+}
+
+.join-lock-toggle:disabled {
+  border-style: dashed;
+  cursor: not-allowed;
+  color: var(--mdq-muted);
+}
+
+.join-lock-toggle:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--mdq-accent) 72%, white);
+  outline-offset: 2px;
+}
+
+.join-lock-help {
+  margin: 0;
+  max-width: 24rem;
+  color: var(--mdq-muted);
+  font-size: 0.8rem;
 }
 
 .participants-count {

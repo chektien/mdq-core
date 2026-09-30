@@ -1,6 +1,6 @@
 import express, { type Request, type Response } from "express";
 import cors from "cors";
-import { API, AccessInfo, CumulativeLeaderboardEntry, PublicCumulativeLeaderboardEntry, DeckPalette, DeckTheme, Quiz, ReleaseSeatRequest, ResponseVisibilityRequest, Session, SessionState, usesStudentIds } from "@mdq/shared";
+import { API, AccessInfo, CumulativeLeaderboardEntry, PublicCumulativeLeaderboardEntry, DeckPalette, DeckTheme, JoinLockRequest, Quiz, ReleaseSeatRequest, ResponseVisibilityRequest, Session, SessionState, usesStudentIds } from "@mdq/shared";
 import {
   createSession,
   storeSession,
@@ -697,6 +697,7 @@ export function createApp(quizDirOrOpts?: string | AppOptions) {
         theme: resolveDeckTheme(quiz, theme),
         palette: resolveDeckPalette(quiz, palette),
         state: session.state,
+        joinLocked: session.joinLocked === true,
         currentQuestionIndex: session.currentQuestionIndex,
         questionCount: quiz.questions.length,
         questionHeadings: getQuestionHeadings(quiz),
@@ -818,6 +819,27 @@ export function createApp(quizDirOrOpts?: string | AppOptions) {
     });
   });
 
+  // ── Stop new participants joining, or allow them again ──
+  app.post(API.SESSION_JOIN_LOCK, requireInstructorAuth, (req, res) => {
+    withSession(req, res, (session) => {
+      const quiz = getQuizForSession(session.week);
+      if (!quiz) return res.status(500).json({ error: "Quiz data not found" });
+      const { locked } = (req.body ?? {}) as Partial<JoinLockRequest>;
+      if (typeof locked !== "boolean") return res.status(400).json({ error: "Send locked as true or false." });
+      try {
+        const result = apply(session, quiz, { type: "joinLock", role: "control", locked }, Date.now());
+        Object.assign(session, result.session);
+        storeSession(session);
+        onMessages?.(session, req.params.id, result);
+        logActivity(`instructor ${locked ? "locked" : "unlocked"} joining session=${req.params.id}`);
+        return res.json({ locked });
+      } catch (e) {
+        if (e instanceof EngineCommandError) return res.status(400).json({ error: e.message });
+        throw e;
+      }
+    });
+  });
+
   // ── Results download ──
   // The file names people by Student ID, so only the instructor may read it.
   app.get(API.SESSION_RESULTS_CSV, requireInstructorAuth, (req, res) => {
@@ -913,6 +935,7 @@ export function createApp(quizDirOrOpts?: string | AppOptions) {
       theme: resolveDeckTheme(quiz, theme),
       palette: resolveDeckPalette(quiz, palette),
       state: session.state,
+      joinLocked: session.joinLocked === true,
       questionCount: quiz.questions.length,
       questionHeadings: getQuestionHeadings(quiz),
       questionSummaries: getQuestionSummaries(quiz),

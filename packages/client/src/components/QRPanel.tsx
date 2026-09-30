@@ -5,14 +5,25 @@ export default function QRPanel({
   shortUrl,
   sessionCode,
   presentationUrl,
+  closed = false,
 }: {
   qrDataUrl: string;
   fullUrl: string;
   shortUrl: string;
   sessionCode: string;
   presentationUrl?: string;
+  /** True while the presenter has closed joining: the panel says so instead of showing the code and QR. */
+  closed?: boolean;
 }) {
   const primaryUrl = shortUrl || fullUrl;
+
+  if (closed) {
+    return (
+      <div className="instructor-qr-panel instructor-qr-panel-closed flex flex-col items-center gap-2 rounded-[1.75rem] border border-zinc-200 bg-white/95 p-8 shadow-[0_24px_60px_rgba(88,64,39,0.12)] max-w-md mx-auto">
+        <p className="text-3xl font-bold text-zinc-900">Joining is closed</p>
+      </div>
+    );
+  }
 
   return (
     <div className="instructor-qr-panel flex flex-col items-center gap-6 rounded-[1.75rem] border border-zinc-200 bg-white/95 p-6 shadow-[0_24px_60px_rgba(88,64,39,0.12)] max-w-md mx-auto">
