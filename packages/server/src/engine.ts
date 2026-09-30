@@ -2,7 +2,7 @@ import {
   Quiz, Session, SessionState, SocketEvents, QuestionOpenPayload, QuestionClosePayload, FoldoutNote,
   StudentJoinPayload, AnswerSubmitPayload, Participant, STATE_TRANSITIONS, StudentAnswer,
   LeaderboardRow, OpenResponseEntry, SessionParticipantsPayload, SocketRole,
-  MAX_DISPLAY_NAME_LENGTH, MAX_OPEN_RESPONSE_LENGTH, MAX_STUDENT_ID_LENGTH, normalizeDisplayName, usesStudentIds,
+  JOIN_LOCKED_MESSAGE, MAX_DISPLAY_NAME_LENGTH, MAX_OPEN_RESPONSE_LENGTH, MAX_STUDENT_ID_LENGTH, normalizeDisplayName, usesStudentIds,
 } from "@mdq/shared";
 import {
   StateTransitionError, computeLeaderboard, getAnsweredQuestions, getDistribution,
@@ -74,6 +74,8 @@ export type Command =
   | { type: "responseVisibility"; role: SocketRole; questionIndex: number; publicKey: string; hidden: boolean }
   /** Free one participant's seat so the next join with that ID (or name) takes it over. `role` is who is asking; only `control` may. */
   | { type: "releaseSeat"; role: SocketRole; publicKey: string; newToken: string }
+  /** Stop (or allow again) new participants joining. `role` is who is asking; only `control` may. Someone who already has a seat can still rejoin it. */
+  | { type: "joinLock"; role: SocketRole; locked: boolean }
   | { type: "disconnect"; studentId: string; socketId: string }
   | { type: "snapshot"; participantId?: string; isReconnect?: boolean; view?: "control" | "display" }
   | { type: "tick"; remainingSec: number };
@@ -201,11 +203,12 @@ const participantsPayload = (session: Session, view: PayloadView): SessionPartic
     .map((p) => view === "control"
       ? { publicKey: p.publicKey, label: p.label, studentId: p.studentId, displayName: p.displayName }
       : { publicKey: p.publicKey, label: p.label });
-  if (view !== "control") return { count: participants.length, participants };
+  const lock = session.joinLocked ? { joinLocked: true as const } : {};
+  if (view !== "control") return { count: participants.length, participants, ...lock };
   const offline = [...session.participants.values()].filter((p) => !p.connected)
     .map((p) => ({ publicKey: p.publicKey, label: p.label, studentId: p.studentId, displayName: p.displayName,
       ...(p.released ? { released: true } : {}) }));
-  return offline.length ? { count: participants.length, participants, offline } : { count: participants.length, participants };
+  return offline.length ? { count: participants.length, participants, offline, ...lock } : { count: participants.length, participants, ...lock };
 };
 /** The close message: it says so when the timer ran out, so screens can tell that from the presenter closing early. */
 const closePayload = (session: Session): QuestionClosePayload => ({
@@ -366,6 +369,8 @@ export function apply(input: Session, quiz: Quiz, command: Command, now: number)
         } else if (validToken && payload.clientInstanceId) existing.clientInstanceId = payload.clientInstanceId;
         participant = existing; isReconnect = true;
       } else {
+        // A new seat is what a lock refuses; every rejoin above got through.
+        if (session.joinLocked) { reject(JOIN_LOCKED_MESSAGE); break; }
         const { label, labelNote } = assignLabel(session, typedName);
         participant = { studentId: id, displayName: usesIds ? typedName || undefined : id,
           publicKey: command.newPublicKey ?? newPublicKey(), label, labelNote,
@@ -448,6 +453,13 @@ export function apply(input: Session, quiz: Quiz, command: Command, now: number)
       participant.clientInstanceId = undefined;
       emitParticipants();
       if (session.state === "QUESTION_OPEN" && session.currentQuestionIndex >= 0) emitCount();
+      break;
+    }
+    case "joinLock": {
+      if (command.role !== "control") throw new EngineCommandError("Only the presenter can lock or unlock joining.");
+      if (typeof command.locked !== "boolean") throw new EngineCommandError("Send locked as true or false.");
+      session.joinLocked = command.locked;
+      emitParticipants();
       break;
     }
     case "disconnect": {
