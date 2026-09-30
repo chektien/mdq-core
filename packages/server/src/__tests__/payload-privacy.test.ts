@@ -267,6 +267,9 @@ describe("payload privacy over real sockets", () => {
     const { sessionId, sessionCode } = created.body;
     const lookup = await request(app).get(`/api/session/by-code/${sessionCode}`).expect(200);
     expect(lookup.body.studentIds).toBe(true);
+    // The instructor view learns the same setting from its create and restore responses.
+    expect(created.body.studentIds).toBe(true);
+    expect((await request(app).get(`/api/session/${sessionId}/state`).expect(200)).body.studentIds).toBe(true);
     const control = connect(sessionId, "instructor");
     const display = connect(sessionId, "presentation");
     await until(() => control.socket.connected && display.socket.connected, "staff connect");
@@ -334,6 +337,8 @@ describe("payload privacy over real sockets", () => {
     const { sessionId, sessionCode } = created.body;
     const lookup = await request(app).get(`/api/session/by-code/${sessionCode}`).expect(200);
     expect(lookup.body.studentIds).toBe(false);
+    expect(created.body.studentIds).toBe(false);
+    expect((await request(app).get(`/api/session/${sessionId}/state`).expect(200)).body.studentIds).toBe(false);
     const alex = await joinAs(sessionId, { displayName: "Alex Tan" });
     expect(alex.joined.participantId).toBe("Alex Tan");
     const second = connect(sessionId);

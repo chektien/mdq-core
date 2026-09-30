@@ -647,6 +647,9 @@ export function createApp(quizDirOrOpts?: string | AppOptions) {
       palette: resolveDeckPalette(quiz, palette),
       questionHeadings: getQuestionHeadings(quiz),
       questionSummaries: getQuestionSummaries(quiz),
+      // Whether the deck uses Student IDs (its `student-id` setting, on by default). The instructor
+      // view hides its Student ID controls when this is false, because the name is the ID.
+      studentIds: usesStudentIds(quiz),
     });
   });
 
@@ -702,6 +705,7 @@ export function createApp(quizDirOrOpts?: string | AppOptions) {
         questionCount: quiz.questions.length,
         questionHeadings: getQuestionHeadings(quiz),
         questionSummaries: getQuestionSummaries(quiz),
+        studentIds: usesStudentIds(quiz),
         reviewQuestions: getReviewQuestions(session, quiz),
         // Student IDs and names only go to a logged-in instructor. With no login set, anyone can
         // reach this route, so restored open responses carry labels only.

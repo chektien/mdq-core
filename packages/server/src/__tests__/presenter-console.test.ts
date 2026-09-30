@@ -87,6 +87,20 @@ describe("Student IDs on the instructor's console", () => {
     // The projector never shows IDs at all.
     expect(read("views/PresentationView.tsx")).not.toContain("showStudentIds={true}");
   });
+
+  it("offers no ID toggle and no ID text when the deck turns Student IDs off", () => {
+    const tsx = read("views/InstructorView.tsx");
+    // The console learns the deck's setting from the create and restore responses; absent means IDs are on.
+    expect(tsx).toContain("setDeckUsesStudentIds(info.studentIds !== false)");
+    expect(tsx).toContain("setDeckUsesStudentIds(snapshot.studentIds !== false)");
+    expect(tsx).toContain("const idsAvailable = deckUsesStudentIds && !autoGenerateStudentIds;");
+    // Every toggle sits behind idsAvailable: the lobby, the Participants dialog and the ended screen.
+    expect(tsx.match(/className="student-ids-toggle/g)?.length).toBe(3);
+    expect(tsx.match(/\{idsAvailable && \(\s*<button\s+type="button"\s+className="student-ids-toggle/g)?.length).toBe(3);
+    // With the toggle gone, idsVisible is false, and that reaches every list.
+    expect(tsx).toContain("const idsVisible = idsAvailable && showStudentIds;");
+    expect(tsx).toContain('nameOnly ? "name" : idsAvailable ? "ID" : "ID or name"');
+  });
 });
 
 describe("resuming a session", () => {
