@@ -7844,3 +7844,112 @@ html:root[data-theme] .slide-surface[data-deck-text] .selection-mode-chip {
 html:root[data-theme] .slide-surface[data-deck-muted] :is(.no-votes-note, .slide-status-pill-neutral, .slide-counter) {
   color: var(--mdq-deck-muted);
 }
+
+/* ── Deck header appearance on the phone's question and result screens ──
+   The screen carries the deck's background and size settings as the slide
+   surface does, under the same custom properties. Its colours reach it as the
+   --student-* properties instead: phoneDeckStyle.ts has already checked each
+   one (4.5:1 for text against the background and the answer panels on it, 3:1
+   for the accent and for an answer's edge) and sends only a set that is
+   readable, so a rule here never needs a fallback.
+   A deck with none of these settings adds no attribute, and none of the rules
+   below apply. */
+html:root[data-theme] .student-screen[data-deck-background="true"] {
+  background: linear-gradient(180deg, var(--mdq-slide-bg-soft, var(--mdq-slide-bg)), var(--mdq-slide-bg));
+}
+
+/* Body size: the question at the slides' body size, each answer a touch smaller, as on Core's own phone screens. */
+html:root[data-theme] .student-screen[data-deck-size="true"] {
+  --student-body-size: var(--mdq-body-size, calc(1.125rem * var(--mdq-body-scale, 1)));
+}
+
+html:root[data-theme] .student-screen[data-deck-size="true"] .student-question-text {
+  font-size: var(--student-body-size);
+}
+
+html:root[data-theme] .student-screen[data-deck-size="true"] .student-question-text-small,
+html:root[data-theme] .student-screen[data-deck-size="true"] .student-panel-text.quiz-html {
+  font-size: calc(var(--student-body-size) * 8 / 9);
+}
+
+/* Text that sits straight on the screen: the question and the notes, status and labels around it.
+   The theme paints these with !important, so each needs the same weight. */
+html:root[data-theme] .student-screen[data-deck-text="true"] :is(.student-question-text, .student-screen-text, .student-screen-quiet) {
+  color: var(--student-text) !important;
+}
+
+html:root[data-theme] .student-screen[data-deck-text="true"] .student-question-text strong {
+  color: var(--student-text);
+}
+
+html:root[data-theme] .student-screen[data-deck-muted="true"] .student-screen-quiet {
+  color: var(--student-muted) !important;
+}
+
+html:root[data-theme] .student-screen[data-deck-text="true"] .timer-label[data-timer-state="ok"] {
+  color: var(--student-text) !important;
+}
+
+/* The selected answer and Submit take the accent. The text on the accent is black or white, whichever reads better. */
+html:root[data-theme] .student-screen[data-deck-accent="true"] .option-btn[class~="border-indigo-500"] {
+  border-color: var(--student-accent) !important;
+}
+
+html:root[data-theme] .student-screen[data-deck-accent="true"] .option-marker[class~="bg-indigo-600"] {
+  background: var(--student-accent) !important;
+  color: var(--student-on-accent) !important;
+  box-shadow: none;
+}
+
+html:root[data-theme] .student-screen[data-deck-accent="true"] .student-submit-button:not(:disabled) {
+  background: var(--student-accent) !important;
+  color: var(--student-on-accent) !important;
+  box-shadow: none;
+}
+
+html:root[data-theme] .student-screen[data-deck-accent="true"] :is(.option-btn, textarea):focus-visible {
+  outline-color: var(--student-accent) !important;
+}
+
+/* A deck background repaints the screen, so the panels the palette fills with its own dark or light card
+   follow it: a light tint of the text colour, outlined in a line that holds 3:1 against the background.
+   Panels tinted with a status colour (the chosen answer, a correct one, a banner) keep their tint and
+   their status line, and their text follows the deck like the rest. */
+html:root[data-theme] .student-screen[data-deck-background="true"] [data-panel="neutral"] {
+  background: color-mix(in srgb, var(--student-text) 7%, transparent) !important;
+  border-color: var(--student-line) !important;
+  box-shadow: none;
+}
+
+html:root[data-theme] .student-screen[data-deck-background="true"] .student-marker[data-tone="neutral"] {
+  background: color-mix(in srgb, var(--student-text) 26%, transparent) !important;
+  color: var(--student-text) !important;
+  box-shadow: none;
+}
+
+html:root[data-theme] .student-screen[data-deck-background="true"] .student-panel-text {
+  color: var(--student-text) !important;
+}
+
+html:root[data-theme] .student-screen[data-deck-background="true"] :is(.student-panel-quiet, .option-btn-locked:not([class~="border-indigo-500"]) .student-panel-text) {
+  color: var(--student-muted) !important;
+}
+
+html:root[data-theme] .student-screen[data-deck-background="true"] .reveal-banner span {
+  color: var(--student-text) !important;
+}
+
+html:root[data-theme] .student-screen[data-deck-background="true"] textarea::placeholder {
+  color: var(--student-muted) !important;
+}
+
+html:root[data-theme] .student-screen[data-deck-background="true"] .student-submit-button:disabled {
+  color: var(--student-muted) !important;
+  border-color: var(--student-line) !important;
+}
+
+html:root[data-theme] .student-screen[data-deck-background="true"] .dist-row-shell {
+  border-color: var(--student-line);
+  background: transparent;
+  box-shadow: none;
+}
