@@ -40,6 +40,56 @@ describe("presenter toolbar", () => {
     expect(index).toMatch(/\.slide-toolbar-nav > \* \{\s*pointer-events: auto;/);
   });
 
+  it("caps each titled Prev and Next at half the column between 761px and 1299px", () => {
+    const block = index.match(/@media \(min-width: 761px\) and \(max-width: 1299px\) \{[\s\S]*?\n\}\n/);
+    expect(block).not.toBeNull();
+    // Each keeps at most half of the column, so two long titles cannot push the second under the controls.
+    expect(block?.[0]).toMatch(/\.slide-nav-button\.slide-action-button-with-detail \{\s*min-width: min\(11rem, 22cqi, calc\(50% - 0\.225rem\)\);/);
+    // Half of the column less half of the 0.45rem gap between the buttons.
+    expect(index).toMatch(/\.slide-toolbar-nav \{\s*display: flex;[^}]*gap: 0\.45rem;/);
+  });
+
+  it("measures the join card and hands its height to the stylesheet", () => {
+    expect(surface).toContain('safe?.querySelector<HTMLElement>(":scope > .slide-join-panel")');
+    // A card pinned to the window (under 700 px tall) is measured the same way as one floating over the slide.
+    expect(surface).toContain('if (style.position !== "absolute" && style.position !== "fixed") {');
+    expect(surface).toContain('safe.style.setProperty("--slide-join-clear"');
+    expect(surface).toContain("(parseFloat(style.bottom) || 0) + card.offsetHeight");
+    expect(surface).toContain('safe.style.removeProperty("--slide-join-clear")');
+  });
+
+  it("keeps a question's options and result bars clear of the floating join card up to a 1440 px laptop", () => {
+    const block = index.match(/@media \(min-width: 761px\) and \(max-width: 1499px\) \{\s*\.quiz-surface \.slide-safe:has\(\.quiz-surface-content-options\) \{[\s\S]*?\n\}\n/);
+    expect(block).not.toBeNull();
+    // The padding the fit step already subtracts grows to hold the card, never below the usual padding,
+    // on the question screen, open or closed. A reveal screen keeps its own.
+    expect(block?.[0]).toMatch(/:has\(\.quiz-surface-content-options\) \{\s*padding-bottom: max\(clamp\(2\.8rem, 5cqi, 5\.5rem\), calc\(var\(--slide-join-clear, 0px\) \+ [\d.]+rem\)\);/);
+    expect(index).not.toMatch(/\.quiz-surface \.slide-safe \{\s*padding-bottom: max\(clamp\(2\.8rem, 5cqi, 5\.5rem\), calc\(var\(--slide-join-clear/);
+    // An open card is a short strip with the QR beside the text and no taller than the text, not the tall projector card.
+    expect(block?.[0]).toMatch(/\.session-code-card-expanded \{\s*display: grid;\s*grid-template-columns: minmax\(0, 1fr\) auto 5\.25rem;/);
+    expect(block?.[0]).toMatch(/\.session-code-card-expanded \.session-code-card-body \{\s*display: contents;/);
+    expect(block?.[0]).toMatch(/\.session-code-card-expanded \.session-code-card-qr-hint \{\s*display: none;/);
+  });
+
+  it("marks a question screen, open or closed, but not a reveal or a leaderboard", () => {
+    const fit = read("components/ResponsiveQuizSurface.tsx");
+    expect(fit).toContain('!reveal && !leaderboard ? "quiz-surface-content-options" : ""');
+    expect(instructor).not.toMatch(/ResponsiveQuizSurface answering/);
+    expect(read("views/PresentationView.tsx")).not.toMatch(/ResponsiveQuizSurface answering/);
+    expect(index).not.toContain("quiz-surface-content-answering");
+  });
+
+  it("gives back the height a scaled question no longer uses, and steps down at any overflow", () => {
+    const fit = read("components/ResponsiveQuizSurface.tsx");
+    expect(fit).toContain('element.style.setProperty("--quiz-fit-height", layoutHeight)');
+    expect(fit).toContain("if (overflowRatio > 1) return nextDensity(current);");
+    expect(index).toMatch(/\[data-fit-density="scaled"\] \{\s*--quiz-fit-scale: 0\.9;[^}]*margin-block: calc\(var\(--quiz-fit-height, 0px\) \* \(var\(--quiz-fit-scale\) - 1\) \/ 2\);/);
+  });
+
+  it("pins the join card to the window on a question shorter than 700 px", () => {
+    expect(index).toMatch(/@media \(min-width: 761px\) and \(max-height: 699px\) \{\s*\.quiz-surface \.slide-join-panel \{\s*position: fixed;/);
+  });
+
   it("measures the toolbar's real height and hands it to the stylesheet", () => {
     expect(surface).toContain("toolbar.offsetTop + height");
     expect(surface).toContain('safe.style.setProperty("--slide-toolbar-clear"');

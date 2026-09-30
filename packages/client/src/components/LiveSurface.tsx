@@ -167,6 +167,33 @@ export default function LiveSurface({
     return () => observer.disconnect();
   }, []);
 
+  // The join card floats over the bottom corner from 761px up. Its height and
+  // its distance from the bottom edge go to the safe area as --slide-join-clear,
+  // so a question on a tablet can keep its options clear of the card (the
+  // stylesheet uses it from 761px to 1180px). A card in the flow needs none.
+  useLayoutEffect(() => {
+    const safe = safeRef.current;
+    const card = hasJoinInfo ? safe?.querySelector<HTMLElement>(":scope > .slide-join-panel") : null;
+    if (!safe || !card) return undefined;
+    const measure = () => {
+      const style = window.getComputedStyle(card);
+      if (style.position !== "absolute" && style.position !== "fixed") {
+        safe.style.removeProperty("--slide-join-clear");
+        return;
+      }
+      safe.style.setProperty("--slide-join-clear", `${Math.ceil((parseFloat(style.bottom) || 0) + card.offsetHeight)}px`);
+    };
+    measure();
+    if (typeof ResizeObserver === "undefined") return () => safe.style.removeProperty("--slide-join-clear");
+    const observer = new ResizeObserver(measure);
+    observer.observe(card);
+    if (surfaceRef.current) observer.observe(surfaceRef.current);
+    return () => {
+      observer.disconnect();
+      safe.style.removeProperty("--slide-join-clear");
+    };
+  }, [hasJoinInfo]);
+
   // Swipe navigation belongs to the presenter, the only surface handed Prev and
   // Next actions. The phone and the projector never swipe. A swipe calls the
   // same handlers as the buttons, so a disabled button also stops the swipe.

@@ -20,6 +20,7 @@
     "verify": "./scripts/verify.sh",
     "verify:quick": "./scripts/verify.sh --quick",
     "check:header-settings": "node scripts/check-header-settings.mjs",
+    "check:presenter-fit": "node scripts/check-presenter-fit.mjs",
     "verify:live": "bash ./scripts/verify-live-readiness.sh",
     "print:pdf": "npm run build --workspace=@mdq/shared && npm run build --workspace=@mdq/server && node packages/server/dist/print-mdq.js",
     "test:e2e": "npx jest --testPathPattern e2e-lifecycle --forceExit --detectOpenHandles --config packages/server/jest.config.js",

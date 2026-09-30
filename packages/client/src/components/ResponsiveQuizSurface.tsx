@@ -48,9 +48,13 @@ export default function ResponsiveQuizSurface({
         const available = getAvailableHeight(element);
         const contentHeight = element.scrollHeight;
         const overflowRatio = contentHeight / available;
+        // The scaled density shrinks the content with a transform, which keeps its
+        // layout height. The stylesheet trims the margins by this height.
+        const layoutHeight = `${element.offsetHeight}px`;
+        if (element.style.getPropertyValue("--quiz-fit-height") !== layoutHeight) element.style.setProperty("--quiz-fit-height", layoutHeight);
 
         setDensity((current) => {
-          if (overflowRatio > 1.03) return nextDensity(current);
+          if (overflowRatio > 1) return nextDensity(current);
           if (overflowRatio < 0.78) return previousDensity(current);
           return current;
         });
@@ -88,6 +92,8 @@ export default function ResponsiveQuizSurface({
         "quiz-surface-content-fit",
         reveal ? "quiz-surface-content-reveal" : "",
         leaderboard ? "quiz-surface-content-leaderboard" : "",
+        // A question screen shows its options or result bars, which the join card must not cover.
+        !reveal && !leaderboard ? "quiz-surface-content-options" : "",
       ].filter(Boolean).join(" ")}
       data-fit-density={leaderboard ? undefined : density}
     >
