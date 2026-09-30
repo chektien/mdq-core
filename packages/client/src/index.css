@@ -6978,9 +6978,12 @@ html[data-theme="light"] .slide-video-figure .slide-video-action:not(button) {
     max-width: min(46rem, 62vw);
   }
 
-  /* The next item's title gives way to the controls; it is cut with an ellipsis. */
+  /* The next item's title gives way to the controls; it is cut with an ellipsis.
+     Neither button keeps more than half of the column for itself, so two long
+     titles share it between them instead of the second one running under the
+     controls on the right. Where there is room, each keeps its usual width. */
   .slide-nav-button.slide-action-button-with-detail {
-    min-width: min(11rem, 22cqi);
+    min-width: min(11rem, 22cqi, calc(50% - 0.225rem));
     max-width: 100%;
   }
 
@@ -7082,6 +7085,56 @@ html[data-theme="light"] .slide-video-figure .slide-video-action:not(button) {
 @media (min-width: 761px) and (max-width: 1180px) {
   .slide-live-shell-controls:has(.presenter-notes-panel) .slide-safe {
     --slide-join-reserve: 0px;
+  }
+}
+
+/* On a tablet the answer options span nearly the whole width, so the join card
+   floating at the bottom right would sit on top of them. LiveSurface measures
+   the card (--slide-join-clear: its height and its distance from the bottom
+   edge) and the question keeps that much room under it, which the fit step
+   already counts because it reads the padding. An open card is a short strip,
+   the QR beside the code and the address, instead of the tall projector card. */
+@media (min-width: 761px) and (max-width: 1180px) {
+  .quiz-surface .slide-safe {
+    padding-bottom: max(clamp(2.8rem, 5cqi, 5.5rem), calc(var(--slide-join-clear, 0px) + 0.6rem));
+  }
+
+  .quiz-surface .slide-join-panel {
+    bottom: clamp(0.6rem, 1.4cqi, 1.1rem);
+  }
+
+  .quiz-surface .slide-join-panel.session-code-card-expanded {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 5.25rem;
+    align-items: start;
+    column-gap: 0.75rem;
+    width: min(26rem, 100%);
+  }
+
+  .quiz-surface .slide-join-panel.session-code-card-expanded .session-code-card-body {
+    display: contents;
+  }
+
+  .quiz-surface .slide-join-panel.session-code-card-expanded .session-code-card-qr-button {
+    grid-column: 2;
+    grid-row: 1 / span 3;
+    align-self: start;
+    width: 5.25rem;
+  }
+
+  .quiz-surface .slide-join-panel.session-code-card-expanded .session-code-card-qr {
+    width: 5.25rem;
+  }
+
+  .quiz-surface .slide-join-panel.session-code-card-expanded .session-code-card-link-text {
+    grid-column: 1;
+    min-width: 0;
+    margin: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .quiz-surface .slide-join-panel.session-code-card-expanded .session-code-card-link {
+    grid-column: 1;
   }
 }
 

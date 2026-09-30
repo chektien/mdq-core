@@ -40,6 +40,33 @@ describe("presenter toolbar", () => {
     expect(index).toMatch(/\.slide-toolbar-nav > \* \{\s*pointer-events: auto;/);
   });
 
+  it("caps each titled Prev and Next at half the column between 761px and 1299px", () => {
+    const block = index.match(/@media \(min-width: 761px\) and \(max-width: 1299px\) \{[\s\S]*?\n\}\n/);
+    expect(block).not.toBeNull();
+    // Each keeps at most half of the column, so two long titles cannot push the second under the controls.
+    expect(block?.[0]).toMatch(/\.slide-nav-button\.slide-action-button-with-detail \{\s*min-width: min\(11rem, 22cqi, calc\(50% - 0\.225rem\)\);/);
+    // Half of the column less half of the 0.45rem gap between the buttons.
+    expect(index).toMatch(/\.slide-toolbar-nav \{\s*display: flex;[^}]*gap: 0\.45rem;/);
+  });
+
+  it("measures the join card and hands its height to the stylesheet", () => {
+    expect(surface).toContain('safe?.querySelector<HTMLElement>(":scope > .slide-join-panel")');
+    expect(surface).toContain('if (style.position !== "absolute") {');
+    expect(surface).toContain('safe.style.setProperty("--slide-join-clear"');
+    expect(surface).toContain("(parseFloat(style.bottom) || 0) + card.offsetHeight");
+    expect(surface).toContain('safe.style.removeProperty("--slide-join-clear")');
+  });
+
+  it("keeps a question's options clear of the floating join card on a tablet", () => {
+    const block = index.match(/@media \(min-width: 761px\) and \(max-width: 1180px\) \{\s*\.quiz-surface \.slide-safe \{[\s\S]*?\n\}\n/);
+    expect(block).not.toBeNull();
+    // The padding the fit step already subtracts grows to hold the card, never below the usual padding.
+    expect(block?.[0]).toMatch(/\.quiz-surface \.slide-safe \{\s*padding-bottom: max\(clamp\(2\.8rem, 5cqi, 5\.5rem\), calc\(var\(--slide-join-clear, 0px\) \+ [\d.]+rem\)\);/);
+    // An open card is a short strip with the QR beside the text, not the tall projector card.
+    expect(block?.[0]).toMatch(/\.session-code-card-expanded \{\s*display: grid;\s*grid-template-columns: minmax\(0, 1fr\) 5\.25rem;/);
+    expect(block?.[0]).toMatch(/\.session-code-card-expanded \.session-code-card-body \{\s*display: contents;/);
+  });
+
   it("measures the toolbar's real height and hands it to the stylesheet", () => {
     expect(surface).toContain("toolbar.offsetTop + height");
     expect(surface).toContain('safe.style.setProperty("--slide-toolbar-clear"');
