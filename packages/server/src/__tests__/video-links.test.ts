@@ -94,6 +94,33 @@ describe("video link detector", () => {
     expect(findVideoLinksInMarkdown(md).map((m) => m.label)).toEqual(["After the list"]);
   });
 
+  it("finds a link after a fence that follows a list, with or without a blank line", () => {
+    const cases = [
+      ["- a", "", "```", "x", "```", "", `[Video: V](${YT})`],
+      ["- a", "", "```", "x", "```", `[Video: V](${YT})`],
+      ["- a", "```", "x", "```", `[Video: V](${YT})`],
+    ];
+    for (const lines of cases) {
+      expect(findVideoLinksInMarkdown(lines.join("\n")).map((m) => m.label)).toEqual(["V"]);
+    }
+  });
+
+  it("keeps a link inside an item after a nested item and a blank line", () => {
+    const v = `[Video: V](${YT})`;
+    for (const lines of [
+      ["- a", "  - b", "", `  ${v}`],
+      ["1. a", "   - b", "", `   ${v}`],
+      ["- a", "  - b", "", `    ${v}`],
+    ]) {
+      expect(findVideoLinksInMarkdown(lines.join("\n"))).toEqual([]);
+    }
+  });
+
+  it("finds a link after a nested list once the text is back at the left edge", () => {
+    const md = ["- a", "  - b", "", `[Video: V](${YT})`].join("\n");
+    expect(findVideoLinksInMarkdown(md).map((m) => m.label)).toEqual(["V"]);
+  });
+
   it("leaves code fences, tilde fences and indented code untouched", () => {
     const md = [
       "```md",
@@ -383,6 +410,15 @@ ${body}
     const result = parseQuizMarkdown(md, "week01.md");
     const expected = md.split("\n").findIndex((line) => line.startsWith("[Video: Elsewhere]")) + 1;
     expect(result.diagnostics[0].lineNumber).toBe(expected);
+  });
+
+  it("reports each repeated identical link on its own line", () => {
+    const link = "[Video: Elsewhere](https://example.com/clip)";
+    const md = deck(`${link}\n\nMiddle.\n\n${link}\n\nEnd.\n\n${link}`);
+    const result = parseQuizMarkdown(md, "week01.md");
+    const expected = md.split("\n").flatMap((line, i) => (line === link ? [i + 1] : []));
+    expect(result.diagnostics.map((d) => d.lineNumber)).toEqual(expected);
+    expect(new Set(expected).size).toBe(3);
   });
 
   it("keeps the first supported video and reports a second", () => {

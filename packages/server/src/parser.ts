@@ -521,8 +521,8 @@ function parseQuestionBlock(
     : { contentLines: textLines, liveEmbed: undefined };
   textLines = liveEmbedExtraction.contentLines;
   const videoExtraction = isSlide
-    ? extractSlideVideo(textLines, (message, lineText) => {
-      const found = lineText === undefined ? -1 : lines.findIndex((line) => line === lineText);
+    ? extractSlideVideo(textLines, (message, at) => {
+      const found = at === undefined ? -1 : indexOfOccurrence(lines, at.text, at.occurrence);
       diagnostics.push({
         severity: "info",
         sourceFile,
@@ -761,9 +761,31 @@ function extractSlideLiveEmbed(lines: string[]): { contentLines: string[]; liveE
   };
 }
 
+/** A line of text and which repeat of that text it is, so a line can be found again in the original block. */
+interface LineRef {
+  text: string;
+  occurrence: number;
+}
+
+type ReportVideoNote = (message: string, at?: LineRef) => void;
+
+function lineRef(lines: readonly string[], index: number): LineRef {
+  let occurrence = 0;
+  for (let i = 0; i <= index; i++) if (lines[i] === lines[index]) occurrence += 1;
+  return { text: lines[index], occurrence };
+}
+
+function indexOfOccurrence(lines: readonly string[], text: string, occurrence: number): number {
+  let seen = 0;
+  for (let i = 0; i < lines.length; i++) {
+    if (lines[i] === text && ++seen === occurrence) return i;
+  }
+  return -1;
+}
+
 function extractSlideVideo(
   lines: string[],
-  report: (message: string, lineText?: string) => void = () => {},
+  report: ReportVideoNote = () => {},
 ): { contentLines: string[]; video?: SlideVideo } {
   const contentLines: string[] = [];
   let embedUrl = "";
@@ -802,7 +824,7 @@ function extractSlideVideo(
   if (shadowed) {
     report(
       "This slide sets video_card, so its [Video: ...](url) link stays an ordinary link. A slide shows one video.",
-      contentLines[shadowed.lineIndex],
+      lineRef(contentLines, shadowed.lineIndex),
     );
   }
 
@@ -824,15 +846,15 @@ function extractSlideVideo(
  */
 function extractVideoLink(
   lines: string[],
-  report: (message: string, lineText?: string) => void,
+  report: ReportVideoNote,
 ): { contentLines: string[]; video?: SlideVideo } {
   const matches = findVideoLinks(lines);
   let chosen: VideoLinkMatch | undefined;
   for (const match of matches) {
     if (!match.video) {
-      report(`"${match.url}" stays an ordinary link. ${match.reason}`, lines[match.lineIndex]);
+      report(`"${match.url}" stays an ordinary link. ${match.reason}`, lineRef(lines, match.lineIndex));
     } else if (chosen) {
-      report(`"${match.url}" stays an ordinary link because a slide shows one video, and it already shows the first.`, lines[match.lineIndex]);
+      report(`"${match.url}" stays an ordinary link because a slide shows one video, and it already shows the first.`, lineRef(lines, match.lineIndex));
     } else {
       chosen = match;
     }

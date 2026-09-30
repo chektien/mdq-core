@@ -96,22 +96,28 @@ export function findVideoLinks(lines: readonly string[]): VideoLinkMatch[] {
   });
 
   // A paragraph inside a list item is not a top-level paragraph of the slide.
+  // The stack holds the content offset of each open list item, outermost first.
+  // A line that starts a paragraph, or a block such as a fence, closes every
+  // item it is not indented into. A line that continues the previous line does
+  // not close anything.
   const inItem = new Array<boolean>(lines.length).fill(false);
-  let itemOffset = -1;
+  const offsets: number[] = [];
   lines.forEach((line, index) => {
-    if (code[index] || !line.trim()) return;
+    if (!line.trim() || (code[index] && !boundary[index])) return;
     const indent = line.match(/^ */)![0].length;
     const marker = line.match(LIST_MARKER);
-    if (marker && indent <= 3 && !THEMATIC_BREAK.test(line)) {
-      itemOffset = indent + marker[1].length;
+    const nested = offsets.length > 0 && indent >= offsets[0];
+    if (marker && (indent <= 3 || nested) && !THEMATIC_BREAK.test(line)) {
+      while (offsets.length > 0 && offsets[offsets.length - 1] > indent) offsets.pop();
+      offsets.push(indent + marker[1].length);
       inItem[index] = true;
-    } else if (itemOffset >= 0 && indent >= itemOffset) {
-      inItem[index] = true;
-    } else if (boundary[index] || index === 0 || !lines[index - 1].trim()) {
-      itemOffset = -1;
-    } else if (itemOffset >= 0) {
-      inItem[index] = true; // lazy continuation of the item's paragraph
+      return;
     }
+    const startsBlock = boundary[index] || index === 0 || !lines[index - 1].trim();
+    if (startsBlock) {
+      while (offsets.length > 0 && offsets[offsets.length - 1] > indent) offsets.pop();
+    }
+    inItem[index] = offsets.length > 0;
   });
 
   const isBoundary = (index: number) => index < 0 || index >= lines.length || boundary[index];
