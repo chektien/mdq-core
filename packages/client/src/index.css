@@ -60,7 +60,6 @@ body {
   border: 0;
   border-radius: 0;
   background:
-    linear-gradient(90deg, rgba(15, 118, 110, 0.12) 0 0.65cqi, transparent 0.65cqi),
     linear-gradient(180deg, rgba(255, 255, 255, 0.7), rgba(246, 240, 226, 0.42)),
     var(--mdq-slide-bg);
   color: var(--mdq-slide-ink);
@@ -203,7 +202,6 @@ body {
 
 .foldout-note {
   border: 1px solid rgba(15, 118, 110, 0.2);
-  border-left: 0.34rem solid var(--mdq-note-attendee);
   border-radius: 4px;
   background: var(--mdq-note-attendee-tint);
   color: var(--mdq-slide-ink);
@@ -4307,7 +4305,6 @@ html[data-theme="light"] .quiz-html a {
 
 .foldout-note {
   border: 1px solid color-mix(in srgb, var(--mdq-note-attendee) 32%, transparent);
-  border-left: 0.34rem solid var(--mdq-note-attendee);
   border-radius: var(--mdq-panel-radius);
   background: var(--mdq-note-attendee-tint);
   color: var(--mdq-slide-ink);
@@ -4316,7 +4313,6 @@ html[data-theme="light"] .quiz-html a {
 
 .foldout-note-presenter {
   border-color: color-mix(in srgb, var(--mdq-note-presenter) 34%, transparent);
-  border-left-color: var(--mdq-note-presenter);
   background: var(--mdq-note-presenter-tint);
 }
 
