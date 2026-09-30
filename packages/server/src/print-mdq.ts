@@ -1,6 +1,7 @@
 import { chromium, type Browser } from "playwright";
 import { DECK_PALETTES, DeckPalette, formatDiagnostic, Quiz, Question, QuestionType, describeDeckPalettes, parseDeckPalette } from "@mdq/shared";
 import { parseQuizMarkdown, QuizParseError } from "./parser";
+import { escapeHtml, renderVideoNote } from "./print-video";
 import { printDeckStyle } from "./print-deck-style";
 import * as fs from "fs";
 import * as path from "path";
@@ -221,14 +222,6 @@ function parseArgs(argv: string[]): CliResult {
       htmlOut: htmlOut ? path.resolve(htmlOut) : undefined,
     },
   };
-}
-
-function escapeHtml(value: string): string {
-  return value
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
 }
 
 function isExternalUrl(src: string): boolean {
@@ -466,7 +459,8 @@ function renderItem(question: Question, index: number, total: number, options: P
   const body = renderTrustedHtml(question.textHtml, inputDir, options.imagesDir);
   const hasBody = body.trim().length > 0;
   const hasSlideMedia = isSlide && (question.slideMedia?.length ?? 0) > 0;
-  const bodySection = hasBody || !hasSlideMedia
+  const hasSlideVideo = isSlide && !!question.slideVideo;
+  const bodySection = hasBody || (!hasSlideMedia && !hasSlideVideo)
     ? `<section class="body-copy">${hasBody ? body : "<p class=\"empty-copy\">No body text.</p>"}</section>`
     : "";
 
@@ -489,6 +483,7 @@ function renderItem(question: Question, index: number, total: number, options: P
         ${bodySection}
         ${renderSlideMedia(question, inputDir, options.imagesDir)}
       </div>
+      ${isSlide ? renderVideoNote(question) : ""}
       ${renderOptions(question, inputDir, options.imagesDir, options.includeAnswers)}
       ${renderAnswerBlock(question, options.includeAnswers)}
       ${renderExplanation(question, options.includeAnswers)}
@@ -1489,8 +1484,39 @@ function renderStyles(
     .answer-block,
     .explanation,
     .foldouts,
-    .references {
+    .references,
+    .video-note {
       margin-top: 3mm;
+    }
+
+    .video-note {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1mm 3mm;
+      align-items: baseline;
+      padding: 2.4mm 3.2mm;
+      border: 1px solid var(--line);
+      break-inside: avoid;
+      font-size: 9.5pt;
+    }
+
+    .video-note-label {
+      font-weight: 800;
+    }
+
+    .video-note-provider {
+      color: var(--muted);
+      font-size: 8pt;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .video-note-link {
+      flex-basis: 100%;
+      color: var(--accent);
+      overflow-wrap: anywhere;
+      word-break: break-all;
     }
 
     .answer-block {

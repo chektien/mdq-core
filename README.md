@@ -827,7 +827,35 @@ Adapters that call the engine's `apply()` route its messages by audience:
 
 Image attachments are supported for quiz stems, option text, and slide bodies through standard markdown syntax. Slide images are automatically arranged into a media layout and keep their original aspect ratio while scaling to fit. Rendered quiz and slide images can be expanded into an overlay for closer inspection without changing their aspect ratio.
 
-Embedded video is still out of scope for now. Keep video context in slides or a separate instructor-controlled window while mdq handles the prompt, options, explanations, and scoring.
+### Video on a slide
+
+Add a video from another site to a slide with an ordinary Markdown link on a line of its own. The link text starts with `Video:` (any case, the space after the colon is optional) and the text after it is the label and the accessible name:
+
+```markdown
+[Video: How a lens focuses light](https://www.youtube.com/watch?v=abc123DEF45)
+```
+
+Because it is a normal link, the line still reads as a usable link in any other Markdown renderer. A `Video:` link that is already alone on its line in an existing deck now becomes a player, so check older decks if you used that wording for a plain link.
+
+Supported forms, https only:
+
+- YouTube: `youtube.com/watch?v=ID`, `youtu.be/ID`, `youtube.com/shorts/ID`, `youtube.com/embed/ID` and the `m.youtube.com` host. A `t=` or `start=` value (`90`, `90s`, `1m30s`) sets where playback starts. Playback uses `youtube-nocookie.com`.
+- Vimeo: `vimeo.com/ID`, `vimeo.com/ID/HASH` for an unlisted video, and `player.vimeo.com/video/ID`. Playback uses `player.vimeo.com` with do-not-track on.
+- A link to a video file on a web address, ending in `.mp4`, `.webm`, `.m4v` or `.mov` (query string allowed), played with the browser's own video controls.
+
+How it behaves:
+
+- The slide shows the label, the provider name and a play button. Nothing is requested from the provider until the viewer presses play, and nothing autoplays.
+- Pressing play swaps the card for the player in place. Moving to another slide, or pressing `Stop video`, stops it. `Escape` also stops it while focus is on the card's own controls, but not while focus is inside the provider's player, which keeps its own keys. The presenter's slide keys and swipe leave a focused player alone, and `Tab` leaves the player.
+- The player is a sandboxed iframe (scripts, same origin and popups only) that sends only the page origin as the referrer.
+- An `Open video` link to the original address is always shown and opens in a new tab.
+- On paper and in PDF exports the video is its label, its provider and the address as a link, with no player.
+- Only a paragraph at the top level of the slide that is just the link counts, so a link inside a list item or quote stays a link. A link to a video site inside a sentence, a link whose text does not start with `Video:`, and anything inside a code span or fenced code block stay ordinary links.
+- Any other host or scheme (including `http:`), a look-alike host, or a bad ID also stays an ordinary link, and the server logs an info note that names the supported forms. The player address is checked again in the browser, and a link that does not pass shows only `Open video`. A slide shows one video, so a second `Video:` link stays a link too.
+- A video link that stays an ordinary link is reported as a `Note` (a diagnostic with severity `info`), using the same `diagnostics` list and format as other deck notes. Its `lineNumber` is the line of the link itself. A note never blocks the deck. The server logs it once when it loads decks, the deck chooser shows it, and the export command logs it.
+- The `video-card:` settings described above keep working unchanged and take priority when both appear on a slide.
+
+Other embedded video, such as a full-slide player or video files uploaded through mdq, is still out of scope. Keep that context in a separate instructor-controlled window while mdq handles the prompt, options, explanations, and scoring.
 
 ## Security and Risk
 

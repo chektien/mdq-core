@@ -3231,6 +3231,8 @@ html[data-theme="light"] .slide-action-button-warning:disabled {
 .slide-content-grid-media-top > .slide-visual-stack .slide-video-slot,
 .slide-content-grid-media-top > .slide-visual-stack .slide-video-figure,
 .slide-content-grid-media-top > .slide-visual-stack .slide-video-card,
+.slide-content-grid-media-top > .slide-visual-stack .slide-video-player,
+.slide-content-grid-media-bottom > .slide-visual-stack .slide-video-player,
 .slide-content-grid-media-bottom > .slide-visual-stack .slide-video-slot,
 .slide-content-grid-media-bottom > .slide-visual-stack .slide-video-figure,
 .slide-content-grid-media-bottom > .slide-visual-stack .slide-video-card,
@@ -3241,7 +3243,9 @@ html[data-theme="light"] .slide-action-button-warning:disabled {
 }
 
 .slide-content-grid-media-top > .slide-visual-stack .slide-video-card,
-.slide-content-grid-media-bottom > .slide-visual-stack .slide-video-card {
+.slide-content-grid-media-bottom > .slide-visual-stack .slide-video-card,
+.slide-content-grid-media-top > .slide-visual-stack .slide-video-player,
+.slide-content-grid-media-bottom > .slide-visual-stack .slide-video-player {
   aspect-ratio: auto;
 }
 
@@ -6169,6 +6173,173 @@ body.image-expansion-lock {
   filter: drop-shadow(0 6px 18px rgba(0, 0, 0, 0.55));
 }
 
+/* A video written as a link. The card is the existing dark 16:9 card, with the
+   label and provider set in text instead of a poster, so nothing is fetched
+   before the viewer presses play. The whole card is the play button. */
+.slide-video-card-link {
+  display: grid;
+  align-items: end;
+  text-align: left;
+  color: #eeeeeb;
+}
+
+.slide-video-card-text {
+  position: relative;
+  display: grid;
+  gap: 0.2rem;
+  max-width: 100%;
+  padding: clamp(0.6rem, 1.6cqi, 1.3rem);
+  padding-inline-end: clamp(4.5rem, 12cqi, 7rem);
+}
+
+.slide-video-card-label {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  overflow: hidden;
+  font-size: clamp(0.95rem, 2cqi, 1.6rem);
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.slide-video-card-provider {
+  color: #b9bfd0;
+  font-size: clamp(0.8rem, 1.2cqi, 1rem);
+  font-weight: 600;
+}
+
+.slide-video-card-link .slide-video-card-play {
+  justify-content: flex-end;
+  align-items: flex-end;
+  padding: clamp(0.6rem, 1.6cqi, 1.3rem);
+}
+
+.slide-video-unavailable {
+  margin: 0;
+  padding: 0.5rem;
+  color: var(--mdq-slide-ink);
+  font-weight: 700;
+  text-align: center;
+}
+
+.slide-video-player {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border-radius: calc(var(--mdq-panel-radius, 0.9rem) - 0.12rem);
+  overflow: hidden;
+  background: #000;
+}
+
+.slide-video-iframe,
+.slide-video-native {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: #000;
+}
+
+.slide-video-native {
+  object-fit: contain;
+}
+
+/* Open video and Stop video sit under the player, each a 44 px target. */
+.slide-video-figure .slide-video-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.3rem 0.75rem;
+  color: var(--mdq-slide-ink);
+  font-size: clamp(0.85rem, 1.1cqi, 1rem);
+  font-weight: 600;
+}
+
+.slide-video-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0 0.85rem;
+  border: 1px solid transparent;
+  border-radius: var(--mdq-panel-radius, 0.9rem);
+  background: transparent;
+  color: var(--mdq-slide-accent-cool);
+  font: inherit;
+  text-decoration: underline;
+  text-decoration-thickness: 0.08em;
+  text-underline-offset: 0.18em;
+  cursor: pointer;
+}
+
+button.slide-video-action {
+  border-color: var(--mdq-control-border);
+  color: var(--mdq-slide-ink);
+  text-decoration: none;
+}
+
+.slide-video-action:hover {
+  text-decoration-thickness: 0.14em;
+}
+
+.slide-video-action:focus-visible {
+  outline: 2px solid var(--mdq-slide-accent-cool);
+  outline-offset: 2px;
+}
+
+html[data-theme="light"] .slide-video-figure .slide-video-action:not(button) {
+  color: var(--mdq-info-ink);
+}
+
+.slide-video-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* On paper there is no player: the label, the provider and the link. */
+.slide-video-print {
+  display: none;
+  margin: 0;
+}
+
+@media print {
+  .slide-video-figure-link .slide-video-card,
+  .slide-video-figure-link .slide-video-player,
+  .slide-video-figure-link .slide-video-actions {
+    display: none;
+  }
+
+  .slide-video-print {
+    display: grid;
+    gap: 0.15rem;
+    color: #000;
+    font-size: 11pt;
+    break-inside: avoid;
+  }
+
+  .slide-video-print-label {
+    font-weight: 700;
+  }
+
+  .slide-video-print-provider {
+    font-size: 9pt;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+
+  .slide-video-print-link {
+    color: #000;
+    overflow-wrap: anywhere;
+    text-decoration: underline;
+  }
+}
+
 /* ── Video expansion modal (modelled on image expansion) ───────────── */
 .video-expansion-overlay {
   position: fixed;
@@ -6694,7 +6865,8 @@ body.image-expansion-lock {
     gap: 0.55rem;
   }
 
-  .slide-visual-stack .slide-video-card {
+  .slide-visual-stack .slide-video-card,
+  .slide-visual-stack .slide-video-player {
     width: 100%;
     aspect-ratio: 16 / 9;
   }

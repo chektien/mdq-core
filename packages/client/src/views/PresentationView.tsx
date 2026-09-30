@@ -263,6 +263,7 @@ export default function PresentationView({
             slideMediaOpacity={currentQuestion.slideMediaOpacity}
             slideLiveEmbed={currentQuestion.slideLiveEmbed}
             slideVideo={currentQuestion.slideVideo}
+            slideKey={currentQuestion.questionIndex}
             slideReferences={currentQuestion.slideReferences}
           />
         );
@@ -503,6 +504,7 @@ export default function PresentationView({
                 deckStyle={currentQuestion.deckStyle}
                 slideLiveEmbed={currentQuestion.slideLiveEmbed}
                 slideVideo={currentQuestion.slideVideo}
+                slideKey={currentQuestion.questionIndex}
                 slideReferences={currentQuestion.slideReferences}
                 positionLabel={positionLabel}
                 nextLabel={nextHeading}
