@@ -209,6 +209,14 @@ describe("Participants dialog", () => {
   });
 });
 
+describe("open join card", () => {
+  it("is wide enough for the join address to wrap to two lines, with the QR at least as large as before", () => {
+    const css = read("index.css");
+    expect(css).toMatch(/@media \(min-width: 761px\) \{\s*\.slide-join-panel\.session-code-card-expanded,[\s\S]*?width: clamp\(11\.5rem, 16cqi, 16rem\)/);
+    expect(css).toMatch(/\.slide-join-panel\.session-code-card-expanded \.session-code-card-qr \{\s*width: min\(100%, 9rem\)/);
+  });
+});
+
 describe("participant list", () => {
   it("asks in place, in plain words, before freeing a seat", () => {
     const tsx = read("components/ParticipantList.tsx");

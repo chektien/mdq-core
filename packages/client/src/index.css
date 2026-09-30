@@ -6827,6 +6827,21 @@ body.image-expansion-lock {
   align-items: center;
 }
 
+/* The open join card is wide enough for the join address to wrap to two lines, and the QR is a little
+   larger than it was. On a phone the card is a row (QR beside the text) and keeps its own layout. */
+@media (min-width: 761px) {
+  .slide-join-panel.session-code-card-expanded,
+  .slide-live-shell-controls:has(.presenter-notes-panel) .slide-join-panel.session-code-card-expanded {
+    width: clamp(11.5rem, 16cqi, 16rem);
+    max-width: 100%;
+  }
+
+  .slide-join-panel.session-code-card-expanded .session-code-card-qr {
+    width: min(100%, 9rem);
+    justify-self: center;
+  }
+}
+
 .qr-enlarged {
   position: fixed;
   inset: 0;
