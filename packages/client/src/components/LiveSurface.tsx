@@ -1,5 +1,14 @@
-import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import SessionCodeCard from "./SessionCodeCard";
+import { pickNavAction } from "../presenterKeys";
+import {
+  SWIPE_BLOCKING_SELECTOR,
+  canBeginSwipe,
+  isSwipePointer,
+  resolveSwipe,
+  type HorizontalScroller,
+  type SwipeStart,
+} from "../presenterSwipe";
 
 export interface LiveSurfaceAction {
   label: string;
@@ -66,6 +75,8 @@ export default function LiveSurface({
   actions = [],
 }: LiveSurfaceProps) {
   const surfaceRef = useRef<HTMLElement | null>(null);
+  const safeRef = useRef<HTMLDivElement | null>(null);
+  const toolbarRef = useRef<HTMLDivElement | null>(null);
   const [fullscreenSupported, setFullscreenSupported] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const hasJoinInfo = qrDataUrl || sessionCode || participantCount !== undefined || presentationUrl || joinUrl || shortUrl;
@@ -75,6 +86,7 @@ export default function LiveSurface({
     "slide-surface",
     `slide-surface-${mode}`,
     backgroundLayer ? "slide-surface-has-bg" : null,
+    hasNavActions ? "slide-surface-swipe" : null,
     surfaceClassName,
   ].filter(Boolean).join(" ");
 
@@ -82,14 +94,124 @@ export default function LiveSurface({
     if (typeof document === "undefined") return;
 
     setFullscreenSupported(document.fullscreenEnabled);
+    // The page also marks <html>, so the stylesheet can keep the toolbar clear
+    // of the close button some browsers draw over the top-left corner in full screen.
     const syncFullscreenState = () => {
-      setIsFullscreen(!!document.fullscreenElement);
+      const active = !!document.fullscreenElement;
+      setIsFullscreen(active);
+      if (active) document.documentElement.setAttribute("data-fullscreen", "true");
+      else document.documentElement.removeAttribute("data-fullscreen");
     };
 
     syncFullscreenState();
     document.addEventListener("fullscreenchange", syncFullscreenState);
-    return () => document.removeEventListener("fullscreenchange", syncFullscreenState);
+    return () => {
+      document.removeEventListener("fullscreenchange", syncFullscreenState);
+      document.documentElement.removeAttribute("data-fullscreen");
+    };
   }, []);
+
+  // The toolbar floats over the top of the slide, so the slide's top padding
+  // follows the toolbar's real height instead of a fixed guess: it grows when
+  // the buttons wrap or carry longer titles. The stylesheet adds a clear gap
+  // (see --slide-toolbar-clear) and applies it from 761px up, where the toolbar
+  // floats. Measured before the first paint so the title does not jump.
+  useLayoutEffect(() => {
+    const safe = safeRef.current;
+    const toolbar = toolbarRef.current;
+    if (!safe || !toolbar) return undefined;
+    const measure = () => {
+      const height = toolbar.offsetHeight;
+      if (height <= 0) {
+        safe.removeAttribute("data-toolbar");
+        safe.style.removeProperty("--slide-toolbar-clear");
+        return;
+      }
+      safe.setAttribute("data-toolbar", "true");
+      safe.style.setProperty("--slide-toolbar-clear", `${Math.ceil(toolbar.offsetTop + height)}px`);
+    };
+    measure();
+    if (typeof ResizeObserver === "undefined") return undefined;
+    const observer = new ResizeObserver(measure);
+    observer.observe(toolbar);
+    if (surfaceRef.current) observer.observe(surfaceRef.current);
+    return () => observer.disconnect();
+  }, []);
+
+  // Swipe navigation belongs to the presenter, the only surface handed Prev and
+  // Next actions. The phone and the projector never swipe. A swipe calls the
+  // same handlers as the buttons, so a disabled button also stops the swipe.
+  const navActionsRef = useRef(navActions);
+  useEffect(() => {
+    navActionsRef.current = navActions;
+  });
+  useEffect(() => {
+    const surface = surfaceRef.current;
+    if (!surface || !hasNavActions) return undefined;
+
+    const touches = new Set<number>();
+    let gesture: { pointerId: number; start: SwipeStart } | null = null;
+
+    const scrollersAround = (target: Element | null): HorizontalScroller[] => {
+      const found: HorizontalScroller[] = [];
+      for (let el: Element | null = target; el; el = el.parentElement) {
+        const overflowX = getComputedStyle(el).overflowX;
+        if (overflowX === "auto" || overflowX === "scroll") {
+          found.push({ scrollLeft: el.scrollLeft, scrollWidth: el.scrollWidth, clientWidth: el.clientWidth });
+        }
+        if (el === surface) break;
+      }
+      return found;
+    };
+
+    const onPointerDown = (event: PointerEvent) => {
+      // Only a finger or a pen counts. A new primary pointer starts afresh, so
+      // an id left behind by a lost pointerup cannot keep swipes off.
+      if (!isSwipePointer(event.pointerType)) return;
+      if (event.isPrimary) touches.clear();
+      touches.add(event.pointerId);
+      // A second finger is a pinch, not a swipe.
+      if (touches.size > 1) {
+        gesture = null;
+        return;
+      }
+      const target = event.target instanceof Element ? event.target : null;
+      const start: SwipeStart = {
+        x: event.clientX,
+        y: event.clientY,
+        pointerType: event.pointerType,
+        viewportWidth: window.innerWidth,
+        onBlockedTarget: !!target?.closest(SWIPE_BLOCKING_SELECTOR),
+        scrollers: scrollersAround(target),
+      };
+      gesture = canBeginSwipe(start) ? { pointerId: event.pointerId, start } : null;
+    };
+
+    const onPointerUp = (event: PointerEvent) => {
+      touches.delete(event.pointerId);
+      const current = gesture;
+      if (!current || current.pointerId !== event.pointerId) return;
+      gesture = null;
+      const direction = resolveSwipe(current.start, event.clientX, event.clientY);
+      if (direction) void pickNavAction(navActionsRef.current, direction)?.onClick?.();
+    };
+
+    const onPointerCancel = (event: PointerEvent) => {
+      touches.delete(event.pointerId);
+      if (gesture?.pointerId === event.pointerId) gesture = null;
+    };
+
+    surface.addEventListener("pointerdown", onPointerDown);
+    surface.addEventListener("pointerup", onPointerUp);
+    surface.addEventListener("pointercancel", onPointerCancel);
+    surface.addEventListener("lostpointercapture", onPointerCancel);
+    return () => {
+      surface.removeEventListener("pointerdown", onPointerDown);
+      surface.removeEventListener("pointerup", onPointerUp);
+      surface.removeEventListener("pointercancel", onPointerCancel);
+      surface.removeEventListener("lostpointercapture", onPointerCancel);
+    };
+  }, [hasNavActions]);
 
   const requestFullscreen = useCallback(async () => {
     if (typeof document === "undefined") return;
@@ -155,8 +277,8 @@ export default function LiveSurface({
   return (
     <section ref={surfaceRef} className={className}>
       {backgroundLayer}
-      <div className="slide-safe">
-        <div className="slide-toolbar">
+      <div ref={safeRef} className="slide-safe">
+        <div ref={toolbarRef} className="slide-toolbar">
           {hasNavActions && (
             <div className="slide-toolbar-nav" aria-label="Slide navigation controls">
               {navActions.map((action, index) => renderActionButton(action, index, "nav"))}

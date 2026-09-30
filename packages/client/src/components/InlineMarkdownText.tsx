@@ -26,7 +26,7 @@ function renderInlineMarkdown(text: string): ReactNode[] {
           key={`${href}-${matchIndex}`}
           href={href}
           target="_blank"
-          rel="noreferrer"
+          rel="noopener noreferrer"
           className="underline decoration-current/45 underline-offset-2 hover:decoration-current"
         >
           {label}

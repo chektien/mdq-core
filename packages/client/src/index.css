@@ -515,6 +515,14 @@ html[data-theme="light"] .slide-surface::after {
   content: none;
 }
 
+/* The presenter swipes sideways to change slides, so the browser keeps only
+   vertical panning and pinching here and hands sideways drags to the page.
+   Scrollable tables and code blocks inside are scroll containers that keep
+   their own sideways panning. */
+.slide-surface-swipe {
+  touch-action: pan-y pinch-zoom;
+}
+
 /* ── Slide palettes (deck `palette:` key) ──────────
    `classic` adds no rules: it is the look defined above. `gruvbox` follows
    the morhetz/gruvbox palette (MIT/X11, https://github.com/morhetz/gruvbox).
@@ -2776,6 +2784,9 @@ html[data-theme="light"] .image-expansion-close:focus-visible {
 }
 
 .slide-nav-button.slide-action-button-with-detail {
+  /* Prev and Next both carry a title, so each may give ground to the other
+     and to the controls on the right instead of running under them. */
+  flex: 0 1 auto;
   min-width: min(20rem, 28cqi);
   max-width: min(30rem, 34cqi);
   align-items: flex-start;
@@ -7236,4 +7247,91 @@ body.image-expansion-lock {
     animation-duration: 5s !important;
     animation-timing-function: steps(1, end) !important;
   }
+}
+
+/* In full screen, iPad Safari draws its own close button over the top-left
+   corner of the page, about 64 by 60 px. LiveSurface marks <html> with
+   data-fullscreen while it is on, and the toolbar's buttons then start clear
+   of that corner: past it on the right in the wide layout, below it in the
+   stacked one. The layout outside full screen does not move. */
+@media (min-width: 761px) {
+  html[data-fullscreen="true"] .slide-toolbar {
+    left: max(clamp(1.2rem, 3.2cqi, 3.5rem), 4.75rem);
+  }
+}
+
+@media (max-width: 760px) {
+  html[data-fullscreen="true"] .slide-toolbar {
+    margin-top: 2.75rem;
+  }
+}
+
+/* Prev and Next both carry a title. A button's own text width is its smallest
+   size as well, so left alone the pair would push past the column and run
+   under the controls on the right. The pair is held to the column, and the
+   titles are cut with an ellipsis where they do not fit. The empty part of the
+   row passes touches through to the slide. */
+@media (min-width: 761px) {
+  .slide-toolbar-nav {
+    width: 100%;
+    pointer-events: none;
+  }
+
+  .slide-toolbar-nav > * {
+    pointer-events: auto;
+  }
+}
+
+/* Wide screens keep the status label in the middle column. It keeps room
+   there by taking it from the two titles, not from the controls. */
+@media (min-width: 1300px) {
+  .slide-toolbar {
+    grid-template-columns: minmax(0, max-content) minmax(0, 1fr) auto;
+  }
+
+  .slide-toolbar:has(.slide-status-pill) {
+    grid-template-columns: minmax(0, max-content) minmax(11rem, 1fr) auto;
+  }
+
+  .slide-nav-button.slide-action-button-with-detail {
+    min-width: min(11rem, 22cqi);
+  }
+}
+
+/* The toolbar floats over the top of the slide from 761px up. LiveSurface
+   measures its real height and sets --slide-toolbar-clear on the safe area,
+   so the top padding is that height plus a clear gap and the title never
+   touches or crowds the buttons, however the toolbar wraps or fills.
+   Below 761px the toolbar is part of the flow and needs no reserve. A live
+   embed fills the whole surface and keeps no padding. */
+.slide-safe {
+  --slide-toolbar-gap: 1.4rem;
+}
+
+@media (min-width: 761px) {
+  .slide-surface:not(.slide-surface-live-embed) > .slide-safe[data-toolbar="true"] {
+    padding-top: calc(var(--slide-toolbar-clear) + var(--slide-toolbar-gap));
+  }
+}
+
+/* The page canvas behind a live presenter or projector page is the slide's own
+   colour. A browser can show canvas past the bottom of the layout viewport
+   (iPad Safari does beside the home indicator in full screen), and in the
+   light themes the canvas otherwise differs from the slide surface, so a
+   stripe of another colour showed there. The slide surface ends on the slide
+   background in the classic look and in some palettes, and on the soft
+   background in the others, so the canvas takes the same end colour.
+   The home indicator itself is system UI that a page cannot hide. */
+html:root[data-theme]:has(.slide-surface:not(.slide-surface-student)) {
+  background: var(--mdq-slide-bg);
+}
+
+html:root[data-palette="gruvbox"][data-theme="light"]:has(.slide-surface:not(.slide-surface-student)),
+html:root[data-palette="rose-pine"][data-theme="light"]:has(.slide-surface:not(.slide-surface-student)),
+html:root[data-palette="ayu"][data-theme="light"]:has(.slide-surface:not(.slide-surface-student)),
+html:root[data-palette="catppuccin"][data-theme="light"]:has(.slide-surface:not(.slide-surface-student)),
+html:root[data-palette="catppuccin"]:not([data-theme="light"]):has(.slide-surface:not(.slide-surface-student)),
+html:root[data-palette="seoul256"]:not([data-theme="light"]):has(.slide-surface:not(.slide-surface-student)),
+html:root[data-palette="tokyo-night"]:not([data-theme="light"]):has(.slide-surface:not(.slide-surface-student)) {
+  background: var(--mdq-slide-bg-soft);
 }

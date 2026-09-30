@@ -43,6 +43,7 @@ import SlideContent, { SlideContentBody } from "../components/SlideContent";
 import SlideBackgroundLayer from "../components/SlideBackgroundLayer";
 import PresenterNotesPanel from "../components/PresenterNotesPanel";
 import { getQuestionModeText, getRevealActionLabel } from "../questionMode";
+import { decidePresenterKey, documentHasOpenDialog, pickNavAction } from "../presenterKeys";
 import { readShowStudentIds, saveShowStudentIds } from "../showStudentIds";
 import { closedLabel as closedLabelFor, formatRemaining, pluralize, positionLabel as positionLabelFor } from "../instructorText";
 
@@ -883,6 +884,10 @@ function LiveView({
   const nextQuestionHeading = isReviewing
     ? null
     : getQuestionHeading(liveQuestionIndex >= 0 ? liveQuestionIndex + 1 : 0);
+  // Prev names the item before the current one, the way Next names the one after.
+  const previousQuestionHeading = isReviewing || liveQuestionIndex <= 0
+    ? null
+    : getQuestionHeading(liveQuestionIndex - 1);
 
   // Determine which controls to show
   const liveIsSlide = q?.questionType === "slide";
@@ -1051,6 +1056,7 @@ function LiveView({
     return [
       {
         label: "Prev",
+        detail: canPrev && waitingReason ? waitingReason : canPrev ? previousQuestionHeading : null,
         onClick: () => onAction(() => prevQuestion(sessionId), "previous"),
         disabled: !canPrev || controlsUnavailable,
         reason: canPrev ? waitingReason : null,
@@ -1065,6 +1071,30 @@ function LiveView({
       },
     ];
   })();
+
+  // Keys drive the same Prev and Next handlers as the buttons, so a disabled or
+  // reconnecting button also stops the key. The ref keeps one listener in place
+  // while the handlers are rebuilt on every render.
+  const navActionsRef = useRef(liveSurfaceNavActions);
+  useEffect(() => {
+    navActionsRef.current = liveSurfaceNavActions;
+  });
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      const decision = decidePresenterKey(
+        event,
+        event.target as Element | null,
+        documentHasOpenDialog(document),
+        { arrowsScroll: window.matchMedia("(max-width: 760px)").matches },
+      );
+      if (!decision.consume || !decision.direction) return;
+      event.preventDefault();
+      if (!decision.act) return;
+      void pickNavAction(navActionsRef.current, decision.direction)?.onClick?.();
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
 
   const participantsAction: LiveSurfaceAction = {
     label: "Participants",
