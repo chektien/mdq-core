@@ -453,6 +453,8 @@ student-id: false
 
 Each interactive question supports the existing `time-limit:` metadata plus optional `multi-select:` and `type:` flags. `question-type:` remains accepted as a backward-compatible alias. Questions default to multiple choice when `type:` is omitted, and `type: multiple_choice` can be written explicitly. Type values also accept hyphens in place of underscores, such as `open-response` for `open_response`. Question stems, slide bodies, and option text can also include standard markdown images.
 
+Slide bodies take bulleted lists, numbered lists and nested lists in any mix, indented by two or more spaces. On a slide the top level uses accent markers and each level below it uses a smaller, quieter marker and slightly smaller text, with the same indent per level on the projector and on phones. A list item with no text (a bare `- ` or `1. `) is hidden when the slide is presented and printed, so no empty marker shows, and the numbers of a numbered list count only the items that show. The Markdown itself is left as written.
+
 Setting keys are written with dashes, as above (`time-limit:`, `presenter-notes:`, `slide-background:`). Decks written with the earlier underscored spelling (`time_limit:`, `presenter_notes:`) still work, and so does `type: open_response`; the two spellings can be mixed in one deck.
 
 ```markdown

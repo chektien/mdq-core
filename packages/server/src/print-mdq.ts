@@ -1201,6 +1201,21 @@ function renderStyles(pageSize: PrintOptions["pageSize"], theme: PrintTheme, pal
       margin: 1.2mm 0;
     }
 
+    /* Nested lists sit tight under their item and keep one indent per level. */
+    .body-copy li > ul,
+    .body-copy li > ol {
+      margin-top: 0.6mm;
+      padding-left: 5mm;
+    }
+
+    .body-copy li li {
+      margin: 0.6mm 0;
+    }
+
+    .body-copy li:empty {
+      display: none;
+    }
+
     .question-layout,
     .slide-layout {
       display: grid;
