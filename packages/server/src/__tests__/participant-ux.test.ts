@@ -342,7 +342,7 @@ describe("presenter review fixes", () => {
   });
 
   it("says ID or name in the participants help when Student IDs are off", () => {
-    expect(instructor).toContain('join with their {idsAvailable ? "ID" : "ID or name"} from any device');
+    expect(instructor).toContain('join with their {nameOnly ? "name" : idsAvailable ? "ID" : "ID or name"} from any device');
   });
 
   it("keeps the QR hint readable in both themes", () => {

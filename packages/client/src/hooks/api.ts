@@ -78,6 +78,8 @@ export interface CreateSessionResponse {
   palette: DeckPalette;
   questionHeadings: string[];
   questionSummaries: QuestionSummary[];
+  /** False when the deck turns Student IDs off, so the name is the ID. Absent means true. */
+  studentIds?: boolean;
 }
 
 export interface SessionRestoreResponse {
@@ -93,6 +95,8 @@ export interface SessionRestoreResponse {
   questionCount: number;
   questionHeadings: string[];
   questionSummaries: QuestionSummary[];
+  /** False when the deck turns Student IDs off, so the name is the ID. Absent means true. */
+  studentIds?: boolean;
   reviewQuestions?: QuestionOpenPayload[];
   reviewReveals?: ResultsRevealPayload[];
 }

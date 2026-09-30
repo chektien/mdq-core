@@ -157,6 +157,8 @@ export default function InstructorView({
   const [questionHeadings, setQuestionHeadings] = useState<string[]>([]);
   const [questionSummaries, setQuestionSummaries] = useState<QuestionSummary[]>([]);
   const [quizLabel, setQuizLabel] = useState("");
+  // Whether the deck uses Student IDs. With `student-id: false` the name is the ID, so the console has no IDs to show.
+  const [deckUsesStudentIds, setDeckUsesStudentIds] = useState(true);
   const [sessionTheme, setSessionTheme] = useState<DeckTheme | undefined>();
   const [sessionPalette, setSessionPalette] = useState<DeckPalette | undefined>();
   const [restoreNotice, setRestoreNotice] = useState<string | null>(null);
@@ -193,7 +195,7 @@ export default function InstructorView({
     return () => window.clearTimeout(timer);
   }, [restoreNotice]);
 
-  const idsAvailable = !autoGenerateStudentIds;
+  const idsAvailable = deckUsesStudentIds && !autoGenerateStudentIds;
   const idsVisible = idsAvailable && showStudentIds;
   const toggleShowStudentIds = useCallback(() => {
     setShowStudentIds((current) => {
@@ -279,6 +281,7 @@ export default function InstructorView({
       setQuestionHeadings(snapshot.questionHeadings || []);
       setQuestionSummaries(snapshot.questionSummaries || []);
       setQuizLabel(deckLabel(snapshot.title, snapshot.week));
+      setDeckUsesStudentIds(snapshot.studentIds !== false);
       setSessionTheme(snapshot.theme);
       setSessionPalette(snapshot.palette);
       setHoldAppearance(false);
@@ -385,6 +388,7 @@ export default function InstructorView({
       setQuestionHeadings(info.questionHeadings || []);
       setQuestionSummaries(info.questionSummaries || []);
       setQuizLabel(deckLabel(deck?.title, deck?.week || selectedWeek));
+      setDeckUsesStudentIds(info.studentIds !== false);
       setSessionTheme(info.theme);
       setSessionPalette(info.palette);
       setRestoreNotice(null);
@@ -452,6 +456,7 @@ export default function InstructorView({
     setQuestionHeadings([]);
     setQuestionSummaries([]);
     setQuizLabel("");
+    setDeckUsesStudentIds(true);
     setSessionTheme(undefined);
     setSessionPalette(undefined);
     setRestoreNotice(null);
@@ -747,6 +752,7 @@ export default function InstructorView({
       errorMsg={errorMsg}
       restoreNotice={restoreNotice}
       idsAvailable={idsAvailable}
+      nameOnly={!deckUsesStudentIds}
       showStudentIds={idsVisible}
       onToggleShowStudentIds={toggleShowStudentIds}
       onReleaseSeat={handleReleaseSeat}
@@ -777,6 +783,7 @@ function LiveView({
   errorMsg,
   restoreNotice,
   idsAvailable,
+  nameOnly,
   showStudentIds,
   onToggleShowStudentIds,
   onReleaseSeat,
@@ -802,6 +809,8 @@ function LiveView({
   restoreNotice: string | null;
   /** False when the deck hides Student IDs altogether. */
   idsAvailable: boolean;
+  /** True when the deck has no Student IDs and the name is the ID. */
+  nameOnly: boolean;
   /** Whether Student IDs show beside names on this console. */
   showStudentIds: boolean;
   onToggleShowStudentIds: () => void;
@@ -1242,7 +1251,7 @@ function LiveView({
           </button>
         </div>
         <p className="participants-help mt-2 text-sm">
-          If someone&apos;s phone stops working, choose Let rejoin. The next time they join with their {idsAvailable ? "ID" : "ID or name"} from any device, they carry on with their answers.
+          If someone&apos;s phone stops working, choose Let rejoin. The next time they join with their {nameOnly ? "name" : idsAvailable ? "ID" : "ID or name"} from any device, they carry on with their answers.
         </p>
         <div className="mt-4 max-h-[50vh] overflow-y-auto">
           {(sock.participants?.count ?? 0) + (sock.participants?.offline?.length ?? 0) === 0 ? (
