@@ -7,6 +7,7 @@ import {
   useState,
 } from "react";
 import { type ExpandedImage, ImageExpansionOverlay } from "./ImageExpansion";
+import { openLinksInNewTab } from "../slideLinks";
 
 function findImageTarget(target: EventTarget | null, container: HTMLElement): HTMLImageElement | null {
   if (!(target instanceof Element)) return null;
@@ -51,6 +52,9 @@ function QuizHtml({
       image.setAttribute("tabindex", image.getAttribute("tabindex") || "0");
       image.setAttribute("aria-label", `Expand ${label}`);
     }
+
+    // A link tap must not replace the session page, so web links open in a new tab.
+    openLinksInNewTab(container.querySelectorAll("a[href]"), document.baseURI);
 
     const openImage = (image: HTMLImageElement) => {
       lastTriggerSrcRef.current = image.currentSrc || image.src;
