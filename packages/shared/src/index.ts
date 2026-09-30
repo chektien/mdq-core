@@ -193,10 +193,25 @@ export interface PresenterNotesResponse {
  * question:open payload for the projector, unlike presenter notes.
  */
 export interface SlideVideo {
+  /** The address the player loads: the iframe source, or the video file. */
   embedUrl: string;
   thumbnail?: string;
   caption?: string;
   label?: string;
+  /**
+   * Set when the video came from a `[Video: label](url)` link. Nothing is
+   * requested from the provider until the viewer presses play.
+   */
+  link?: SlideVideoLink;
+}
+
+export interface SlideVideoLink {
+  /** The address the author wrote, offered as the "Open video" link. */
+  url: string;
+  provider: "youtube" | "vimeo" | "file";
+  /** How the player loads: an iframe (YouTube, Vimeo) or a native video element (a direct file). */
+  mode: "iframe" | "file";
+  startSeconds?: number;
 }
 
 export interface SlideMedia {
@@ -641,3 +656,5 @@ export const DATA_DIR = "data";
 export * from "./setting-keys";
 export * from "./deck-style";
 export * from "./identity";
+export * from "./videoProviders";
+export * from "./videoLinks";

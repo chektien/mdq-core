@@ -1,5 +1,5 @@
 import { chromium, type Browser } from "playwright";
-import { DECK_PALETTES, DeckPalette, formatDiagnostic, Quiz, Question, QuestionType, describeDeckPalettes, parseDeckPalette } from "@mdq/shared";
+import { DECK_PALETTES, DeckPalette, formatDiagnostic, Quiz, Question, QuestionType, describeDeckPalettes, parseDeckPalette, videoProviderName } from "@mdq/shared";
 import { parseQuizMarkdown, QuizParseError } from "./parser";
 import { printDeckStyle } from "./print-deck-style";
 import * as fs from "fs";
@@ -386,6 +386,29 @@ function renderSlideMedia(question: Question, inputDir: string, imagesDir: strin
   `;
 }
 
+/** A slide video prints as its label, its provider and its address as a link. There is no player on paper. */
+function renderVideoNote(question: Question): string {
+  const video = question.slideVideo;
+  if (!video) return "";
+  const label = video.label || "Video";
+  const href = video.link?.url ?? video.embedUrl;
+  const external = /^https?:\/\//i.test(href);
+  const provider = video.link
+    ? videoProviderName(video.link.provider, href)
+    : external
+      ? new URL(href).hostname
+      : "Video file";
+  return `
+    <section class="video-note" aria-label="Video">
+      <span class="video-note-label">${escapeHtml(label)}</span>
+      <span class="video-note-provider">${escapeHtml(provider)}</span>
+      ${external
+        ? `<a class="video-note-link" href="${escapeHtml(href)}">${escapeHtml(href)}</a>`
+        : `<span class="video-note-link">${escapeHtml(href)}</span>`}
+    </section>
+  `;
+}
+
 function renderReferences(question: Question, inputDir: string, imagesDir: string): string {
   const references = question.slideReferences || [];
   if (references.length === 0) return "";
@@ -489,6 +512,7 @@ function renderItem(question: Question, index: number, total: number, options: P
         ${bodySection}
         ${renderSlideMedia(question, inputDir, options.imagesDir)}
       </div>
+      ${isSlide ? renderVideoNote(question) : ""}
       ${renderOptions(question, inputDir, options.imagesDir, options.includeAnswers)}
       ${renderAnswerBlock(question, options.includeAnswers)}
       ${renderExplanation(question, options.includeAnswers)}
@@ -1489,8 +1513,39 @@ function renderStyles(
     .answer-block,
     .explanation,
     .foldouts,
-    .references {
+    .references,
+    .video-note {
       margin-top: 3mm;
+    }
+
+    .video-note {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1mm 3mm;
+      align-items: baseline;
+      padding: 2.4mm 3.2mm;
+      border: 1px solid var(--line);
+      break-inside: avoid;
+      font-size: 9.5pt;
+    }
+
+    .video-note-label {
+      font-weight: 800;
+    }
+
+    .video-note-provider {
+      color: var(--muted);
+      font-size: 8pt;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .video-note-link {
+      flex-basis: 100%;
+      color: var(--accent);
+      overflow-wrap: anywhere;
+      word-break: break-all;
     }
 
     .answer-block {

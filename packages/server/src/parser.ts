@@ -22,6 +22,8 @@ import {
   type ParseDiagnostic,
   type DeckStyle,
   type DeckStyleSettings,
+  findVideoLinks,
+  VideoLinkMatch,
 } from "@mdq/shared";
 import { marked } from "marked";
 
@@ -104,7 +106,7 @@ export function parseQuizMarkdown(source: string, sourceFile: string): ParseResu
     if (!block) continue;
 
     try {
-      const question = parseQuestionBlock(block, i, sourceFile, startLine);
+      const question = parseQuestionBlock(block, i, sourceFile, startLine, diagnostics);
       questions.push(question);
     } catch (e) {
       if (e instanceof QuizParseError) {
@@ -298,7 +300,13 @@ function extractDeckStyleMetadata(
 /**
  * Parse a single question block into a Question object.
  */
-function parseQuestionBlock(block: string, index: number, sourceFile: string, blockStartLine: number): Question {
+function parseQuestionBlock(
+  block: string,
+  index: number,
+  sourceFile: string,
+  blockStartLine: number,
+  diagnostics: ParseDiagnostic[] = [],
+): Question {
   const lines = block.split("\n");
 
   // 1. Extract topic from H2 heading
@@ -504,7 +512,9 @@ function parseQuestionBlock(block: string, index: number, sourceFile: string, bl
     : { contentLines: textLines, liveEmbed: undefined };
   textLines = liveEmbedExtraction.contentLines;
   const videoExtraction = isSlide
-    ? extractSlideVideo(textLines)
+    ? extractSlideVideo(textLines, (message) => {
+      diagnostics.push({ severity: "info", sourceFile, questionIndex: index, lineNumber: blockStartLine, message });
+    })
     : { contentLines: textLines, video: undefined };
   textLines = videoExtraction.contentLines;
   const backgroundExtraction = isSlide
@@ -735,7 +745,10 @@ function extractSlideLiveEmbed(lines: string[]): { contentLines: string[]; liveE
   };
 }
 
-function extractSlideVideo(lines: string[]): { contentLines: string[]; video?: SlideVideo } {
+function extractSlideVideo(
+  lines: string[],
+  report: (message: string) => void = () => {},
+): { contentLines: string[]; video?: SlideVideo } {
   const contentLines: string[] = [];
   let embedUrl = "";
   let thumbnail: string | undefined;
@@ -764,7 +777,13 @@ function extractSlideVideo(lines: string[]): { contentLines: string[]; video?: S
   }
 
   if (!embedUrl) {
+    const linked = extractVideoLink(contentLines, report);
+    if (linked.video) return linked;
     return { contentLines };
+  }
+
+  if (findVideoLinks(contentLines).length > 0) {
+    report("This slide sets video_card, so its [Video: ...](url) link stays an ordinary link. A slide shows one video.");
   }
 
   return {
@@ -774,6 +793,46 @@ function extractSlideVideo(lines: string[]): { contentLines: string[]; video?: S
       ...(thumbnail ? { thumbnail } : {}),
       ...(caption ? { caption } : {}),
       ...(label ? { label } : {}),
+    },
+  };
+}
+
+/**
+ * The first `[Video: label](url)` paragraph with a supported address becomes
+ * the slide's video and leaves the text. An unsupported address, or a second
+ * video link, stays in the text as an ordinary link and is reported.
+ */
+function extractVideoLink(
+  lines: string[],
+  report: (message: string) => void,
+): { contentLines: string[]; video?: SlideVideo } {
+  const matches = findVideoLinks(lines);
+  let chosen: VideoLinkMatch | undefined;
+  for (const match of matches) {
+    if (!match.video) {
+      report(`"${match.url}" stays an ordinary link. ${match.reason}`);
+    } else if (chosen) {
+      report(`"${match.url}" stays an ordinary link because a slide shows one video, and it already shows the first.`);
+    } else {
+      chosen = match;
+    }
+  }
+  const descriptor = chosen?.video;
+  if (!chosen || !descriptor) return { contentLines: lines };
+
+  const contentLines = lines.filter((_, index) => index !== chosen!.lineIndex);
+  const isFile = descriptor.provider === "file";
+  return {
+    contentLines,
+    video: {
+      embedUrl: (isFile ? descriptor.fileUrl : descriptor.embedUrl) ?? "",
+      label: descriptor.label,
+      link: {
+        url: descriptor.url,
+        provider: descriptor.provider,
+        mode: isFile ? "file" : "iframe",
+        ...(descriptor.startSeconds ? { startSeconds: descriptor.startSeconds } : {}),
+      },
     },
   };
 }
