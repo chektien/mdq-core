@@ -6437,10 +6437,9 @@ html[data-theme="light"] .slide-video-figure .slide-video-action:not(button) {
   min-height: 100%;
 }
 
-/* Tablet instructor views have enough width to keep projector composition,
-   but not enough height once notes are docked. Put the compact join control
-   into normal flow before slide content and make the preview itself scroll,
-   so it never floats over evidence or disappears behind the notes panel. */
+/* Short instructor previews scroll inside their allocated surface, above
+   the private notes. The join card stays in its own bottom corner on tablets;
+   it must not introduce a stray row between the toolbar and slide title. */
 @media (max-width: 1180px) {
   .slide-live-shell-controls:has(.presenter-notes-panel)
     .slide-live-main
@@ -6450,12 +6449,25 @@ html[data-theme="light"] .slide-video-figure .slide-video-action:not(button) {
     overscroll-behavior: contain;
   }
 
+}
+
+@media (max-width: 760px) {
   .slide-live-shell-controls:has(.presenter-notes-panel) .slide-join-panel {
     position: static;
     align-self: flex-end;
     width: max-content;
     max-width: 100%;
     margin: 0;
+  }
+}
+
+@media (min-width: 761px) and (max-width: 1180px) {
+  .slide-live-shell-controls:has(.presenter-notes-panel) .slide-safe {
+    padding-bottom: max(2.8rem, calc(var(--slide-join-clear, 0px) + 0.6rem));
+  }
+
+  .slide-live-shell-controls:has(.presenter-notes-panel) .slide-join-panel {
+    bottom: 0.6rem;
   }
 }
 
