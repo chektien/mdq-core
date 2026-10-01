@@ -91,7 +91,7 @@ export default function SessionCodeCard({
           {displayJoinUrl && <p className="session-code-card-link-text">{displayJoinUrl}</p>}
           {presentationUrl && (
             <a className="session-code-card-link" href={presentationUrl} target="_blank" rel="noopener noreferrer">
-              Presentation view
+              Projector
             </a>
           )}
         </div>

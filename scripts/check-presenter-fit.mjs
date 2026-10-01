@@ -30,7 +30,7 @@
  * tighter than before (a step up needs the content under 78% of the room, so
  * one step of hysteresis is allowed). Two routes are driven at each size: the
  * instructor console (#/instructor), sampled with the join card closed and
- * opened, and the presentation view (#/present/<session>), opened in a second
+ * opened, and Projector (#/present/<session>), opened in a second
  * page of the same size on the same session and sampled as it opens. Each
  * surface remounts between a question and its reveal, so this exercises the
  * path but does not by itself fail when fitKey is dropped. The source-contract
@@ -270,7 +270,7 @@ async function main() {
       await read("slide", "");
       await page.getByRole("button", { name: /^Next/ }).click();
       await page.waitForSelector(".quiz-surface-content .grid");
-      // The presentation view follows the session the console runs.
+      // Projector follows the session the console runs.
       // Earlier sizes leave their sessions running, and the newest is listed last.
       const active = (await (await page.request.get(`${base}/api/sessions/active`)).json()).pop();
       const present = await context.newPage();
@@ -289,7 +289,7 @@ async function main() {
       const sampleBoth = async (question, again = false, kind = "open") => {
         await sampleStability(page, "console", false, question, again, kind);
         await sampleStability(page, "console", true, question, again, kind);
-        await sampleStability(present, "presentation", null, question, again, kind);
+        await sampleStability(present, "projector", null, question, again, kind);
       };
       // A question can only be left once it is closed and revealed, so the long question follows the short one in that order.
       await showing("is a fruit");

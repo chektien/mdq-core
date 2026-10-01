@@ -19,7 +19,7 @@ from a phone-sized student view, reveal feedback, use fold-out notes and image
 placement, and export a printable PDF.
 
 A future cut should also show the presenter-view workflow: the projected laptop
-opens the read-only presentation surface while the instructor advances and
+opens the read-only Projector while the instructor advances and
 reveals content from an authenticated phone view.
 
 ## What MDQ Does
@@ -269,7 +269,7 @@ If `VITE_INSTRUCTOR_ROUTE_SEGMENT` is unset, the default segment is `instructor`
 
 4. **Important limitation:** The longer route is still obscurity, not authentication by itself. Keep using a strong `INSTRUCTOR_PASSWORD` and avoid sharing your instructor route.
 
-Tip for classroom privacy and mobility: project a separate presentation view from the laptop, then keep the authenticated instructor controls on a phone or other personal device. The projected browser shows only the live session surface while the instructor device moves the session forward.
+Tip for classroom privacy and mobility: open Projector on the laptop, then keep the authenticated instructor controls on a phone or other personal device. The projected browser shows only the live session surface while the instructor device moves the session forward.
 
 **For classroom security:** Keep your Tailscale Funnel URL private. The security boundary is your private network (Tailscale) plus operational secrecy (don't share the instructor route with students).
 
@@ -349,13 +349,13 @@ Student QR behavior:
 - Students land on the join page with the code pre-filled
 - Instructor controls require a valid login session when `INSTRUCTOR_PASSWORD` is configured
 
-### 4) presentation mode (read-only projector view)
+### 4) Projector (read-only audience display)
 
-- Open the session-scoped `Presentation view` link from the authenticated instructor screen when you want a second display that mirrors the instructor presentation without controls.
-- The presentation route is intentionally not linked from the public home page. A code-based public entry point would let students discover the live projector feed and monitor the session outside the instructor flow.
-- The presentation screen stays read-only. It never renders instructor action buttons or calls instructor REST actions.
+- Open the session-scoped `Projector` link from the authenticated instructor screen when you want a second display that mirrors the instructor presentation without controls.
+- The Projector route is intentionally not linked from the public home page. A code-based public entry point would let students discover the live projector feed and monitor the session outside the instructor flow.
+- Projector stays read-only. It never renders instructor action buttons or calls instructor REST actions.
 - The projector names participants by label only (lobby, leaderboard and open responses). It never receives Student IDs.
-- A common classroom setup is to connect the laptop to the projector, open the `Presentation view` there, then open the authenticated instructor view on a phone. Advancing, reviewing, revealing feedback, and ending the session from the phone updates the projected laptop view in real time.
+- A common classroom setup is to connect the laptop to the projector, open the `Projector` there, then open the authenticated instructor view on a phone. Advancing, reviewing, revealing feedback, and ending the session from the phone updates the projected laptop view in real time.
 - This keeps instructor-only controls and route details off the projector while still allowing the instructor to move around the room.
 
 ### 5) mock students (for testing)
@@ -705,8 +705,8 @@ Delivery and privacy:
 - Presenter notes are served **only** to the authenticated instructor
   controller, via `GET /api/deck/:week/presenter-notes` (guarded by instructor
   auth). They are never included on any Socket.IO/session payload, the public
-  `GET /api/deck/:week` response, the student view, the projector/presentation
-  view, or the default PDF export.
+  `GET /api/deck/:week` response, the student view, Projector, or the default
+  PDF export.
 - In the instructor controller they appear in a labelled, keyboard-accessible
   fold-out panel directly below the current slide preview. Expanding or
   collapsing the panel never advances the slide, and its open/closed state

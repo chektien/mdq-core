@@ -856,7 +856,7 @@ function QuestionView({
         <div className="slide-live-shell">
           <div className="slide-live-main">
             <div className="slide-student-empty">
-              <p>Please view the presentation screen.</p>
+              <p>Please view the projector.</p>
             </div>
           </div>
         </div>

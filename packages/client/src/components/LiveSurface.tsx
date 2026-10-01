@@ -350,7 +350,7 @@ export default function LiveSurface({
             )}
           </div>
           {(hasActions || (showFullscreenButton && fullscreenSupported)) && (
-            <div className="slide-toolbar-actions" aria-label="Presentation controls">
+            <div className="slide-toolbar-actions" aria-label={hasActions || hasNavActions ? "Presenter controls" : "Display controls"}>
               {actions.map((action, index) => renderActionButton(action, index, "action"))}
               {showFullscreenButton && fullscreenSupported && (
                 <button

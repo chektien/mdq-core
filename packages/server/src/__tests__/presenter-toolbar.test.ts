@@ -79,12 +79,12 @@ describe("presenter toolbar", () => {
     expect(index).not.toContain("quiz-surface-content-answering");
   });
 
-  it("gives every question and reveal surface a fit key from the shared helper, on the presenter view and the instructor console", () => {
+  it("gives every question and reveal surface a fit key from the shared helper, on Projector and the instructor console", () => {
     const sources = { "views/InstructorView.tsx": instructor, "views/PresentationView.tsx": read("views/PresentationView.tsx") };
     for (const [file, source] of Object.entries(sources)) {
       const tags = source.match(/<ResponsiveQuizSurface\b[^>]*>/g) ?? [];
       const fitted = tags.filter((tag) => !/\bleaderboard\b/.test(tag));
-      // The instructor console has a question and a reveal surface on each of its two layouts, the presenter view the same.
+      // The instructor console has a question and a reveal surface on each of its two layouts, Projector the same.
       expect(fitted.length).toBeGreaterThanOrEqual(4);
       for (const tag of fitted) expect(`${file}: ${tag}`).toMatch(/fitKey=\{fitKey\}/);
       expect(source).toContain('import { quizFitKey } from "../quizFit";');
