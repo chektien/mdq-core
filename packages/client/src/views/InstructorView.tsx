@@ -1,5 +1,5 @@
 import { isSlideType } from "@mdq/shared";
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useSocket } from "../hooks/useSocket";
 import { resolveSlideBackground, type QuestionState, type RevealState } from "../hooks/useSocket";
 import {
@@ -45,6 +45,7 @@ import LiveSurface, { type LiveSurfaceAction } from "../components/LiveSurface";
 import ResponsiveQuizSurface from "../components/ResponsiveQuizSurface";
 import { quizFitKey } from "../quizFit";
 import SlideContent, { SlideContentBody, QuestionMedia } from "../components/SlideContent";
+import PresenterContent, { type PresenterPublicContentInput } from "../components/PresenterContent";
 import SlideBackgroundLayer from "../components/SlideBackgroundLayer";
 import PresenterNotesPanel from "../components/PresenterNotesPanel";
 import { getQuestionModeText, getRevealActionLabel } from "../questionMode";
@@ -914,6 +915,21 @@ function LiveView({
     return questionHeadings[questionIndex] || null;
   }, [questionHeadings]);
   const displayHeading = getQuestionHeading(displayQuestion?.questionIndex) || displayQuestion?.topic || null;
+  // Build only the public body/heading input. Never hand a renderer the socket
+  // question, reveal/answer state, presenter-note payload or controller actions.
+  const presenterPublicContent = useMemo<PresenterPublicContentInput | null>(() => displayQuestion ? {
+    title: displayHeading || displayQuestion.topic,
+    textHtml: displayQuestion.text,
+    questionType: displayQuestion.questionType,
+    slideKey: displayQuestion.questionIndex,
+    attendeeNotes: displayQuestion.attendeeNotes,
+    slideMedia: displayQuestion.slideMedia,
+    slideMediaPosition: displayQuestion.slideMediaPosition,
+    slideMediaOpacity: displayQuestion.slideMediaOpacity,
+    slideLiveEmbed: displayQuestion.slideLiveEmbed,
+    slideVideo: displayQuestion.slideVideo,
+    slideReferences: displayQuestion.slideReferences,
+  } : null, [displayQuestion, displayHeading]);
   const nextQuestionHeading = isReviewing
     ? null
     : getQuestionHeading(liveQuestionIndex >= 0 ? liveQuestionIndex + 1 : 0);
@@ -1358,19 +1374,21 @@ function LiveView({
     if (displayQuestion && (((state === "QUESTION_OPEN" || state === "QUESTION_CLOSED") && !isReviewing) || (isReviewing && !displayReveal))) {
       if (isSlideType(displayQuestion.questionType)) {
         return (
-          <SlideContentBody
-            slideType={displayQuestion.questionType}
-            title={displayHeading || displayQuestion.topic}
-            html={displayQuestion.text}
-            attendeeNotes={displayQuestion.attendeeNotes}
-            slideMedia={displayQuestion.slideMedia}
-            slideMediaPosition={displayQuestion.slideMediaPosition}
-            slideMediaOpacity={displayQuestion.slideMediaOpacity}
-            slideLiveEmbed={displayQuestion.slideLiveEmbed}
-            slideVideo={displayQuestion.slideVideo}
-            slideKey={displayQuestion.questionIndex}
-            slideReferences={displayQuestion.slideReferences}
-          />
+          <PresenterContent sessionId={sessionId} kind="slide" content={presenterPublicContent!} reviewing={isReviewing}>
+            <SlideContentBody
+              slideType={displayQuestion.questionType}
+              title={displayHeading || displayQuestion.topic}
+              html={displayQuestion.text}
+              attendeeNotes={displayQuestion.attendeeNotes}
+              slideMedia={displayQuestion.slideMedia}
+              slideMediaPosition={displayQuestion.slideMediaPosition}
+              slideMediaOpacity={displayQuestion.slideMediaOpacity}
+              slideLiveEmbed={displayQuestion.slideLiveEmbed}
+              slideVideo={displayQuestion.slideVideo}
+              slideKey={displayQuestion.questionIndex}
+              slideReferences={displayQuestion.slideReferences}
+            />
+          </PresenterContent>
         );
       }
 
@@ -1390,11 +1408,13 @@ function LiveView({
             <div className="text-amber-300 text-lg font-semibold">Review Mode</div>
           )}
 
-          <QuizHtml
-            className="quiz-html text-2xl lg:text-3xl text-white text-center leading-relaxed max-w-5xl"
-            html={displayQuestion.text}
-          />
-          <QuestionMedia media={displayQuestion.slideMedia} />
+          <PresenterContent sessionId={sessionId} kind="question-stem" content={presenterPublicContent!} reviewing={isReviewing}>
+            <QuizHtml
+              className="quiz-html text-2xl lg:text-3xl text-white text-center leading-relaxed max-w-5xl"
+              html={displayQuestion.text}
+            />
+            <QuestionMedia media={displayQuestion.slideMedia} />
+          </PresenterContent>
 
           <div className={`selection-mode-chip ${displayQuestion.questionType === "open_response" || displayQuestion.allowsMultiple ? "selection-mode-chip-multi" : "selection-mode-chip-single"}`}>
             {displayQuestionModeText}
@@ -1453,11 +1473,13 @@ function LiveView({
     if (displayReveal && displayQuestion && (((state === "REVEAL") && !isReviewing) || isReviewing)) {
       return (
         <ResponsiveQuizSurface reveal fitKey={fitKey}>
-          <QuizHtml
-            className={`quiz-html text-center leading-relaxed max-w-5xl ${isReviewing ? "text-2xl lg:text-3xl text-white" : "text-xl lg:text-2xl text-zinc-300"}`}
-            html={displayQuestion.text}
-          />
-          <QuestionMedia media={displayQuestion.slideMedia} />
+          <PresenterContent sessionId={sessionId} kind="question-stem" content={presenterPublicContent!} reveal reviewing={isReviewing}>
+            <QuizHtml
+              className={`quiz-html text-center leading-relaxed max-w-5xl ${isReviewing ? "text-2xl lg:text-3xl text-white" : "text-xl lg:text-2xl text-zinc-300"}`}
+              html={displayQuestion.text}
+            />
+            <QuestionMedia media={displayQuestion.slideMedia} />
+          </PresenterContent>
 
           {noVotesRevealed && <p className="no-votes-note">No votes yet</p>}
 
@@ -1713,11 +1735,13 @@ function LiveView({
                   )}
 
                   {/* Question text */}
-                  <QuizHtml
-                    className="quiz-html text-2xl lg:text-3xl text-white text-center leading-relaxed max-w-5xl"
-                    html={displayQuestion.text}
-                  />
-          <QuestionMedia media={displayQuestion.slideMedia} />
+                  <PresenterContent sessionId={sessionId} kind="question-stem" content={presenterPublicContent!} reviewing={isReviewing}>
+                    <QuizHtml
+                      className="quiz-html text-2xl lg:text-3xl text-white text-center leading-relaxed max-w-5xl"
+                      html={displayQuestion.text}
+                    />
+                    <QuestionMedia media={displayQuestion.slideMedia} />
+                  </PresenterContent>
 
                   <div className={`selection-mode-chip ${displayQuestion.questionType === "open_response" || displayQuestion.allowsMultiple ? "selection-mode-chip-multi" : "selection-mode-chip-single"}`}>
                     {displayQuestionModeText}
@@ -1797,11 +1821,13 @@ function LiveView({
             actions={liveSurfaceActions}
           >
             <ResponsiveQuizSurface reveal fitKey={fitKey}>
-              <QuizHtml
-                className={`quiz-html text-center leading-relaxed max-w-5xl ${isReviewing ? "text-2xl lg:text-3xl text-white" : "text-xl lg:text-2xl text-zinc-300"}`}
-                html={displayQuestion.text}
-              />
-          <QuestionMedia media={displayQuestion.slideMedia} />
+              <PresenterContent sessionId={sessionId} kind="question-stem" content={presenterPublicContent!} reveal reviewing={isReviewing}>
+                <QuizHtml
+                  className={`quiz-html text-center leading-relaxed max-w-5xl ${isReviewing ? "text-2xl lg:text-3xl text-white" : "text-xl lg:text-2xl text-zinc-300"}`}
+                  html={displayQuestion.text}
+                />
+                <QuestionMedia media={displayQuestion.slideMedia} />
+              </PresenterContent>
 
               {noVotesRevealed && <p className="no-votes-note">No votes yet</p>}
 
