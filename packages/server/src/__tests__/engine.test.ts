@@ -112,7 +112,7 @@ it("joins, answers and disconnects without changing the supplied session", () =>
   expect(joined.session.submissions).toHaveLength(0);
   expect(answered.messages).toEqual([
     { audience: "participant:S1", event: SocketEvents.ANSWER_ACCEPTED, payload: { questionIndex: 0 } },
-    msg(SocketEvents.ANSWER_COUNT, { questionIndex: 0, submitted: 1, total: 1, openResponses: undefined }, "staff"),
+    msg(SocketEvents.ANSWER_COUNT, { questionIndex: 0, submitted: 1, total: 1, openResponses: undefined, hasAnswers: true }, "staff"),
   ]);
   const disconnected = apply(answered.session, quiz, { type: "disconnect", studentId: "S1", socketId: "socket-1" }, 4000);
   expect(disconnected.session.participants.get("S1")?.connected).toBe(false);
