@@ -62,7 +62,7 @@ The instructor wants a quick pulse check before the final smoke-test step.
 
 A. Instructor controls
 B. Student question screen
-C. Projected presentation view
+C. Projector
 D. I am between screens right now
 
 > Overall Feedback: This poll confirms which surface each tester is validating, without changing the score.

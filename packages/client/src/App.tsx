@@ -133,6 +133,13 @@ export default function App({ runtimeConfig = {} }: { runtimeConfig?: RuntimeCli
     applyClientPalette(defaultPalette);
   }, [defaultPalette, defaultTheme, route.page]);
 
+  useEffect(() => {
+    if (route.page !== "presentation") return;
+    const previousTitle = document.title;
+    document.title = "Projector · MDQ";
+    return () => { document.title = previousTitle; };
+  }, [route.page]);
+
   if (route.page === "instructor") {
     return <InstructorGate returnTo={route.next} authContext={route.authContext} autoGenerateStudentIds={autoGenerateStudentIds} defaultTheme={defaultTheme} defaultPalette={defaultPalette} />;
   }
@@ -265,7 +272,7 @@ function InstructorGate({
   if (authenticated && returnTo) {
     return (
       <div className="min-h-dvh flex items-center justify-center p-6 text-zinc-300">
-        Opening presentation view...
+        Opening projector...
       </div>
     );
   }
@@ -277,7 +284,7 @@ function InstructorGate({
   const isPresentationLogin = authContext === "presentation";
   const title = isPresentationLogin ? "Instructor Login Required" : "Instructor Login";
   const description = isPresentationLogin
-    ? "Presentation mode is protected when the instructor password is enabled. Sign in and you will return to the presenter view."
+    ? "Projector is protected when the instructor password is enabled. Sign in and you will return to Projector."
     : "Enter the instructor password to access session controls.";
 
   return (
@@ -285,7 +292,7 @@ function InstructorGate({
       <InstructorLoginPrompt
         title={title}
         description={description}
-        submitLabel={isPresentationLogin ? "Sign In to Open Presentation" : "Sign In"}
+        submitLabel={isPresentationLogin ? "Sign In to Open Projector" : "Sign In"}
         onSuccess={() => {
           if (returnTo) {
             navigateToHashPath(returnTo);

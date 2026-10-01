@@ -1042,7 +1042,7 @@ describe("Socket.IO Integration", () => {
       student.disconnect();
     });
 
-    it("presentation view connects without instructor auth when no password is configured", async () => {
+    it("Projector connects without instructor auth when no password is configured", async () => {
       const originalInstructorPassword = process.env.INSTRUCTOR_PASSWORD;
       delete process.env.INSTRUCTOR_PASSWORD;
       clearInstructorSessionsForTests();

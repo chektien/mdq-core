@@ -363,7 +363,7 @@ export async function fetchPresentationSession(sessionId: string): Promise<Prese
   });
   if (!res.ok) {
     const data = await res.json().catch(() => ({}));
-    throw new Error(data.error || "Failed to load presentation session");
+    throw new Error(data.error || "Failed to load projector session");
   }
   return res.json();
 }

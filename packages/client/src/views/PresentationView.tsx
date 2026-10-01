@@ -64,7 +64,7 @@ export default function PresentationView({
       })
       .catch((error) => {
         if (cancelled) return;
-        setErrorMsg(error instanceof Error ? error.message : "Unable to load presentation session.");
+        setErrorMsg(error instanceof Error ? error.message : "Unable to load projector session.");
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -83,7 +83,7 @@ export default function PresentationView({
       const data = await fetchPresentationSession(sessionId);
       setMeta(data);
     } catch (error) {
-      setErrorMsg(error instanceof Error ? error.message : "Unable to load presentation session.");
+      setErrorMsg(error instanceof Error ? error.message : "Unable to load projector session.");
       setMeta(null);
       throw error;
     } finally {
@@ -144,7 +144,7 @@ export default function PresentationView({
   if (loading) {
     return (
       <div className="min-h-dvh flex items-center justify-center p-6 text-zinc-300">
-        Loading presentation mode...
+        Loading projector...
       </div>
     );
   }
@@ -154,16 +154,16 @@ export default function PresentationView({
       return (
         <div className="min-h-dvh flex flex-col items-center justify-center gap-8 p-6">
           <div className="text-center space-y-3">
-            <p className="text-sm uppercase tracking-[0.22em] text-zinc-500">Presentation Mode</p>
+            <p className="text-sm uppercase tracking-[0.22em] text-zinc-500">Projector</p>
             <p className="max-w-xl text-zinc-400">
-              This presenter view is protected when instructor auth is enabled. Sign in here and presentation mode will continue automatically.
+              Projector is protected when instructor auth is enabled. Sign in here and Projector will continue automatically.
             </p>
           </div>
 
           <InstructorLoginPrompt
             title="Instructor login required"
-            description="Enter the instructor password to continue into presenter mode."
-            submitLabel="Sign In to Open Presentation"
+            description="Enter the instructor password to continue into Projector."
+            submitLabel="Sign In to Open Projector"
             onSuccess={retryPresentationFetch}
             backHref="#/"
             backLabel="Back home"
@@ -176,8 +176,8 @@ export default function PresentationView({
 
     return (
       <div className="min-h-dvh flex flex-col items-center justify-center gap-4 p-6 text-center">
-        <h1 className="text-3xl font-bold text-white">Presentation unavailable</h1>
-        <p className="max-w-lg text-zinc-400">{errorMsg || "The presentation session could not be loaded."}</p>
+        <h1 className="text-3xl font-bold text-white">Projector unavailable</h1>
+        <p className="max-w-lg text-zinc-400">{errorMsg || "The projector session could not be loaded."}</p>
         <a href="#/" className="rounded-xl bg-zinc-800 px-6 py-3 font-semibold text-white transition-colors hover:bg-zinc-700">
           Back home
         </a>
@@ -198,7 +198,7 @@ export default function PresentationView({
     return (
       <div className="min-h-dvh flex flex-col items-center justify-center gap-8 p-8">
         <div className="text-center">
-          <p className="text-sm uppercase tracking-[0.22em] text-zinc-500">Presentation Mode</p>
+          <p className="text-sm uppercase tracking-[0.22em] text-zinc-500">Projector</p>
           <h1 className="mt-2 text-3xl font-bold text-white">Waiting for Students</h1>
           <p className="mt-3 text-zinc-400">Read-only projector view, controls stay on the instructor device.</p>
         </div>
@@ -237,7 +237,7 @@ export default function PresentationView({
     return (
       <div className="min-h-dvh flex flex-col items-center justify-center gap-8 p-8">
         <div className="text-center">
-          <p className="text-sm uppercase tracking-[0.22em] text-zinc-500">Presentation Mode</p>
+          <p className="text-sm uppercase tracking-[0.22em] text-zinc-500">Projector</p>
           <h1 className="mt-2 text-3xl font-bold text-white">Session Ended</h1>
         </div>
         <Leaderboard
