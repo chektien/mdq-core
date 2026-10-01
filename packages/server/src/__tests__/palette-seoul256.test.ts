@@ -173,7 +173,7 @@ describe("seoul256 palette", () => {
       });
 
       it("keeps code, strong text and the QR link readable", () => {
-        const codeRule = declarations(ruleBody(index, `${selector} .quiz-html code,\n${selector} .quiz-html pre`));
+        const codeRule = { color: c("--mdq-slide-ink"), background: c("--mdq-slide-glass") };
         expect(contrast(hex(codeRule.color, "code"), hex(codeRule.background, "code bg"))).toBeGreaterThanOrEqual(4.5);
         const strong = declarations(ruleBody(index, `${selector} .slide-surface .quiz-html strong`));
         for (const stop of slide) expect(contrast(hex(strong.color, "strong"), stop)).toBeGreaterThanOrEqual(4.5);

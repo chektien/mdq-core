@@ -1023,10 +1023,21 @@ function renderStyles(
   const pageRule = pageSize === "Letter" ? "size: Letter;" : "size: A4;";
   const deckStyle = printDeckStyle(deck);
   const pageBackground = deckStyle.pageBackground ?? printPageBackground(theme, palette);
+  // Code stays light and ink-friendly even when printing a dark deck. Reuse
+  // the palette's light paper tokens, independently of authored page colours.
+  const codeTokenNames: Record<string, string> = { wash: "bg", body: "ink", "soft-line": "border" };
+  const codeTokens = [...renderThemeTokens("light", palette).matchAll(/--(wash|body|soft-line): ([^;]+);/g)]
+    .map(([, name, value]) => `--mdq-code-${codeTokenNames[name]}: ${value};`).join("\n      ");
   return `
     :root {
       ${renderThemeTokens(theme, palette)}
       ${deckStyle.tokens}
+      ${codeTokens}
+      --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+      --mdq-code-padding: 0.7em 1em;
+      --mdq-code-size: 0.88em;
+      --mdq-code-line-height: 1.45;
+      --mdq-code-radius: 0.35rem;
     }
 
     @page {
@@ -1226,6 +1237,45 @@ function renderStyles(
       min-width: 0;
       color: var(--body);
       font-size: var(--mdq-body-size, calc(11.2pt * var(--mdq-body-scale, 1)));
+    }
+
+    :not(pre) > code,
+    pre {
+      background: var(--mdq-code-bg);
+      color: var(--mdq-code-ink);
+      border: 1px solid var(--mdq-code-border);
+      border-radius: var(--mdq-code-radius);
+      font-family: var(--font-mono);
+    }
+    :not(pre) > code {
+      padding: 0.15em 0.4em;
+      font-size: 0.9em;
+    }
+    pre {
+      min-width: 0;
+      max-width: 100%;
+      margin: 0.75em 0;
+      padding: var(--mdq-code-padding);
+      font-size: var(--mdq-code-size);
+      line-height: var(--mdq-code-line-height);
+      tab-size: 2;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+      word-break: normal;
+      overflow: visible;
+      text-align: left;
+    }
+    pre code {
+      background: none;
+      border: 0;
+      padding: 0;
+      border-radius: 0;
+      color: inherit;
+      display: block;
+      font: inherit;
+      white-space: inherit;
+      overflow-wrap: inherit;
+      word-break: inherit;
     }
 
     .body-copy > :first-child {

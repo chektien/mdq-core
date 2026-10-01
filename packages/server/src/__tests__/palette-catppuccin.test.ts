@@ -105,7 +105,7 @@ describe(`${NAME} palette`, () => {
   describe.each(themes)("%s theme", (mode, selector) => {
     const t = declarations(ruleBody(css, selector));
     const slideStops = [t["--mdq-slide-bg"], t["--mdq-slide-bg-soft"]];
-    const codeBody = declarations(ruleBody(css, `${selector} .slide-surface .quiz-html code,\n${selector} .slide-surface .quiz-html pre`));
+    const codeBody = { color: t["--mdq-slide-ink"], background: t["--mdq-slide-glass"] };
     // Surfaces that hold text: page, panels, cards and (light) dialog and field.
     const surfaces = [t["--mdq-paper"], t["--mdq-paper-strong"], over(t["--mdq-card"], t["--mdq-paper"]), t["--mdq-card-strong"], t["--mdq-dialog"], t["--mdq-field"]]
       .filter(Boolean)
@@ -145,7 +145,7 @@ describe(`${NAME} palette`, () => {
 
     it("keeps code blocks and bold text at 4.5:1", () => {
       expectRatio(`${mode} code`, solid(codeBody.color), solid(codeBody.background), 4.5);
-      const questionCode = declarations(ruleBody(css, `${selector} .quiz-html code,\n${selector} .quiz-html pre`));
+      const questionCode = codeBody;
       expectRatio(`${mode} question code`, solid(questionCode.color), solid(questionCode.background), 4.5);
       const strong = declarations(ruleBody(css, `${selector} .slide-surface .quiz-html strong`)).color;
       for (const bg of slideStops) expectRatio(`${mode} strong`, solid(strong), solid(bg), 4.5);

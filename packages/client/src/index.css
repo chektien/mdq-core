@@ -378,6 +378,11 @@ body {
   --mdq-control-line: rgba(179, 102, 255, 0.3);
   --mdq-control-radius: 0.58rem;
   --mdq-panel-radius: 0.68rem;
+  /* One compact code panel: sizes track the surrounding deck text. */
+  --mdq-code-padding: 0.7em 1em;
+  --mdq-code-size: 0.88em;
+  --mdq-code-line-height: 1.45;
+  --mdq-code-radius: min(var(--mdq-panel-radius), 0.35rem);
 }
 
 html[data-theme="light"] {
@@ -581,12 +586,6 @@ html[data-palette="gruvbox"]:not([data-theme="light"]) .slide-surface {
   background: linear-gradient(180deg, #32302f 0%, #282828 100%);
 }
 
-html[data-palette="gruvbox"]:not([data-theme="light"]) .slide-surface .quiz-html code,
-html[data-palette="gruvbox"]:not([data-theme="light"]) .slide-surface .quiz-html pre {
-  background: #1d2021;
-  color: #ebdbb2;
-}
-
 /* Bold text: theme.css colours .quiz-html strong per theme, which out-ranks
    the slide rule, so name the Gruvbox foreground explicitly. */
 html[data-palette="gruvbox"]:not([data-theme="light"]) .slide-surface .quiz-html strong {
@@ -696,12 +695,6 @@ html[data-palette="gruvbox"][data-theme="light"] .slide-surface {
   background: linear-gradient(180deg, #eff0ec 0%, #e3e5e0 100%);
 }
 
-html[data-palette="gruvbox"][data-theme="light"] .slide-surface .quiz-html code,
-html[data-palette="gruvbox"][data-theme="light"] .slide-surface .quiz-html pre {
-  background: #e1e3dd;
-  color: #3c3836;
-}
-
 html[data-palette="gruvbox"][data-theme="light"] .slide-surface .quiz-html strong {
   color: #282828;
 }
@@ -717,18 +710,6 @@ html[data-palette="gruvbox"][data-theme="light"] .slide-status-pill-warning {
   color: var(--mdq-warning-ink);
 }
 
-/* Question and reveal text outside the slide canvas. */
-html[data-palette="gruvbox"]:not([data-theme="light"]) .quiz-html code,
-html[data-palette="gruvbox"]:not([data-theme="light"]) .quiz-html pre {
-  background: #1d2021;
-  color: #ebdbb2;
-}
-
-html[data-palette="gruvbox"][data-theme="light"] .quiz-html code,
-html[data-palette="gruvbox"][data-theme="light"] .quiz-html pre {
-  background: #e1e3dd;
-  color: #3c3836;
-}
 
 /* The dark selection-mode card and chips carry classic purple and green in
    their base rules; the light theme already reads the tokens. */
@@ -908,12 +889,6 @@ html[data-palette="rose-pine"]:not([data-theme="light"]) .slide-surface {
   background: linear-gradient(180deg, #1f1d2e 0%, #191724 100%);
 }
 
-html[data-palette="rose-pine"]:not([data-theme="light"]) .slide-surface .quiz-html code,
-html[data-palette="rose-pine"]:not([data-theme="light"]) .slide-surface .quiz-html pre {
-  background: #26233a;
-  color: #e0def4;
-}
-
 /* Bold text: theme.css colours .quiz-html strong per theme, which out-ranks
    the slide rule, so name the Rosé Pine foreground explicitly. */
 html[data-palette="rose-pine"]:not([data-theme="light"]) .slide-surface .quiz-html strong {
@@ -1022,12 +997,6 @@ html[data-palette="rose-pine"][data-theme="light"] .slide-surface {
   background: linear-gradient(180deg, #faf4ed 0%, #f4ede8 100%);
 }
 
-html[data-palette="rose-pine"][data-theme="light"] .slide-surface .quiz-html code,
-html[data-palette="rose-pine"][data-theme="light"] .slide-surface .quiz-html pre {
-  background: #f2e9e1;
-  color: #575279;
-}
-
 html[data-palette="rose-pine"][data-theme="light"] .slide-surface .quiz-html strong {
   color: #575279;
 }
@@ -1042,18 +1011,6 @@ html[data-palette="rose-pine"][data-theme="light"] .slide-status-pill-warning {
   color: var(--mdq-warning-ink);
 }
 
-/* Question and reveal text outside the slide canvas. */
-html[data-palette="rose-pine"]:not([data-theme="light"]) .quiz-html code,
-html[data-palette="rose-pine"]:not([data-theme="light"]) .quiz-html pre {
-  background: #26233a;
-  color: #e0def4;
-}
-
-html[data-palette="rose-pine"][data-theme="light"] .quiz-html code,
-html[data-palette="rose-pine"][data-theme="light"] .quiz-html pre {
-  background: #f2e9e1;
-  color: #575279;
-}
 
 /* The dark selection-mode card and chips carry classic purple and green in
    their base rules; the light theme already reads the tokens. */
@@ -1131,7 +1088,6 @@ html[data-palette="rose-pine"]:not([data-theme="light"]) .leaderboard-row.leader
 html[data-palette="rose-pine"][data-theme="light"] .leaderboard-row.rank-standard {
   --leaderboard-rank-color: #5d5a73;
 }
-
 
 /* ── Catppuccin palette (deck palette: catppuccin) ── */
 /* The -ink tokens and rank colours are darker (light) or lighter (dark)
@@ -1242,12 +1198,6 @@ html[data-palette="catppuccin"]:not([data-theme="light"]) .slide-surface {
   background: linear-gradient(180deg, #1e1e2e 0%, #181825 100%);
 }
 
-html[data-palette="catppuccin"]:not([data-theme="light"]) .slide-surface .quiz-html code,
-html[data-palette="catppuccin"]:not([data-theme="light"]) .slide-surface .quiz-html pre {
-  background: #11111b;
-  color: #cdd6f4;
-}
-
 /* Bold text: theme.css colours .quiz-html strong per theme, which out-ranks
    the slide rule, so name the Catppuccin Mocha foreground explicitly. */
 html[data-palette="catppuccin"]:not([data-theme="light"]) .slide-surface .quiz-html strong {
@@ -1356,12 +1306,6 @@ html[data-palette="catppuccin"][data-theme="light"] .slide-surface {
   background: linear-gradient(180deg, #eff1f5 0%, #e6e9ef 100%);
 }
 
-html[data-palette="catppuccin"][data-theme="light"] .slide-surface .quiz-html code,
-html[data-palette="catppuccin"][data-theme="light"] .slide-surface .quiz-html pre {
-  background: #dce0e8;
-  color: #4c4f69;
-}
-
 html[data-palette="catppuccin"][data-theme="light"] .slide-surface .quiz-html strong {
   color: #4c4f69;
 }
@@ -1376,18 +1320,6 @@ html[data-palette="catppuccin"][data-theme="light"] .slide-status-pill-warning {
   color: var(--mdq-warning-ink);
 }
 
-/* Question and reveal text outside the slide canvas. */
-html[data-palette="catppuccin"]:not([data-theme="light"]) .quiz-html code,
-html[data-palette="catppuccin"]:not([data-theme="light"]) .quiz-html pre {
-  background: #11111b;
-  color: #cdd6f4;
-}
-
-html[data-palette="catppuccin"][data-theme="light"] .quiz-html code,
-html[data-palette="catppuccin"][data-theme="light"] .quiz-html pre {
-  background: #dce0e8;
-  color: #4c4f69;
-}
 
 /* The dark selection-mode card and chips carry classic purple and green in
    their base rules; the light theme already reads the tokens. */
@@ -1456,7 +1388,6 @@ html[data-palette="catppuccin"]:not([data-theme="light"]) .leaderboard-row.leade
 html[data-palette="catppuccin"][data-theme="light"] .leaderboard-row.rank-standard {
   --leaderboard-rank-color: #525465;
 }
-
 
 /* ── seoul256 palette (deck palette: seoul256) ── */
 /* The -ink tokens and rank colours are darker (light) or lighter (dark)
@@ -1579,20 +1510,8 @@ html[data-palette="seoul256"]:not([data-theme="light"]) .slide-surface {
   background: linear-gradient(180deg, #4b4b4b 0%, #3f3f3f 100%);
 }
 
-html[data-palette="seoul256"]:not([data-theme="light"]) .slide-surface .quiz-html code,
-html[data-palette="seoul256"]:not([data-theme="light"]) .slide-surface .quiz-html pre {
-  background: #333233;
-  color: #d9d9d9;
-}
-
 html[data-palette="seoul256"]:not([data-theme="light"]) .slide-surface .quiz-html strong {
   color: #f1f1f1;
-}
-
-html[data-palette="seoul256"]:not([data-theme="light"]) .quiz-html code,
-html[data-palette="seoul256"]:not([data-theme="light"]) .quiz-html pre {
-  background: #333233;
-  color: #d9d9d9;
 }
 
 html[data-palette="seoul256"][data-theme="light"] {
@@ -1692,20 +1611,8 @@ html[data-palette="seoul256"][data-theme="light"] .slide-surface {
   background: linear-gradient(180deg, #e9e9e9 0%, #e1e1e1 100%);
 }
 
-html[data-palette="seoul256"][data-theme="light"] .slide-surface .quiz-html code,
-html[data-palette="seoul256"][data-theme="light"] .slide-surface .quiz-html pre {
-  background: #d9d9d9;
-  color: #4b4b4b;
-}
-
 html[data-palette="seoul256"][data-theme="light"] .slide-surface .quiz-html strong {
   color: #333233;
-}
-
-html[data-palette="seoul256"][data-theme="light"] .quiz-html code,
-html[data-palette="seoul256"][data-theme="light"] .quiz-html pre {
-  background: #d9d9d9;
-  color: #4b4b4b;
 }
 
 /* seoul256 link on the white join QR panel (theme.css). */
@@ -1894,20 +1801,8 @@ html[data-palette="ayu"]:not([data-theme="light"]) .slide-surface {
   background: linear-gradient(180deg, #141821 0%, #10141c 100%);
 }
 
-html[data-palette="ayu"]:not([data-theme="light"]) .slide-surface .quiz-html code,
-html[data-palette="ayu"]:not([data-theme="light"]) .slide-surface .quiz-html pre {
-  background: #0d1017;
-  color: #bfbdb6;
-}
-
 html[data-palette="ayu"]:not([data-theme="light"]) .slide-surface .quiz-html strong {
   color: #e2e1de;
-}
-
-html[data-palette="ayu"]:not([data-theme="light"]) .quiz-html code,
-html[data-palette="ayu"]:not([data-theme="light"]) .quiz-html pre {
-  background: #0d1017;
-  color: #bfbdb6;
 }
 
 html[data-palette="ayu"][data-theme="light"] {
@@ -2007,20 +1902,8 @@ html[data-palette="ayu"][data-theme="light"] .slide-surface {
   background: linear-gradient(180deg, #fcfcfc 0%, #f8f9fa 100%);
 }
 
-html[data-palette="ayu"][data-theme="light"] .slide-surface .quiz-html code,
-html[data-palette="ayu"][data-theme="light"] .slide-surface .quiz-html pre {
-  background: #ebeef0;
-  color: #595d62;
-}
-
 html[data-palette="ayu"][data-theme="light"] .slide-surface .quiz-html strong {
   color: #46494d;
-}
-
-html[data-palette="ayu"][data-theme="light"] .quiz-html code,
-html[data-palette="ayu"][data-theme="light"] .quiz-html pre {
-  background: #ebeef0;
-  color: #595d62;
 }
 
 /* ayu link on the white join QR panel (theme.css). */
@@ -2205,20 +2088,8 @@ html[data-palette="tokyo-night"]:not([data-theme="light"]) .slide-surface {
   background: linear-gradient(180deg, #1a1b26 0%, #16161e 100%);
 }
 
-html[data-palette="tokyo-night"]:not([data-theme="light"]) .slide-surface .quiz-html code,
-html[data-palette="tokyo-night"]:not([data-theme="light"]) .slide-surface .quiz-html pre {
-  background: #16161e;
-  color: #c0caf5;
-}
-
 html[data-palette="tokyo-night"]:not([data-theme="light"]) .slide-surface .quiz-html strong {
   color: #d6ddf9;
-}
-
-html[data-palette="tokyo-night"]:not([data-theme="light"]) .quiz-html code,
-html[data-palette="tokyo-night"]:not([data-theme="light"]) .quiz-html pre {
-  background: #16161e;
-  color: #c0caf5;
 }
 
 html[data-palette="tokyo-night"][data-theme="light"] {
@@ -2318,20 +2189,8 @@ html[data-palette="tokyo-night"][data-theme="light"] .slide-surface {
   background: linear-gradient(180deg, #ececef 0%, #e1e2e7 100%);
 }
 
-html[data-palette="tokyo-night"][data-theme="light"] .slide-surface .quiz-html code,
-html[data-palette="tokyo-night"][data-theme="light"] .slide-surface .quiz-html pre {
-  background: #d0d5e3;
-  color: #2a4990;
-}
-
 html[data-palette="tokyo-night"][data-theme="light"] .slide-surface .quiz-html strong {
   color: #1f356a;
-}
-
-html[data-palette="tokyo-night"][data-theme="light"] .quiz-html code,
-html[data-palette="tokyo-night"][data-theme="light"] .quiz-html pre {
-  background: #d0d5e3;
-  color: #2a4990;
 }
 
 /* tokyo-night link on the white join QR panel (theme.css). */
@@ -3106,13 +2965,6 @@ html[data-theme="light"] .slide-action-button-warning:disabled {
 
 .slide-surface .quiz-html.slide-live-embed-copy strong {
   color: rgba(255, 253, 247, 0.94);
-}
-
-.slide-surface .quiz-html code,
-.slide-surface .quiz-html pre {
-  border: 1px solid var(--mdq-slide-glass-line);
-  background: var(--mdq-slide-glass);
-  color: var(--mdq-slide-ink);
 }
 
 .slide-surface .quiz-html img,
@@ -5488,33 +5340,42 @@ html[data-theme="light"] .quiz-html a {
 }
 
 .quiz-html {
+  min-width: 0;
   overflow-wrap: anywhere;
   word-break: break-word;
 }
-.quiz-html code {
-  background: #242836;
-  padding: 0.15em 0.4em;
-  border-radius: 4px;
+.quiz-html :not(pre) > code,
+.quiz-html pre {
+  background: var(--mdq-code-bg, var(--mdq-slide-glass));
+  color: var(--mdq-code-ink, var(--mdq-slide-ink));
+  border: 1px solid var(--mdq-code-border, var(--mdq-slide-glass-line));
+  border-radius: var(--mdq-code-radius);
   font-family: var(--font-mono);
+}
+.quiz-html :not(pre) > code {
+  padding: 0.15em 0.4em;
   font-size: 0.9em;
 }
 .quiz-html pre {
-  background: #242836;
-  padding: 1em;
-  border-radius: 8px;
-  margin: 0.75em 0;
+  box-sizing: border-box;
+  min-width: 0;
   max-width: 100%;
+  padding: var(--mdq-code-padding);
+  margin: 0.75em 0;
   overflow-x: auto;
   white-space: pre;
   tab-size: 2;
   text-align: left;
-  font-family: var(--font-mono);
-  font-size: 0.95rem;
-  line-height: 1.5;
+  font-size: var(--mdq-code-size);
+  line-height: var(--mdq-code-line-height);
 }
+/* Fenced code never inherits the inline chip, on any theme or surface. */
 .quiz-html pre code {
   background: none;
+  border: 0;
   padding: 0;
+  border-radius: 0;
+  color: inherit;
   display: block;
   white-space: inherit;
   text-align: inherit;
@@ -6027,7 +5888,6 @@ body.image-expansion-lock {
     text-align: left;
   }
 }
-
 
 /* ── Presenter notes panel (instructor-only, below slide preview) ─────
    The panel reads the warning tokens every palette sets, so it follows the
@@ -6543,7 +6403,6 @@ html[data-theme="light"] .slide-video-figure .slide-video-action:not(button) {
 .open-response-count-label {
   color: var(--mdq-slide-ink);
 }
-
 
 /* When presenter notes are shown, dock them below the preview and let the
    slide surface share one instructor viewport (surface flexes, panel caps). */
