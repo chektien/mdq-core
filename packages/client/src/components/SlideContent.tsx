@@ -1,3 +1,5 @@
+import { useLayoutEffect, useRef } from "react";
+import { splitCoverHtml, type QuestionType } from "@mdq/shared";
 import type {
   FoldoutNote as FoldoutNoteModel,
   MediaPosition,
@@ -18,6 +20,7 @@ import { isAgendaSlide } from "../agendaSlide";
 
 interface SlideContentBodyProps {
   title: string;
+  slideType?: QuestionType;
   html: string;
   attendeeNotes?: FoldoutNoteModel[];
   slideMedia?: SlideMedia[];
@@ -93,8 +96,58 @@ function renderMediaFigure(media: SlideMedia, index: number) {
   );
 }
 
+/** Cover typography fits the remaining safe area, including live chrome and notes. */
+function CoverContent({ title, html, slideMedia = [], slideMediaPosition, slideMediaOpacity }: SlideContentBodyProps) {
+  const stageRef = useRef<HTMLDivElement>(null);
+  const blockRef = useRef<HTMLDivElement>(null);
+  const { subtitleHtml, metaHtml } = splitCoverHtml(html);
+  useLayoutEffect(() => {
+    const stage = stageRef.current;
+    const block = blockRef.current;
+    if (!stage || !block) return;
+    const fit = () => {
+      block.style.setProperty("--cover-fit", "1");
+      if (block.scrollHeight <= stage.clientHeight && block.scrollWidth <= stage.clientWidth) return;
+      let low = 0.01;
+      let high = 1;
+      for (let i = 0; i < 12; i++) {
+        const scale = (low + high) / 2;
+        block.style.setProperty("--cover-fit", String(scale));
+        if (block.scrollHeight <= stage.clientHeight && block.scrollWidth <= stage.clientWidth) low = scale;
+        else high = scale;
+      }
+      block.style.setProperty("--cover-fit", String(low));
+    };
+    fit();
+    // Intrinsic media sizes arrive after the first layout, without resizing the stage.
+    block.addEventListener("load", fit, true);
+    const observer = typeof ResizeObserver === "undefined" ? undefined : new ResizeObserver(fit);
+    observer?.observe(stage);
+    let disposed = false;
+    void document.fonts?.ready.then(() => { if (!disposed) fit(); });
+    return () => { disposed = true; observer?.disconnect(); block.removeEventListener("load", fit, true); };
+  }, [title, html, slideMedia]);
+  const background = slideMediaPosition === "background";
+  return (
+    <div ref={stageRef} className="slide-cover-stage">
+      {background && <div className="slide-cover-background" style={{ opacity: slideMediaOpacity ?? 0.3 }}>
+        {slideMedia.map((media, index) => <img key={index} src={media.src} alt={media.alt} />)}
+      </div>}
+      <div ref={blockRef} className="slide-cover-block slide-header">
+        <h1 className="slide-title slide-cover-title">{title}</h1>
+        {subtitleHtml && <QuizHtml className="quiz-html slide-cover-subtitle" html={subtitleHtml} />}
+        {metaHtml && <QuizHtml className="quiz-html slide-cover-meta" html={metaHtml} />}
+        {!background && slideMedia.length > 0 && <div className="slide-cover-media" aria-label="Slide images">
+          {slideMedia.map((media, index) => renderMediaFigure(media, index))}
+        </div>}
+      </div>
+    </div>
+  );
+}
+
 export function SlideContentBody({
   title,
+  slideType,
   html,
   attendeeNotes = [],
   slideMedia = [],
@@ -125,6 +178,18 @@ export function SlideContentBody({
     resolvedPosition === "background" && hasMedia
       ? ({ ["--bg-opacity" as string]: slideMediaOpacity ?? 0.3 } as React.CSSProperties)
       : undefined;
+
+  if (slideType === "cover") {
+    return <>
+      <CoverContent title={title} html={html} slideMedia={slideMedia} slideMediaPosition={slideMediaPosition} slideMediaOpacity={slideMediaOpacity} />
+      {hasAttendeeNotes && <div className="slide-notes"><div className="slide-note-group slide-note-group-attendee">
+        {attendeeNotes.map(note => <FoldoutNote key={note.id} note={note} />)}
+      </div></div>}
+      {hasReferences && <footer className="slide-references" aria-label="Slide references"><ol>
+        {slideReferences.map(reference => <li key={reference.id}><QuizHtml className="slide-reference-text" html={reference.html} as="span" /></li>)}
+      </ol></footer>}
+    </>;
+  }
 
   if (slideLiveEmbed) {
     const showOverlay = slideLiveEmbed.titleOverlay !== false;
@@ -262,6 +327,7 @@ export function SlideContentBody({
 
 export default function SlideContent({
   title,
+  slideType,
   html,
   attendeeNotes = [],
   slideMedia = [],
@@ -293,7 +359,7 @@ export default function SlideContent({
   navActions = [],
   actions = [],
 }: SlideContentProps) {
-  const surfaceClassName = slideLiveEmbed ? "slide-surface-live-embed" : undefined;
+  const surfaceClassName = slideType === "cover" ? "slide-surface-cover" : slideLiveEmbed ? "slide-surface-live-embed" : undefined;
 
   return (
     <LiveSurface
@@ -320,6 +386,7 @@ export default function SlideContent({
       actions={actions}
     >
       <SlideContentBody
+        slideType={slideType}
         title={title}
         html={html}
         attendeeNotes={attendeeNotes}

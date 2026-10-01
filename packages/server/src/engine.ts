@@ -1,3 +1,4 @@
+import { isSlideType } from "@mdq/shared";
 import {
   Quiz, Session, SessionState, SocketEvents, QuestionOpenPayload, QuestionClosePayload, FoldoutNote,
   StudentJoinPayload, AnswerSubmitPayload, Participant, STATE_TRANSITIONS, StudentAnswer,
@@ -115,10 +116,10 @@ const questionAt = (session: Session, quiz: Quiz) => quiz.questions[session.curr
  */
 export const questionPosition = (quiz: Quiz, questionIndex: number): { questionNumber?: number; questionTotal?: number } => {
   const q = quiz.questions[questionIndex];
-  if (!q || getQuestionType(q) === "slide") return {};
+  if (!q || isSlideType(getQuestionType(q))) return {};
   return {
-    questionNumber: quiz.questions.slice(0, questionIndex + 1).filter((item) => getQuestionType(item) !== "slide").length,
-    questionTotal: quiz.questions.filter((item) => getQuestionType(item) !== "slide").length,
+    questionNumber: quiz.questions.slice(0, questionIndex + 1).filter((item) => !isSlideType(getQuestionType(item))).length,
+    questionTotal: quiz.questions.filter((item) => !isSlideType(getQuestionType(item))).length,
   };
 };
 const questionPayload = (session: Session, quiz: Quiz, now: number): QuestionOpenPayload | null => {
@@ -218,7 +219,7 @@ const closePayload = (session: Session): QuestionClosePayload => ({
 });
 const deadline = (session: Session, quiz: Quiz): number | null => {
   const q = questionAt(session, quiz);
-  return session.state === "QUESTION_OPEN" && q && getQuestionType(q) !== "slide" && session.questionStartedAt !== undefined
+  return session.state === "QUESTION_OPEN" && q && !isSlideType(getQuestionType(q)) && session.questionStartedAt !== undefined
     ? session.questionStartedAt + q.timeLimitSec * 1000 : null;
 };
 
@@ -268,14 +269,14 @@ export function apply(input: Session, quiz: Quiz, command: Command, now: number)
       session.currentQuestionIndex = 0;
       session.questionStartedAt = now;
       openContext(); state();
-      if (getQuestionType(questionAt(session, quiz)) !== "slide") emitCount();
+      if (!isSlideType(getQuestionType(questionAt(session, quiz)))) emitCount();
       break;
     case "previous": {
       const prev = session.currentQuestionIndex - 1;
       if (session.state === "LOBBY") throw new EngineCommandError("Start the session before going back.");
       if (prev < 0) throw new EngineCommandError("Already at the first item");
       session.currentQuestionIndex = prev;
-      session.state = getQuestionType(questionAt(session, quiz)) === "slide" ? "QUESTION_OPEN" : "REVEAL";
+      session.state = isSlideType(getQuestionType(questionAt(session, quiz))) ? "QUESTION_OPEN" : "REVEAL";
       if (session.state === "QUESTION_OPEN") {
         session.questionStartedAt = now;
         openContext(); state();
@@ -289,13 +290,13 @@ export function apply(input: Session, quiz: Quiz, command: Command, now: number)
       if (next >= quiz.questions.length) throw new EngineCommandError("No more questions");
       if (session.state === "LOBBY") throw new EngineCommandError("Start the session before advancing.");
       if (session.state === "QUESTION_OPEN") {
-        if (getQuestionType(questionAt(session, quiz)) !== "slide") throw new EngineCommandError("Close and reveal the current question before advancing.");
+        if (!isSlideType(getQuestionType(questionAt(session, quiz)))) throw new EngineCommandError("Close and reveal the current question before advancing.");
       } else transition(session, "QUESTION_OPEN");
       session.currentQuestionIndex = next;
-      if (getQuestionType(questionAt(session, quiz)) !== "slide" && session.revealedQuestionIndexes?.has(next)) session.state = "REVEAL";
+      if (!isSlideType(getQuestionType(questionAt(session, quiz))) && session.revealedQuestionIndexes?.has(next)) session.state = "REVEAL";
       if (session.state === "QUESTION_OPEN") {
         session.questionStartedAt = now; openContext(); state();
-        if (getQuestionType(questionAt(session, quiz)) !== "slide") emitCount();
+        if (!isSlideType(getQuestionType(questionAt(session, quiz)))) emitCount();
       } else {
         openContext(); emitReveal(); state();
       }
@@ -306,11 +307,11 @@ export function apply(input: Session, quiz: Quiz, command: Command, now: number)
       if (session.currentQuestionIndex < 0) session.currentQuestionIndex = 0;
       session.questionStartedAt = now;
       openContext(); state();
-      if (getQuestionType(questionAt(session, quiz)) !== "slide") emitCount();
+      if (!isSlideType(getQuestionType(questionAt(session, quiz)))) emitCount();
       break;
     case "close":
     case "timeout":
-      if (command.type === "close" && getQuestionType(questionAt(session, quiz)) === "slide") throw new EngineCommandError("Slides do not close; advance to the next item.");
+      if (command.type === "close" && isSlideType(getQuestionType(questionAt(session, quiz)))) throw new EngineCommandError("Slides do not close; advance to the next item.");
       if (command.type === "timeout") {
         const due = deadline(session, quiz);
         // An alarm set for an earlier question or opening carries a different deadline and is ignored.
@@ -322,7 +323,7 @@ export function apply(input: Session, quiz: Quiz, command: Command, now: number)
       emit(SocketEvents.RESULTS_DISTRIBUTION, { questionIndex: session.currentQuestionIndex, distribution: getDistribution(session, session.currentQuestionIndex) }, "staff");
       break;
     case "reveal":
-      if (getQuestionType(questionAt(session, quiz)) === "slide") throw new EngineCommandError("Slides do not reveal answers; advance to the next item.");
+      if (isSlideType(getQuestionType(questionAt(session, quiz)))) throw new EngineCommandError("Slides do not reveal answers; advance to the next item.");
       transition(session, "REVEAL"); review();
       openContext(); emitReveal(); state();
       break;
@@ -386,7 +387,7 @@ export function apply(input: Session, quiz: Quiz, command: Command, now: number)
         publicKey: participant.publicKey, label: participant.label, labelNote: participant.labelNote,
         ...(quiz.title ? { deckTitle: quiz.title } : {}) }, `participant:${participant.studentId}`);
       emitParticipants();
-      if (session.state === "QUESTION_OPEN" && session.currentQuestionIndex >= 0) emitCount();
+      if (session.state === "QUESTION_OPEN" && session.currentQuestionIndex >= 0 && !isSlideType(getQuestionType(questionAt(session, quiz)))) emitCount();
       messages.push(...snapshotMessages(session, quiz, now, `participant:${participant.studentId}`, "participant", isReconnect));
       break;
     }
@@ -399,6 +400,7 @@ export function apply(input: Session, quiz: Quiz, command: Command, now: number)
       if (seat && sessionToken !== undefined && sessionToken !== seat.sessionToken) { reject(SEAT_IN_USE_MESSAGE); break; }
       const q = questionAt(session, quiz);
       if (!q) { reject(`Question ${session.currentQuestionIndex + 1} not found.`); break; }
+      if (isSlideType(getQuestionType(q))) { reject("Slides do not accept answers."); break; }
       const options = payload.selectedOptions || [];
       const responseText = payload.responseText?.trim();
       if (isOpenResponseQuestion(q)) {
@@ -455,7 +457,7 @@ export function apply(input: Session, quiz: Quiz, command: Command, now: number)
       participant.sessionToken = command.newToken; participant.socketId = "";
       participant.clientInstanceId = undefined;
       emitParticipants();
-      if (session.state === "QUESTION_OPEN" && session.currentQuestionIndex >= 0) emitCount();
+      if (session.state === "QUESTION_OPEN" && session.currentQuestionIndex >= 0 && !isSlideType(getQuestionType(questionAt(session, quiz)))) emitCount();
       break;
     }
     case "joinLock": {
@@ -471,7 +473,7 @@ export function apply(input: Session, quiz: Quiz, command: Command, now: number)
       if (participant && participant.socketId === command.socketId) {
         participant.connected = false;
         emitParticipants();
-        if (session.state === "QUESTION_OPEN" && session.currentQuestionIndex >= 0) emitCount();
+        if (session.state === "QUESTION_OPEN" && session.currentQuestionIndex >= 0 && !isSlideType(getQuestionType(questionAt(session, quiz)))) emitCount();
       }
       break;
     }
@@ -483,7 +485,7 @@ export function apply(input: Session, quiz: Quiz, command: Command, now: number)
     case "broadcastOpen":
       session.questionStartedAt = now;
       openContext(); state();
-      if (getQuestionType(questionAt(session, quiz)) !== "slide") emitCount();
+      if (!isSlideType(getQuestionType(questionAt(session, quiz)))) emitCount();
       break;
     case "broadcastReveal":
       openContext(); emitReveal(); state();
@@ -493,7 +495,7 @@ export function apply(input: Session, quiz: Quiz, command: Command, now: number)
       break;
     case "participants": emitParticipants(); break;
     case "repairClosedSlide":
-      if (session.state === "QUESTION_CLOSED" && getQuestionType(questionAt(session, quiz)) === "slide") {
+      if (session.state === "QUESTION_CLOSED" && isSlideType(getQuestionType(questionAt(session, quiz)))) {
         session.state = "QUESTION_OPEN";
         session.questionStartedAt = now;
         openContext(); state();
@@ -523,8 +525,8 @@ function snapshotMessages(session: Session, quiz: Quiz, now: number, audience: A
   if (!q || !payload) return messages;
   if (session.state === "QUESTION_OPEN") {
     emit(SocketEvents.QUESTION_OPEN, payload);
-    if (session.questionStartedAt) emit(SocketEvents.QUESTION_TICK, { remainingSec: Math.max(0, q.timeLimitSec - Math.floor((now - session.questionStartedAt) / 1000)) });
-    if (staff) emitCount();
+    if (!isSlideType(getQuestionType(q)) && session.questionStartedAt) emit(SocketEvents.QUESTION_TICK, { remainingSec: Math.max(0, q.timeLimitSec - Math.floor((now - session.questionStartedAt) / 1000)) });
+    if (staff && !isSlideType(getQuestionType(q))) emitCount();
   } else if (session.state === "QUESTION_CLOSED") {
     emit(SocketEvents.QUESTION_OPEN, payload);
     emit(SocketEvents.QUESTION_CLOSE, closePayload(session));

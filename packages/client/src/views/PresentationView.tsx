@@ -1,3 +1,4 @@
+import { isSlideType } from "@mdq/shared";
 import { useEffect, useMemo, useState } from "react";
 import type { DeckPalette, DeckTheme, SessionState } from "@mdq/shared";
 import InstructorLoginPrompt from "../components/InstructorLoginPrompt";
@@ -114,8 +115,8 @@ export default function PresentationView({
     if (!currentQuestion) return null;
     return questionHeadings[currentQuestion.questionIndex + 1] || null;
   }, [currentQuestion, questionHeadings]);
-  const isSlideDisplay = currentQuestion?.questionType === "slide" && !currentReveal && (state === "QUESTION_OPEN" || state === "QUESTION_CLOSED");
-  const isQuizSurfaceDisplay = !!currentQuestion && currentQuestion.questionType !== "slide" && state !== "LEADERBOARD";
+  const isSlideDisplay = isSlideType(currentQuestion?.questionType) && !currentReveal && (state === "QUESTION_OPEN" || state === "QUESTION_CLOSED");
+  const isQuizSurfaceDisplay = !!currentQuestion && !isSlideType(currentQuestion.questionType) && state !== "LEADERBOARD";
   const isLeaderboardDisplay = state === "LEADERBOARD";
   // What a question screen shows, so its fit starts afresh for a new question or state.
   const fitKey = quizFitKey(currentQuestion, state);
@@ -132,7 +133,7 @@ export default function PresentationView({
   // Questions are counted without slides, the same as on the phones; a slide shows no number.
   const positionLabel = positionLabelFor(currentQuestion);
   const quizStatusLabel = (() => {
-    if (!currentQuestion || currentQuestion.questionType === "slide") return null;
+    if (!currentQuestion || isSlideType(currentQuestion.questionType)) return null;
     if (currentReveal) return currentReveal.isPoll ? "Results open" : "Answer revealed";
     if (state === "QUESTION_CLOSED") return closedLabel;
     if (sock.answerCount && state === "QUESTION_OPEN") {
@@ -255,9 +256,10 @@ export default function PresentationView({
     : quizStatusLabel;
   const liveSurfaceContent = (() => {
     if (currentQuestion && (state === "QUESTION_OPEN" || state === "QUESTION_CLOSED")) {
-      if (currentQuestion.questionType === "slide") {
+      if (isSlideType(currentQuestion.questionType)) {
         return (
           <SlideContentBody
+            slideType={currentQuestion.questionType}
             title={currentHeading || currentQuestion.topic}
             html={currentQuestion.text}
             attendeeNotes={currentQuestion.attendeeNotes}
@@ -475,7 +477,7 @@ export default function PresentationView({
           {currentHeading && <span className="text-sm text-zinc-600">{currentHeading}</span>}
         </div>
         <div className="flex items-center gap-4">
-          {sock.answerCount && currentQuestion?.questionType !== "slide" && (state === "QUESTION_OPEN" || state === "QUESTION_CLOSED") && (
+          {sock.answerCount && !isSlideType(currentQuestion?.questionType) && (state === "QUESTION_OPEN" || state === "QUESTION_CLOSED") && (
             <span className="font-mono tabular-nums text-zinc-400">
               {sock.answerCount.submitted}/{sock.answerCount.total} answered
             </span>
@@ -495,8 +497,9 @@ export default function PresentationView({
 
         {currentQuestion && (state === "QUESTION_OPEN" || state === "QUESTION_CLOSED") && (
           <>
-            {currentQuestion.questionType === "slide" ? (
+            {isSlideType(currentQuestion.questionType) ? (
               <SlideContent
+                slideType={currentQuestion.questionType}
                 title={currentHeading || currentQuestion.topic}
                 html={currentQuestion.text}
                 attendeeNotes={currentQuestion.attendeeNotes}

@@ -8033,3 +8033,98 @@ html:root[data-theme] .student-screen[data-deck-background="true"] .dist-row-she
   background: transparent;
   box-shadow: none;
 }
+
+/* Covers: a public slide surface. The 1.25 title factor features the opening
+   title; subtitle and metadata reuse the deck's body and small tokens. Spacing
+   is in em so it fits with the type. No added font, palette or decoration. */
+.slide-surface:has(.slide-cover-stage) > .slide-safe {
+  height: 100dvh;
+  min-height: 0;
+  padding-inline: var(--mdq-slide-padding, 6.4cqi);
+}
+.slide-cover-stage {
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  flex: 1 1 0;
+  min-height: 0;
+  min-width: 0;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+.slide-cover-block.slide-header {
+  --cover-fit: 1;
+  position: relative;
+  width: 100%;
+  max-width: var(--mdq-content-width, 100%);
+  min-width: 0;
+  border: 0;
+  padding: 0;
+  overflow-wrap: anywhere;
+}
+.slide-cover-block::after { display: none; }
+.slide-cover-block .slide-cover-title {
+  max-width: 100%;
+  font-size: calc(var(--mdq-title-size, clamp(2.25rem, 6.3cqi, 7.3rem)) * var(--mdq-title-scale, 1) * 1.25 * var(--cover-fit));
+  line-height: 1.08;
+  text-wrap: balance;
+}
+.slide-cover-block .slide-cover-subtitle {
+  margin-top: 1.1em;
+  font-size: calc(var(--mdq-body-size, clamp(1.08rem, 2.5cqi, 2.8rem)) * var(--mdq-body-scale, 1) * var(--cover-fit));
+}
+.slide-cover-block .slide-cover-meta {
+  margin-top: 1.6em;
+  font-size: calc(var(--mdq-small-size, clamp(0.85rem, 1.5cqi, 1.4rem)) * var(--mdq-small-scale, 1) * var(--cover-fit));
+}
+.slide-cover-block :is(.slide-cover-subtitle, .slide-cover-meta) {
+  color: var(--mdq-slide-ink-soft);
+  line-height: 1.45;
+  text-wrap: balance;
+}
+.slide-cover-block :is(.slide-cover-subtitle, .slide-cover-meta) :is(p, ul, ol, li) {
+  margin: 0;
+  padding: 0;
+  max-width: none;
+  font-size: inherit;
+  color: inherit;
+  list-style: none;
+}
+.slide-cover-block .slide-cover-meta :is(p, li) + :is(p, li) { margin-top: 0.3em; }
+.slide-cover-block .slide-cover-meta li::before { display: none; }
+.slide-cover-block .slide-cover-meta li::marker { content: ""; }
+.slide-cover-media {
+  display: flex;
+  justify-content: center;
+  gap: 1em;
+  margin-top: 1em;
+}
+.slide-cover-media .slide-media-figure { flex: 0 1 20%; min-width: 0; }
+.slide-cover-media img { max-height: 12dvh; object-fit: contain; }
+.slide-cover-background {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  display: flex;
+  pointer-events: none;
+}
+.slide-cover-block.slide-header { z-index: 1; }
+.slide-cover-background img { width: 100%; min-width: 0; object-fit: cover; }
+@media (min-width: 761px) {
+  .slide-surface:has(.slide-cover-stage) > .slide-safe {
+    padding-bottom: max(var(--mdq-slide-padding, 5cqi), calc(var(--slide-join-clear, 0px) + 1rem));
+  }
+}
+@media (max-width: 760px) {
+  .slide-cover-block .slide-cover-title {
+    font-size: calc(var(--mdq-title-size, clamp(2.25rem, 14cqi, 4rem)) * var(--mdq-title-scale, 1) * 1.25 * var(--cover-fit));
+  }
+  .slide-surface-student .slide-cover-block .slide-cover-title {
+    font-size: calc(var(--mdq-title-size, clamp(1.75rem, 9.2cqi, 2.7rem)) * var(--mdq-title-scale, 1) * 1.25 * var(--cover-fit));
+  }
+}
+@media print {
+  .slide-surface:has(.slide-cover-stage) > .slide-safe { height: 100vh; padding: 5%; }
+  .slide-cover-stage { break-inside: avoid; }
+}

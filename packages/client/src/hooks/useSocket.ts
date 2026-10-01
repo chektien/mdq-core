@@ -1,3 +1,4 @@
+import { isSlideType } from "@mdq/shared";
 import { hasResultsAnswers, updateResultsEvidence, type ResultsEvidence } from "../instructorResults";
 import { io, type Socket } from "socket.io-client";
 import { useState, useEffect, useCallback, useRef } from "react";
@@ -619,7 +620,7 @@ export function useSocket(
   // Ticks stop while offline, so keep the countdown moving from the question's
   // start time until the rejoin snapshot's tick takes over again.
   useEffect(() => {
-    if (connected || sessionState !== "QUESTION_OPEN" || !currentQuestion || currentQuestion.questionType === "slide") return;
+    if (connected || sessionState !== "QUESTION_OPEN" || !currentQuestion || isSlideType(currentQuestion.questionType)) return;
     const update = () => setRemainingSec(localRemainingSec(currentQuestion, Date.now(), clockOffsetRef.current));
     update();
     const timer = setInterval(update, 1000);

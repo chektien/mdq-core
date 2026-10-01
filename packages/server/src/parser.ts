@@ -346,7 +346,7 @@ function parseQuestionBlock(
 
   const questionTypeMatch = block.match(/^(?:type|question_type):\s*([a-z_-]+)\s*$/im);
   const questionType = questionTypeMatch?.[1].toLowerCase().replace(/-/g, "_");
-  if (questionType && questionType !== "multiple_choice" && questionType !== "poll" && questionType !== "open_response" && questionType !== "slide") {
+  if (questionType && questionType !== "multiple_choice" && questionType !== "poll" && questionType !== "open_response" && questionType !== "slide" && questionType !== "cover") {
     throw new QuizParseError(
       sourceFile,
       index,
@@ -357,7 +357,8 @@ function parseQuestionBlock(
   const normalizedQuestionType = (questionType || "multiple_choice") as QuestionType;
   const isPoll = normalizedQuestionType === "poll";
   const isOpenResponse = normalizedQuestionType === "open_response";
-  const isSlide = normalizedQuestionType === "slide";
+  const isCover = normalizedQuestionType === "cover";
+  const isSlide = normalizedQuestionType === "slide" || isCover;
 
   if (isSlide && timeLimitMatch) {
     throw new QuizParseError(
@@ -423,7 +424,7 @@ function parseQuestionBlock(
 
   let correctOptions: string[];
   if (isSlide) {
-    if (correctSingleMatch || correctMultiMatch) {
+    if (correctSingleMatch || correctMultiMatch || (isCover && correctSingleLineMatch)) {
       throw new QuizParseError(
         sourceFile,
         index,
@@ -532,6 +533,11 @@ function parseQuestionBlock(
       });
     })
     : { contentLines: textLines, video: undefined };
+  if (isCover && (liveEmbedExtraction.liveEmbed || videoExtraction.video)) {
+    throw new QuizParseError(sourceFile, index,
+      "cover items support images; use type: slide for live embeds or videos",
+      findLineNumber(lines, blockStartLine, line => /^(?:live_url|video_card):|^\[Video:/i.test(line.trim())));
+  }
   textLines = videoExtraction.contentLines;
   const backgroundExtraction = isSlide
     ? extractSlideBackground(textLines)
@@ -580,8 +586,8 @@ function parseQuestionBlock(
 
   return {
     index,
-    topic,
-    subtopic: subtopic || undefined,
+    topic: isCover ? topicRaw : topic,
+    subtopic: isCover ? undefined : subtopic || undefined,
     textMd,
     textHtml,
     questionType: normalizedQuestionType,

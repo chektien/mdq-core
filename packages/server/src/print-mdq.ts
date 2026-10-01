@@ -1,3 +1,4 @@
+import { isSlideType, splitCoverHtml } from "@mdq/shared";
 import { chromium, type Browser } from "playwright";
 import { DECK_PALETTES, DeckPalette, formatDiagnostic, Quiz, Question, QuestionType, describeDeckPalettes, parseDeckPalette } from "@mdq/shared";
 import { parseQuizMarkdown, QuizParseError } from "./parser";
@@ -46,6 +47,7 @@ const QUESTION_TYPE_LABELS: Record<QuestionType, string> = {
   poll: "Poll",
   open_response: "Open response",
   slide: "Slide",
+  cover: "Cover",
 };
 
 function usage(): string {
@@ -311,7 +313,7 @@ function questionTypeLabel(question: Question): string {
 }
 
 function buildStats(quiz: Quiz) {
-  const slideCount = quiz.questions.filter((question) => questionType(question) === "slide").length;
+  const slideCount = quiz.questions.filter((question) => isSlideType(questionType(question))).length;
   const pollCount = quiz.questions.filter((question) => questionType(question) === "poll").length;
   const openResponseCount = quiz.questions.filter((question) => questionType(question) === "open_response").length;
   return {
@@ -414,7 +416,7 @@ function renderAnswerBlock(question: Question, includeAnswers: boolean): string 
   if (!includeAnswers) return "";
 
   const type = questionType(question);
-  if (type === "slide") return "";
+  if (isSlideType(type)) return "";
   if (type === "poll") {
     return `
       <section class="answer-block answer-neutral">
@@ -454,9 +456,22 @@ function renderExplanation(question: Question, includeAnswers: boolean): string 
 function renderItem(question: Question, index: number, total: number, options: PrintOptions): string {
   const inputDir = path.dirname(options.inputFile);
   const type = questionType(question);
-  const isSlide = type === "slide";
+  const isSlide = isSlideType(type);
   const heading = questionHeading(question);
   const body = renderTrustedHtml(question.textHtml, inputDir, options.imagesDir);
+  if (type === "cover") {
+    const { subtitleHtml, metaHtml } = splitCoverHtml(body);
+    return `<article class="item item-cover">
+      <div class="cover-block">
+        <h2>${escapeHtml(heading)}</h2>
+        ${subtitleHtml ? `<section class="cover-subtitle">${subtitleHtml}</section>` : ""}
+        ${metaHtml ? `<section class="cover-meta">${metaHtml}</section>` : ""}
+        ${renderSlideMedia(question, inputDir, options.imagesDir)}
+      </div>
+      ${renderNotes(question, options.includeFoldouts, options.includePresenterNotes, inputDir, options.imagesDir)}
+      ${renderReferences(question, inputDir, options.imagesDir)}
+    </article>`;
+  }
   const hasBody = body.trim().length > 0;
   const hasSlideMedia = isSlide && (question.slideMedia?.length ?? 0) > 0;
   const hasSlideVideo = isSlide && !!question.slideVideo;
@@ -1154,6 +1169,32 @@ function renderStyles(
       box-shadow: 0 0.6mm 0 var(--shadow);
     }
 
+    /* A cover owns one page; title, subtitle and metadata form its centred block. */
+    .item-cover {
+      min-height: ${pageSize === "Letter" ? "249mm" : "267mm"};
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      text-align: center;
+      break-before: page;
+      break-after: page;
+      margin: 0;
+      border: 0;
+      box-shadow: none;
+    }
+    .item.item-cover h2 {
+      font-size: calc(var(--mdq-title-size, 18pt) * var(--mdq-title-scale, 1) * 1.25);
+      text-wrap: balance;
+      overflow-wrap: anywhere;
+    }
+    .cover-subtitle { margin-top: 1.1em; font-size: var(--mdq-body-size, calc(11.2pt * var(--mdq-body-scale, 1))); color: var(--muted); }
+    .cover-meta { margin-top: 1.6em; font-size: var(--mdq-small-size, 9pt); color: var(--muted); }
+    .item-cover :is(p, ul, ol, li) { margin: 0; padding: 0; list-style: none; }
+    .item-cover li::before { display: none; }
+    .item-cover li::marker { content: ""; }
+    .item-cover .media-grid { justify-content: center; margin-top: 1em; }
+    .item-cover .media-grid .media-figure img { max-height: 30mm; }
+
     .item-header {
       margin-bottom: 4mm;
       padding-bottom: 3.2mm;
@@ -1602,7 +1643,7 @@ function renderStyles(
   `;
 }
 
-function buildHtml(quiz: Quiz, options: PrintOptions): string {
+export function buildHtml(quiz: Quiz, options: PrintOptions): string {
   const title = options.title || quiz.title || path.basename(options.inputFile);
 
   return `<!doctype html>
@@ -1704,7 +1745,7 @@ async function main(): Promise<void> {
   console.log(`Printed ${plural(deckStats.total, "item")} to ${options.outputFile} (${sizeMb} MB)`);
 }
 
-main().catch((error: unknown) => {
+if (require.main === module) main().catch((error: unknown) => {
   const message = error instanceof Error ? error.message : String(error);
   console.error(`print:pdf failed: ${message}`);
   process.exitCode = 1;

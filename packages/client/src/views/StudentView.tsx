@@ -1,3 +1,4 @@
+import { isSlideType } from "@mdq/shared";
 import { useState, useCallback, useEffect, useMemo, useRef, useSyncExternalStore } from "react";
 import { useSocket } from "../hooks/useSocket";
 import type { QuestionState, RevealState } from "../hooks/useSocket";
@@ -841,7 +842,7 @@ function QuestionView({
   const questionTextId = `question-text-${question.questionIndex}`;
   const closedNote = timedOut ? "Time's up. Waiting for the instructor." : "Answers are closed. Waiting for the instructor.";
 
-  if (question.questionType === "slide") {
+  if (isSlideType(question.questionType)) {
     const hasStudentVisibleSlideContent = [
       question.topic,
       question.text,
@@ -867,6 +868,7 @@ function QuestionView({
       <div className="slide-live-shell">
         <div className="slide-live-main">
         <SlideContent
+          slideType={question.questionType}
           title={question.topic}
           html={question.text}
           attendeeNotes={question.attendeeNotes}

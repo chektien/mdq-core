@@ -1,3 +1,4 @@
+import { isSlideType } from "@mdq/shared";
 import express, { type Request, type Response } from "express";
 import cors from "cors";
 import { API, AccessInfo, CumulativeLeaderboardEntry, PublicCumulativeLeaderboardEntry, ParseDiagnostic, formatDiagnostic, DeckPalette, DeckTheme, JoinLockRequest, Quiz, ReleaseSeatRequest, ResponseVisibilityRequest, Session, SessionState, usesStudentIds } from "@mdq/shared";
@@ -58,7 +59,7 @@ function resolveDeckPalette(q: Quiz, fallbackPalette: DeckPalette): DeckPalette 
 }
 
 function summarizeQuizForList(q: Quiz, fallbackTheme: DeckTheme, fallbackPalette: DeckPalette, diagnostics: ParseDiagnostic[] = []) {
-  const slideCount = q.questions.filter((question) => question.questionType === "slide").length;
+  const slideCount = q.questions.filter((question) => isSlideType(question.questionType)).length;
   return {
     week: q.week,
     title: q.title,
@@ -284,7 +285,7 @@ export function createApp(quizDirOrOpts?: string | AppOptions) {
     return quiz.questions
       .slice(0, revealedThroughIndex + 1)
       .map((question, questionIndex) => ({ question, questionIndex }))
-      .filter(({ question }) => getQuestionType(question) !== "slide")
+      .filter(({ question }) => !isSlideType(getQuestionType(question)))
       .map(({ question, questionIndex }) => ({
         questionIndex,
         questionType: getQuestionType(question),

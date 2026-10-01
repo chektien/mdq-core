@@ -120,7 +120,41 @@ export interface StudentRejectedPayload {
   reason: string;
 }
 
-export type QuestionType = "multiple_choice" | "poll" | "open_response" | "slide";
+export type QuestionType = "multiple_choice" | "poll" | "open_response" | "slide" | "cover";
+/** Content-only items share navigation, counting and submission rules. */
+export function isSlideType(type: unknown): type is "slide" | "cover" {
+  return type === "slide" || type === "cover";
+}
+
+/** The first top-level paragraph is the subtitle; lists and later paragraphs are metadata.
+ * Input is rendered Markdown. Consumers still sanitize it before displaying it. */
+export function splitCoverHtml(html: string): { subtitleHtml: string; metaHtml: string } {
+  // Walk element boundaries: paragraphs inside lists/quotes are not subtitles,
+  // and every other block (including nested lists) must survive intact.
+  const stack: string[] = [];
+  const voidTags = new Set(["area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "param", "source", "track", "wbr"]);
+  let paragraphStart = -1;
+  const tags = /<!--[\s\S]*?-->|<\/?([a-z][\w:-]*)\b(?:"[^"]*"|'[^']*'|[^'">])*>/gi;
+  for (const match of html.matchAll(tags)) {
+    if (!match[1]) continue;
+    const tag = match[1].toLowerCase();
+    const closing = match[0].startsWith("</");
+    if (!closing) {
+      if (stack.length === 0 && tag === "p") paragraphStart = match.index!;
+      if (!voidTags.has(tag) && !match[0].endsWith("/>")) stack.push(tag);
+    } else {
+      const at = stack.lastIndexOf(tag);
+      if (at >= 0) stack.length = at;
+      if (tag === "p" && stack.length === 0 && paragraphStart >= 0) {
+        const end = match.index! + match[0].length;
+        return { subtitleHtml: html.slice(paragraphStart, end),
+          metaHtml: (html.slice(0, paragraphStart) + html.slice(end)).trim() };
+      }
+    }
+  }
+  return { subtitleHtml: "", metaHtml: html.trim() };
+}
+
 export type DeckTheme = "dark" | "light";
 /**
  * Every supported slide color palette, in the order they are documented and

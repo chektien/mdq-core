@@ -1,3 +1,4 @@
+import { isSlideType } from "@mdq/shared";
 import type { QuestionType } from "@mdq/shared";
 
 export function getQuestionModeText(questionType: QuestionType, allowsMultiple: boolean): string {
@@ -11,7 +12,7 @@ export function getQuestionModeText(questionType: QuestionType, allowsMultiple: 
     return "Open response. Write a reply. You can update it until time is up. This does not affect your score.";
   }
 
-  if (questionType === "slide") {
+  if (isSlideType(questionType)) {
     return "Slide. No student response is needed.";
   }
 
@@ -27,7 +28,7 @@ export function getRevealActionLabel(questionType: QuestionType): string {
   if (questionType === "open_response") {
     return "Reveal Responses";
   }
-  if (questionType === "slide") {
+  if (isSlideType(questionType)) {
     return "Continue";
   }
   return "Reveal Answer";
