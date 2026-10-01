@@ -569,8 +569,10 @@ function parseQuestionBlock(
   const promptMedia = extractSlideMedia(textLines);
   const mediaExtraction = isSlide ? promptMedia : {
     contentLines: promptMedia.contentLines,
-    media: extractSlideMedia(lines.slice(h2LineIdx + 1).map(line =>
-      /^\s*>/.test(line) || optionRegex.test(line.trim()) ? "" : line,
+    // Lex the original body before excluding option lines. Replacing quoted
+    // lines with blanks destroys Markdown lazy-blockquote audience context.
+    media: extractSlideMedia(lines.slice(h2LineIdx + 1), new Set(
+      optionLines.map(option => option.lineIndex - h2LineIdx - 1),
     )).media,
   };
   textLines = mediaExtraction.contentLines;
@@ -580,7 +582,9 @@ function parseQuestionBlock(
     index,
     blockStartLine,
   );
-  const textMd = textLines.join("\n").trim();
+  // Strip only blank edge lines: trim() would turn initial indented code
+  // into active Markdown (and can reveal a literal image example).
+  const textMd = textLines.join("\n").replace(/^(?:[ \t]*\r?\n)+|(?:\r?\n[ \t]*)+$/g, "");
 
   // 7. Render markdown to HTML
   const textHtml = renderMarkdown(textMd);
@@ -935,7 +939,10 @@ function extractSlideBackground(lines: string[]): { contentLines: string[]; back
 /** Literal block context comes from the same Markdown lexer as rendering,
  * including indented code and list continuations across blank lines. */
 function literalMediaLines(lines: string[]): Map<number, "code" | "literal"> {
-  const text = lines.join("\n").replace(/\r/g, "");
+  // marked expands leading tabs before creating raw block tokens. Use its
+  // normalised text for offset matching; line numbers stay unchanged.
+  const text = lines.join("\n").replace(/\r/g, "")
+    .replace(/^( *)(\t+)/gm, (_match, spaces: string, tabs: string) => spaces + "    ".repeat(tabs.length));
   const result = new Map<number, "code" | "literal">();
   let cursor = 0;
   for (const token of marked.lexer(text)) {
@@ -951,7 +958,7 @@ function literalMediaLines(lines: string[]): Map<number, "code" | "literal"> {
   return result;
 }
 
-function extractSlideMedia(lines: string[]): { contentLines: string[]; media: SlideMedia[] } {
+function extractSlideMedia(lines: string[], excludedLines: ReadonlySet<number> = new Set()): { contentLines: string[]; media: SlideMedia[] } {
   const contentLines: string[] = [];
   const media: SlideMedia[] = [];
   const fencedLines = getFencedCodeLineIndices(lines);
@@ -963,8 +970,8 @@ function extractSlideMedia(lines: string[]): { contentLines: string[]; media: Sl
     const line = lines[lineIdx];
 
     // Lines inside a fenced code block are literal — pass them through unchanged.
-    if (fencedLines.has(lineIdx) || literalLines.has(lineIdx)) {
-      contentLines.push(literalLines.get(lineIdx) === "literal" ? escapeImageMarkdownInLine(line) : line);
+    if (excludedLines.has(lineIdx) || fencedLines.has(lineIdx) || literalLines.has(lineIdx)) {
+      contentLines.push(!fencedLines.has(lineIdx) && literalLines.get(lineIdx) === "literal" ? escapeImageMarkdownInLine(line) : line);
       continue;
     }
 

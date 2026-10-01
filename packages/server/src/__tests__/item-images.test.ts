@@ -46,3 +46,34 @@ it.each(["slide", "multiple_choice"])("keeps indented code, escapes and list con
   expect(parsed.quiz!.questions[0].slideMedia).toEqual([{ src: "assets/a.png", alt: "Public" }]);
   expect(parsed.quiz!.questions[0].textHtml).not.toContain("<img");
 });
+
+
+it.each(["slide", "multiple_choice"])("preserves initial and tail tab/space code on %s", kind => {
+  const options = kind === "slide" ? "" : "A. First\nB. Second\n\n> Correct Answer: A\n";
+  for (const indent of ["    ", "\t", " \t", "\t\t"]) {
+    const source = `## Sample\ntype: ${kind}\n\n${indent}![Initial code](assets/a.png)\n\nPrompt\n\n${options}\n${indent}![Tail code](assets/a.png)\n\n![Public](assets/a.png)\n`;
+    const parsed = parseQuizMarkdown(source, "sample.md");
+    expect(parsed.errors).toEqual([]);
+    expect(parsed.quiz!.questions[0].slideMedia).toEqual([{ src: "assets/a.png", alt: "Public" }]);
+    expect(parsed.quiz!.questions[0].textHtml).not.toContain("<img");
+    expect(parsed.quiz!.questions[0].textHtml).toContain("<pre><code>");
+  }
+});
+
+
+it("keeps lazy blockquote images in their original audience before and after options", () => {
+  const source = `## Sample\n\nPrompt\n\n> Quoted content\n![Quoted](assets/a.png)\n\nA. First\nB. Second\n\n> Correct Answer: A\n> Presenter Note: Private\n![Private continuation](assets/a.png)\n\n![Public](assets/a.png)\n`;
+  const parsed = parseQuizMarkdown(source, "sample.md");
+  expect(parsed.errors).toEqual([]);
+  expect(parsed.quiz!.questions[0].slideMedia).toEqual([{ src: "assets/a.png", alt: "Public" }]);
+});
+
+it("does not add visible escapes inside nested fenced examples", () => {
+  const parsed = parseQuizMarkdown(`## Sample\ntype: slide\n\n- Example\n\n  \`\`\`md\n  ![Code](assets/a.png)\n  \`\`\`\n\n![Public](assets/a.png)\n`, "sample.md");
+  expect(parsed.errors).toEqual([]);
+  const item = parsed.quiz!.questions[0];
+  expect(item.slideMedia).toEqual([{ src: "assets/a.png", alt: "Public" }]);
+  expect(item.textHtml).toContain('![Code](assets/a.png)');
+  expect(item.textHtml).not.toContain('\\![Code');
+  expect(item.textHtml).not.toContain('<img');
+});
