@@ -27,7 +27,7 @@ export default function Timer({
   return (
     <div
       data-fit-ignore
-      className={`relative inline-flex items-center justify-center ${urgent ? "timer-urgent" : ""}`}
+      className={`relative inline-flex shrink-0 items-center justify-center ${urgent ? "timer-urgent" : ""}`}
       style={{ width: size, height: size }}
     >
       <svg width={size} height={size} className="-rotate-90">

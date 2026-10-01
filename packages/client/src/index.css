@@ -3457,6 +3457,9 @@ html[data-theme="light"] .slide-action-button-warning:disabled {
   height: auto;
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr));
   grid-auto-rows: auto;
+  /* Content-slide grids reserve two rows. Question images use only the rows
+     they actually fill, so two side-by-side images leave no empty band. */
+  grid-template-rows: none;
 }
 
 .question-media .slide-media-figure:first-child {
@@ -4608,6 +4611,9 @@ html[data-theme="light"] .quiz-html a {
   justify-content: center;
   gap: clamp(1rem, 2cqi, 1.8rem);
   text-align: center;
+  /* Shrinking this flex item hides its real height from the density fitter
+     and lets the timer/options paint over the toolbar and join card. */
+  flex-shrink: 0;
 }
 
 .quiz-surface-content-fit {
