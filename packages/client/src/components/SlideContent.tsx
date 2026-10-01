@@ -119,11 +119,13 @@ function CoverContent({ title, html, slideMedia = [], slideMediaPosition, slideM
       block.style.setProperty("--cover-fit", String(low));
     };
     fit();
+    // Intrinsic media sizes arrive after the first layout, without resizing the stage.
+    block.addEventListener("load", fit, true);
     const observer = typeof ResizeObserver === "undefined" ? undefined : new ResizeObserver(fit);
     observer?.observe(stage);
     let disposed = false;
     void document.fonts?.ready.then(() => { if (!disposed) fit(); });
-    return () => { disposed = true; observer?.disconnect(); };
+    return () => { disposed = true; observer?.disconnect(); block.removeEventListener("load", fit, true); };
   }, [title, html, slideMedia]);
   const background = slideMediaPosition === "background";
   return (

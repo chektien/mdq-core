@@ -8037,15 +8037,14 @@ html:root[data-theme] .student-screen[data-deck-background="true"] .dist-row-she
 /* Covers: a public slide surface. The 1.25 title factor features the opening
    title; subtitle and metadata reuse the deck's body and small tokens. Spacing
    is in em so it fits with the type. No added font, palette or decoration. */
-html:root:root[data-theme] .slide-surface:has(.slide-cover-stage) {
-  background: var(--mdq-slide-bg);
-}
 .slide-surface:has(.slide-cover-stage) > .slide-safe {
   height: 100dvh;
   min-height: 0;
   padding-inline: var(--mdq-slide-padding, 6.4cqi);
 }
 .slide-cover-stage {
+  position: relative;
+  isolation: isolate;
   display: flex;
   flex: 1 1 0;
   min-height: 0;
@@ -8106,10 +8105,11 @@ html:root:root[data-theme] .slide-surface:has(.slide-cover-stage) {
 .slide-cover-background {
   position: absolute;
   inset: 0;
-  z-index: -1;
+  z-index: 0;
   display: flex;
   pointer-events: none;
 }
+.slide-cover-block.slide-header { z-index: 1; }
 .slide-cover-background img { width: 100%; min-width: 0; object-fit: cover; }
 @media (min-width: 761px) {
   .slide-surface:has(.slide-cover-stage) > .slide-safe {
