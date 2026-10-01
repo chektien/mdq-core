@@ -51,8 +51,6 @@ import { decidePresenterKey, documentHasOpenDialog, pickNavAction } from "../pre
 import { readShowStudentIds, saveShowStudentIds } from "../showStudentIds";
 import { closedLabel as closedLabelFor, formatRemaining, pluralize, positionLabel as positionLabelFor } from "../instructorText";
 
-import { hasResultsAnswers } from "../instructorResults";
-
 type InstructorPhase = "setup" | "lobby" | "live" | "ended";
 const INSTRUCTOR_RESTORE_KEY = "mdquiz_instructor_session";
 const INSTRUCTOR_RESTORE_SUCCESS_NOTICE = "Resumed active session after refresh.";
@@ -200,16 +198,7 @@ export default function InstructorView({
   // Socket connection (instructor role)
   const sock = useSocket(sessionInfo?.sessionId ?? null, "instructor");
 
-  // Keep earlier reveals after navigation and on the ended screen. Counts are per question.
-  useEffect(() => {
-    if (sock.reveal) {
-      const reveal = sock.reveal;
-      setRestoredRevealCache((previous) => ({ ...previous, [reveal.questionIndex]: reveal }));
-    }
-  }, [sock.reveal]);
-  const hasAnswers = hasResultsAnswers(sock.answerCount, [
-    ...Object.values(restoredRevealCache), ...(sock.reveal ? [sock.reveal] : []),
-  ]);
+  const hasAnswers = sock.hasSessionAnswers;
 
   // "Session resumed" is good news, not a lasting notice: it goes after a few seconds.
   useEffect(() => {

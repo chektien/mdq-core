@@ -1,9 +1,17 @@
-/** Evidence of an answer from the counts and reveals the instructor already holds. */
-export function hasResultsAnswers(
-  answerCount: { submitted: number } | null,
-  reveals: readonly { distribution: Record<string, number>; openResponses: readonly unknown[] }[],
-): boolean {
-  return (answerCount?.submitted ?? 0) > 0 || reveals.some((reveal) =>
-    reveal.openResponses.length > 0 || Object.values(reveal.distribution).some((count) => count > 0),
-  );
+export interface ResultsEvidence {
+  sessionId: string;
+  hasAnswers: boolean;
+}
+
+/** Answers persist through navigation and ending, but belong to one session. */
+export function updateResultsEvidence(
+  previous: ResultsEvidence | null,
+  sessionId: string,
+  hasAnswers: boolean,
+): ResultsEvidence {
+  return { sessionId, hasAnswers: hasAnswers || (previous?.sessionId === sessionId && previous.hasAnswers) };
+}
+
+export function hasResultsAnswers(evidence: ResultsEvidence | null, sessionId: string | null): boolean {
+  return !!sessionId && evidence?.sessionId === sessionId && evidence.hasAnswers;
 }
