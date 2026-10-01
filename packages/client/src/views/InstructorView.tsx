@@ -44,7 +44,7 @@ import QuizHtml from "../components/QuizHtml";
 import LiveSurface, { type LiveSurfaceAction } from "../components/LiveSurface";
 import ResponsiveQuizSurface from "../components/ResponsiveQuizSurface";
 import { quizFitKey } from "../quizFit";
-import SlideContent, { SlideContentBody } from "../components/SlideContent";
+import SlideContent, { SlideContentBody, QuestionMedia } from "../components/SlideContent";
 import SlideBackgroundLayer from "../components/SlideBackgroundLayer";
 import PresenterNotesPanel from "../components/PresenterNotesPanel";
 import { getQuestionModeText, getRevealActionLabel } from "../questionMode";
@@ -1394,6 +1394,7 @@ function LiveView({
             className="quiz-html text-2xl lg:text-3xl text-white text-center leading-relaxed max-w-5xl"
             html={displayQuestion.text}
           />
+          <QuestionMedia media={displayQuestion.slideMedia} />
 
           <div className={`selection-mode-chip ${displayQuestion.questionType === "open_response" || displayQuestion.allowsMultiple ? "selection-mode-chip-multi" : "selection-mode-chip-single"}`}>
             {displayQuestionModeText}
@@ -1456,6 +1457,7 @@ function LiveView({
             className={`quiz-html text-center leading-relaxed max-w-5xl ${isReviewing ? "text-2xl lg:text-3xl text-white" : "text-xl lg:text-2xl text-zinc-300"}`}
             html={displayQuestion.text}
           />
+          <QuestionMedia media={displayQuestion.slideMedia} />
 
           {noVotesRevealed && <p className="no-votes-note">No votes yet</p>}
 
@@ -1715,6 +1717,7 @@ function LiveView({
                     className="quiz-html text-2xl lg:text-3xl text-white text-center leading-relaxed max-w-5xl"
                     html={displayQuestion.text}
                   />
+          <QuestionMedia media={displayQuestion.slideMedia} />
 
                   <div className={`selection-mode-chip ${displayQuestion.questionType === "open_response" || displayQuestion.allowsMultiple ? "selection-mode-chip-multi" : "selection-mode-chip-single"}`}>
                     {displayQuestionModeText}
@@ -1798,6 +1801,7 @@ function LiveView({
                 className={`quiz-html text-center leading-relaxed max-w-5xl ${isReviewing ? "text-2xl lg:text-3xl text-white" : "text-xl lg:text-2xl text-zinc-300"}`}
                 html={displayQuestion.text}
               />
+          <QuestionMedia media={displayQuestion.slideMedia} />
 
               {noVotesRevealed && <p className="no-votes-note">No votes yet</p>}
 

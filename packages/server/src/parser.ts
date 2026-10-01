@@ -562,9 +562,17 @@ function parseQuestionBlock(
     ...note,
     id: `note-${idx + 1}`,
   }));
-  const mediaExtraction = isSlide
-    ? extractSlideMedia(textLines)
-    : { contentLines: textLines, media: [] as SlideMedia[] };
+  // Images belong to every item, not just content slides. Scan the question's
+  // whole non-quoted body so an image after its options is not silently lost.
+  // Options and quoted metadata/notes are separate audiences, never media.
+  // Keep fence lines and line positions intact while excluding those regions.
+  const promptMedia = extractSlideMedia(textLines);
+  const mediaExtraction = isSlide ? promptMedia : {
+    contentLines: promptMedia.contentLines,
+    media: extractSlideMedia(lines.slice(h2LineIdx + 1).map(line =>
+      /^\s*>/.test(line) || optionRegex.test(line.trim()) ? "" : line,
+    )).media,
+  };
   textLines = mediaExtraction.contentLines;
   const { slideMediaPosition, slideMediaOpacity } = resolveMediaPosition(
     mediaExtraction.media,

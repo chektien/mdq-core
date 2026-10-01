@@ -765,7 +765,7 @@ The PDF exporter keeps presenter notes hidden by default; pass
 
 Slide images and references:
 
-- For `type: slide` or `type: cover`, ordinary markdown image lines are extracted into a structured media area instead of staying inline with the body copy.
+- On every item type (cover, slide, multiple choice, multi-select, poll and open response), ordinary Markdown image lines are extracted into a structured media area instead of staying inline with the body copy. On questions, put images on unquoted lines before or after the answer options; images in notes stay private to their original audience. Alt text names the image for screen readers; an optional Markdown title is its visible caption. Images can be enlarged on phones and remain in portable bundles and print without changing answering, timers or scoring.
 - One to three images are the intended sweet spot. MDQ automatically chooses a balanced layout beside the text on wide screens and stacks the media cleanly on narrow screens.
 - Image aspect ratios are preserved. MDQ only scales images within available width and height constraints, so portrait assets such as iPhone screenshots stay portrait.
 - Slide images and quiz prompt images are expandable. Click or tap an image to open a responsive overlay; close it with the close control, backdrop, or `Escape`.

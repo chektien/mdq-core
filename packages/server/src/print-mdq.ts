@@ -473,7 +473,7 @@ function renderItem(question: Question, index: number, total: number, options: P
     </article>`;
   }
   const hasBody = body.trim().length > 0;
-  const hasSlideMedia = isSlide && (question.slideMedia?.length ?? 0) > 0;
+  const hasSlideMedia = (question.slideMedia?.length ?? 0) > 0;
   const hasSlideVideo = isSlide && !!question.slideVideo;
   const bodySection = hasBody || (!hasSlideMedia && !hasSlideVideo)
     ? `<section class="body-copy">${hasBody ? body : "<p class=\"empty-copy\">No body text.</p>"}</section>`

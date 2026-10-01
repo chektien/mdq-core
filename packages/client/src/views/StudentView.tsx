@@ -9,7 +9,7 @@ import Leaderboard from "../components/Leaderboard";
 import DistributionChart from "../components/DistributionChart";
 import InlineMarkdownText from "../components/InlineMarkdownText";
 import QuizHtml from "../components/QuizHtml";
-import SlideContent from "../components/SlideContent";
+import SlideContent, { QuestionMedia } from "../components/SlideContent";
 import { getQuestionModeText } from "../questionMode";
 import { phoneScreenAppearance, type PhoneScreenAppearance } from "../phoneDeckStyle";
 import { browserColorEnv } from "../phoneDeckStyleBrowser";
@@ -902,6 +902,7 @@ function QuestionView({
 
       {/* Question text */}
       <QuizHtml id={questionTextId} className="quiz-html student-question-text text-lg text-white leading-relaxed mb-6" html={question.text} />
+      <QuestionMedia media={question.slideMedia} />
 
       <div className={`selection-mode-card mb-5 rounded-2xl border px-4 py-3 ${question.questionType === "open_response" || question.allowsMultiple ? "selection-mode-card-multi" : "selection-mode-card-single"}`}>
         <div className="selection-mode-text">{selectionModeText}</div>
@@ -1140,6 +1141,7 @@ function RevealView({
 
       {/* Question text */}
       <QuizHtml className="quiz-html student-question-text student-question-text-small text-base text-zinc-300 leading-relaxed mb-4" html={question.text} />
+      <QuestionMedia media={question.slideMedia} />
 
       {isOpenResponse ? (
         // With no response, the banner above already says so.

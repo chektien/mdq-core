@@ -15,7 +15,7 @@ import QuizHtml from "../components/QuizHtml";
 import LiveSurface from "../components/LiveSurface";
 import ResponsiveQuizSurface from "../components/ResponsiveQuizSurface";
 import { quizFitKey } from "../quizFit";
-import SlideContent, { SlideContentBody } from "../components/SlideContent";
+import SlideContent, { SlideContentBody, QuestionMedia } from "../components/SlideContent";
 import SlideBackgroundLayer from "../components/SlideBackgroundLayer";
 import { getQuestionModeText } from "../questionMode";
 import { closedLabel as closedLabelFor, positionLabel as positionLabelFor } from "../instructorText";
@@ -285,6 +285,7 @@ export default function PresentationView({
             className="quiz-html max-w-5xl text-center text-2xl leading-relaxed text-white lg:text-3xl"
             html={currentQuestion.text}
           />
+          <QuestionMedia media={currentQuestion.slideMedia} />
 
           <div className={`selection-mode-chip ${currentQuestion.questionType === "open_response" || currentQuestion.allowsMultiple ? "selection-mode-chip-multi" : "selection-mode-chip-single"}`}>
             {getQuestionModeText(currentQuestion.questionType, currentQuestion.allowsMultiple)}
@@ -340,6 +341,7 @@ export default function PresentationView({
             className="quiz-html max-w-5xl text-center text-xl leading-relaxed text-zinc-300 lg:text-2xl"
             html={currentQuestion.text}
           />
+          <QuestionMedia media={currentQuestion.slideMedia} />
 
           {noVotesRevealed && <p className="no-votes-note">No votes yet</p>}
 
@@ -547,6 +549,7 @@ export default function PresentationView({
                     className="quiz-html max-w-5xl text-center text-2xl leading-relaxed text-white lg:text-3xl"
                     html={currentQuestion.text}
                   />
+          <QuestionMedia media={currentQuestion.slideMedia} />
 
                   <div className={`selection-mode-chip ${currentQuestion.questionType === "open_response" || currentQuestion.allowsMultiple ? "selection-mode-chip-multi" : "selection-mode-chip-single"}`}>
                     {getQuestionModeText(currentQuestion.questionType, currentQuestion.allowsMultiple)}
@@ -618,6 +621,7 @@ export default function PresentationView({
                 className="quiz-html max-w-5xl text-center text-xl leading-relaxed text-zinc-300 lg:text-2xl"
                 html={currentQuestion.text}
               />
+          <QuestionMedia media={currentQuestion.slideMedia} />
 
               {noVotesRevealed && <p className="no-votes-note">No votes yet</p>}
 

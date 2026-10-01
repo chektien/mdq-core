@@ -586,8 +586,8 @@ B. Router
       const result = parseQuizMarkdown(md, "week01.md");
       expect(result.errors).toHaveLength(0);
       const q = result.quiz!.questions[0];
-      expect(q.textHtml).toContain('src="/data/images/xr-setup.png"');
-      expect(q.textHtml).toContain('class="quiz-embedded-image"');
+      expect(q.slideMedia?.[0].src).toBe('/data/images/xr-setup.png');
+      expect(q.textHtml).not.toContain('<img');
     });
 
     it("rewrites image paths inside answer options too", () => {
