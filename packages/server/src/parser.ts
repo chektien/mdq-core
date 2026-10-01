@@ -953,7 +953,13 @@ function literalMediaLines(lines: string[]): Map<number, "code" | "literal"> {
     if (!["code", "list", "blockquote"].includes(token.type)) continue;
     const first = text.slice(0, from).split("\n").length - 1;
     const last = text.slice(0, cursor - 1).split("\n").length - 1;
-    for (let line = first; line <= last; line++) result.set(line, token.type === "code" ? "code" : "literal");
+    for (let line = first; line <= last; line++) {
+      // MDQ historically lifts an unindented image line immediately after a
+      // bullet into item media. Only markers/indented list continuations are
+      // literal list examples; keep the image helper and existing decks working.
+      if (token.type === "list" && !/^(?:\s+\S|\s*(?:[-*+]|\d+[.)])\s+)/.test(lines[line] ?? "")) continue;
+      result.set(line, token.type === "code" ? "code" : "literal");
+    }
   }
   return result;
 }

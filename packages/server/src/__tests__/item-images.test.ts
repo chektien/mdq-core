@@ -77,3 +77,11 @@ it("does not add visible escapes inside nested fenced examples", () => {
   expect(item.textHtml).not.toContain('\\![Code');
   expect(item.textHtml).not.toContain('<img');
 });
+
+
+it("preserves standalone item images immediately after list cues", () => {
+  const source = `## Sample\ntype: slide\n\n- Show a diagram.\n![Public](assets/a.png)\n- Next.\n`;
+  const parsed = parseQuizMarkdown(source, "sample.md");
+  expect(parsed.errors).toEqual([]);
+  expect(parsed.quiz!.questions[0].slideMedia).toEqual([{src: "assets/a.png", alt: "Public"}]);
+});
