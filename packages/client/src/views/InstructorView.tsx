@@ -51,6 +51,8 @@ import { decidePresenterKey, documentHasOpenDialog, pickNavAction } from "../pre
 import { readShowStudentIds, saveShowStudentIds } from "../showStudentIds";
 import { closedLabel as closedLabelFor, formatRemaining, pluralize, positionLabel as positionLabelFor } from "../instructorText";
 
+import { hasResultsAnswers } from "../instructorResults";
+
 type InstructorPhase = "setup" | "lobby" | "live" | "ended";
 const INSTRUCTOR_RESTORE_KEY = "mdquiz_instructor_session";
 const INSTRUCTOR_RESTORE_SUCCESS_NOTICE = "Resumed active session after refresh.";
@@ -197,6 +199,17 @@ export default function InstructorView({
 
   // Socket connection (instructor role)
   const sock = useSocket(sessionInfo?.sessionId ?? null, "instructor");
+
+  // Keep earlier reveals after navigation and on the ended screen. Counts are per question.
+  useEffect(() => {
+    if (sock.reveal) {
+      const reveal = sock.reveal;
+      setRestoredRevealCache((previous) => ({ ...previous, [reveal.questionIndex]: reveal }));
+    }
+  }, [sock.reveal]);
+  const hasAnswers = hasResultsAnswers(sock.answerCount, [
+    ...Object.values(restoredRevealCache), ...(sock.reveal ? [sock.reveal] : []),
+  ]);
 
   // "Session resumed" is good news, not a lasting notice: it goes after a few seconds.
   useEffect(() => {
@@ -394,6 +407,7 @@ export default function InstructorView({
     setErrorMsg(null);
     try {
       const info = await createSession(selectedWeek);
+      setRestoredRevealCache({});
       setSessionInfo(info);
       const deck = decks.find((q) => q.week === selectedWeek);
       if (deck) setTotalQuestionsInQuiz(deck.questionCount);
@@ -462,6 +476,7 @@ export default function InstructorView({
   const handleBackToSetup = useCallback(() => {
     sock.disconnect();
     clearInstructorRestore();
+    setRestoredRevealCache({});
     setSessionInfo(null);
     setAccessInfo(null);
     setTotalQuestionsInQuiz(0);
@@ -732,7 +747,7 @@ export default function InstructorView({
           </button>
         )}
         <div className="flex flex-wrap items-center justify-center gap-3">
-          {sid && (
+          {sid && hasAnswers && (
             <a
               href={resultsCsvUrl(sid)}
               download
@@ -756,6 +771,7 @@ export default function InstructorView({
   return (
     <LiveView
       sock={sock}
+      hasAnswers={hasAnswers}
       sessionId={sid}
       sessionCode={sessionInfo?.sessionCode || ""}
       accessInfo={accessInfo}
@@ -787,6 +803,7 @@ export default function InstructorView({
 
 function LiveView({
   sock,
+  hasAnswers,
   sessionId,
   sessionCode,
   accessInfo,
@@ -812,6 +829,7 @@ function LiveView({
   onAction,
 }: {
   sock: ReturnType<typeof useSocket>;
+  hasAnswers: boolean;
   sessionId: string;
   sessionCode: string;
   accessInfo: AccessInfo | null;
@@ -1206,7 +1224,7 @@ function LiveView({
       });
     }
     actions.push(participantsAction);
-    actions.push({ label: "Download results (CSV)", href: resultsCsvUrl(sessionId) });
+    if (hasAnswers) actions.push({ label: "Download results (CSV)", href: resultsCsvUrl(sessionId) });
     actions.push({
       label: "End Session",
       onClick: requestEndSession,
