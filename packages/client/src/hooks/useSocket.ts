@@ -1,4 +1,5 @@
 import { isSlideType } from "@mdq/shared";
+import { hasResultsAnswers, updateResultsEvidence, type ResultsEvidence } from "../instructorResults";
 import { io, type Socket } from "socket.io-client";
 import { useState, useEffect, useCallback, useRef } from "react";
 import type {
@@ -205,6 +206,7 @@ export interface UseSocketReturn {
   /** True when the open question closed because its timer ran out, false when it was closed early. */
   timedOut: boolean;
   answerCount: AnswerCountPayload | null;
+  hasSessionAnswers: boolean;
   submitted: boolean;
   submittedOptions: string[];
   submittedResponseText: string | null;
@@ -263,6 +265,7 @@ export function useSocket(
   const [currentQuestion, setCurrentQuestion] = useState<QuestionState | null>(null);
   const [remainingSec, setRemainingSec] = useState(0);
   const [timedOut, setTimedOut] = useState(false);
+  const [resultsEvidence, setResultsEvidence] = useState<ResultsEvidence | null>(null);
   const [answerCount, setAnswerCount] = useState<AnswerCountPayload | null>(null);
   const [submitted, setSubmitted] = useState(false);
   const [submittedOptions, setSubmittedOptions] = useState<string[]>([]);
@@ -493,6 +496,7 @@ export function useSocket(
     // ── Answer count (instructor) ─────────
     socket.on(SocketEvents.ANSWER_COUNT, (data: AnswerCountPayload) => {
       setAnswerCount(data);
+      setResultsEvidence(previous => updateResultsEvidence(previous, sessionId, data.hasAnswers === true));
       setAnsweredQuestions((prev) => {
         const current = currentQuestionRef.current;
         const ownKey = publicKeyRef.current;
@@ -551,6 +555,7 @@ export function useSocket(
     // ── Session state broadcasts ──────────
     socket.on(SocketEvents.SESSION_STATE, (data: SessionStatePayload) => {
       setSessionState(data.state);
+      setResultsEvidence(previous => updateResultsEvidence(previous, sessionId, data.hasAnswers === true));
     });
 
     // ── Participants (instructor) ─────────
@@ -708,6 +713,7 @@ export function useSocket(
     remainingSec,
     timedOut,
     answerCount,
+    hasSessionAnswers: hasResultsAnswers(resultsEvidence, sessionId),
     submitted,
     submittedOptions,
     submittedResponseText,

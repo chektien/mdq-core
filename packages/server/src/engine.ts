@@ -158,6 +158,7 @@ export const responsesFor = (responses: OpenResponseEntry[], view: ResponseView)
 const countPayload = (session: Session, quiz: Quiz, view: ResponseView) => ({
   questionIndex: session.currentQuestionIndex,
   ...getSubmissionCount(session, session.currentQuestionIndex),
+  ...(session.submissions.length > 0 ? { hasAnswers: true as const } : {}),
   openResponses: view === "control" && isOpenResponseQuestion(questionAt(session, quiz))
     ? responsesFor(getOpenResponses(session, session.currentQuestionIndex), view) : undefined,
 });
@@ -256,7 +257,8 @@ export function apply(input: Session, quiz: Quiz, command: Command, now: number)
     if (payload) emit(SocketEvents.QUESTION_OPEN, payload);
   };
   const state = (includeIndex = true) => emit(SocketEvents.SESSION_STATE,
-    includeIndex ? { state: session.state, questionIndex: session.currentQuestionIndex } : { state: session.state });
+    { ...(includeIndex ? { state: session.state, questionIndex: session.currentQuestionIndex } : { state: session.state }),
+      ...(session.submissions.length > 0 ? { hasAnswers: true } : {}) });
   const review = () => {
     session.revealedQuestionIndexes ??= new Set<number>();
     session.revealedQuestionIndexes.add(session.currentQuestionIndex);
@@ -516,7 +518,8 @@ function snapshotMessages(session: Session, quiz: Quiz, now: number, audience: A
   const payloadView: PayloadView = view === "control" ? "control" : "public";
   const emit = (event: string, payload: unknown, target: Audience = audience) => messages.push(message(event, payload, target));
   const emitCount = () => emit(SocketEvents.ANSWER_COUNT, countPayload(session, quiz, view));
-  if (staff) emit(SocketEvents.SESSION_STATE, { state: session.state, questionIndex: session.currentQuestionIndex >= 0 ? session.currentQuestionIndex : undefined });
+  if (staff) emit(SocketEvents.SESSION_STATE, { state: session.state, questionIndex: session.currentQuestionIndex >= 0 ? session.currentQuestionIndex : undefined,
+    ...(session.submissions.length > 0 ? { hasAnswers: true } : {}) });
   const q = questionAt(session, quiz);
   const payload = questionPayload(session, quiz, now);
   if (!q || !payload) return messages;

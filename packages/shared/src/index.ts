@@ -368,6 +368,8 @@ export interface AnswerRejectedPayload {
 }
 
 export interface AnswerCountPayload {
+  /** Session-wide evidence, independent of the current question. */
+  hasAnswers?: true;
   questionIndex: number;
   submitted: number;
   total: number;
@@ -424,6 +426,8 @@ export interface LeaderboardUpdatePayload {
 }
 
 export interface SessionStatePayload {
+  /** Present once the session has any submissions, including after it ends. */
+  hasAnswers?: true;
   state: SessionState;
   questionIndex?: number;
 }
