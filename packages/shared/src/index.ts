@@ -120,7 +120,24 @@ export interface StudentRejectedPayload {
   reason: string;
 }
 
-export type QuestionType = "multiple_choice" | "poll" | "open_response" | "slide";
+export type QuestionType = "multiple_choice" | "poll" | "open_response" | "slide" | "cover";
+/** Content-only items share navigation, counting and submission rules. */
+export function isSlideType(type: unknown): type is "slide" | "cover" {
+  return type === "slide" || type === "cover";
+}
+
+/** The first top-level paragraph is the subtitle; lists and later paragraphs are metadata.
+ * Input is rendered Markdown. Consumers still sanitize it before displaying it. */
+export function splitCoverHtml(html: string): { subtitleHtml: string; metaHtml: string } {
+  let subtitleHtml = "";
+  const meta: string[] = [];
+  for (const match of html.matchAll(/<(p|ul|ol)\b[^>]*>[\s\S]*?<\/\1>/g)) {
+    if (match[1] === "p" && !subtitleHtml) subtitleHtml = match[0];
+    else meta.push(match[0]);
+  }
+  return { subtitleHtml, metaHtml: meta.join("\n") };
+}
+
 export type DeckTheme = "dark" | "light";
 /**
  * Every supported slide color palette, in the order they are documented and

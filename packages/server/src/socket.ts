@@ -1,3 +1,4 @@
+import { isSlideType } from "@mdq/shared";
 import { Server as HttpServer } from "http";
 import { Server, Socket } from "socket.io";
 import { SEAT_TAKEN_MESSAGE, SocketEvents, StudentJoinPayload, StudentJoinedPayload, AnswerSubmitPayload, TICK_INTERVAL_MS, Quiz, Session, SOCKET_ROLES, type SocketRole } from "@mdq/shared";
@@ -163,7 +164,7 @@ export function startQuestionTimer(io: Server, session: Session, sessionId: stri
   const timedStart = session.questionStartedAt;
   const due = nextDeadline ?? Date.now() + timeLimitSec * 1000;
   const isCurrent = () => session.state === "QUESTION_OPEN" && session.currentQuestionIndex === timedIndex
-    && session.questionStartedAt === timedStart && getQuestionType(quiz.questions[timedIndex]) !== "slide";
+    && session.questionStartedAt === timedStart && !isSlideType(getQuestionType(quiz.questions[timedIndex]));
   let remaining = timeLimitSec;
   const tick = setInterval(() => {
     if (tickTimers.get(sessionId) !== tick || !isCurrent()) { if (tickTimers.get(sessionId) === tick) clearSessionTimers(sessionId); return; }

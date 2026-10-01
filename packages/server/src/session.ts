@@ -1,3 +1,4 @@
+import { isSlideType } from "@mdq/shared";
 import {
   Session,
   SessionState,
@@ -120,7 +121,7 @@ export function transitionState(session: Session, to: SessionState): void {
  */
 export function repairClosedSlideState(session: Session, quiz: Quiz): boolean {
   const currentQuestion = quiz.questions[session.currentQuestionIndex];
-  if (session.state !== "QUESTION_CLOSED" || currentQuestion?.questionType !== "slide") {
+  if (session.state !== "QUESTION_CLOSED" || !isSlideType(currentQuestion?.questionType)) {
     return false;
   }
 

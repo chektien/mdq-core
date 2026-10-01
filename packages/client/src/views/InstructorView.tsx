@@ -1,3 +1,4 @@
+import { isSlideType } from "@mdq/shared";
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useSocket } from "../hooks/useSocket";
 import { resolveSlideBackground, type QuestionState, type RevealState } from "../hooks/useSocket";
@@ -915,7 +916,7 @@ function LiveView({
     : getQuestionHeading(liveQuestionIndex - 1);
 
   // Determine which controls to show
-  const liveIsSlide = q?.questionType === "slide";
+  const liveIsSlide = isSlideType(q?.questionType);
   const canClose = state === "QUESTION_OPEN" && !liveIsSlide;
   const canReveal = state === "QUESTION_CLOSED" && !liveIsSlide;
   const canNext =
@@ -956,8 +957,8 @@ function LiveView({
   const revealOpenResponses = displayReveal?.questionType === "open_response"
     ? displayReveal.openResponses
     : [];
-  const isSlideDisplay = displayQuestion?.questionType === "slide" && !displayReveal;
-  const isQuizSurfaceDisplay = !!displayQuestion && displayQuestion.questionType !== "slide" && state !== "LEADERBOARD";
+  const isSlideDisplay = isSlideType(displayQuestion?.questionType) && !displayReveal;
+  const isQuizSurfaceDisplay = !!displayQuestion && !isSlideType(displayQuestion.questionType) && state !== "LEADERBOARD";
   const isLeaderboardDisplay = state === "LEADERBOARD" && !isReviewing;
   const isReviewSurfaceDisplay = isReviewing && !!displayQuestion;
   const isLiveSurfaceDisplay = isSlideDisplay || isQuizSurfaceDisplay || isLeaderboardDisplay || isReviewSurfaceDisplay;
@@ -987,7 +988,7 @@ function LiveView({
   const quizStatusLabel = (() => {
     if (liveConnectionNoticeLabel) return liveConnectionNoticeLabel;
     if (liveRestoreNoticeLabel) return liveRestoreNoticeLabel;
-    if (!displayQuestion || displayQuestion.questionType === "slide") return null;
+    if (!displayQuestion || isSlideType(displayQuestion.questionType)) return null;
     if (isReviewing && reviewQuestionIndex !== null) {
       return `${reviewingLabel}; students stay live`;
     }
@@ -1012,7 +1013,7 @@ function LiveView({
     ? liveQuestionIndex + (activeItemStillPending ? 0 : 1)
     : 0;
   const remainingItems = itemSummaries.slice(Math.max(0, Math.min(remainingStartIndex, itemSummaries.length)));
-  const remainingSlideCount = remainingItems.filter((item) => item.questionType === "slide").length;
+  const remainingSlideCount = remainingItems.filter((item) => isSlideType(item.questionType)).length;
   const remainingQuizQuestionCount = Math.max(remainingItems.length - remainingSlideCount, 0);
   const remainingSummary = formatRemaining(remainingQuizQuestionCount, remainingSlideCount);
   const controlsUnavailable = loading || !sock.connected;
@@ -1348,9 +1349,10 @@ function LiveView({
       : quizStatusLabel;
   const liveSurfaceContent = (() => {
     if (displayQuestion && (((state === "QUESTION_OPEN" || state === "QUESTION_CLOSED") && !isReviewing) || (isReviewing && !displayReveal))) {
-      if (displayQuestion.questionType === "slide") {
+      if (isSlideType(displayQuestion.questionType)) {
         return (
           <SlideContentBody
+            slideType={displayQuestion.questionType}
             title={displayHeading || displayQuestion.topic}
             html={displayQuestion.text}
             attendeeNotes={displayQuestion.attendeeNotes}
@@ -1634,8 +1636,9 @@ function LiveView({
         {/* Question display (for QUESTION_OPEN, QUESTION_CLOSED) */}
         {displayQuestion && (((state === "QUESTION_OPEN" || state === "QUESTION_CLOSED") && !isReviewing) || (isReviewing && !displayReveal)) && (
           <>
-            {displayQuestion.questionType === "slide" ? (
+            {isSlideType(displayQuestion.questionType) ? (
               <SlideContent
+                slideType={displayQuestion.questionType}
                 title={displayHeading || displayQuestion.topic}
                 html={displayQuestion.text}
                 attendeeNotes={displayQuestion.attendeeNotes}

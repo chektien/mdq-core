@@ -627,6 +627,7 @@ Rules:
 - To stop new people joining, for example once the class is in, choose "Lock joining" beside the participant list (in the lobby and in the Participants dialog). It then reads "Joining locked"; choose it again to open joining. While it is locked, a phone that would take a new seat is told "This session is not taking new participants. Ask the presenter." Anyone who already has a seat can still rejoin it, with their token or browser, and a seat freed with "Let rejoin" can still be taken over. The projector's join card says "Joining is closed" instead of showing the code and QR. Only the instructor's screen and the projector receive the state, as `joinLocked: true` on the participants list (absent when open); phones only see the refusal. The lock is saved with the session.
 - The same control is `POST /api/session/:id/join-lock` with `{ "locked": true }` or `{ "locked": false }`, answering `{ "locked": true|false }`. It needs the instructor login (with no login set, anyone who knows the session ID can call it). It answers 400 when `locked` is not a boolean and 404 for an unknown session. `GET /api/session/:id/state` and `GET /api/session/:id/presentation` also report `joinLocked`.
 - `GET /api/session/:id/results.csv` downloads the results as a CSV file, while the session runs and after it ends (instructor login when one is configured). The instructor view links to it as "Download results (CSV)".
+- Use `type: cover` for an opening or section title. The full `## Title` is centred, the first paragraph is an optional subtitle, and later paragraphs or list items are quiet metadata on separate lines without markers. A title-only cover is complete. Title size uses the deck’s `title-size` token × 1.25, fitting long titles to the safe area. Covers support normal notes and per-slide images/backgrounds, have no timer or answers, and count as slides.
 - Use `type: slide` for non-interactive slide content. Slides have no timer, answer choices, correct answers, submissions, or leaderboard weight.
 - Add standard markdown images to slide bodies when you want MDQ to arrange media beside the text. Images are scaled proportionately and never cropped or stretched.
 - Use `live-url: https://...` on a slide when you want the instructor/projector surface to embed a live website as the slide itself. Add `live-title-overlay: true` to keep the slide title and body text over the live surface, and keep a normal markdown image in the slide as the static fallback for PDF exports and non-live surfaces.
@@ -634,6 +635,23 @@ Rules:
 - Add slide references with blockquote labels such as `> Reference:` or `> Image Source:`. References render as small, grey, right-aligned footer text and links.
 - Do not combine `multi-select: false` with multiple correct answers.
 - The instructor live `Next` button preview uses the existing `## ...` item heading, including both sides of `Topic: Subtopic` when present.
+
+Cover example:
+
+```markdown
+# Sample deck
+
+---
+
+## A shared starting point
+
+type: cover
+
+An introduction to the session
+
+- Sample course
+- Presenter · October 2026
+```
 
 Slide example:
 
@@ -747,7 +765,7 @@ The PDF exporter keeps presenter notes hidden by default; pass
 
 Slide images and references:
 
-- For `type: slide`, ordinary markdown image lines are extracted into a structured media area instead of staying inline with the body copy.
+- For `type: slide` or `type: cover`, ordinary markdown image lines are extracted into a structured media area instead of staying inline with the body copy.
 - One to three images are the intended sweet spot. MDQ automatically chooses a balanced layout beside the text on wide screens and stacks the media cleanly on narrow screens.
 - Image aspect ratios are preserved. MDQ only scales images within available width and height constraints, so portrait assets such as iPhone screenshots stay portrait.
 - Slide images and quiz prompt images are expandable. Click or tap an image to open a responsive overlay; close it with the close control, backdrop, or `Escape`.
