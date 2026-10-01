@@ -1,39 +1,53 @@
 import { type ReactNode, useLayoutEffect, useRef, useState } from "react";
+import { type FitDensity, type FitRoom, initialFitState, stepFit } from "../quizFit";
 
-type FitDensity = "comfortable" | "compact" | "tight" | "scaled";
-
-const DENSITY_ORDER: FitDensity[] = ["comfortable", "compact", "tight", "scaled"];
-
-function nextDensity(current: FitDensity): FitDensity {
-  return DENSITY_ORDER[Math.min(DENSITY_ORDER.indexOf(current) + 1, DENSITY_ORDER.length - 1)];
-}
-
-function previousDensity(current: FitDensity): FitDensity {
-  return DENSITY_ORDER[Math.max(DENSITY_ORDER.indexOf(current) - 1, 0)];
-}
-
-function getAvailableHeight(element: HTMLElement): number {
+function getAvailableRoom(element: HTMLElement): FitRoom {
   const safeArea = element.closest(".slide-safe") as HTMLElement | null;
   const container = safeArea || element.parentElement;
-  if (!container) return window.innerHeight;
+  if (!container) return { width: window.innerWidth, height: window.innerHeight };
 
   const styles = window.getComputedStyle(container);
   const paddingY = parseFloat(styles.paddingTop) + parseFloat(styles.paddingBottom);
   const rect = container.getBoundingClientRect();
   const visibleHeight = Math.min(container.clientHeight, rect.height, window.innerHeight - Math.max(0, rect.top));
-  return Math.max(240, visibleHeight - paddingY);
+  return { width: container.clientWidth, height: Math.max(240, visibleHeight - paddingY) };
+}
+
+/** Whether a DOM change can alter the content's height. The timer's ring and count change every second and never do. */
+function mayChangeFit(record: MutationRecord, element: HTMLElement): boolean {
+  // The fit writes its own height to the element's style.
+  if (record.type === "attributes" && record.target === element && record.attributeName === "style") return false;
+  const target = record.target instanceof Element ? record.target : record.target.parentElement;
+  return !target?.closest("[data-fit-ignore]");
+}
+
+const LAYOUT_PROPERTY = /^(gap|row-gap|column-gap|margin|padding|font-size|line-height)/;
+
+/** The transitions under the element that are still moving something in its layout, such as the gap a new density eases to. */
+function layoutTransitions(element: HTMLElement): Animation[] {
+  if (typeof element.getAnimations !== "function") return [];
+  return element.getAnimations({ subtree: true }).filter((animation) => {
+    const { transitionProperty } = animation as Partial<CSSTransition>;
+    if (!transitionProperty || !LAYOUT_PROPERTY.test(transitionProperty)) return false;
+    const target = (animation.effect as KeyframeEffect | null)?.target;
+    return !target?.closest("[data-fit-ignore]");
+  });
 }
 
 export default function ResponsiveQuizSurface({
   children,
   reveal = false,
   leaderboard = false,
+  fitKey = "",
 }: {
   children: ReactNode;
   reveal?: boolean;
   leaderboard?: boolean;
+  /** Names what the screen shows, such as the question and its state. When it changes the fit forgets which densities overflowed. */
+  fitKey?: string;
 }) {
   const ref = useRef<HTMLDivElement | null>(null);
+  const fitRef = useRef(initialFitState(fitKey));
   const [density, setDensity] = useState<FitDensity>("comfortable");
 
   useLayoutEffect(() => {
@@ -41,23 +55,26 @@ export default function ResponsiveQuizSurface({
     if (!element || leaderboard) return undefined;
 
     let frame = 0;
+    let active = true;
 
     const measure = () => {
       cancelAnimationFrame(frame);
       frame = requestAnimationFrame(() => {
-        const available = getAvailableHeight(element);
-        const contentHeight = element.scrollHeight;
-        const overflowRatio = contentHeight / available;
+        // A density that has just been set is still easing its gaps in. Measure once it has arrived.
+        const moving = layoutTransitions(element);
+        if (moving.length > 0) {
+          void Promise.allSettled(moving.map((animation) => animation.finished)).then(() => { if (active) measure(); });
+          return;
+        }
+        const room = getAvailableRoom(element);
+        const overflowRatio = element.scrollHeight / room.height;
         // The scaled density shrinks the content with a transform, which keeps its
         // layout height. The stylesheet trims the margins by this height.
         const layoutHeight = `${element.offsetHeight}px`;
         if (element.style.getPropertyValue("--quiz-fit-height") !== layoutHeight) element.style.setProperty("--quiz-fit-height", layoutHeight);
 
-        setDensity((current) => {
-          if (overflowRatio > 1) return nextDensity(current);
-          if (overflowRatio < 0.78) return previousDensity(current);
-          return current;
-        });
+        fitRef.current = stepFit(fitRef.current, { ratio: overflowRatio, room, contentKey: fitKey });
+        setDensity(fitRef.current.density);
       });
     };
 
@@ -67,7 +84,9 @@ export default function ResponsiveQuizSurface({
     const safeArea = element.closest(".slide-safe");
     if (safeArea) resizeObserver.observe(safeArea);
 
-    const mutationObserver = new MutationObserver(measure);
+    const mutationObserver = new MutationObserver((records) => {
+      if (records.some((record) => mayChangeFit(record, element))) measure();
+    });
     mutationObserver.observe(element, {
       childList: true,
       subtree: true,
@@ -78,11 +97,12 @@ export default function ResponsiveQuizSurface({
     measure();
 
     return () => {
+      active = false;
       cancelAnimationFrame(frame);
       resizeObserver.disconnect();
       mutationObserver.disconnect();
     };
-  }, [leaderboard]);
+  }, [leaderboard, fitKey]);
 
   return (
     <div

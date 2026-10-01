@@ -79,10 +79,26 @@ describe("presenter toolbar", () => {
     expect(index).not.toContain("quiz-surface-content-answering");
   });
 
+  it("gives every question and reveal surface a fit key from the shared helper, on the presenter view and the instructor console", () => {
+    const sources = { "views/InstructorView.tsx": instructor, "views/PresentationView.tsx": read("views/PresentationView.tsx") };
+    for (const [file, source] of Object.entries(sources)) {
+      const tags = source.match(/<ResponsiveQuizSurface\b[^>]*>/g) ?? [];
+      const fitted = tags.filter((tag) => !/\bleaderboard\b/.test(tag));
+      // The instructor console has a question and a reveal surface on each of its two layouts, the presenter view the same.
+      expect(fitted.length).toBeGreaterThanOrEqual(4);
+      for (const tag of fitted) expect(`${file}: ${tag}`).toMatch(/fitKey=\{fitKey\}/);
+      expect(source).toContain('import { quizFitKey } from "../quizFit";');
+    }
+    expect(instructor).toContain("const fitKey = quizFitKey(displayQuestion, state, isReviewing);");
+    expect(sources["views/PresentationView.tsx"]).toContain("const fitKey = quizFitKey(currentQuestion, state);");
+  });
+
   it("gives back the height a scaled question no longer uses, and steps down at any overflow", () => {
     const fit = read("components/ResponsiveQuizSurface.tsx");
     expect(fit).toContain('element.style.setProperty("--quiz-fit-height", layoutHeight)');
-    expect(fit).toContain("if (overflowRatio > 1) return nextDensity(current);");
+    // Any overflow steps down, with no tolerance for a few pixels of scroll.
+    expect(fit).toContain("stepFit(fitRef.current");
+    expect(read("quizFit.ts")).toContain("if (ratio > 1) {");
     expect(index).toMatch(/\[data-fit-density="scaled"\] \{\s*--quiz-fit-scale: 0\.9;[^}]*margin-block: calc\(var\(--quiz-fit-height, 0px\) \* \(var\(--quiz-fit-scale\) - 1\) \/ 2\);/);
   });
 
