@@ -3,7 +3,7 @@ import * as os from "os";
 import * as path from "path";
 import { Quiz, Question } from "@mdq/shared";
 import { buildResultsCsv, csvEscape } from "../results-csv";
-import { getSessionResultsCsvPath, markQuestionRevealed, saveResultsCsv } from "../persistence";
+import { getSessionResultsCsvPath, markQuestionRevealed, saveResultsCsv, saveSessionSummaryMarkdown } from "../persistence";
 import { addParticipant, createSession, recordSubmission, transitionState } from "../session";
 
 function makeQuestion(index: number, overrides: Partial<Question> = {}): Question {
@@ -195,6 +195,23 @@ describe("results CSV builder", () => {
     const jo = byId.get("S0003")!;
     expect(jo[col("q2_selected")]).toBe("");
     expect(jo[col("q3_selected")]).toBe("");
+  });
+
+  it("omits covers and slides from result columns and saved question statistics", () => {
+    const { session, quiz } = makeFixture();
+    quiz.questions.push(makeQuestion(3, { questionType: "cover", correctOptions: [], options: [] }));
+    quiz.questions.push(makeQuestion(4, { questionType: "slide", correctOptions: [], options: [] }));
+    const rows = parseCsv(buildResultsCsv(session, quiz));
+    expect(rows[0]).toHaveLength(28);
+    expect(rows[0]).not.toContain("q4_selected");
+    expect(rows[0]).not.toContain("q5_selected");
+    expect(rows.every(row => row.length === 28)).toBe(true);
+    expect(saveResultsCsv(session, quiz, tempDir).questionCount).toBe(3);
+    const summary = saveSessionSummaryMarkdown(session, quiz, tempDir);
+    const text = fs.readFileSync(summary.filePath, "utf8");
+    expect(text).toContain("| Q3 | Open Response |");
+    expect(text).not.toMatch(/Q[45]/);
+    expect(text).toContain("- Scored Questions: 1");
   });
 
   describe("formula injection", () => {

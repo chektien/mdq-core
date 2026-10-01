@@ -1,6 +1,6 @@
 // Pure results CSV builder. Keep this module free of Node fs/path imports so it
 // can be bundled for runtimes that have no filesystem.
-import { Session, Quiz, Submission } from "@mdq/shared";
+import { isSlideType, Session, Quiz, Submission } from "@mdq/shared";
 import { computeLeaderboard, isExactOptionMatch } from "./session";
 import { buildScoredCorrectAnswersMap, isScoredQuestion } from "./scoring";
 
@@ -53,8 +53,14 @@ export function buildResultsCsv(session: Session, quiz: Quiz, options: BuildResu
   const leaderboard = computeLeaderboard(session, correctMap);
   const boardMap = new Map(leaderboard.map((entry) => [entry.studentId, entry]));
 
+  // Keep item indexes in column names, but content-only items have no results.
+  const resultIndexes = quiz.questions.flatMap((question, index) =>
+    isSlideType(question.questionType) ? [] : [index]);
+  const resultIndexSet = new Set(resultIndexes);
+
   const submissionsByStudent = new Map<string, Map<number, Submission>>();
   for (const sub of session.submissions) {
+    if (!resultIndexSet.has(sub.questionIndex)) continue;
     if (!submissionsByStudent.has(sub.studentId)) {
       submissionsByStudent.set(sub.studentId, new Map<number, Submission>());
     }
@@ -77,7 +83,7 @@ export function buildResultsCsv(session: Session, quiz: Quiz, options: BuildResu
     "attendance",
   ];
 
-  for (let i = 0; i < quiz.questions.length; i++) {
+  for (const i of resultIndexes) {
     headers.push(`q${i + 1}_revealed_at_iso`);
     headers.push(`q${i + 1}_selected`);
     headers.push(`q${i + 1}_correct`);
@@ -108,7 +114,7 @@ export function buildResultsCsv(session: Session, quiz: Quiz, options: BuildResu
       "present",
     ];
 
-    for (let i = 0; i < quiz.questions.length; i++) {
+    for (const i of resultIndexes) {
       const sub = subs.get(i);
       const revealedAtIso = toIso(revealTimestamps.get(i));
       const isScored = isScoredQuestion(quiz.questions[i]);

@@ -1,6 +1,7 @@
 import * as fs from "fs";
 import * as path from "path";
 import {
+  isSlideType,
   Session,
   SessionSnapshot,
   WeeklyResult,
@@ -200,7 +201,7 @@ export function saveResultsCsv(session: Session, quiz: Quiz, baseDir?: string): 
     action,
     filePath,
     rowCount: session.participants.size,
-    questionCount: quiz.questions.length,
+    questionCount: quiz.questions.filter(question => !isSlideType(getQuestionType(question))).length,
   };
 }
 
@@ -289,6 +290,7 @@ export function saveSessionSummaryMarkdown(
   const anomalies: string[] = [];
   for (let i = 0; i < quiz.questions.length; i++) {
     const question = quiz.questions[i];
+    if (isSlideType(getQuestionType(question))) continue;
     const subs = submissionsByQuestion.get(i) || [];
     const responseRate = participants.length > 0 ? subs.length / participants.length : 0;
     const unanswered = Math.max(0, participants.length - subs.length);
