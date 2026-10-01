@@ -424,7 +424,7 @@ function parseQuestionBlock(
 
   let correctOptions: string[];
   if (isSlide) {
-    if (correctSingleMatch || correctMultiMatch) {
+    if (correctSingleMatch || correctMultiMatch || (isCover && correctSingleLineMatch)) {
       throw new QuizParseError(
         sourceFile,
         index,
@@ -533,6 +533,11 @@ function parseQuestionBlock(
       });
     })
     : { contentLines: textLines, video: undefined };
+  if (isCover && (liveEmbedExtraction.liveEmbed || videoExtraction.video)) {
+    throw new QuizParseError(sourceFile, index,
+      "cover items support images; use type: slide for live embeds or videos",
+      findLineNumber(lines, blockStartLine, line => /^(?:live_url|video_card):|^\[Video:/i.test(line.trim())));
+  }
   textLines = videoExtraction.contentLines;
   const backgroundExtraction = isSlide
     ? extractSlideBackground(textLines)
