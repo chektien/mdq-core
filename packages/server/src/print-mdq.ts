@@ -1182,18 +1182,18 @@ function renderStyles(
       border: 0;
       box-shadow: none;
     }
-    .item-cover h2 {
+    .item.item-cover h2 {
       font-size: calc(var(--mdq-title-size, 18pt) * var(--mdq-title-scale, 1) * 1.25);
       text-wrap: balance;
       overflow-wrap: anywhere;
     }
-    .cover-subtitle { margin-top: 1.1em; font-size: var(--mdq-body-size, 11.2pt); color: var(--muted); }
+    .cover-subtitle { margin-top: 1.1em; font-size: var(--mdq-body-size, calc(11.2pt * var(--mdq-body-scale, 1))); color: var(--muted); }
     .cover-meta { margin-top: 1.6em; font-size: var(--mdq-small-size, 9pt); color: var(--muted); }
     .item-cover :is(p, ul, ol, li) { margin: 0; padding: 0; list-style: none; }
     .item-cover li::before { display: none; }
     .item-cover li::marker { content: ""; }
     .item-cover .media-grid { justify-content: center; margin-top: 1em; }
-    .item-cover .media-figure img { max-height: 30mm; }
+    .item-cover .media-grid .media-figure img { max-height: 30mm; }
 
     .item-header {
       margin-bottom: 4mm;
@@ -1643,7 +1643,7 @@ function renderStyles(
   `;
 }
 
-function buildHtml(quiz: Quiz, options: PrintOptions): string {
+export function buildHtml(quiz: Quiz, options: PrintOptions): string {
   const title = options.title || quiz.title || path.basename(options.inputFile);
 
   return `<!doctype html>
@@ -1745,7 +1745,7 @@ async function main(): Promise<void> {
   console.log(`Printed ${plural(deckStats.total, "item")} to ${options.outputFile} (${sizeMb} MB)`);
 }
 
-main().catch((error: unknown) => {
+if (require.main === module) main().catch((error: unknown) => {
   const message = error instanceof Error ? error.message : String(error);
   console.error(`print:pdf failed: ${message}`);
   process.exitCode = 1;
