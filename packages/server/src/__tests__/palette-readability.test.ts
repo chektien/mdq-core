@@ -149,6 +149,11 @@ describe("palette readability, 7 palettes x 2 themes", () => {
     const stops = slideStops(palette, mode, t);
     const paperColor = over(token(t, "--mdq-paper"), "#ffffff");
 
+    it("keeps fenced and inline code at 4.5:1 on their shared deck panel", () => {
+      const grounds = Object.fromEntries(stops.map((stop, i) => [`code on slide stop ${i + 1}`, over(token(t, "--mdq-slide-glass"), stop)]));
+      expectPairs(`${name} code`, { text: token(t, "--mdq-slide-ink") }, grounds);
+    });
+
     it("keeps the attendee fold-out note kicker and text at 4.5:1 on their wash", () => {
       const wash = parseColor(token(t, "--mdq-note-attendee-tint"));
       const grounds = Object.fromEntries(stops.map((stop, i) => [`note on slide stop ${i + 1}`, over(wash, stop)]));

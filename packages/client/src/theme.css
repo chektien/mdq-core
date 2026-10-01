@@ -77,12 +77,6 @@ html[data-theme="dark"] body {
   background: var(--mdq-paper);
 }
 
-html[data-theme="dark"] .quiz-html code,
-html[data-theme="dark"] .quiz-html pre {
-  background: #20201f;
-  color: #f0ebf5;
-}
-
 html[data-theme="dark"] .quiz-html strong {
   color: var(--mdq-ink-strong);
 }
@@ -336,12 +330,6 @@ html[data-theme="light"] body::after {
   height: 30rem;
   border-radius: 999px;
   background: radial-gradient(circle, var(--mdq-page-glow-warm), transparent 70%);
-}
-
-html[data-theme="light"] .quiz-html code,
-html[data-theme="light"] .quiz-html pre {
-  background: #f1e7d5;
-  color: #433528;
 }
 
 html[data-theme="light"] .quiz-html strong {

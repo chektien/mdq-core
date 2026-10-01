@@ -90,8 +90,7 @@ describe("client slide palette contract", () => {
       ]) {
         expect(css).toContain(`${selector} {`);
       }
-      expect(css).toContain(`${GRUVBOX_DARK} .slide-surface .quiz-html code,\n${GRUVBOX_DARK} .slide-surface .quiz-html pre {`);
-      expect(css).toContain(`${GRUVBOX_LIGHT} .slide-surface .quiz-html code,\n${GRUVBOX_LIGHT} .slide-surface .quiz-html pre {`);
+      expect(css).toContain("background: var(--mdq-code-bg, var(--mdq-slide-glass))");
       expect(declarations(ruleBody(css, `${GRUVBOX_DARK} .slide-surface`)).background)
         .toBe("linear-gradient(180deg, #32302f 0%, #282828 100%)");
       expect(declarations(ruleBody(css, `${GRUVBOX_LIGHT} .slide-surface`)).background)
@@ -119,11 +118,10 @@ describe("client slide palette contract", () => {
 
     it("out-ranks the classic theme rules by specificity rather than !important", () => {
       // The classic rules these override: html[data-theme="light"] .slide-surface
-      // (0,2,1) and theme.css html[data-theme] .quiz-html code (0,2,2). Every
+      // (0,2,1). Code now follows palette tokens without theme selectors. Every
       // gruvbox selector carries two attribute tests on html, so it wins.
       expect(css).toContain('html[data-theme="light"] .slide-surface {');
-      expect(themeCss).toContain('html[data-theme="light"] .quiz-html code,');
-      expect(themeCss).toContain('html[data-theme="dark"] .quiz-html code,');
+      expect(themeCss).not.toMatch(/\.quiz-html code[,\s{]/);
       for (const [, selectorList] of paletteRules) {
         for (const selector of selectorList.split(",").map((part) => part.trim()).filter(Boolean)) {
           const attributeTests = selector.match(/\[data-(?:palette|theme)=/g) ?? [];
@@ -171,8 +169,9 @@ describe("client slide palette contract", () => {
       ["dark", GRUVBOX_DARK],
       ["light", GRUVBOX_LIGHT],
     ])("gruvbox %s code blocks keep 4.5:1 ink on their panel", (_mode, selector) => {
-      const body = ruleBody(css, `${selector} .slide-surface .quiz-html code,\n${selector} .slide-surface .quiz-html pre`);
-      const { background, color } = declarations(body);
+      const tokens = declarations(ruleBody(css, selector));
+      const background = tokens["--mdq-slide-glass"];
+      const color = tokens["--mdq-slide-ink"];
       expect(contrast(color, background)).toBeGreaterThanOrEqual(4.5);
     });
 
