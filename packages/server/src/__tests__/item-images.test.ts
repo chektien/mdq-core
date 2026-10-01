@@ -37,3 +37,12 @@ it("does not lift fenced, inline code, quoted feedback or notes into question me
   expect(parsed.errors).toEqual([]);
   expect(parsed.quiz!.questions[0].slideMedia).toEqual([{ src: "public.png", alt: "Public" }]);
 });
+
+it.each(["slide", "multiple_choice"])("keeps indented code, escapes and list continuations literal on %s", kind => {
+  const options = kind === "slide" ? "" : "A. First\nB. Second\n\n> Correct Answer: A\n";
+  const source = `## Sample\ntype: ${kind}\n\nPrompt\n\n    ![Indented code](assets/a.png)\n\n\\![Escaped](assets/a.png)\n\n- Example\n\n  ![List](assets/a.png)\n\n1) ![Ordered list](assets/a.png)\n\n${options}\n    ![Tail code](assets/a.png)\n\n\\![Tail escape](assets/a.png)\n\n![Public](assets/a.png)\n`;
+  const parsed = parseQuizMarkdown(source, "sample.md");
+  expect(parsed.errors).toEqual([]);
+  expect(parsed.quiz!.questions[0].slideMedia).toEqual([{ src: "assets/a.png", alt: "Public" }]);
+  expect(parsed.quiz!.questions[0].textHtml).not.toContain("<img");
+});

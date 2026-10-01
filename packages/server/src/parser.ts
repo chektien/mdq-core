@@ -725,7 +725,7 @@ function getFencedCodeLineIndices(lines: string[]): Set<number> {
 
 /** Detect the start of a list item: leading whitespace then `-`, `*`, `+`, or
  * an ordered marker like `1.` or `12.` followed by a space. */
-const LIST_MARKER_REGEX = /^\s*(?:[-*+]|\d+\.)\s+/;
+const LIST_MARKER_REGEX = /^\s*(?:[-*+]|\d+[.)])\s+/;
 
 /** Escape image markdown so marked renders the source literally instead of as
  * an <img> tag. `\![alt\](src)` is a valid CommonMark escape pair that
@@ -932,10 +932,30 @@ function extractSlideBackground(lines: string[]): { contentLines: string[]; back
   };
 }
 
+/** Literal block context comes from the same Markdown lexer as rendering,
+ * including indented code and list continuations across blank lines. */
+function literalMediaLines(lines: string[]): Map<number, "code" | "literal"> {
+  const text = lines.join("\n").replace(/\r/g, "");
+  const result = new Map<number, "code" | "literal">();
+  let cursor = 0;
+  for (const token of marked.lexer(text)) {
+    if (!token.raw) continue;
+    const from = text.indexOf(token.raw, cursor);
+    if (from < 0) continue;
+    cursor = from + token.raw.length;
+    if (!["code", "list", "blockquote"].includes(token.type)) continue;
+    const first = text.slice(0, from).split("\n").length - 1;
+    const last = text.slice(0, cursor - 1).split("\n").length - 1;
+    for (let line = first; line <= last; line++) result.set(line, token.type === "code" ? "code" : "literal");
+  }
+  return result;
+}
+
 function extractSlideMedia(lines: string[]): { contentLines: string[]; media: SlideMedia[] } {
   const contentLines: string[] = [];
   const media: SlideMedia[] = [];
   const fencedLines = getFencedCodeLineIndices(lines);
+  const literalLines = literalMediaLines(lines);
   let inListItem = false;
   let currentGroup: string | undefined;
 
@@ -943,8 +963,8 @@ function extractSlideMedia(lines: string[]): { contentLines: string[]; media: Sl
     const line = lines[lineIdx];
 
     // Lines inside a fenced code block are literal — pass them through unchanged.
-    if (fencedLines.has(lineIdx)) {
-      contentLines.push(line);
+    if (fencedLines.has(lineIdx) || literalLines.has(lineIdx)) {
+      contentLines.push(literalLines.get(lineIdx) === "literal" ? escapeImageMarkdownInLine(line) : line);
       continue;
     }
 
@@ -987,6 +1007,9 @@ function extractSlideMedia(lines: string[]): { contentLines: string[]; media: Sl
     while ((match = MARKDOWN_IMAGE_REGEX.exec(line)) !== null) {
       // Skip if the match starts inside an inline code span — that's literal text.
       if (indexInRanges(match.index, codeSpans)) continue;
+      let escapes = 0;
+      for (let index = match.index - 1; index >= 0 && line[index] === "\\"; index--) escapes++;
+      if (escapes % 2 === 1) continue;
 
       const alt = match[1]?.trim() || "Slide image";
       const src = resolveMarkdownImageHref(match[2] || "");
