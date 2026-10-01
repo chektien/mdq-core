@@ -16,8 +16,16 @@
  * A table of the measured scroll, covered options or bars and what falls
  * outside the viewport is printed at the end.
  *
+ * It also checks that the fit settles. With a question open and its timer
+ * running, the page is sampled for several seconds, with the join card closed
+ * up and opened out. At 700 px tall and more the question's density must not
+ * change once it has settled and the page must not scroll in any sample. A
+ * second table lists the density changes and scrolling samples per size.
+ *
  * Run `npm run build` first, then:
- *   node scripts/check-presenter-fit.mjs [--chrome <path>]
+ *   node scripts/check-presenter-fit.mjs [--chrome <path>] [--samples <n>] [--interval <ms>] [--only <WxH,WxH>]
+ * --only limits the run to some sizes and --samples and --interval set how
+ * often and how many times the stability check samples (default 25 x 160 ms).
  */
 import { spawn } from "node:child_process";
 import fs from "node:fs";
@@ -47,9 +55,25 @@ type: slide
 
 ---
 
+## Quick check
+
+time-limit: 60
+
+**Which of these is a fruit?**
+
+A. Apple
+B. Brick
+C. Chair
+D. Drill
+
+> Correct Answer: A
+> Overall Feedback: Apple.
+
+---
+
 ## Deployment check
 
-time-limit: 120
+time-limit: 60
 
 **Which of these steps should a release engineer complete before promoting a build to production?**
 
@@ -72,14 +96,20 @@ type: slide
 ---
 `;
 
+const SAMPLES = Number(option("--samples")) || 25;
+const INTERVAL = Number(option("--interval")) || 160;
 const FULL_HEIGHT = 700; // from this height up the page must not scroll and everything must be in view
 const SIZES = [
   [768, 700], [800, 800], [820, 1180], [1024, 768], [1180, 820], [1280, 720], [1280, 800], [1366, 768], [1440, 900], [1920, 1080],
   [768, 600], [1024, 500],
 ];
 
+const only = option("--only");
+const sizes = only ? only.split(",").map((size) => size.split("x").map(Number)) : SIZES;
+
 const failures = [];
 const rows = [];
+const stabilityRows = [];
 const check = (ok, message) => { console.log(`${ok ? "ok  " : "FAIL"} ${message}`); if (!ok) failures.push(message); };
 
 function freePort() {
@@ -143,7 +173,7 @@ async function main() {
       try { if ((await fetch(`${base}/api/decks`)).ok) break; } catch { /* still starting */ }
       await new Promise((resolve) => setTimeout(resolve, 250));
     }
-    for (const [width, height] of SIZES) {
+    for (const [width, height] of sizes) {
       const full = height >= FULL_HEIGHT;
       // A new page for each size: the question's fit step keeps its density between resizes.
       const context = await browser.newContext({ viewport: { width, height } });
@@ -154,6 +184,37 @@ async function main() {
       await page.getByRole("button", { name: /start session/i }).click();
       await page.waitForSelector(".slide-surface .slide-title");
       const states = [];
+      const sampleStability = async (expanded, question) => {
+        const toggle = page.locator(".slide-join-panel .session-code-card-toggle");
+        if (((await toggle.getAttribute("aria-expanded")) === "true") !== expanded) await toggle.click({ force: true });
+        await page.evaluate(() => window.scrollTo(0, 0));
+        // Give a fit step that is still moving after the toggle time to come to rest, then count what follows.
+        await page.waitForTimeout(450);
+        const samples = [];
+        for (let i = 0; i < SAMPLES; i += 1) {
+          samples.push(await page.evaluate(() => {
+            const surface = document.querySelector(".quiz-surface-content-fit");
+            const scroller = document.scrollingElement || document.documentElement;
+            return {
+              density: surface?.getAttribute("data-fit-density") ?? "none",
+              scroll: Math.max(0, scroller.scrollHeight - window.innerHeight),
+              timer: document.querySelector(".timer-label")?.textContent ?? "",
+            };
+          }));
+          await page.waitForTimeout(INTERVAL);
+        }
+        const changes = samples.filter((sample, i) => i > 0 && sample.density !== samples[i - 1].density).length;
+        const scrolling = samples.filter((sample) => sample.scroll > 1).length;
+        const ticks = new Set(samples.map((sample) => sample.timer)).size;
+        const row = { question, size: `${width}x${height}`, card: expanded ? "open" : "closed", densities: [...new Set(samples.map((sample) => sample.density))].join(","), changes, scrolling, samples: samples.length, ticks };
+        stabilityRows.push(row);
+        const where = `${width}x${height} ${question} question open with the timer running, join card ${row.card}`;
+        check(ticks > 1, `${where}: the timer ticked while sampling (${ticks} values)`);
+        if (full) {
+          check(changes === 0, `${where}: the density does not change over ${samples.length} samples (${changes} changes, ${row.densities})`);
+          check(scrolling === 0, `${where}: the page does not scroll in any of ${samples.length} samples (${scrolling} scrolling)`);
+        }
+      };
       const read = async (name, kind) => {
         for (const expanded of [false, true]) {
           const toggle = page.locator(".slide-join-panel .session-code-card-toggle");
@@ -167,6 +228,12 @@ async function main() {
       await read("slide", "");
       await page.getByRole("button", { name: /^Next/ }).click();
       await page.waitForSelector(".quiz-surface-content .grid");
+      await sampleStability(false, "short");
+      await sampleStability(true, "short");
+      await page.getByRole("button", { name: /^Next/ }).click({ force: true });
+      await page.waitForSelector(".quiz-surface-content .grid");
+      await sampleStability(false, "long");
+      await sampleStability(true, "long");
       await read("question open", "answer option");
       await page.getByRole("button", { name: "Close Question" }).click({ force: true });
       await page.waitForTimeout(600);
@@ -194,6 +261,8 @@ async function main() {
   }
   console.log("\nsize        state                                 scroll  covered  options outside  card outside");
   for (const row of rows) console.log(`${row.size.padEnd(11)} ${row.name.padEnd(37)} ${String(row.scroll).padStart(6)}  ${String(row.covered.length).padStart(7)}  ${String(row.optionsOutside.length).padStart(15)}  ${row.cardOutside ? "yes" : "no"}`);
+  console.log("\nsize        question join card  densities seen                     density changes  scrolling samples  timer values");
+  for (const row of stabilityRows) console.log(`${row.size.padEnd(11)} ${row.question.padEnd(8)} ${row.card.padEnd(10)} ${row.densities.padEnd(34)} ${String(row.changes).padStart(15)}  ${`${row.scrolling} of ${row.samples}`.padStart(17)}  ${String(row.ticks).padStart(12)}`);
   if (failures.length > 0) {
     console.error(`\n${failures.length} check(s) failed.`);
     process.exit(1);

@@ -82,7 +82,9 @@ describe("presenter toolbar", () => {
   it("gives back the height a scaled question no longer uses, and steps down at any overflow", () => {
     const fit = read("components/ResponsiveQuizSurface.tsx");
     expect(fit).toContain('element.style.setProperty("--quiz-fit-height", layoutHeight)');
-    expect(fit).toContain("if (overflowRatio > 1) return nextDensity(current);");
+    // Any overflow steps down, with no tolerance for a few pixels of scroll.
+    expect(fit).toContain("stepFit(fitRef.current");
+    expect(read("quizFit.ts")).toContain("if (ratio > 1) {");
     expect(index).toMatch(/\[data-fit-density="scaled"\] \{\s*--quiz-fit-scale: 0\.9;[^}]*margin-block: calc\(var\(--quiz-fit-height, 0px\) \* \(var\(--quiz-fit-scale\) - 1\) \/ 2\);/);
   });
 

@@ -116,6 +116,8 @@ export default function PresentationView({
   const isSlideDisplay = currentQuestion?.questionType === "slide" && !currentReveal && (state === "QUESTION_OPEN" || state === "QUESTION_CLOSED");
   const isQuizSurfaceDisplay = !!currentQuestion && currentQuestion.questionType !== "slide" && state !== "LEADERBOARD";
   const isLeaderboardDisplay = state === "LEADERBOARD";
+  // What a question screen shows, so its fit starts afresh for a new question or state.
+  const fitKey = `${currentQuestion?.questionIndex ?? ""}:${state ?? ""}`;
   const isLiveSurfaceDisplay = isSlideDisplay || isQuizSurfaceDisplay || isLeaderboardDisplay;
   const isLiveEmbedSlideDisplay = isSlideDisplay && !!currentQuestion?.slideLiveEmbed;
   // Until the first state arrives the counts and "next up" are not known, so they are held back rather than shown as zero.
@@ -270,7 +272,7 @@ export default function PresentationView({
       }
 
       return (
-        <ResponsiveQuizSurface>
+        <ResponsiveQuizSurface fitKey={fitKey}>
           {state === "QUESTION_OPEN" && (
             <Timer remainingSec={sock.remainingSec} totalSec={currentQuestion.timeLimitSec} size={140} />
           )}
@@ -330,7 +332,7 @@ export default function PresentationView({
 
     if (currentReveal && currentQuestion && state === "REVEAL") {
       return (
-        <ResponsiveQuizSurface reveal>
+        <ResponsiveQuizSurface reveal fitKey={fitKey}>
           <QuizHtml
             className="quiz-html max-w-5xl text-center text-xl leading-relaxed text-zinc-300 lg:text-2xl"
             html={currentQuestion.text}
@@ -531,7 +533,7 @@ export default function PresentationView({
                 positionLabel={positionLabel}
                 statusLabel={quizStatusLabel}
               >
-                <ResponsiveQuizSurface>
+                <ResponsiveQuizSurface fitKey={fitKey}>
                   {state === "QUESTION_OPEN" && (
                     <Timer remainingSec={sock.remainingSec} totalSec={currentQuestion.timeLimitSec} size={140} />
                   )}
@@ -607,7 +609,7 @@ export default function PresentationView({
             positionLabel={positionLabel}
             statusLabel={quizStatusLabel}
           >
-            <ResponsiveQuizSurface reveal>
+            <ResponsiveQuizSurface reveal fitKey={fitKey}>
               <QuizHtml
                 className="quiz-html max-w-5xl text-center text-xl leading-relaxed text-zinc-300 lg:text-2xl"
                 html={currentQuestion.text}
