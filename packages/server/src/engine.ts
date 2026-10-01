@@ -385,7 +385,7 @@ export function apply(input: Session, quiz: Quiz, command: Command, now: number)
         publicKey: participant.publicKey, label: participant.label, labelNote: participant.labelNote,
         ...(quiz.title ? { deckTitle: quiz.title } : {}) }, `participant:${participant.studentId}`);
       emitParticipants();
-      if (session.state === "QUESTION_OPEN" && session.currentQuestionIndex >= 0) emitCount();
+      if (session.state === "QUESTION_OPEN" && session.currentQuestionIndex >= 0 && !isSlideType(getQuestionType(questionAt(session, quiz)))) emitCount();
       messages.push(...snapshotMessages(session, quiz, now, `participant:${participant.studentId}`, "participant", isReconnect));
       break;
     }
@@ -455,7 +455,7 @@ export function apply(input: Session, quiz: Quiz, command: Command, now: number)
       participant.sessionToken = command.newToken; participant.socketId = "";
       participant.clientInstanceId = undefined;
       emitParticipants();
-      if (session.state === "QUESTION_OPEN" && session.currentQuestionIndex >= 0) emitCount();
+      if (session.state === "QUESTION_OPEN" && session.currentQuestionIndex >= 0 && !isSlideType(getQuestionType(questionAt(session, quiz)))) emitCount();
       break;
     }
     case "joinLock": {
@@ -471,7 +471,7 @@ export function apply(input: Session, quiz: Quiz, command: Command, now: number)
       if (participant && participant.socketId === command.socketId) {
         participant.connected = false;
         emitParticipants();
-        if (session.state === "QUESTION_OPEN" && session.currentQuestionIndex >= 0) emitCount();
+        if (session.state === "QUESTION_OPEN" && session.currentQuestionIndex >= 0 && !isSlideType(getQuestionType(questionAt(session, quiz)))) emitCount();
       }
       break;
     }
@@ -522,8 +522,8 @@ function snapshotMessages(session: Session, quiz: Quiz, now: number, audience: A
   if (!q || !payload) return messages;
   if (session.state === "QUESTION_OPEN") {
     emit(SocketEvents.QUESTION_OPEN, payload);
-    if (session.questionStartedAt) emit(SocketEvents.QUESTION_TICK, { remainingSec: Math.max(0, q.timeLimitSec - Math.floor((now - session.questionStartedAt) / 1000)) });
-    if (staff) emitCount();
+    if (!isSlideType(getQuestionType(q)) && session.questionStartedAt) emit(SocketEvents.QUESTION_TICK, { remainingSec: Math.max(0, q.timeLimitSec - Math.floor((now - session.questionStartedAt) / 1000)) });
+    if (staff && !isSlideType(getQuestionType(q))) emitCount();
   } else if (session.state === "QUESTION_CLOSED") {
     emit(SocketEvents.QUESTION_OPEN, payload);
     emit(SocketEvents.QUESTION_CLOSE, closePayload(session));
