@@ -42,6 +42,7 @@ import InlineMarkdownText from "../components/InlineMarkdownText";
 import QuizHtml from "../components/QuizHtml";
 import LiveSurface, { type LiveSurfaceAction } from "../components/LiveSurface";
 import ResponsiveQuizSurface from "../components/ResponsiveQuizSurface";
+import { quizFitKey } from "../quizFit";
 import SlideContent, { SlideContentBody } from "../components/SlideContent";
 import SlideBackgroundLayer from "../components/SlideBackgroundLayer";
 import PresenterNotesPanel from "../components/PresenterNotesPanel";
@@ -892,6 +893,8 @@ function LiveView({
     : rev && q && rev.questionIndex === q.questionIndex
       ? rev
       : null;
+  // What a question screen shows, so its fit starts afresh for a new question, state or edit.
+  const fitKey = quizFitKey(displayQuestion, state, isReviewing);
   const showDetailedRevealChoices = !!displayReveal && !!displayQuestion;
   const currentPresenterNotes = presenterNotesEnabled
     ? presenterNotesByIndex[displayQuestion?.questionIndex ?? -1] ?? []
@@ -1363,7 +1366,7 @@ function LiveView({
       }
 
       return (
-        <ResponsiveQuizSurface>
+        <ResponsiveQuizSurface fitKey={fitKey}>
           {state === "QUESTION_OPEN" && !isReviewing && (
             <Timer
               remainingSec={sock.remainingSec}
@@ -1439,7 +1442,7 @@ function LiveView({
 
     if (displayReveal && displayQuestion && (((state === "REVEAL") && !isReviewing) || isReviewing)) {
       return (
-        <ResponsiveQuizSurface reveal>
+        <ResponsiveQuizSurface reveal fitKey={fitKey}>
           <QuizHtml
             className={`quiz-html text-center leading-relaxed max-w-5xl ${isReviewing ? "text-2xl lg:text-3xl text-white" : "text-xl lg:text-2xl text-zinc-300"}`}
             html={displayQuestion.text}
@@ -1681,7 +1684,7 @@ function LiveView({
                 navActions={liveSurfaceNavActions}
                 actions={liveSurfaceActions}
               >
-                <ResponsiveQuizSurface>
+                <ResponsiveQuizSurface fitKey={fitKey}>
                   {/* Timer */}
                   {state === "QUESTION_OPEN" && !isReviewing && (
                     <Timer
@@ -1780,7 +1783,7 @@ function LiveView({
             navActions={liveSurfaceNavActions}
             actions={liveSurfaceActions}
           >
-            <ResponsiveQuizSurface reveal>
+            <ResponsiveQuizSurface reveal fitKey={fitKey}>
               <QuizHtml
                 className={`quiz-html text-center leading-relaxed max-w-5xl ${isReviewing ? "text-2xl lg:text-3xl text-white" : "text-xl lg:text-2xl text-zinc-300"}`}
                 html={displayQuestion.text}

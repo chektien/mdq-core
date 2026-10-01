@@ -75,3 +75,25 @@ export function stepFit(state: FitState, measurement: { ratio: number; room: Fit
   }
   return { ...state, floor, overflowRoom, contentKey };
 }
+
+/** A short, stable hash of some text, so a changed question can be told from the one before without keeping its words. */
+function shortHash(text: string): string {
+  let hash = 5381;
+  for (let i = 0; i < text.length; i += 1) hash = ((hash * 33) ^ text.charCodeAt(i)) >>> 0;
+  return hash.toString(36);
+}
+
+/**
+ * Names what a question screen shows: which question, the session state, whether
+ * the presenter is looking back at an earlier one, and a short hash of the
+ * question's text and options. A new question, a new state or an edit to the
+ * question under the same index gives a new key, and the fit starts afresh.
+ */
+export function quizFitKey(
+  question: { questionIndex: number; text?: string; options?: Array<{ label: string; text: string }> } | null | undefined,
+  state: string | null | undefined,
+  reviewing = false,
+): string {
+  const content = question ? `${question.text ?? ""}\u0000${(question.options ?? []).map((option) => `${option.label}\u0001${option.text}`).join("\u0000")}` : "";
+  return `${question?.questionIndex ?? ""}:${state ?? ""}:${reviewing ? "review" : "live"}:${shortHash(content)}`;
+}

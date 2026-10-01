@@ -2,6 +2,7 @@ import {
   DENSITY_ORDER,
   FIT_GROWTH_TOLERANCE,
   initialFitState,
+  quizFitKey,
   stepFit,
   type FitRoom,
   type FitState,
@@ -100,5 +101,50 @@ describe("quiz fit steps", () => {
         if (after > before) overflowed = true;
       }
     }
+  });
+});
+
+describe("quiz fit key", () => {
+  const question = { questionIndex: 2, text: "<p>Which is a fruit?</p>", options: [{ label: "A", text: "Apple" }, { label: "B", text: "Brick" }] };
+
+  it("is the same for the same question, state and review mode", () => {
+    expect(quizFitKey({ ...question }, "QUESTION_OPEN", false)).toBe(quizFitKey(question, "QUESTION_OPEN", false));
+  });
+
+  it("changes with the question, the state and review mode", () => {
+    const key = quizFitKey(question, "QUESTION_OPEN", false);
+    expect(quizFitKey({ ...question, questionIndex: 3 }, "QUESTION_OPEN", false)).not.toBe(key);
+    expect(quizFitKey(question, "QUESTION_CLOSED", false)).not.toBe(key);
+    expect(quizFitKey(question, "QUESTION_OPEN", true)).not.toBe(key);
+  });
+
+  it("changes when the text or an option is edited under the same index", () => {
+    const key = quizFitKey(question, "QUESTION_OPEN", false);
+    expect(quizFitKey({ ...question, text: "<p>Which is a vegetable?</p>" }, "QUESTION_OPEN", false)).not.toBe(key);
+    expect(quizFitKey({ ...question, options: [{ label: "A", text: "Apple" }, { label: "B", text: "Bricks" }] }, "QUESTION_OPEN", false)).not.toBe(key);
+    expect(quizFitKey({ ...question, options: [{ label: "A", text: "Apple" }] }, "QUESTION_OPEN", false)).not.toBe(key);
+  });
+
+  it("does not run an option into the next one", () => {
+    const a = quizFitKey({ questionIndex: 0, text: "t", options: [{ label: "A", text: "x" }, { label: "B", text: "y" }] }, "S");
+    const b = quizFitKey({ questionIndex: 0, text: "t", options: [{ label: "A", text: "xB" }, { label: "", text: "y" }] }, "S");
+    expect(a).not.toBe(b);
+  });
+
+  it("copes with no question and no state yet", () => {
+    expect(quizFitKey(null, null)).toBe(quizFitKey(undefined, undefined));
+    expect(quizFitKey(null, null)).not.toBe(quizFitKey(question, null));
+  });
+
+  it("resets a floor that a long question pushed down when the next question's key differs", () => {
+    const long = quizFitKey({ ...question, text: "x".repeat(400) }, "QUESTION_OPEN");
+    const short = quizFitKey(question, "QUESTION_OPEN");
+    let state = initialFitState(long);
+    state = stepFit(state, { ratio: 1.3, room, contentKey: long });
+    state = stepFit(state, { ratio: 1.2, room, contentKey: long });
+    expect(state.floor).toBe(2);
+    state = stepFit(state, { ratio: 0.3, room, contentKey: short });
+    expect(state.floor).toBe(0);
+    expect(state.density).toBe("compact");
   });
 });
