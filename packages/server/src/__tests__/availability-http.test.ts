@@ -89,3 +89,31 @@ it("actual expiry/reconnect/extension/End transports deny new seats and result l
     fs.rmSync(dir, { recursive: true, force: true });
   }
 }, 15000);
+
+it("native notification/purge alarms resolve rehydrated identity and purge unrecovered data without End", async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "mdq-availability-purge-"));
+  fs.writeFileSync(path.join(dir, "synthetic.md"), DECK);
+  const oldPassword = process.env.INSTRUCTOR_PASSWORD;const oldKey = process.env.INSTRUCTOR_KEY;
+  delete process.env.INSTRUCTOR_PASSWORD;delete process.env.INSTRUCTOR_KEY;
+  clearAllSessions();clearInstructorSessionsForTests();
+  let now: jest.SpyInstance | undefined;
+  try {
+    const app = createApp({ quizDir: dir, dataDir: path.join(dir, "runtime") });
+    const expiry = Date.now() + 300;
+    const made = await request(app).post("/api/session").send({ week: "synthetic", availableUntil: expiry }).expect(201);
+    const restored = deserializeSession(serializeSession(getSession(made.body.sessionId)!));storeSession(restored);
+    now = jest.spyOn(Date, "now").mockReturnValue(expiry + SESSION_RECOVERY_MS + 1);
+    await new Promise(resolve => setTimeout(resolve, 600));
+    expect(getSession(made.body.sessionId)).toBeUndefined();
+    expect(restored.deletedAt).toBe(expiry + SESSION_RECOVERY_MS + 1);
+    expect(restored.state).toBe("LOBBY");expect(restored.resultScope).toBeUndefined();
+    expect(fs.existsSync(path.join(dir, "runtime", "winners"))).toBe(false);
+    await request(app).get(`/api/session/by-code/${made.body.sessionCode}`).expect(404);
+    await request(app).get(`/api/session/${made.body.sessionId}/availability`).expect(410);
+  } finally {
+    now?.mockRestore();clearAllSessions();clearInstructorSessionsForTests();
+    if (oldPassword === undefined) delete process.env.INSTRUCTOR_PASSWORD;else process.env.INSTRUCTOR_PASSWORD = oldPassword;
+    if (oldKey === undefined) delete process.env.INSTRUCTOR_KEY;else process.env.INSTRUCTOR_KEY = oldKey;
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});

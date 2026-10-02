@@ -420,20 +420,23 @@ export function createApp(quizDirOrOpts?: string | AppOptions) {
     const alarm = nextAvailabilityAlarm(session, Date.now());
     if (!alarm) return;
     const timer = setTimeout(() => {
-      if (availabilityTimers.get(session.sessionId) !== timer || getSession(session.sessionId) !== session) return;
-      availabilityTimers.delete(session.sessionId);
-      const quiz = getQuizForSession(session);
+      if (availabilityTimers.get(alarm.sessionId) !== timer) return;
+      availabilityTimers.delete(alarm.sessionId);
+      // Resolve the same logical identity after serialization/rehydration. The engine validates generation and deadlines.
+      const current = getSession(alarm.sessionId);
+      if (!current) return;
+      const quiz = getQuizForSession(current);
       if (!quiz) return;
-      const result = apply(session, quiz, { type: alarm.phase === "expire" ? "expireAvailability" : "purgeAvailability", alarm }, Date.now());
+      const result = apply(current, quiz, { type: alarm.phase === "expire" ? "expireAvailability" : "purgeAvailability", alarm }, Date.now());
       if (result.session.deletedAt !== undefined) {
-        purgeSessionArtifacts(session, dataDir);
-        Object.assign(session, result.session);
-        onMessages?.(session, session.sessionId, result);
-        deleteSession(session);
+        purgeSessionArtifacts(current, dataDir);
+        Object.assign(current, result.session);
+        onMessages?.(current, current.sessionId, result);
+        deleteSession(current);
       } else {
-        Object.assign(session, result.session);
-        onMessages?.(session, session.sessionId, result);
-        scheduleAvailability(session);
+        Object.assign(current, result.session);
+        onMessages?.(current, current.sessionId, result);
+        scheduleAvailability(current);
       }
     }, Math.max(0, alarm.dueAt - Date.now()));
     timer.unref();
