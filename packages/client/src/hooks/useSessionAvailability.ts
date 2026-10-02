@@ -50,7 +50,10 @@ export function useSessionAvailability(sessionId: string | null, observed?: Sess
   const due = availability?.phase === "active" ? availability.availableUntil : availability?.deleteAt;
   useEffect(() => {
     if (due === undefined || due <= now) return;
-    const timer = setTimeout(() => { setClockRevision(value => value + 1); refresh(); }, Math.max(1, due - now));
+    // Browsers clamp overflowing signed-32-bit delays to an immediate timer.
+    // Adapter-owned retention can be longer, so reevaluate in bounded chunks.
+    const delay = Math.min(2_147_483_647, Math.max(1, due - now));
+    const timer = setTimeout(() => { setClockRevision(value => value + 1); refresh(); }, delay);
     return () => clearTimeout(timer);
   }, [due, current, clockRevision, refresh]);
   return { availability, refresh };
