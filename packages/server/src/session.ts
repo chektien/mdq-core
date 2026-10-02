@@ -11,6 +11,7 @@ import {
   SESSION_CODE_LENGTH,
   normalizeDisplayName,
 } from "@mdq/shared";
+import { defaultSessionPolicy } from "./policy";
 import { assignLabel, ensureParticipantIdentity, newPublicKey } from "./identity";
 
 /** Error for invalid state transitions */
@@ -90,6 +91,9 @@ export function deserializeSession(json: string): Session {
 /** Create a new Session in LOBBY state */
 export function createSession(week: string, mode: SessionMode): Session {
   return {
+    policy: defaultSessionPolicy(),
+    policyFrozen: false,
+    releasedQuestionIndexes: new Set<number>(),
     sessionId: crypto.randomUUID(),
     sessionCode: generateSessionCode(),
     week,
@@ -207,6 +211,7 @@ export function recordSubmission(
   questionIndex: number,
   response: { selectedOptions?: string[]; responseText?: string } | string[],
 ): Submission {
+  if (session.policy) throw new Error("Versioned sessions require the authenticated answerSubmit engine command.");
   const normalizedSelectedOptions = normalizeOptionSet(Array.isArray(response) ? response : (response.selectedOptions || []));
   const normalizedResponseText = normalizeResponseText(Array.isArray(response) ? undefined : response.responseText);
   const isOpenResponseSubmission = normalizedSelectedOptions.length === 0 && typeof normalizedResponseText === "string";
@@ -361,6 +366,7 @@ export function isExactOptionMatch(selectedOptions: string[], correctOptions: st
 export function computeLeaderboard(
   session: Session,
   correctAnswersMap: Map<number, string[]>,
+  ranking: "correctness" | "speed" | "legacy" = session.policy ? "correctness" : "legacy",
 ): { rank: number; studentId: string; displayName?: string; correctCount: number; totalTimeMs: number }[] {
   const studentStats = new Map<
     string,
@@ -403,13 +409,15 @@ export function computeLeaderboard(
     }))
     .sort((a, b) => {
       if (b.correctCount !== a.correctCount) return b.correctCount - a.correctCount;
-      if (a.totalTimeMs !== b.totalTimeMs) return a.totalTimeMs - b.totalTimeMs;
+      if (ranking !== "correctness" && a.totalTimeMs !== b.totalTimeMs) return a.totalTimeMs - b.totalTimeMs;
       return a.studentId.localeCompare(b.studentId);
     });
 
   // Assign ranks
   entries.forEach((entry, i) => {
-    entry.rank = i + 1;
+    const previous = entries[i - 1];
+    entry.rank = ranking !== "legacy" && previous && previous.correctCount === entry.correctCount
+      && (ranking === "correctness" || previous.totalTimeMs === entry.totalTimeMs) ? previous.rank : i + 1;
   });
 
   return entries;

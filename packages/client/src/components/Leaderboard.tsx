@@ -73,9 +73,9 @@ export default function Leaderboard({
                     {hasScoredQuestions ? `${entry.correctCount} of ${totalQuestions} correct` : "Poll only"}
                   </span>
                   <small>
-                    {hasScoredQuestions
+                    {hasScoredQuestions && entry.totalTimeMs !== undefined
                       ? <>{(entry.totalTimeMs / 1000).toFixed(1)} s<span className="sr-only"> total time</span></>
-                      : "No scored questions"}
+                      : hasScoredQuestions ? "" : "No scored questions"}
                   </small>
                 </div>
               </li>

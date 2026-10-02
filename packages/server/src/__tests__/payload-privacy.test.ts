@@ -1,3 +1,4 @@
+import { createLegacySession } from "./fixtures/legacy-session";
 import { createServer } from "http";
 import * as fs from "fs";
 import * as os from "os";
@@ -9,7 +10,7 @@ import { io as ioClient, Socket as ClientSocket } from "socket.io-client";
 import { Quiz, Session, SocketEvents, SocketRole, StudentJoinedPayload, LeaderboardUpdatePayload, ResultsRevealPayload, SessionParticipantsPayload } from "@mdq/shared";
 import { createApp } from "../app";
 import { apply, audienceReaches, leaderboardRows, type Command, type EngineMessage } from "../engine";
-import { createSession, clearAllSessions } from "../session";
+import { clearAllSessions } from "../session";
 import { setupSocket, emitMessages, clearSessionTimers } from "../socket";
 import { parseQuizMarkdown } from "../parser";
 
@@ -56,7 +57,7 @@ const NAMES = ["Alex", "Alex", undefined];
 
 /** Every message an engine run produced, tagged with who may receive it. */
 function run(quiz: Quiz): { messages: EngineMessage[]; session: Session } {
-  let session: Session = createSession("privacy", "open");
+  let session: Session = createLegacySession("privacy", "open");
   const messages: EngineMessage[] = [];
   const step = (command: Command, at: number) => {
     const result = apply(session, quiz, command, at);

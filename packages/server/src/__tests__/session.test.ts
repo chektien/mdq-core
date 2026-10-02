@@ -1,3 +1,4 @@
+import { createLegacySession } from "./fixtures/legacy-session";
 import {
   createSession,
   serializeSession,
@@ -19,7 +20,7 @@ describe("Session Engine", () => {
   let session: Session;
 
   beforeEach(() => {
-    session = createSession("week01", "open");
+    session = createLegacySession("week01", "open");
   });
 
   describe("createSession", () => {
@@ -92,7 +93,7 @@ describe("Session Engine", () => {
     });
 
     it("preserves absent optional fields and remains usable after restoration", () => {
-      const original = createSession("week01", "open");
+      const original = createLegacySession("week01", "open");
       delete original.revealedQuestionIndexes;
       const { participant } = addParticipant(original, "S001", "sock1");
       original.state = "QUESTION_OPEN";

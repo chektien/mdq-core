@@ -765,9 +765,15 @@ type: slide
       expect(res.status).toBe(404);
     });
 
-    it("gets leaderboard", async () => {
-      const res = await request(app).get(`/api/session/${sessionId}/leaderboard`);
-      expect(res.status).toBe(200);
+    it("does not invent a new-session scored scope before anything is shown", async () => {
+      const res = await request(app).get(`/api/session/${sessionId}/leaderboard`).expect(200);
+      expect(res.body).toEqual({ entries: [] });
+    });
+
+    it("retains whole-deck leaderboard scope for a policy-less legacy session", async () => {
+      const session = getSession(sessionId)!;
+      delete session.policy; delete session.policyFrozen; delete session.releasedQuestionIndexes;
+      const res = await request(app).get(`/api/session/${sessionId}/leaderboard`).expect(200);
       expect(res.body.entries).toBeDefined();
       expect(res.body.totalQuestions).toBe(3);
     });
@@ -816,16 +822,8 @@ type: slide
 
       expect(res.body.sessionId).toBe(createRes.body.sessionId);
       expect(res.body.sessionCode).toBe(createRes.body.sessionCode);
-      expect(res.body.questionHeadings).toEqual([
-        "Intro: Definitions",
-        "Intro: Defaults",
-        "Intro: Multi-select",
-      ]);
-      expect(res.body.questionSummaries).toEqual([
-        { heading: "Intro: Definitions", questionType: "multiple_choice" },
-        { heading: "Intro: Defaults", questionType: "multiple_choice" },
-        { heading: "Intro: Multi-select", questionType: "multiple_choice" },
-      ]);
+      expect(res.body.questionHeadings).toEqual(["", "", ""]);
+      expect(res.body.questionSummaries).toEqual([{}, {}, {}]);
       expect(res.body.accessInfo.fullUrl).toBe(`http://quiz-host.local:3001/join/${createRes.body.sessionCode}`);
       expect(res.body.accessInfo.presentationUrl).toBe(`http://quiz-host.local:3001/#/present/${createRes.body.sessionId}`);
     });
@@ -843,13 +841,13 @@ type: slide
       expect(res.body.week).toBe("week01");
       expect(res.body.questionHeadings).toEqual([
         "Intro: Definitions",
-        "Intro: Defaults",
-        "Intro: Multi-select",
+        "",
+        "",
       ]);
       expect(res.body.questionSummaries).toEqual([
         { heading: "Intro: Definitions", questionType: "multiple_choice" },
-        { heading: "Intro: Defaults", questionType: "multiple_choice" },
-        { heading: "Intro: Multi-select", questionType: "multiple_choice" },
+        {},
+        {},
       ]);
       expect(res.body.reviewQuestions).toHaveLength(1);
       expect(res.body.reviewQuestions[0]).toMatchObject({

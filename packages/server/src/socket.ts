@@ -1,3 +1,4 @@
+import { isSelfPaced } from "./policy";
 import { isSlideType } from "@mdq/shared";
 import { Server as HttpServer } from "http";
 import { Server, Socket } from "socket.io";
@@ -158,7 +159,7 @@ export function setupSocket(httpServer: HttpServer, quizzes: Map<string, Quiz>):
 /** Schedule the existing ticks and automatic close using the engine deadline. */
 export function startQuestionTimer(io: Server, session: Session, sessionId: string, timeLimitSec: number | null, nextDeadline?: number | null): void {
   clearSessionTimers(sessionId);
-  if (timeLimitSec === null || nextDeadline === null) return;
+  if (isSelfPaced(session) || timeLimitSec === null || nextDeadline === null) return;
   const quiz = quizStore.get(session.week);
   if (!quiz) return;
   const timedIndex = session.currentQuestionIndex;

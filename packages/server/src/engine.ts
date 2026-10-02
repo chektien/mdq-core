@@ -1,3 +1,4 @@
+import { defaultSessionPolicy, effectiveRanking, getSessionScoredQuestionCount, isQuestionReleased, isSelfPaced, publicResultsHidden, releasedQuestionIndexes, scoredCorrectAnswersForSession } from "./policy";
 import { isSlideType } from "@mdq/shared";
 import {
   Quiz, Session, SessionState, SocketEvents, QuestionOpenPayload, QuestionClosePayload, FoldoutNote,
@@ -9,7 +10,7 @@ import {
   StateTransitionError, computeLeaderboard, getAnsweredQuestions, getDistribution,
   getOpenResponses, getSubmissionCount,
 } from "./session";
-import { buildScoredCorrectAnswersMap, getQuestionType, getScoredQuestionCount, isOpenResponseQuestion } from "./scoring";
+import { getQuestionType, isOpenResponseQuestion } from "./scoring";
 import {
   assignLabel, ensureParticipantIdentity, findSeatByName, idTakenMessage, nameTakenMessage, newPublicKey,
 } from "./identity";
@@ -62,7 +63,9 @@ export type PayloadView = "control" | "public";
 /** Who an open-response payload is built for: only `control` sees every response. */
 export type ResponseView = "control" | "display" | "participant";
 export type Command =
-  | { type: "start" | "next" | "previous" | "open" | "close" | "reveal" | "end" | "leaderboardShow" | "leaderboardHide" | "broadcastOpen" | "broadcastReveal" | "broadcastLeaderboard" | "participants" | "repairClosedSlide" }
+  | { type: "end"; discloseResults?: boolean }
+  | { type: "configurePolicy"; role: SocketRole; pacing: "presenter-paced" | "self-paced"; ranking: "correctness" | "speed" }
+  | { type: "start" | "next" | "previous" | "open" | "close" | "reveal" | "leaderboardShow" | "leaderboardHide" | "broadcastOpen" | "broadcastReveal" | "broadcastLeaderboard" | "participants" | "repairClosedSlide" }
   | { type: "timeout"; deadline?: number; questionIndex?: number; startedAt?: number; restartCount?: number }
   | { type: "restartCountdown"; role: SocketRole }
   | { type: "join"; payload: StudentJoinPayload; socketId: string; newToken: string; newPublicKey?: string }
@@ -107,6 +110,9 @@ export const SEAT_IN_USE_MESSAGE = "This seat is now in use on another device.";
 const message = (event: string, payload: unknown, audience: Audience = "all"): EngineMessage => ({ audience, event, payload });
 const clone = (session: Session): Session => ({
   ...session,
+  policy: session.policy ? { ...session.policy } : undefined,
+  releasedQuestionIndexes: session.releasedQuestionIndexes ? new Set(session.releasedQuestionIndexes) : undefined,
+  resultScope: session.resultScope ? { ...session.resultScope, releasedQuestionIndexes: [...session.resultScope.releasedQuestionIndexes], scoredQuestionIndexes: [...session.resultScope.scoredQuestionIndexes] } : undefined,
   revealedQuestionIndexes: session.revealedQuestionIndexes ? new Set(session.revealedQuestionIndexes) : undefined,
   participants: new Map([...session.participants].map(([id, p]) => [id, { ...p }])),
   submissions: session.submissions.map((s) => ({ ...s, selectedOptions: [...s.selectedOptions] })),
@@ -123,13 +129,15 @@ const transition = (session: Session, to: SessionState): void => {
 const questionAt = (session: Session, quiz: Quiz) => quiz.questions[session.currentQuestionIndex];
 /** Read legacy timing without inventing a first-open history or resetting its clock. */
 export const timingFor = (session: Session, quiz: Quiz, index = session.currentQuestionIndex): QuestionTiming | undefined => {
+  quiz = session.deckSnapshot ?? quiz;
   const saved = session.questionTiming?.[String(index)];
+  if (isSelfPaced(session) && saved) return { ...saved, deadlineAt: null };
   if (saved) return saved;
   const q = quiz.questions[index];
   if (!q || index !== session.currentQuestionIndex || session.questionStartedAt === undefined) return undefined;
   return {
     startedAt: session.questionStartedAt,
-    deadlineAt: q.timeLimitSec === null || isSlideType(getQuestionType(q)) ? null
+    deadlineAt: isSelfPaced(session) || q.timeLimitSec === null || isSlideType(getQuestionType(q)) ? null
       : session.questionDeadlineAt !== undefined ? session.questionDeadlineAt : session.questionStartedAt + q.timeLimitSec * 1000,
     restarts: [],
   };
@@ -146,13 +154,16 @@ export const questionPosition = (quiz: Quiz, questionIndex: number): { questionN
     questionTotal: quiz.questions.filter((item) => !isSlideType(getQuestionType(item))).length,
   };
 };
-const questionPayload = (session: Session, quiz: Quiz, now: number): QuestionOpenPayload | null => {
-  const q = questionAt(session, quiz);
+/** Audience-safe content; reading/previewing must never release an item. */
+export const publicQuestionPayload = (session: Session, quiz: Quiz, index: number, now: number): QuestionOpenPayload | null => {
+  quiz = session.deckSnapshot ?? quiz;
+  if (!isQuestionReleased(session, index)) return null;
+  const q = quiz.questions[index];
   if (!q) return null;
   const attendeeNotes: FoldoutNote[] | undefined = q.attendeeNotes?.length ? q.attendeeNotes : undefined;
-  const timing = timingFor(session, quiz);
+  const timing = timingFor(session, quiz, index);
   return {
-    questionIndex: session.currentQuestionIndex, topic: q.topic, text: q.textHtml,
+    questionIndex: index, topic: q.topic, text: q.textHtml,
     questionType: getQuestionType(q), attendeeNotes, slideMedia: q.slideMedia,
     slideMediaPosition: q.slideMediaPosition, slideMediaOpacity: q.slideMediaOpacity,
     slideBackground: q.slideBackground, slideLiveEmbed: q.slideLiveEmbed,
@@ -160,12 +171,13 @@ const questionPayload = (session: Session, quiz: Quiz, now: number): QuestionOpe
     ...(quiz.style ? { deckStyle: quiz.style } : {}),
     options: q.options.map((o) => ({ label: o.label, text: o.textHtml })),
     allowsMultiple: q.allowsMultiple, isPoll: q.isPoll === true,
-    timeLimitSec: q.timeLimitSec, startedAt: timing?.startedAt ?? now, serverNow: now,
-    ...(timing ? { deadlineAt: timing.deadlineAt, ...(timing.firstOpenedAt !== undefined ? { firstOpenedAt: timing.firstOpenedAt } : {}) }
+    timeLimitSec: isSelfPaced(session) ? null : q.timeLimitSec, startedAt: timing?.startedAt ?? now, serverNow: now,
+    ...(isSelfPaced(session) ? { deadlineAt: null, ...(timing?.firstOpenedAt !== undefined ? { firstOpenedAt: timing.firstOpenedAt } : {}) } : timing ? { deadlineAt: timing.deadlineAt, ...(timing.firstOpenedAt !== undefined ? { firstOpenedAt: timing.firstOpenedAt } : {}) }
       : q.timeLimitSec === null || isSlideType(getQuestionType(q)) ? { deadlineAt: null } : {}),
-    ...questionPosition(quiz, session.currentQuestionIndex),
+    ...questionPosition(quiz, index),
   };
 };
+const questionPayload = (session: Session, quiz: Quiz, now: number) => publicQuestionPayload(session, quiz, session.currentQuestionIndex, now);
 /**
  * Open responses for one view. The instructor gets every response with IDs,
  * names and a hidden flag. The projector gets labels only, and only the
@@ -191,6 +203,7 @@ const countPayload = (session: Session, quiz: Quiz, view: ResponseView) => ({
 });
 const revealPayload = (session: Session, quiz: Quiz, view: ResponseView) => {
   const q = questionAt(session, quiz);
+  if (view !== "control" && publicResultsHidden(session)) return null;
   return {
     questionIndex: session.currentQuestionIndex, questionType: getQuestionType(q),
     correctOptions: q.correctOptions, explanation: q.explanation,
@@ -215,18 +228,19 @@ const ownAnswers = (session: Session, quiz: Quiz, studentId: string): StudentAns
  * key only, so they are safe for phones and the projector.
  */
 export function leaderboardRows(session: Session, quiz: Quiz, view: PayloadView): LeaderboardRow[] {
-  return computeLeaderboard(session, buildScoredCorrectAnswersMap(quiz)).map((entry) => {
+  if ((view === "public" && publicResultsHidden(session)) || (session.policy && !getSessionScoredQuestionCount(session, quiz))) return [];
+  return computeLeaderboard(session, scoredCorrectAnswersForSession(session, quiz), effectiveRanking(session, quiz)).map((entry) => {
     const participant = session.participants.get(entry.studentId);
     const row = {
       rank: entry.rank, publicKey: participant?.publicKey ?? "", label: participant?.label ?? "",
-      correctCount: entry.correctCount, totalTimeMs: entry.totalTimeMs,
+      correctCount: entry.correctCount, ...(view === "control" || !session.policy || effectiveRanking(session, quiz) === "speed" ? { totalTimeMs: entry.totalTimeMs } : {}),
     };
     return view === "control" ? { ...row, studentId: entry.studentId, displayName: entry.displayName } : row;
   });
 }
 const leaderboardPayload = (session: Session, quiz: Quiz, view: PayloadView) => ({
   entries: leaderboardRows(session, quiz, view),
-  totalQuestions: getScoredQuestionCount(quiz),
+  totalQuestions: getSessionScoredQuestionCount(session, quiz),
 });
 const participantsPayload = (session: Session, view: PayloadView): SessionParticipantsPayload => {
   const participants = [...session.participants.values()].filter((p) => p.connected)
@@ -246,13 +260,14 @@ const closePayload = (session: Session): QuestionClosePayload => ({
 });
 const deadline = (session: Session, quiz: Quiz): number | null => {
   const q = questionAt(session, quiz);
-  return session.state === "QUESTION_OPEN" && q && q.timeLimitSec !== null && !isSlideType(getQuestionType(q))
+  return !isSelfPaced(session) && session.state === "QUESTION_OPEN" && q && q.timeLimitSec !== null && !isSlideType(getQuestionType(q))
     ? timingFor(session, quiz)?.deadlineAt ?? null : null;
 };
 
 /** Calculate a session change without mutating its input or using a clock or transport. */
 export function apply(input: Session, quiz: Quiz, command: Command, now: number): EngineResult {
   const session = clone(input);
+  quiz = session.deckSnapshot ?? quiz;
   ensureParticipantIdentity(session);
   // Adopt only the known current legacy clock before navigating to another item.
   const restoredTiming = timingFor(session, quiz);
@@ -269,12 +284,15 @@ export function apply(input: Session, quiz: Quiz, command: Command, now: number)
   const emit = (event: string, payload: unknown, audience: Audience = "all") => messages.push(message(event, payload, audience));
   // Open responses go out in full to control only; the projector gets the count, then the visible responses at reveal.
   const emitCount = () => {
+    if (publicResultsHidden(session)) { emit(SocketEvents.ANSWER_COUNT, countPayload(session, quiz, "control"), "control"); return; }
     if (isOpenResponseQuestion(questionAt(session, quiz))) {
       emit(SocketEvents.ANSWER_COUNT, countPayload(session, quiz, "control"), "control");
       emit(SocketEvents.ANSWER_COUNT, countPayload(session, quiz, "display"), "display");
     } else emit(SocketEvents.ANSWER_COUNT, countPayload(session, quiz, "display"), "staff");
   };
   const emitReveal = () => {
+    if (session.policy && !isQuestionReleased(session, session.currentQuestionIndex)) return;
+    if (publicResultsHidden(session)) { emit(SocketEvents.RESULTS_REVEAL, revealPayload(session, quiz, "control"), "control"); return; }
     if (isOpenResponseQuestion(questionAt(session, quiz))) {
       emit(SocketEvents.RESULTS_REVEAL, revealPayload(session, quiz, "control"), "control");
       emit(SocketEvents.RESULTS_REVEAL, revealPayload(session, quiz, "display"), "display");
@@ -282,8 +300,9 @@ export function apply(input: Session, quiz: Quiz, command: Command, now: number)
     } else emit(SocketEvents.RESULTS_REVEAL, revealPayload(session, quiz, "display"));
   };
   const emitLeaderboard = () => {
+    if (session.policy && !getSessionScoredQuestionCount(session, quiz)) return;
     emit(SocketEvents.LEADERBOARD_UPDATE, leaderboardPayload(session, quiz, "control"), "control");
-    emit(SocketEvents.LEADERBOARD_UPDATE, leaderboardPayload(session, quiz, "public"), "public");
+    if (!publicResultsHidden(session)) emit(SocketEvents.LEADERBOARD_UPDATE, leaderboardPayload(session, quiz, "public"), "public");
   };
   const emitParticipants = () => {
     emit(SocketEvents.SESSION_PARTICIPANTS, participantsPayload(session, "control"), "control");
@@ -306,17 +325,29 @@ export function apply(input: Session, quiz: Quiz, command: Command, now: number)
     session.questionTiming ??= {};
     const timing = session.questionTiming[String(session.currentQuestionIndex)] ??= {
       firstOpenedAt: now, startedAt: now,
-      deadlineAt: q.timeLimitSec === null || isSlideType(getQuestionType(q)) ? null : now + q.timeLimitSec * 1000,
+      deadlineAt: isSelfPaced(session) || q.timeLimitSec === null || isSlideType(getQuestionType(q)) ? null : now + q.timeLimitSec * 1000,
       restarts: [],
     };
+    if (session.policy) { session.releasedQuestionIndexes ??= new Set<number>(); session.releasedQuestionIndexes.add(session.currentQuestionIndex); }
     session.questionStartedAt = timing.startedAt;
     session.questionDeadlineAt = timing.deadlineAt;
     session.closedByTimer = false;
   };
+  if (session.resultScope && ["configurePolicy", "start", "next", "previous", "open", "restartCountdown", "close", "reveal", "leaderboardShow", "leaderboardHide"].includes(command.type)) throw new EngineCommandError("Session has ended.");
   switch (command.type) {
+    case "configurePolicy":
+      if (command.role !== "control") throw new EngineCommandError("Only the presenter can select the session policy.");
+      if (session.state !== "LOBBY" || session.policyFrozen) throw new EngineCommandError("The session policy is frozen after Start.");
+      if (!["presenter-paced", "self-paced"].includes(command.pacing) || !["correctness", "speed"].includes(command.ranking)
+        || (command.pacing === "self-paced" && command.ranking === "speed")) throw new EngineCommandError("Invalid pacing or ranking policy.");
+      session.policy = { ...defaultSessionPolicy(), pacing: command.pacing, ranking: command.ranking,
+        effectiveTiming: command.pacing === "self-paced" ? "untimed" : "authored" };
+      session.releasedQuestionIndexes ??= new Set<number>();
+      break;
     case "start":
       if (session.state !== "LOBBY") throw new EngineCommandError("The session has already started.");
       transition(session, "QUESTION_OPEN");
+      if (session.policy) { session.policyFrozen = true; session.deckSnapshot = JSON.parse(JSON.stringify(quiz)) as Quiz; quiz = session.deckSnapshot; }
       session.currentQuestionIndex = 0;
       preserveOpening();
       openContext(); state();
@@ -328,7 +359,7 @@ export function apply(input: Session, quiz: Quiz, command: Command, now: number)
       if (session.state === "ENDED") throw new EngineCommandError("Session has ended.");
       if (prev < 0) throw new EngineCommandError("Already at the first item");
       session.currentQuestionIndex = prev;
-      session.state = isSlideType(getQuestionType(questionAt(session, quiz))) ? "QUESTION_OPEN" : "REVEAL";
+      session.state = isSelfPaced(session) || isSlideType(getQuestionType(questionAt(session, quiz))) ? "QUESTION_OPEN" : "REVEAL";
       if (session.state === "QUESTION_OPEN") {
         preserveOpening();
         openContext(); state();
@@ -343,11 +374,13 @@ export function apply(input: Session, quiz: Quiz, command: Command, now: number)
       const next = session.currentQuestionIndex + 1;
       if (next >= quiz.questions.length) throw new EngineCommandError("No more questions");
       if (session.state === "LOBBY") throw new EngineCommandError("Start the session before advancing.");
-      if (session.state === "QUESTION_OPEN") {
+      if (session.state === "ENDED") throw new EngineCommandError("Session has ended.");
+      if (isSelfPaced(session)) session.state = "QUESTION_OPEN";
+      else if (session.state === "QUESTION_OPEN") {
         if (!isSlideType(getQuestionType(questionAt(session, quiz)))) throw new EngineCommandError("Close and reveal the current question before advancing.");
       } else transition(session, "QUESTION_OPEN");
       session.currentQuestionIndex = next;
-      if (!isSlideType(getQuestionType(questionAt(session, quiz))) && session.revealedQuestionIndexes?.has(next)) session.state = "REVEAL";
+      if (!isSelfPaced(session) && !isSlideType(getQuestionType(questionAt(session, quiz))) && session.revealedQuestionIndexes?.has(next)) session.state = "REVEAL";
       if (session.state === "QUESTION_OPEN") {
         preserveOpening(); openContext(); state();
         if (!isSlideType(getQuestionType(questionAt(session, quiz)))) emitCount();
@@ -359,6 +392,7 @@ export function apply(input: Session, quiz: Quiz, command: Command, now: number)
       break;
     }
     case "open":
+      if (session.policy && session.state === "LOBBY") { session.policyFrozen = true; session.deckSnapshot = JSON.parse(JSON.stringify(quiz)) as Quiz; quiz = session.deckSnapshot; }
       if (session.state === "REVEAL" || session.revealedQuestionIndexes?.has(session.currentQuestionIndex)) {
         throw new EngineCommandError("Revealed questions cannot be reopened.");
       }
@@ -371,7 +405,7 @@ export function apply(input: Session, quiz: Quiz, command: Command, now: number)
     case "restartCountdown": {
       if (command.role !== "control") throw new EngineCommandError("Only the presenter can restart the countdown.");
       const q = questionAt(session, quiz);
-      if (session.state !== "QUESTION_OPEN" || !q || isSlideType(getQuestionType(q)) || q.timeLimitSec === null
+      if (isSelfPaced(session) || session.state !== "QUESTION_OPEN" || !q || isSlideType(getQuestionType(q)) || q.timeLimitSec === null
         || !Number.isFinite(q.timeLimitSec) || q.timeLimitSec <= 0
         || session.revealedQuestionIndexes?.has(session.currentQuestionIndex)) {
         throw new EngineCommandError("Only an open, unrevealed timed question can restart its countdown.");
@@ -393,6 +427,7 @@ export function apply(input: Session, quiz: Quiz, command: Command, now: number)
     }
     case "close":
     case "timeout":
+      if (isSelfPaced(session)) { if (command.type === "timeout") break; throw new EngineCommandError("Self-paced answers stay open until End."); }
       if (command.type === "close" && isSlideType(getQuestionType(questionAt(session, quiz)))) throw new EngineCommandError("Slides do not close; advance to the next item.");
       if (command.type === "timeout") {
         const due = deadline(session, quiz);
@@ -409,22 +444,33 @@ export function apply(input: Session, quiz: Quiz, command: Command, now: number)
       emit(SocketEvents.RESULTS_DISTRIBUTION, { questionIndex: session.currentQuestionIndex, distribution: getDistribution(session, session.currentQuestionIndex) }, "staff");
       break;
     case "reveal":
+      if (isSelfPaced(session)) throw new EngineCommandError("Self-paced results remain hidden until End.");
       if (isSlideType(getQuestionType(questionAt(session, quiz)))) throw new EngineCommandError("Slides do not reveal answers; advance to the next item.");
       transition(session, "REVEAL"); review();
       openContext(); emitReveal(); state();
       break;
     case "end":
+      if (session.policy) {
+        if (session.resultScope) break;
+        session.resultScope = { schemaVersion: 1, releasedQuestionIndexes: releasedQuestionIndexes(session, quiz),
+          scoredQuestionIndexes: [...scoredCorrectAnswersForSession(session, quiz).keys()], endedAt: now, disclosed: command.discloseResults !== false };
+        session.policyFrozen = true;
+        session.state = "ENDED"; state(false);
+        break;
+      }
       if (session.state === "QUESTION_CLOSED") transition(session, "REVEAL");
       if (session.state === "REVEAL") transition(session, "LEADERBOARD");
       transition(session, "ENDED"); state(false);
       break;
     case "leaderboardShow":
+      if (isSelfPaced(session)) { emitLeaderboard(); break; }
       if (session.state === "QUESTION_CLOSED") transition(session, "REVEAL");
       transition(session, "LEADERBOARD");
       review();
       emitLeaderboard(); state(false);
       break;
     case "leaderboardHide":
+      if (isSelfPaced(session)) break;
       if (session.currentQuestionIndex >= quiz.questions.length - 1) break;
       transition(session, "REVEAL");
       review();
@@ -433,7 +479,7 @@ export function apply(input: Session, quiz: Quiz, command: Command, now: number)
     case "join": {
       const { payload, socketId } = command;
       const reject = (reason: string) => emit(SocketEvents.STUDENT_REJECTED, { reason }, `participant:${socketId}`);
-      if (session.state === "ENDED") { reject("Session has ended"); break; }
+      if (session.state === "ENDED" || session.resultScope) { reject("Session has ended"); break; }
       // The name is normalised for everyone; where Student IDs are off it is also the ID.
       const usesIds = usesStudentIds(quiz);
       const typedName = normalizeDisplayName(payload.displayName);
@@ -484,11 +530,13 @@ export function apply(input: Session, quiz: Quiz, command: Command, now: number)
       const target: Audience = `participant:${studentId || ""}`;
       const reject = (reason: string) => emit(SocketEvents.ANSWER_REJECTED, { questionIndex: payload.questionIndex, reason }, target);
       if (!studentId) { reject("Not joined to a session"); break; }
+      if (session.resultScope) { reject("Session has ended"); break; }
       const seat = session.participants.get(studentId);
-      if (seat && sessionToken !== undefined && sessionToken !== seat.sessionToken) { reject(SEAT_IN_USE_MESSAGE); break; }
-      const q = questionAt(session, quiz);
+      if (seat && ((session.policy && !sessionToken) || (sessionToken !== undefined && sessionToken !== seat.sessionToken))) { reject(SEAT_IN_USE_MESSAGE); break; }
+      if (!isSelfPaced(session) && payload.questionIndex !== session.currentQuestionIndex) { reject(`Question index mismatch: expected ${session.currentQuestionIndex}, got ${payload.questionIndex}.`); break; }
+      const q = quiz.questions[payload.questionIndex];
       if (!q) { reject(`Question ${session.currentQuestionIndex + 1} not found.`); break; }
-      if (payload.questionIndex !== session.currentQuestionIndex) { reject(`Question index mismatch: expected ${session.currentQuestionIndex}, got ${payload.questionIndex}.`); break; }
+      if (session.policy && !isQuestionReleased(session, payload.questionIndex)) { reject("This question has not been released."); break; }
       if (session.revealedQuestionIndexes?.has(payload.questionIndex)) { reject("Revealed questions do not accept answers."); break; }
       if (isSlideType(getQuestionType(q))) { reject("Slides do not accept answers."); break; }
       const options = payload.selectedOptions || [];
@@ -510,7 +558,7 @@ export function apply(input: Session, quiz: Quiz, command: Command, now: number)
       if (existing && !isOpenResponseQuestion(q)) { reject("Already submitted an answer for this question."); break; }
       const submission = { studentId, questionIndex: payload.questionIndex,
         selectedOptions: [...new Set(options)].sort(), responseText: responseText || undefined,
-        submittedAt: now, responseTimeMs: session.questionStartedAt !== undefined ? now - session.questionStartedAt : 0 };
+        submittedAt: now, responseTimeMs: timingFor(session, quiz, payload.questionIndex)?.startedAt !== undefined ? now - timingFor(session, quiz, payload.questionIndex)!.startedAt : 0 };
       if (existing) Object.assign(existing, submission);
       else session.submissions.push(submission);
       emit(SocketEvents.ANSWER_ACCEPTED, { questionIndex: payload.questionIndex }, target);
@@ -535,7 +583,7 @@ export function apply(input: Session, quiz: Quiz, command: Command, now: number)
         emit(SocketEvents.ANSWER_COUNT, countPayload(session, quiz, "control"), "control");
         if (session.state === "REVEAL") {
           emit(SocketEvents.RESULTS_REVEAL, revealPayload(session, quiz, "control"), "control");
-          emit(SocketEvents.RESULTS_REVEAL, revealPayload(session, quiz, "display"), "display");
+          if (!publicResultsHidden(session)) emit(SocketEvents.RESULTS_REVEAL, revealPayload(session, quiz, "display"), "display");
         }
       }
       break;
@@ -591,7 +639,7 @@ export function apply(input: Session, quiz: Quiz, command: Command, now: number)
         openContext(); state();
       }
       break;
-    case "tick": emit(SocketEvents.QUESTION_TICK, { remainingSec: command.remainingSec }); break;
+    case "tick": if (!isSelfPaced(session)) emit(SocketEvents.QUESTION_TICK, { remainingSec: command.remainingSec }); break;
   }
   const nextDeadline = deadline(session, quiz);
   const nextTiming = timingFor(session, quiz);
@@ -611,7 +659,7 @@ function snapshotMessages(session: Session, quiz: Quiz, now: number, audience: A
   const staff = view !== "participant";
   const payloadView: PayloadView = view === "control" ? "control" : "public";
   const emit = (event: string, payload: unknown, target: Audience = audience) => messages.push(message(event, payload, target));
-  const emitCount = () => emit(SocketEvents.ANSWER_COUNT, countPayload(session, quiz, view));
+  const emitCount = () => { if (view === "control" || !publicResultsHidden(session)) emit(SocketEvents.ANSWER_COUNT, countPayload(session, quiz, view)); };
   if (staff) emit(SocketEvents.SESSION_STATE, { state: session.state, questionIndex: session.currentQuestionIndex >= 0 ? session.currentQuestionIndex : undefined,
     ...(session.submissions.length > 0 ? { hasAnswers: true } : {}) });
   const q = questionAt(session, quiz);
@@ -626,13 +674,13 @@ function snapshotMessages(session: Session, quiz: Quiz, now: number, audience: A
     emit(SocketEvents.QUESTION_OPEN, payload);
     emit(SocketEvents.QUESTION_CLOSE, closePayload(session));
     if (staff) {
-      emit(SocketEvents.RESULTS_DISTRIBUTION, { questionIndex: session.currentQuestionIndex, distribution: getDistribution(session, session.currentQuestionIndex) });
+      if (view === "control" || !publicResultsHidden(session)) emit(SocketEvents.RESULTS_DISTRIBUTION, { questionIndex: session.currentQuestionIndex, distribution: getDistribution(session, session.currentQuestionIndex) });
       emitCount();
     }
   } else if (session.state === "REVEAL" && (staff || isReconnect)) {
     emit(SocketEvents.QUESTION_OPEN, payload);
-    emit(SocketEvents.RESULTS_REVEAL, revealPayload(session, quiz, view));
+    if (view === "control" || !publicResultsHidden(session)) emit(SocketEvents.RESULTS_REVEAL, revealPayload(session, quiz, view));
     if (staff) emitCount();
-  } else if (session.state === "LEADERBOARD") emit(SocketEvents.LEADERBOARD_UPDATE, leaderboardPayload(session, quiz, payloadView));
+  } else if (session.state === "LEADERBOARD" && (view === "control" || !publicResultsHidden(session)) && (!session.policy || getSessionScoredQuestionCount(session, quiz) > 0)) emit(SocketEvents.LEADERBOARD_UPDATE, leaderboardPayload(session, quiz, payloadView));
   return messages;
 }

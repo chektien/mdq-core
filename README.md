@@ -861,6 +861,28 @@ Adapters that call the engine's `apply()` route its messages by audience:
 - `control`: the instructor only, with Student IDs and names. `display`: the projector only. `public`: the projector and participants. Their payloads carry `label` and `publicKey` in place of the ID.
 - `participant:<id>`: that participant's own socket.
 
+New sessions carry a versioned `policy`, separate from the legacy `strict`/`open`
+identity mode. They default to presenter-paced, authored timing and correctness-only
+ranking. An authenticated presenter can select pacing and ranking through
+`POST /api/session/:id/policy` in the lobby; Start freezes both that policy and an
+authored deck snapshot. Self-paced keeps every genuinely shown item answerable,
+uses no question countdown, and hides public results until deliberate End. It
+tracks an explicit released-item set, so an adapter's jump does not unlock skipped
+content. `publicQuestionPayload(session, quiz, index, now)` is the release-gated,
+audience-safe content projection; reading it never releases an item. The Core
+item REST route requires the existing participant ID and seat token.
+
+Only released scored questions count in new results. Equal correctness receives
+competition ranks (1, 1, 3); speed is an optional presenter-paced policy that falls
+back to correctness after an untimed scored release or countdown restart. Policy,
+released/scored scope and result finality survive serialization and exports.
+Policy-less legacy records retain their historical whole-deck scope and time ranks;
+rehydration does not invent a release history. Versioned submissions must use the
+pure engine's `answerSubmit` command with seat credentials, not the legacy
+`recordSubmission` compatibility helper. Hosted adapters own availability checks
+and serialization of competing commands. Automatic availability shutdown must
+use `end` with `discloseResults: false`, never deliberate result disclosure.
+
 `audienceReaches(audience, role)` answers whether a socket of role `"control"`, `"display"` or `"participant"` should receive a message. For a connecting socket, `apply(..., { type: "snapshot", view: "control" | "display" })` builds the messages for that role, and `{ type: "snapshot", participantId }` builds a participant's. A `join` command may carry `newPublicKey` (a random key); without it the engine makes one. `leaderboardRows(session, quiz, "public" | "control")` gives the same rows for REST responses.
 
 ## Media Scope

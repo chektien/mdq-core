@@ -19,7 +19,7 @@ const run = (session: Session, command: Command, now: number, quiz = deck()) => 
 const opened = (quiz = deck(), now = 0) => run(createSession("synthetic", "open"), { type: "start" }, now, quiz).session;
 const joined = (session: Session, quiz = deck()) => run(session, { type: "join", payload: { studentId: "test" }, socketId: "test-socket", newToken: "test-token" }, 1, quiz).session;
 const answer = (session: Session, now: number, quiz = deck(), selectedOptions = ["A"]) => run(session,
-  { type: "answerSubmit", studentId: "test", payload: { questionIndex: 0, selectedOptions } }, now, quiz);
+  { type: "answerSubmit", studentId: "test", sessionToken: "test-token", payload: { questionIndex: 0, selectedOptions } }, now, quiz);
 const timing = (session: Session) => session.questionTiming!["0"];
 const payload = (result: ReturnType<typeof apply>) => result.messages.find(message => message.event === SocketEvents.QUESTION_OPEN)?.payload as QuestionOpenPayload;
 
@@ -70,7 +70,7 @@ describe("authoritative question timing", () => {
     expect(result.messages.some(message => message.event === SocketEvents.QUESTION_TICK)).toBe(false);
     expect(run(session, { type: "timeout" }, 100000, quiz).session.state).toBe("QUESTION_OPEN");
     const response = questionType === "open_response" ? { responseText: "Synthetic response" } : { selectedOptions: ["A"] };
-    session = run(session, { type: "answerSubmit", studentId: "test", payload: { questionIndex: 0, ...response } }, 100000, quiz).session;
+    session = run(session, { type: "answerSubmit", studentId: "test", sessionToken: "test-token", payload: { questionIndex: 0, ...response } }, 100000, quiz).session;
     expect(session.submissions).toHaveLength(1);
     expect(deserializeSession(serializeSession(session)).questionTiming!["0"].deadlineAt).toBeNull();
   });
@@ -136,7 +136,7 @@ describe("authoritative question timing", () => {
 
   it("keeps an open response's submitted and response timestamps when restarting", () => {
     const quiz = deck([question({ questionType: "open_response", options: [], correctOptions: [] })]);
-    const submitted = run(joined(opened(quiz), quiz), { type: "answerSubmit", studentId: "test",
+    const submitted = run(joined(opened(quiz), quiz), { type: "answerSubmit", studentId: "test", sessionToken: "test-token",
       payload: { questionIndex: 0, responseText: "Synthetic response" } }, 2000, quiz).session;
     expect(submitted.submissions[0]).toMatchObject({ submittedAt: 2000, responseTimeMs: 2000 });
     const restarted = run(submitted, { type: "restartCountdown", role: "control" }, 6000, quiz);
@@ -168,7 +168,7 @@ describe("authoritative question timing", () => {
   it("rejects fabricated options and mismatched items, and no post-reveal retry can score", () => {
     let session = joined(opened());
     expect(answer(session, 1000, deck(), ["FABRICATED"]).messages[0].event).toBe(SocketEvents.ANSWER_REJECTED);
-    expect(run(session, { type: "answerSubmit", studentId: "test", payload: { questionIndex: 1, selectedOptions: ["A"] } }, 1000).messages[0].event).toBe(SocketEvents.ANSWER_REJECTED);
+    expect(run(session, { type: "answerSubmit", studentId: "test", sessionToken: "test-token", payload: { questionIndex: 1, selectedOptions: ["A"] } }, 1000).messages[0].event).toBe(SocketEvents.ANSWER_REJECTED);
     session = run(run(session, { type: "close" }, 1000).session, { type: "reveal" }, 1001).session;
     expect(() => run(session, { type: "open" }, 2000)).toThrow();
     expect(() => run(session, { type: "restartCountdown", role: "control" }, 2000)).toThrow();

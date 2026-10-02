@@ -10,9 +10,10 @@ import {
   Submission,
   DATA_DIR,
 } from "@mdq/shared";
+import { effectiveRanking, getSessionScoredQuestionCount, releasedQuestionIndexes, resultMetadata, scoredCorrectAnswersForSession } from "./policy";
 import { computeLeaderboard } from "./session";
 import { buildResultsCsv, isSubmissionCorrect, toIso } from "./results-csv";
-import { buildScoredCorrectAnswersMap, getQuestionType, getScoredQuestionCount, isScoredQuestion } from "./scoring";
+import { getQuestionType, isScoredQuestion } from "./scoring";
 
 const sessionRevealTimestamps = new Map<string, Map<number, number>>();
 const DEFAULT_DATA_DIR = path.resolve(__dirname, "../../../", DATA_DIR);
@@ -120,7 +121,8 @@ export function saveSessionSnapshot(session: Session, baseDir?: string): void {
     sessionCode: session.sessionCode,
     week: session.week,
     mode: session.mode,
-    questionCount: session.currentQuestionIndex + 1,
+    questionCount: session.policy ? (session.resultScope?.releasedQuestionIndexes ?? [...(session.releasedQuestionIndexes ?? [])]).length : session.currentQuestionIndex + 1,
+    ...(session.policy ? { deckSnapshot: session.deckSnapshot, policy: session.policy, policyFrozen: session.policyFrozen, releasedQuestionIndexes: [...(session.releasedQuestionIndexes ?? [])], resultScope: session.resultScope } : {}),
     participantCount: session.participants.size,
     participants: [...session.participants.values()].map((p) => ({
       studentId: p.studentId,
@@ -128,7 +130,7 @@ export function saveSessionSnapshot(session: Session, baseDir?: string): void {
       joinedAt: p.joinedAt,
     })),
     createdAt: session.createdAt,
-    endedAt: Date.now(),
+    endedAt: session.resultScope?.endedAt ?? Date.now(),
     ...(session.questionTiming ? { questionTiming: session.questionTiming } : {}),
   };
 
@@ -239,8 +241,8 @@ export function saveSessionSummaryMarkdown(
   ensureDir(dir);
 
   const participants = [...session.participants.values()].sort((a, b) => a.studentId.localeCompare(b.studentId));
-  const correctMap = buildScoredCorrectAnswersMap(quiz);
-  const scoredQuestionCount = getScoredQuestionCount(quiz);
+  const correctMap = scoredCorrectAnswersForSession(session, quiz);
+  const scoredQuestionCount = getSessionScoredQuestionCount(session, quiz);
 
   const submissionsByQuestion = new Map<number, Submission[]>();
   const submissionsByStudent = new Map<string, Submission[]>();
@@ -256,7 +258,7 @@ export function saveSessionSummaryMarkdown(
     submissionsByStudent.get(sub.studentId)!.push(sub);
   }
 
-  const leaderboard = computeLeaderboard(session, correctMap);
+  const leaderboard = computeLeaderboard(session, correctMap, effectiveRanking(session, quiz));
   const activeParticipants = participants.filter((p) => (submissionsByStudent.get(p.studentId)?.length || 0) > 0);
   const avgScore = leaderboard.length > 0
     ? leaderboard.reduce((sum, e) => sum + e.correctCount, 0) / leaderboard.length
@@ -290,6 +292,7 @@ export function saveSessionSummaryMarkdown(
 
   const anomalies: string[] = [];
   for (let i = 0; i < quiz.questions.length; i++) {
+    if (session.policy && !releasedQuestionIndexes(session, quiz).includes(i)) continue;
     const question = quiz.questions[i];
     if (isSlideType(getQuestionType(question))) continue;
     const subs = submissionsByQuestion.get(i) || [];
@@ -391,14 +394,15 @@ export function saveWeeklyResult(
   const dir = winnersDir(baseDir);
   ensureDir(dir);
 
-  const correctMap = buildScoredCorrectAnswersMap(quiz);
-  const entries = computeLeaderboard(session, correctMap);
+  const correctMap = scoredCorrectAnswersForSession(session, quiz);
+  const entries = session.policy && !correctMap.size ? [] : computeLeaderboard(session, correctMap, effectiveRanking(session, quiz));
 
   const result: WeeklyResult = {
     week: session.week,
     sessionId: session.sessionId,
-    totalQuestions: getScoredQuestionCount(quiz),
-    completedAt: Date.now(),
+    totalQuestions: getSessionScoredQuestionCount(session, quiz),
+    completedAt: session.resultScope?.endedAt ?? Date.now(),
+    ...(session.policy ? { metadata: resultMetadata(session, quiz) } : {}),
     entries,
   };
 
@@ -491,6 +495,8 @@ export function computeCumulativeFromResults(
   >();
 
   for (const result of weeklyResults) {
+    // Stored instructor records are not permission to publish provisional or expired results.
+    if (result.metadata && result.metadata.finality !== "ended") continue;
     for (const entry of result.entries) {
       const existing = statsMap.get(entry.studentId);
       if (existing) {

@@ -65,7 +65,7 @@ describe("REST routes that could carry Student IDs", () => {
     const step = (command: Parameters<typeof apply>[2], at: number) => { const stored = getSession(sessionId)!; Object.assign(stored, apply(stored, quiz, command, at).session); };
     step({ type: "join", socketId: "sock", newToken: "tok", newPublicKey: "pk", payload: { studentId: "ZQ-1001", displayName: "Alex" } }, 1);
     await agent.post(`/api/session/${sessionId}/start`).expect(200);
-    step({ type: "answerSubmit", studentId: "ZQ-1001", payload: { questionIndex: 0, responseText: "A thought" } }, 2);
+    step({ type: "answerSubmit", studentId: "ZQ-1001", sessionToken: "tok", payload: { questionIndex: 0, responseText: "A thought" } }, 2);
     await agent.post(`/api/session/${sessionId}/close`).expect(200);
     await agent.post(`/api/session/${sessionId}/reveal`).expect(200);
     await agent.post(`/api/session/${sessionId}/leaderboard-show`).expect(200);

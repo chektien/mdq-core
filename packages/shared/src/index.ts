@@ -424,7 +424,7 @@ export interface LeaderboardRow {
   studentId?: string;
   displayName?: string;
   correctCount: number;
-  totalTimeMs: number;
+  totalTimeMs?: number;
 }
 
 export interface LeaderboardUpdatePayload {
@@ -469,6 +469,8 @@ export const API = {
   QUIZZES_RELOAD: "/api/quizzes/reload",
   QUIZ: "/api/quiz/:week",
   SESSION_CREATE: "/api/session",
+  SESSION_POLICY: "/api/session/:id/policy",
+  SESSION_ITEM: "/api/session/:id/items/:index",
   SESSION_START: "/api/session/:id/start",
   SESSION_PREV: "/api/session/:id/prev",
   SESSION_NEXT: "/api/session/:id/next",
@@ -578,6 +580,30 @@ export interface Quiz {
 
 export type SessionMode = "strict" | "open";
 
+/** Independent of the legacy participant identity/session mode. */
+export interface SessionPolicy {
+  schemaVersion: 1;
+  pacing: "presenter-paced" | "self-paced";
+  ranking: "correctness" | "speed";
+  effectiveTiming: "authored" | "untimed";
+}
+export interface SessionResultScope {
+  schemaVersion: 1;
+  releasedQuestionIndexes: number[];
+  scoredQuestionIndexes: number[];
+  endedAt: number;
+  disclosed: boolean;
+}
+export interface SessionResultMetadata {
+  schemaVersion: 1;
+  policy: SessionPolicy;
+  effectiveRanking: "correctness" | "speed";
+  releasedQuestionIndexes: number[];
+  scoredQuestionIndexes: number[];
+  finality: "provisional" | "ended" | "undisclosed";
+}
+
+
 export interface Participant {
   studentId: string;
   displayName?: string;
@@ -617,6 +643,12 @@ export interface QuestionTiming {
 }
 
 export interface Session {
+  /** New sessions pin authored content at first Start; effective timing stays a separate policy. */
+  deckSnapshot?: Quiz;
+  policy?: SessionPolicy;
+  policyFrozen?: boolean;
+  releasedQuestionIndexes?: Set<number>;
+  resultScope?: SessionResultScope;
   sessionId: string;
   sessionCode: string;
   week: string;
@@ -650,6 +682,11 @@ export interface Session {
 
 /** Snapshot of a session written to data/sessions/<id>.json on session end */
 export interface SessionSnapshot {
+  deckSnapshot?: Quiz;
+  policy?: SessionPolicy;
+  policyFrozen?: boolean;
+  releasedQuestionIndexes?: number[];
+  resultScope?: SessionResultScope;
   sessionId: string;
   sessionCode: string;
   week: string;
@@ -665,6 +702,7 @@ export interface SessionSnapshot {
 
 /** Per-week leaderboard results written to data/winners/weekNN.json */
 export interface WeeklyResult {
+  metadata?: SessionResultMetadata;
   week: string;
   sessionId: string;
   totalQuestions: number;

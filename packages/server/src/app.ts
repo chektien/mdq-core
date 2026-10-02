@@ -13,14 +13,15 @@ import {
   getOpenResponses,
 } from "./session";
 import { parseQuizMarkdown } from "./parser";
-import { apply, leaderboardRows, questionPosition, responsesFor, timingFor, EngineCommandError, type Command, type EngineResult } from "./engine";
+import { publicResultsHidden, releasedQuestionIndexes, getSessionScoredQuestionCount, sessionPolicy } from "./policy";
+import { apply, publicQuestionPayload, leaderboardRows, questionPosition, responsesFor, timingFor, EngineCommandError, type Command, type EngineResult } from "./engine";
 import {
   persistSessionOnEnd,
   computeCumulativeLeaderboard,
   persistSessionProgressOnReveal,
   buildSessionResultsCsv,
 } from "./persistence";
-import { getQuestionType, getScoredQuestionCount, isOpenResponseQuestion } from "./scoring";
+import { getQuestionType, isOpenResponseQuestion } from "./scoring";
 import { getCachedAccessInfo, generateQrDataUrl, generateShortUrl, type ShortUrlProvider } from "./access-info";
 import {
   INSTRUCTOR_SESSION_COOKIE,
@@ -244,38 +245,12 @@ export function createApp(quizDirOrOpts?: string | AppOptions) {
     }
 
     const serverNow = Date.now();
-    return quiz.questions.slice(0, session.currentQuestionIndex + 1).map((question, questionIndex) => {
-      const timing = timingFor(session, quiz, questionIndex);
-      return {
-        questionIndex,
-        topic: question.topic,
-        text: question.textHtml,
-        questionType: getQuestionType(question),
-        ...questionPosition(quiz, questionIndex),
-        attendeeNotes: question.attendeeNotes && question.attendeeNotes.length > 0
-          ? question.attendeeNotes
-          : undefined,
-        slideMedia: question.slideMedia,
-        slideBackground: question.slideBackground,
-        slideLiveEmbed: question.slideLiveEmbed,
-        slideVideo: question.slideVideo,
-        slideReferences: question.slideReferences,
-        ...(quiz.style ? { deckStyle: quiz.style } : {}),
-        options: question.options.map((option) => ({ label: option.label, text: option.textHtml })),
-        allowsMultiple: question.allowsMultiple,
-        isPoll: question.isPoll === true,
-        timeLimitSec: question.timeLimitSec,
-        startedAt: timing?.startedAt ?? session.createdAt,
-        serverNow,
-        ...(timing ? {
-          deadlineAt: timing.deadlineAt,
-          ...(timing.firstOpenedAt !== undefined ? { firstOpenedAt: timing.firstOpenedAt } : {}),
-        } : question.timeLimitSec === null || isSlideType(getQuestionType(question)) ? { deadlineAt: null } : {}),
-      };
-    });
+    return (session.policy ? releasedQuestionIndexes(session, quiz) : quiz.questions.map((_, i) => i).filter((i) => i <= session.currentQuestionIndex))
+      .map((index) => publicQuestionPayload(session, quiz, index, serverNow)).filter((item) => item !== null);
   }
 
   function getReviewReveals(session: Session, quiz: Quiz, view: "control" | "display") {
+    if (publicResultsHidden(session)) return [];
     if (session.currentQuestionIndex < 0) {
       return [];
     }
@@ -292,7 +267,7 @@ export function createApp(quizDirOrOpts?: string | AppOptions) {
     return quiz.questions
       .slice(0, revealedThroughIndex + 1)
       .map((question, questionIndex) => ({ question, questionIndex }))
-      .filter(({ question }) => !isSlideType(getQuestionType(question)))
+      .filter(({ question, questionIndex }) => !isSlideType(getQuestionType(question)) && (!session.policy || session.revealedQuestionIndexes?.has(questionIndex)))
       .map(({ question, questionIndex }) => ({
         questionIndex,
         questionType: getQuestionType(question),
@@ -432,8 +407,8 @@ export function createApp(quizDirOrOpts?: string | AppOptions) {
   }
 
   /** Helper to get quiz for a session */
-  function getQuizForSession(week: string): Quiz | undefined {
-    return quizzes.get(week);
+  function getQuizForSession(session: Session): Quiz | undefined {
+    return session.deckSnapshot ?? quizzes.get(session.week);
   }
 
   /** Notify state change if callback is set */
@@ -690,11 +665,12 @@ export function createApp(quizDirOrOpts?: string | AppOptions) {
     if (!session) {
       return res.status(404).json({ error: "Session not found for that code" });
     }
-    const quiz = getQuizForSession(session.week);
+    const quiz = getQuizForSession(session);
     res.json({
       sessionId: session.sessionId,
       sessionCode: session.sessionCode,
       state: session.state,
+      policy: sessionPolicy(session),
       week: session.week,
       title: quiz?.title || undefined,
       theme: quiz ? resolveDeckTheme(quiz, theme) : theme,
@@ -710,7 +686,7 @@ export function createApp(quizDirOrOpts?: string | AppOptions) {
         return res.status(410).json({ error: "Session has ended" });
       }
 
-      const quiz = getQuizForSession(session.week);
+      const quiz = getQuizForSession(session);
       if (!quiz) {
         return res.status(500).json({ error: "Quiz data not found" });
       }
@@ -730,11 +706,14 @@ export function createApp(quizDirOrOpts?: string | AppOptions) {
         theme: resolveDeckTheme(quiz, theme),
         palette: resolveDeckPalette(quiz, palette),
         state: session.state,
+        policy: sessionPolicy(session),
+        policyFrozen: session.policyFrozen === true,
+        releasedQuestionIndexes: session.policy ? releasedQuestionIndexes(session, quiz) : undefined,
         joinLocked: session.joinLocked === true,
         currentQuestionIndex: session.currentQuestionIndex,
         questionCount: quiz.questions.length,
-        questionHeadings: getQuestionHeadings(quiz),
-        questionSummaries: getQuestionSummaries(quiz),
+        questionHeadings: isAuthenticatedInstructor(req) ? getQuestionHeadings(quiz) : quiz.questions.map((q, i) => publicQuestionPayload(session, quiz, i, Date.now()) ? getQuestionHeading(q) : ""),
+        questionSummaries: isAuthenticatedInstructor(req) ? getQuestionSummaries(quiz) : quiz.questions.map((q, i) => publicQuestionPayload(session, quiz, i, Date.now()) ? { heading: getQuestionHeading(q), questionType: getQuestionType(q) } : {}),
         studentIds: usesStudentIds(quiz),
         reviewQuestions: getReviewQuestions(session, quiz),
         // Student IDs and names only go to a logged-in instructor. With no login set, anyone can
@@ -757,6 +736,32 @@ export function createApp(quizDirOrOpts?: string | AppOptions) {
     callback(session);
   }
 
+  app.post(API.SESSION_POLICY, requireInstructorAuth, (req, res) => {
+    withSession(req, res, (session) => {
+      const quiz = getQuizForSession(session);
+      if (!quiz) return res.status(500).json({ error: "Quiz data not found" });
+      try {
+        const result = apply(session, quiz, { type: "configurePolicy", role: "control", pacing: req.body?.pacing, ranking: req.body?.ranking }, Date.now());
+        Object.assign(session, result.session); storeSession(session);
+        return res.json({ policy: sessionPolicy(session), policyFrozen: session.policyFrozen === true });
+      } catch (error) {
+        if (error instanceof EngineCommandError) return res.status(400).json({ error: error.message });
+        throw error;
+      }
+    });
+  });
+  app.get(API.SESSION_ITEM, (req, res) => {
+    withSession(req, res, (session) => {
+      const quiz = getQuizForSession(session);
+      if (!quiz) return res.status(500).json({ error: "Quiz data not found" });
+      const participant = session.participants.get(String(req.query.participantId ?? ""));
+      if (!participant || !req.query.sessionToken || participant.sessionToken !== req.query.sessionToken || participant.released) return res.status(401).json({ error: "Valid seat credentials are required" });
+      const item = publicQuestionPayload(session, quiz, Number(req.params.index), Date.now());
+      if (!item) return res.status(404).json({ error: "Item unavailable" });
+      res.setHeader("Cache-Control", "no-store"); return res.json(item);
+    });
+  });
+
   const actions: { path: string; type: Command["type"] }[] = [
     { path: API.SESSION_START, type: "start" },
     { path: API.SESSION_PREV, type: "previous" },
@@ -771,7 +776,7 @@ export function createApp(quizDirOrOpts?: string | AppOptions) {
   for (const action of actions) {
     app.post(action.path, requireInstructorAuth, (req, res) => {
       withSession(req, res, (current) => {
-        const quiz = getQuizForSession(current.week);
+        const quiz = getQuizForSession(current);
         if (!quiz) return res.status(500).json({ error: "Quiz data not found" });
         try {
           // A session ended from the lobby has no results, so it must not replace saved ones.
@@ -815,7 +820,7 @@ export function createApp(quizDirOrOpts?: string | AppOptions) {
   // ── Hide or show one open response on the projector ──
   app.post(API.SESSION_RESPONSE_VISIBILITY, requireInstructorAuth, (req, res) => {
     withSession(req, res, (session) => {
-      const quiz = getQuizForSession(session.week);
+      const quiz = getQuizForSession(session);
       if (!quiz) return res.status(500).json({ error: "Quiz data not found" });
       const { questionIndex, publicKey, hidden } = (req.body ?? {}) as Partial<ResponseVisibilityRequest>;
       if (!Number.isInteger(questionIndex) || typeof publicKey !== "string" || !publicKey || typeof hidden !== "boolean") {
@@ -838,7 +843,7 @@ export function createApp(quizDirOrOpts?: string | AppOptions) {
   // ── Free a participant's seat so they can rejoin from a new device ──
   app.post(API.SESSION_RELEASE_SEAT, requireInstructorAuth, (req, res) => {
     withSession(req, res, (session) => {
-      const quiz = getQuizForSession(session.week);
+      const quiz = getQuizForSession(session);
       if (!quiz) return res.status(500).json({ error: "Quiz data not found" });
       const { publicKey } = (req.body ?? {}) as Partial<ReleaseSeatRequest>;
       if (typeof publicKey !== "string" || !publicKey || publicKey.length > MAX_PUBLIC_KEY_LENGTH) return res.status(400).json({ error: "Send publicKey." });
@@ -859,7 +864,7 @@ export function createApp(quizDirOrOpts?: string | AppOptions) {
   // ── Stop new participants joining, or allow them again ──
   app.post(API.SESSION_JOIN_LOCK, requireInstructorAuth, (req, res) => {
     withSession(req, res, (session) => {
-      const quiz = getQuizForSession(session.week);
+      const quiz = getQuizForSession(session);
       if (!quiz) return res.status(500).json({ error: "Quiz data not found" });
       const { locked } = (req.body ?? {}) as Partial<JoinLockRequest>;
       if (typeof locked !== "boolean") return res.status(400).json({ error: "Send locked as true or false." });
@@ -881,7 +886,7 @@ export function createApp(quizDirOrOpts?: string | AppOptions) {
   // The file names people by Student ID, so only the instructor may read it.
   app.get(API.SESSION_RESULTS_CSV, requireInstructorAuth, (req, res) => {
     withSession(req, res, (session) => {
-      const quiz = getQuizForSession(session.week);
+      const quiz = getQuizForSession(session);
       if (!quiz) return res.status(500).json({ error: "Quiz data not found" });
       res.setHeader("Content-Type", "text/csv; charset=utf-8");
       res.setHeader("Content-Disposition", `attachment; filename="${resultsFileName(quiz.title, session.createdAt)}"`);
@@ -892,14 +897,14 @@ export function createApp(quizDirOrOpts?: string | AppOptions) {
 
   app.get(API.SESSION_LEADERBOARD, (req, res) => {
     withSession(req, res, (session) => {
-      const quiz = getQuizForSession(session.week);
+      const quiz = getQuizForSession(session);
       if (!quiz) {
         return res.status(500).json({ error: "Quiz data not found" });
       }
       // Anyone with the session ID can read this, so it names people by label and public key only.
       res.json({
         entries: leaderboardRows(session, quiz, "public"),
-        totalQuestions: getScoredQuestionCount(quiz),
+        ...(!publicResultsHidden(session) && (!session.policy || getSessionScoredQuestionCount(session, quiz) > 0) ? { totalQuestions: getSessionScoredQuestionCount(session, quiz) } : {}),
       });
     });
   });
@@ -956,7 +961,7 @@ export function createApp(quizDirOrOpts?: string | AppOptions) {
       return res.status(410).json({ error: "Session has ended" });
     }
 
-    const quiz = getQuizForSession(session.week);
+    const quiz = getQuizForSession(session);
     if (!quiz) {
       return res.status(500).json({ error: "Quiz data not found" });
     }
@@ -974,8 +979,9 @@ export function createApp(quizDirOrOpts?: string | AppOptions) {
       state: session.state,
       joinLocked: session.joinLocked === true,
       questionCount: quiz.questions.length,
-      questionHeadings: getQuestionHeadings(quiz),
-      questionSummaries: getQuestionSummaries(quiz),
+      questionHeadings: isAuthenticatedInstructor(req) ? getQuestionHeadings(quiz) : quiz.questions.map((q, i) => publicQuestionPayload(session, quiz, i, Date.now()) ? getQuestionHeading(q) : ""),
+      questionSummaries: isAuthenticatedInstructor(req) ? getQuestionSummaries(quiz) : quiz.questions.map((q, i) => publicQuestionPayload(session, quiz, i, Date.now()) ? { heading: getQuestionHeading(q), questionType: getQuestionType(q) } : {}),
+      policy: sessionPolicy(session),
       accessInfo,
     });
   });

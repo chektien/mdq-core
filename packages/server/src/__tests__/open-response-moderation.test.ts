@@ -1,6 +1,7 @@
+import { createLegacySession } from "./fixtures/legacy-session";
 import { Quiz, Session, SocketEvents, AnswerCountPayload, ResultsRevealPayload, MAX_OPEN_RESPONSE_LENGTH } from "@mdq/shared";
 import { apply, EngineCommandError, type Command, type EngineMessage } from "../engine";
-import { createSession, serializeSession, deserializeSession, getOpenResponses } from "../session";
+import { serializeSession, deserializeSession, getOpenResponses } from "../session";
 import { parseQuizMarkdown } from "../parser";
 
 const DECK = `# Moderation check
@@ -36,7 +37,7 @@ const TEXTS = ["Kind words from Alex", "Rude words from Sam", "Plain words from 
 
 /** A session with three participants who each answered the open question (index 1), left open. */
 function openSession(): { session: Session; keys: string[]; step: (command: Command, at?: number) => EngineMessage[] } {
-  let session: Session = createSession("moderation", "open");
+  let session: Session = createLegacySession("moderation", "open");
   const step = (command: Command, at = 5000) => {
     const result = apply(session, quiz, command, at);
     session = result.session;
@@ -230,7 +231,7 @@ describe("open response moderation", () => {
 
   it("lists responses from the same millisecond in the same order whatever the submit order", () => {
     const orderFor = (submitOrder: number[]): string[] => {
-      let session: Session = createSession("tiebreak", "open");
+      let session: Session = createLegacySession("tiebreak", "open");
       const step = (command: Command, at: number) => { session = apply(session, quiz, command, at).session; };
       IDS.forEach((id, i) => step({ type: "join", socketId: `sock-${i}`, newToken: `tok-${i}`, newPublicKey: `key-${i}`, payload: { studentId: id } }, 100 + i));
       step({ type: "start" }, 1000);
