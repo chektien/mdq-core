@@ -63,7 +63,7 @@ it("HTTP retained own results survive missed/rejected final sockets, token-only 
     await teacher.post("/api/instructor/login").send({ password: "synthetic-instructor-password" }).expect(204);
     const made = await teacher.post("/api/session").send({ week: "synthetic" }).expect(201);
     sessionId = made.body.sessionId;
-    await teacher.post(`/api/session/${sessionId}/policy`).send({ pacing: "self-paced", ranking: "correctness" }).expect(200);
+    await teacher.post(`/api/session/${sessionId}/policy`).send({ pacing: "self-paced" }).expect(200);
     await teacher.post(`/api/session/${sessionId}/start`).expect(200);
     const first = client();const firstJoined = once<StudentJoinedPayload>(first, SocketEvents.STUDENT_JOINED);
     first.connect();first.emit(SocketEvents.STUDENT_JOIN, { studentId: "synthetic-one" });const seat = await firstJoined;

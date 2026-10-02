@@ -18,7 +18,12 @@ const item = (index: number, extra: Partial<Question> = {}): Question => ({ inde
 const deck: Quiz = { week: "synthetic", title: "Synthetic", sourceFile: "synthetic.md", questions: [item(0), item(1, {
   options: [{ label: "X", textMd: "x", textHtml: "x" }], correctOptions: ["X"] }), item(2), item(3, { questionType: "open_response", options: [], correctOptions: [] })] };
 const run = (session: Session, command: Command, now = 0, quiz = deck) => apply(session, quiz, command, now);
-const policy = (pacing: "presenter-paced" | "self-paced" = "self-paced", ranking: "correctness" | "speed" = "correctness") => run(createSession("synthetic", "open"), { type: "configurePolicy", role: "control", pacing, ranking }).session;
+const policy = (pacing: "presenter-paced" | "self-paced" = "self-paced", ranking?: "correctness" | "speed") => {
+  const created = createSession("synthetic", "open");
+  // Explicit v1 fixture retains the original opt-in result semantics.
+  if (ranking !== undefined) created.policy = { schemaVersion: 1, pacing: "presenter-paced", ranking: "correctness", effectiveTiming: "authored" };
+  return run(created, { type: "configurePolicy", role: "control", pacing, ranking }).session;
+};
 const start = (session = policy()) => run(session, { type: "start" }).session;
 const join = (session: Session, id = "one") => run(session, { type: "join", payload: { studentId: id }, socketId: id, newToken: `token-${id}` }).session;
 const answer = (session: Session, index: number, labels = ["A"], id = "one", now = 10) => run(session,
@@ -26,7 +31,7 @@ const answer = (session: Session, index: number, labels = ["A"], id = "one", now
 const rejected = (result: ReturnType<typeof apply>) => result.messages.some((m) => m.event === SocketEvents.ANSWER_REJECTED);
 
 it("new defaults are independent from legacy mode and freeze policy/deck at Start", () => {
-  expect(createSession("synthetic", "strict").policy).toEqual({ schemaVersion: 1, pacing: "presenter-paced", ranking: "correctness", effectiveTiming: "authored" });
+  expect(createSession("synthetic", "strict").policy).toEqual({ schemaVersion: 2, pacing: "presenter-paced", ranking: "automatic", effectiveTiming: "authored" });
   const session = start();
   expect(() => recordSubmission(session, "one", 0, ["A"])).toThrow("authenticated answerSubmit");
   expect(() => run(session, { type: "configurePolicy", role: "control", pacing: "presenter-paced", ranking: "speed" })).toThrow("frozen");
@@ -180,7 +185,7 @@ it("snapshot, CSV and result history persist versioned effective policy and rele
     expect(loadWeeklyResult("synthetic", directory)?.metadata).toMatchObject({ schemaVersion: 1, effectiveRanking: "correctness", releasedQuestionIndexes: [0], finality: "ended" });
     const csv = buildResultsCsv(session, deck, { now: 20 });
     expect(csv).toContain("results_schema_version,pacing,effective_timing,ranking,effective_ranking,released_item_indexes,scored_item_indexes,finality");
-    expect(csv).toContain("1,self-paced,untimed,correctness,correctness,0,0,ended");
+    expect(csv).toContain("1,self-paced,untimed,automatic,correctness,0,0,ended");
     expect(csv.split("\n")[0]).not.toContain("q2_");
   } finally { fs.rmSync(directory, { recursive: true, force: true }); }
 });
@@ -203,8 +208,8 @@ it("actual REST authenticates policy selection/seat content and hides self-paced
     await agent.post("/api/instructor/login").send({ password: "synthetic-password" }).expect(204);
     const created = await agent.post("/api/session").send({ week: "synthetic" }).expect(201);
     const id = created.body.sessionId;
-    await request(app).post(`/api/session/${id}/policy`).send({ pacing: "self-paced", ranking: "correctness" }).expect(401);
-    await agent.post(`/api/session/${id}/policy`).send({ pacing: "self-paced", ranking: "correctness" }).expect(200);
+    await request(app).post(`/api/session/${id}/policy`).send({ pacing: "self-paced" }).expect(401);
+    await agent.post(`/api/session/${id}/policy`).send({ pacing: "self-paced" }).expect(200);
     await agent.post(`/api/session/${id}/start`).expect(200);
     const session = getSession(id)!;
     const quiz = session.deckSnapshot!;
@@ -222,4 +227,29 @@ it("actual REST authenticates policy selection/seat content and hides self-paced
     if (originalPassword === undefined) delete process.env.INSTRUCTOR_PASSWORD; else process.env.INSTRUCTOR_PASSWORD = originalPassword;
     clearAllSessions(); clearInstructorSessionsForTests(); fs.rmSync(directory, { recursive: true, force: true });
   }
+});
+
+it("automatic v2 ranking respects released scored timers, not unscored items or unreleased content", () => {
+  const quiz = { ...deck, questions: [item(0), item(1, { questionType: "poll", correctOptions: [], timeLimitSec: null }), item(2, { timeLimitSec: null })] };
+  let session = run(policy("presenter-paced"), { type: "start" }, 0, quiz).session;
+  expect(session.policy).toMatchObject({ schemaVersion: 2, ranking: "automatic" });
+  expect(effectiveRanking(session, quiz)).toBe("speed");
+  session = run(session, { type: "close" }, 1, quiz).session;
+  session = run(session, { type: "reveal" }, 2, quiz).session;
+  session = run(session, { type: "next" }, 3, quiz).session;
+  expect(effectiveRanking(session, quiz)).toBe("speed");
+  session = run(session, { type: "close" }, 4, quiz).session;
+  session = run(session, { type: "reveal" }, 5, quiz).session;
+  session = run(session, { type: "next" }, 6, quiz).session;
+  expect(effectiveRanking(deserializeSession(serializeSession(session)), quiz)).toBe("correctness");
+});
+it("v2 rejects ranking overrides and persists restart fairness while v1 correctness stays unchanged", () => {
+  expect(() => run(createSession("synthetic", "open"), { type: "configurePolicy", role: "control", pacing: "presenter-paced", ranking: "speed" })).toThrow("automatically");
+  expect(effectiveRanking(start(policy("presenter-paced", "correctness")), deck)).toBe("correctness");
+  const session = start(policy("presenter-paced"));
+  expect(effectiveRanking(session, deck)).toBe("speed");
+  const result = run(session, { type: "restartCountdown", role: "control" }, 1000);
+  expect(result.messages.find(m => m.event === SocketEvents.SESSION_STATE && m.audience === "control")?.payload).toMatchObject({ effectiveRanking: "correctness" });
+  expect(effectiveRanking(deserializeSession(serializeSession(result.session)), deck)).toBe("correctness");
+  expect(effectiveRanking(start(policy("self-paced")), deck)).toBe("correctness");
 });

@@ -5,6 +5,7 @@ import { io, type Socket } from "socket.io-client";
 import { useState, useEffect, useCallback, useRef } from "react";
 import type {
   SessionState,
+  SessionPolicy,
   SessionAvailabilityPayload,
   StudentJoinedPayload,
   QuestionOpenPayload,
@@ -155,6 +156,8 @@ export interface UseSocketReturn {
   // Session
   availability?: SessionAvailabilityPayload | null;
   sessionState: SessionState | null;
+  policy: SessionPolicy | null;
+  effectiveRanking: "correctness" | "speed" | "legacy" | null;
   sessionToken: string | null;
   /** True once the presenter's Let rejoin was used from another device: this screen has lost the seat. */
   seatTaken: boolean;
@@ -229,6 +232,8 @@ export function useSocket(
 
   const [socketAvailability, setSocketAvailability] = useState<{ id: string; value: SessionAvailabilityPayload } | null>(null);
   const [sessionState, setSessionState] = useState<SessionState | null>(null);
+  const [policy, setPolicy] = useState<SessionPolicy | null>(null);
+  const [effectiveRanking, setEffectiveRanking] = useState<"correctness" | "speed" | "legacy" | null>(null);
   const [sessionToken, setSessionToken] = useState<string | null>(null);
   const [credentialSessionId, setCredentialSessionId] = useState<string | null>(null);
   const scopedAvailability = socketAvailability?.id === sessionId ? socketAvailability.value : null;
@@ -287,6 +292,7 @@ export function useSocket(
     setCredentialSessionId(null);
     setSessionState(null);
     setSocketAvailability(null);
+    setPolicy(null); setEffectiveRanking(null);
     if (!sessionId) return;
 
     const socket = io({
@@ -556,6 +562,8 @@ export function useSocket(
 
     // ── Session state broadcasts ──────────
     socket.on(SocketEvents.SESSION_STATE, (data: SessionStatePayload) => {
+      if (data.policy) setPolicy(data.policy);
+      if (data.effectiveRanking) setEffectiveRanking(data.effectiveRanking);
       if (data.availability) setSocketAvailability({ id: sessionId, value: data.availability });
       setSessionState(data.state);
       setResultsEvidence(previous => updateResultsEvidence(previous, sessionId, data.hasAnswers === true));
@@ -706,6 +714,8 @@ export function useSocket(
     error: socketSessionId === sessionId ? error : null,
     availability,
     sessionState: socketSessionId === sessionId ? sessionState : null,
+    policy: socketSessionId === sessionId ? policy : null,
+    effectiveRanking: socketSessionId === sessionId ? effectiveRanking : null,
     sessionToken: credentialSessionId === sessionId ? sessionToken : null,
     seatTaken: socketSessionId === sessionId && seatTaken,
     studentId: studentIdState,

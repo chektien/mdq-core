@@ -435,6 +435,8 @@ export interface LeaderboardUpdatePayload {
 }
 
 export interface SessionStatePayload {
+  policy?: SessionPolicy;
+  effectiveRanking?: "correctness" | "speed" | "legacy";
   availability?: SessionAvailabilityPayload;
   /** Present once the session has any submissions, including after it ends. */
   hasAnswers?: true;
@@ -588,12 +590,17 @@ export interface Quiz {
 export type SessionMode = "strict" | "open";
 
 /** Independent of the legacy participant identity/session mode. */
-export interface SessionPolicy {
+export type SessionPolicy = {
   schemaVersion: 1;
   pacing: "presenter-paced" | "self-paced";
   ranking: "correctness" | "speed";
   effectiveTiming: "authored" | "untimed";
-}
+} | {
+  schemaVersion: 2;
+  pacing: "presenter-paced" | "self-paced";
+  ranking: "automatic";
+  effectiveTiming: "authored" | "untimed";
+};
 export interface SessionResultScope {
   schemaVersion: 1;
   /** Fixed at first finalization. Absent on older schema-1 records, where it is 1. */

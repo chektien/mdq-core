@@ -40,7 +40,7 @@ it("actual expiry/reconnect/extension/End transports deny new seats and result l
     const made = await teacher.post("/api/session").send({ week: "synthetic", availableUntil: expiry }).expect(201);
     sessionId = made.body.sessionId;
     expect(made.body.availability.availableUntil).toBe(expiry);
-    await teacher.post(`/api/session/${sessionId}/policy`).send({ pacing: "self-paced", ranking: "correctness" }).expect(200);
+    await teacher.post(`/api/session/${sessionId}/policy`).send({ pacing: "self-paced" }).expect(200);
     await teacher.post(`/api/session/${sessionId}/start`).expect(200);
     const first = socket();const joined = once<StudentJoinedPayload>(first, SocketEvents.STUDENT_JOINED);
     first.connect();first.emit(SocketEvents.STUDENT_JOIN, { studentId: "synthetic-seat", clientInstanceId: "same-device" });const seat = await joined;

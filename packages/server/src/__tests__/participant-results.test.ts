@@ -18,7 +18,7 @@ const quiz: Quiz = { week: "synthetic", title: "Synthetic finality", sourceFile:
 function played(pacing: "presenter-paced" | "self-paced" = "self-paced") {
   let session = createSession("synthetic", "open");
   const step = (command: Command, now = 0) => { const result = apply(session, quiz, command, now); session = result.session; return result; };
-  step({ type: "configurePolicy", role: "control", pacing, ranking: "correctness" });
+  step({ type: "configurePolicy", role: "control", pacing });
   for (const id of ["one", "two"]) step({ type: "join", payload: { studentId: id }, socketId: id, newToken: `seat-${id}`, newPublicKey: `opaque-${id}` });
   step({ type: "start" });step({ type: "next" });
   step({ type: "answerSubmit", studentId: "one", sessionToken: "seat-one", payload: { questionIndex: 1, selectedOptions: ["A"] } });

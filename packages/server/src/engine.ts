@@ -65,9 +65,9 @@ export type PayloadView = "control" | "public";
 export type ResponseView = "control" | "display" | "participant";
 export type Command =
   | { type: "end"; discloseResults?: boolean }
-  | { type: "configureAvailability"; role: SocketRole; availableUntil: number }
+  | { type: "configureAvailability"; role: SocketRole; availableUntil?: number; extendForMs?: number }
   | { type: "expireAvailability" | "purgeAvailability"; alarm: import("@mdq/shared").SessionAvailabilityAlarm }
-  | { type: "configurePolicy"; role: SocketRole; pacing: "presenter-paced" | "self-paced"; ranking: "correctness" | "speed" }
+  | { type: "configurePolicy"; role: SocketRole; pacing: "presenter-paced" | "self-paced"; ranking?: "correctness" | "speed" }
   | { type: "start" | "next" | "previous" | "open" | "close" | "reveal" | "leaderboardShow" | "leaderboardHide" | "broadcastOpen" | "broadcastReveal" | "broadcastLeaderboard" | "participants" | "repairClosedSlide" }
   | { type: "timeout"; deadline?: number; questionIndex?: number; startedAt?: number; restartCount?: number }
   | { type: "restartCountdown"; role: SocketRole }
@@ -385,9 +385,13 @@ export function apply(input: Session, quiz: Quiz, command: Command, now: number)
     const payload = questionPayload(session, quiz, now);
     if (payload) emit(SocketEvents.QUESTION_OPEN, payload);
   };
-  const state = (includeIndex = true) => emit(SocketEvents.SESSION_STATE,
-    { ...(session.availability ? { availability: availabilityPayload(session, now) } : {}), ...(includeIndex ? { state: session.state, questionIndex: session.currentQuestionIndex } : { state: session.state }),
-      ...(session.submissions.length > 0 ? { hasAnswers: true } : {}) });
+  const state = (includeIndex = true) => {
+    const payload = { ...(session.availability ? { availability: availabilityPayload(session, now) } : {}),
+      ...(includeIndex ? { state: session.state, questionIndex: session.currentQuestionIndex } : { state: session.state }),
+      ...(session.submissions.length > 0 ? { hasAnswers: true as const } : {}) };
+    emit(SocketEvents.SESSION_STATE, payload);
+    if (session.policy) emit(SocketEvents.SESSION_STATE, { ...payload, policy: session.policy, effectiveRanking: effectiveRanking(session, quiz) }, "control");
+  };
   const review = () => {
     session.revealedQuestionIndexes ??= new Set<number>();
     session.revealedQuestionIndexes.add(session.currentQuestionIndex);
@@ -415,9 +419,12 @@ export function apply(input: Session, quiz: Quiz, command: Command, now: number)
       if (command.role !== "control") throw new EngineCommandError("Only the presenter can change availability.");
       if (session.state === "ENDED" || session.resultScope) throw new EngineCommandError("Ended sessions cannot be reopened.");
       if (!session.availability) throw new EngineCommandError("Legacy availability must be explicitly adopted by its adapter.");
-      try { validateAvailabilityDeadline(command.availableUntil, now); } catch (error) { throw new EngineCommandError((error as Error).message); }
-      if (command.availableUntil <= session.availability.availableUntil) throw new EngineCommandError("The new deadline must be later than the previous deadline.");
-      session.availability = { ...session.availability, availableUntil: command.availableUntil, generation: session.availability.generation + 1 };
+      if (command.availableUntil !== undefined && command.extendForMs !== undefined) throw new EngineCommandError("Choose a duration or an exact deadline, not both.");
+      if (command.extendForMs !== undefined && (!Number.isSafeInteger(command.extendForMs) || command.extendForMs < 60_000)) throw new EngineCommandError("Invalid availability duration.");
+      const until = command.extendForMs !== undefined ? now + command.extendForMs : command.availableUntil;
+      try { validateAvailabilityDeadline(until, now); } catch (error) { throw new EngineCommandError((error as Error).message); }
+      if (until! <= session.availability.availableUntil) throw new EngineCommandError("The new deadline must be later than the previous deadline.");
+      session.availability = { ...session.availability, availableUntil: until!, generation: session.availability.generation + 1 };
       emit(SocketEvents.SESSION_AVAILABILITY, availabilityPayload(session, now));
       state();
       break;
@@ -440,10 +447,16 @@ export function apply(input: Session, quiz: Quiz, command: Command, now: number)
     case "configurePolicy":
       if (command.role !== "control") throw new EngineCommandError("Only the presenter can select the session policy.");
       if (session.state !== "LOBBY" || session.policyFrozen) throw new EngineCommandError("The session policy is frozen after Start.");
-      if (!["presenter-paced", "self-paced"].includes(command.pacing) || !["correctness", "speed"].includes(command.ranking)
-        || (command.pacing === "self-paced" && command.ranking === "speed")) throw new EngineCommandError("Invalid pacing or ranking policy.");
-      session.policy = { ...defaultSessionPolicy(), pacing: command.pacing, ranking: command.ranking,
-        effectiveTiming: command.pacing === "self-paced" ? "untimed" : "authored" };
+      if (!["presenter-paced", "self-paced"].includes(command.pacing)) throw new EngineCommandError("Invalid pacing policy.");
+      if (command.ranking !== undefined) {
+        if (session.policy?.schemaVersion !== 1 || !["correctness", "speed"].includes(command.ranking)
+          || (command.pacing === "self-paced" && command.ranking === "speed")) throw new EngineCommandError("Invalid ranking policy. New sessions rank automatically.");
+        session.policy = { schemaVersion: 1, pacing: command.pacing, ranking: command.ranking,
+          effectiveTiming: command.pacing === "self-paced" ? "untimed" : "authored" };
+      } else {
+        session.policy = { ...defaultSessionPolicy(), pacing: command.pacing,
+          effectiveTiming: command.pacing === "self-paced" ? "untimed" : "authored" };
+      }
       session.releasedQuestionIndexes ??= new Set<number>();
       break;
     case "start":
@@ -776,7 +789,8 @@ function snapshotMessages(session: Session, quiz: Quiz, now: number, audience: A
   if (session.availability) emit(SocketEvents.SESSION_AVAILABILITY, availabilityPayload(session, now));
   if (sessionAvailabilityPhase(session, now) === "deleted") return messages;
   if (staff) emit(SocketEvents.SESSION_STATE, { ...(session.availability ? { availability: availabilityPayload(session, now) } : {}), state: session.state, questionIndex: session.currentQuestionIndex >= 0 ? session.currentQuestionIndex : undefined,
-    ...(session.submissions.length > 0 ? { hasAnswers: true } : {}) });
+    ...(session.submissions.length > 0 ? { hasAnswers: true } : {}),
+    ...(view === "control" && session.policy ? { policy: session.policy, effectiveRanking: effectiveRanking(session, quiz) } : {}) });
   const q = questionAt(session, quiz);
   const payload = questionPayload(session, quiz, now);
   if (!q || !payload) return messages;

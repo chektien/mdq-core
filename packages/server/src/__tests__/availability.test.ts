@@ -8,7 +8,7 @@ function open(pacing: "presenter-paced" | "self-paced" = "self-paced", until = 1
   let session = createSession("synthetic", "open");
   session.createdAt = 0;
   session.availability = { schemaVersion: 1, availableUntil: until, generation: 1 };
-  session = apply(session, quiz, { type: "configurePolicy", role: "control", pacing, ranking: "correctness" }, 0).session;
+  session = apply(session, quiz, { type: "configurePolicy", role: "control", pacing }, 0).session;
   session = apply(session, quiz, { type: "start" }, 0).session;
   return apply(session, quiz, { type: "join", socketId: "sock", newToken: "token", payload: { studentId: "synthetic-seat", clientInstanceId: "device" } }, 0).session;
 }
@@ -121,4 +121,14 @@ it("unrecovered expiry purges without End, result scope or disclosure", () => {
   expect(deleted.messages.map(item => item.event)).toEqual([SocketEvents.SESSION_AVAILABILITY]);
   expect(participantStudyPayload(deleted.session, quiz, "synthetic-seat", alarm.dueAt).items).toEqual([]);
   expect(() => apply(deleted.session, quiz, { type: "end" }, alarm.dueAt)).toThrow("deleted");
+});
+
+it("duration extension resolves at command time and rejects ambiguous, shorter or out-of-bounds requests", () => {
+  const session = createSession("synthetic", "open");
+  session.availability = { schemaVersion: 1, availableUntil: 10_000, generation: 1 };
+  const changed = apply(session, quiz, { type: "configureAvailability", role: "control", extendForMs: 7_200_000 }, 5000).session;
+  expect(changed.availability?.availableUntil).toBe(7_205_000);
+  for (const request of [{ extendForMs: 7_200_000, availableUntil: 7_205_000 }, { extendForMs: 60_000 }, { extendForMs: 604_800_001 }, { extendForMs: NaN }]) {
+    expect(() => apply(changed, quiz, { type: "configureAvailability", role: "control", ...request }, 5000)).toThrow();
+  }
 });

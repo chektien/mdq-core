@@ -1,5 +1,5 @@
 import SessionAvailabilitySettings from "../components/SessionAvailabilitySettings";
-import SessionAvailabilityInfo, { availabilityTimezone, localAvailabilityInput } from "../components/SessionAvailabilityInfo";
+import AvailabilityChoiceControl, { AVAILABILITY_PRESETS, availabilityRequest, deadlineProblem, type AvailabilityChoice } from "../components/AvailabilityChoice";
 import { isSlideType } from "@mdq/shared";
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import EndSessionConfirmation from "../components/EndSessionConfirmation";
@@ -11,7 +11,6 @@ import {
   reloadDecks,
   createSession,
   startSession,
-  configureSessionPolicy,
   prevQuestion,
   nextQuestion,
   closeQuestion,
@@ -171,13 +170,20 @@ export default function InstructorView({
   const [pacing, setPacing] = useState<"presenter-paced" | "self-paced">("presenter-paced");
   const [sessionInfo, setSessionInfo] = useState<CreateSessionResponse | null>(null);
   const [accessInfo, setAccessInfo] = useState<AccessInfo | null>(null);
-  const [initialDeadline, setInitialDeadline] = useState(() => {
+  const [initialAvailability, setInitialAvailability] = useState<AvailabilityChoice>(() => {
     try {
-      const saved = localStorage.getItem("mdquiz_available_until_preference");
-      const timestamp = saved ? new Date(saved).getTime() : NaN;
-      return timestamp > Date.now() && timestamp <= Date.now() + 7 * 24 * 60 * 60 * 1000 ? saved! : "";
-    } catch { return ""; }
+      const key = localStorage.getItem("mdquiz_availability_preset");
+      if (AVAILABILITY_PRESETS.some(p => p.key === key)) return { kind: "preset", key: key! };
+    } catch { /* Optional preference. */ }
+    return { kind: "preset", key: "4h" };
   });
+  const [setupNow, setSetupNow] = useState(Date.now);
+  const [showLobbyOptions, setShowLobbyOptions] = useState(false);
+  const lobbyOptionsOpener = useRef<HTMLButtonElement>(null);
+  const mountLobbyOptions = useCallback((dialog: HTMLDialogElement | null) => {
+    if (dialog) return mountParticipantsDialog(dialog, lobbyOptionsOpener.current);
+  }, []);
+  useEffect(() => { const timer = setInterval(() => setSetupNow(Date.now()), 30_000); return () => clearInterval(timer); }, []);
   const [phase, setPhase] = useState<InstructorPhase>("setup");
   // After session end the live opener no longer exists. Focus the new screen
   // once on attachment rather than leaving focus on the removed dialog/body.
@@ -299,6 +305,7 @@ export default function InstructorView({
     try {
       const snapshot = await fetchSessionStateForRestore(stored.sessionId);
       const restoredInfo: CreateSessionResponse = {
+        policy: snapshot.policy ?? undefined,
         sessionId: snapshot.sessionId,
         sessionCode: snapshot.sessionCode,
         joinUrl: `/join/${snapshot.sessionCode}`,
@@ -310,7 +317,7 @@ export default function InstructorView({
 
       setSessionInfo(restoredInfo);
       setPacing(snapshot.policy?.pacing ?? "presenter-paced");
-      setRanking(snapshot.effectiveRanking === "correctness" ? "correctness" : snapshot.policy?.ranking ?? "correctness");
+      setRanking(snapshot.effectiveRanking === "speed" ? "speed" : "correctness");
       setSelectedWeek(snapshot.week);
       setTotalQuestionsInQuiz(snapshot.questionCount);
       setQuestionHeadings(snapshot.questionHeadings || []);
@@ -416,14 +423,17 @@ export default function InstructorView({
     setLoading(true);
     setErrorMsg(null);
     try {
-      const info = await createSession(selectedWeek, "open", initialDeadline ? new Date(initialDeadline).getTime() : undefined);
+      const problem = deadlineProblem(initialAvailability, Date.now());
+      if (problem) throw new Error(problem);
+      const info = await createSession(selectedWeek, "open", { pacing, ...availabilityRequest(initialAvailability) });
       try {
-        if (initialDeadline) localStorage.setItem("mdquiz_available_until_preference", initialDeadline);
-        else localStorage.removeItem("mdquiz_available_until_preference");
-      } catch {}
+        if (initialAvailability.kind === "preset") localStorage.setItem("mdquiz_availability_preset", initialAvailability.key);
+        else localStorage.removeItem("mdquiz_availability_preset");
+        localStorage.removeItem("mdquiz_available_until_preference");
+      } catch { /* Optional preference. */ }
       setRestoredRevealCache({});
       setSessionInfo(info);
-      setPacing("presenter-paced");
+      setPacing(info.policy?.pacing ?? pacing);
       setRanking("correctness");
       const deck = decks.find((q) => q.week === selectedWeek);
       if (deck) setTotalQuestionsInQuiz(deck.questionCount);
@@ -448,7 +458,7 @@ export default function InstructorView({
     } finally {
       setLoading(false);
     }
-  }, [selectedWeek, decks, initialDeadline]);
+  }, [selectedWeek, decks, initialAvailability, pacing]);
 
   const handleReloadDecks = useCallback(async () => {
     setLoading(true);
@@ -620,13 +630,16 @@ export default function InstructorView({
             >
               {loading ? "Reloading..." : "Reload Decks"}
             </button>
-            <label className="block text-sm">Available until ({availabilityTimezone()})
-              <input type="datetime-local" className="block w-full bg-zinc-800 text-white border border-zinc-700 rounded-xl p-3" value={initialDeadline} min={localAvailabilityInput(Date.now())} max={localAvailabilityInput(Date.now() + 7 * 24 * 60 * 60 * 1000)} onChange={event => setInitialDeadline(event.target.value)} />
-              <span className="block text-zinc-400 mt-2">Leave blank for four hours from creation. Choose up to seven days.</span>
-            </label>
+            <fieldset className="availability-choice" disabled={loading}>
+              <legend>Session pacing</legend>
+              <label className="availability-option"><input type="radio" name="setup-pacing" checked={pacing === "presenter-paced"} onChange={() => setPacing("presenter-paced")} />Presenter-paced</label>
+              <label className="availability-option"><input type="radio" name="setup-pacing" checked={pacing === "self-paced"} onChange={() => setPacing("self-paced")} />Self-paced</label>
+              <p className="availability-preview">{pacing === "self-paced" ? "Participants explore released items without countdowns. Results stay hidden until you end the session." : "Participants follow you. Question timers apply, with speed breaking ties only when all scored questions shown have timers."}</p>
+            </fieldset>
+            <AvailabilityChoiceControl choice={initialAvailability} onChange={setInitialAvailability} now={setupNow} disabled={loading} />
             <button
               onClick={handleCreateSession}
-              disabled={loading || !selectedWeek}
+              disabled={loading || !selectedWeek || !!deadlineProblem(initialAvailability, setupNow)}
               className="w-full bg-indigo-600 hover:bg-indigo-500 disabled:bg-zinc-700 disabled:text-zinc-500 text-white font-semibold py-4 rounded-xl transition-colors text-lg"
             >
               {loading ? "Creating..." : "Create Session"}
@@ -647,7 +660,7 @@ export default function InstructorView({
         >
           &larr; Back to Setup
         </button>
-        <h1 className="instructor-phase-title text-2xl font-bold text-white">Waiting for Students</h1>
+        <h1 className="instructor-phase-title text-2xl font-bold text-white">Waiting for participants</h1>
 
         {/* Join details beside the room status on landscape screens, stacked otherwise */}
         <div className="instructor-lobby-body">
@@ -677,7 +690,7 @@ export default function InstructorView({
               <span className="instructor-participant-count-value text-5xl font-bold text-white tabular-nums">
                 {sock.participants?.count ?? 0}
               </span>
-              <span className="instructor-participant-count-label text-zinc-400 text-lg ml-2">students joined</span>
+              <span className="instructor-participant-count-label text-zinc-400 text-lg ml-2">participants joined</span>
             </div>
 
             {/* Participant list */}
@@ -691,23 +704,6 @@ export default function InstructorView({
                 />
               </div>
             )}
-            {sessionInfo && <SessionAvailabilitySettings sessionId={sessionInfo.sessionId} observed={sock.availability} />}
-            <div className="session-settings session-settings-lobby" role="group" aria-label="Session settings">
-              <JoinLockToggle
-                locked={sock.participants?.joinLocked === true}
-                onChange={handleJoinLock}
-                disabled={!sock.connected}
-              />
-              {idsAvailable && (
-                <SettingSwitch
-                  label="Show Student IDs"
-                  description={STUDENT_IDS_DESCRIPTION}
-                  checked={showStudentIds}
-                  onToggle={toggleShowStudentIds}
-                />
-              )}
-            </div>
-
             {errorMsg && (
               <div className="bg-red-900/50 border border-red-700 text-red-200 px-4 py-3 rounded-xl">
                 {errorMsg}
@@ -720,21 +716,26 @@ export default function InstructorView({
               </div>
             )}
 
-            <fieldset className="session-settings w-full" disabled={loading || !sock.connected}>
-              <legend className="text-sm font-semibold">Session pacing</legend>
-              <label className="flex items-center gap-3 py-2"><input className="shrink-0" type="radio" name="session-pacing" value="presenter-paced" checked={pacing === "presenter-paced"} onChange={() => setPacing("presenter-paced")} /> Presenter-paced</label>
-              <label className="flex items-center gap-3 py-2"><input className="shrink-0" type="radio" name="session-pacing" value="self-paced" checked={pacing === "self-paced"} onChange={() => { setPacing("self-paced"); setRanking("correctness"); }} /> Self-paced</label>
-              <p className="text-sm text-zinc-400">{pacing === "self-paced" ? "Participants can browse shown items. No countdowns or speed ranking. Results stay hidden until End." : "Participants follow the presenter. Authored question timers apply."} Pacing is fixed when you start.</p>
-              <label className="flex items-center gap-3 py-2"><input className="shrink-0" type="checkbox" checked={ranking === "speed"} disabled={pacing === "self-paced" || questionSummaries.some(item => item.questionType === "multiple_choice" && item.timeLimitSec == null)} onChange={event => setRanking(event.target.checked ? "speed" : "correctness")} /> Include answer speed in ranking</label>
-              <p className="text-sm text-zinc-400">{pacing === "self-paced" ? "Speed ranking is unavailable in self-paced sessions." : questionSummaries.some(item => item.questionType === "multiple_choice" && item.timeLimitSec == null) ? "Speed ranking requires verified countdowns on every scored question." : "Correctness is the default. Restarting a countdown switches the session to correctness-only ranking."}</p>
-            </fieldset>
             <button
-              onClick={() => handleAction(async () => { await configureSessionPolicy(sid, pacing, ranking); return startSession(sid); }, "start")}
+              onClick={() => handleAction(() => startSession(sid), "start")}
               disabled={loading || !sock.connected || sock.availability?.phase === "expired" || sock.availability?.phase === "deleted"}
               className="instructor-start-button bg-emerald-600 hover:bg-emerald-500 disabled:bg-zinc-700 text-white font-semibold py-4 px-12 rounded-xl transition-colors text-xl"
             >
               {loading ? "Starting..." : sock.connected ? "Start Session" : "Reconnecting..."}
             </button>
+            <button ref={lobbyOptionsOpener} type="button" className="session-options-button" onClick={() => setShowLobbyOptions(true)}>Session options</button>
+            {showLobbyOptions && <dialog ref={mountLobbyOptions} className="end-session-overlay participants-overlay fixed inset-0 z-[10000] flex items-center justify-center bg-[#07060b]/80 px-5 backdrop-blur-sm" aria-labelledby="lobby-options-title" onCancel={() => setShowLobbyOptions(false)} onClick={event => { if (event.target === event.currentTarget) setShowLobbyOptions(false); }}>
+              <div className="participants-card w-full max-w-lg rounded-2xl bg-[var(--mdq-dialog)] p-6 text-white">
+                <div className="participants-header"><h2 id="lobby-options-title" className="text-2xl font-semibold">Session options</h2><button type="button" className="participants-close" aria-label="Close session options" onClick={() => setShowLobbyOptions(false)} autoFocus>×</button></div>
+                <p className="participants-help">Pacing is {(sock.policy?.pacing ?? pacing) === "self-paced" ? "self-paced" : "presenter-paced"}. To change it, create a new session from setup.</p>
+                <p className="participants-help">{(sock.policy ?? sessionInfo?.policy)?.schemaVersion === 1 ? "This session keeps its original ranking policy." : "Ranking is automatic. Correct answers rank first. Speed breaks ties only for timed, presenter-paced questions; otherwise ties share a rank."}</p>
+                <SessionAvailabilitySettings sessionId={sid} observed={sock.availability} />
+                <div className="session-settings" role="group" aria-label="Joining options"><JoinLockToggle locked={sock.participants?.joinLocked === true} onChange={handleJoinLock} disabled={!sock.connected} />
+                {idsAvailable && (
+                  <SettingSwitch label="Show Student IDs" description={STUDENT_IDS_DESCRIPTION} checked={showStudentIds} onToggle={toggleShowStudentIds} />
+                )}</div>
+              </div>
+            </dialog>}
             {!sock.connected && (
               <button
                 type="button"
@@ -754,7 +755,6 @@ export default function InstructorView({
   if (phase === "ended") {
     return (
       <div className="min-h-dvh flex flex-col items-center justify-center gap-8 p-8">
-        <SessionAvailabilityInfo availability={sock.availability} />
         <h1 ref={endedHeadingRef} tabIndex={-1} className="text-3xl font-bold text-white">Session Ended</h1>
         {quizLabel && (
           <h2 className="text-xl font-semibold text-zinc-300 text-center">
@@ -801,8 +801,8 @@ export default function InstructorView({
   // ── Live Phase (QUESTION_OPEN, QUESTION_CLOSED, REVEAL, LEADERBOARD) ──
   return (
     <LiveView
-      selfPaced={pacing === "self-paced"}
-      speedRanking={ranking === "speed"}
+      selfPaced={(sock.policy?.pacing ?? pacing) === "self-paced"}
+      speedRanking={(sock.effectiveRanking ?? ranking) === "speed"}
       onSpeedInvalidated={() => setRanking("correctness")}
       sock={sock}
       hasAnswers={hasAnswers}
@@ -1228,7 +1228,7 @@ function LiveView({
     if (canClose) {
       if (q && q.timeLimitSec !== null && sock.remainingSec !== null && sock.remainingSec > 0 && !sock.reveal && !isReviewing) actions.push({
         label: "Restart Countdown",
-        detail: speedRanking ? "Switches to correctness-only ranking" : null,
+        detail: speedRanking ? "Ties will no longer use answer speed" : null,
         reason: waitingReason,
         onClick: () => onAction(async () => { const result = await restartCountdown(sessionId); onSpeedInvalidated(); return result; }, "restart countdown"),
         disabled: controlsUnavailable,
@@ -1321,6 +1321,7 @@ function LiveView({
           )}
         </div>
         <div className="session-settings" role="group" aria-labelledby="session-settings-title">
+          <p className="participants-help">Ranking is by correct answers. {speedRanking ? "Speed breaks ties." : "Ties share a rank."}</p>
           <SessionAvailabilitySettings sessionId={sessionId} observed={sock.availability} />
           <h3 id="session-settings-title" className="session-settings-title">Session settings</h3>
           <JoinLockToggle
@@ -1550,7 +1551,9 @@ function LiveView({
   if (sock.availability?.phase === "expired" || sock.availability?.phase === "deleted") {
     return <main className="min-h-dvh p-6 space-y-6">
       <h1 className="text-2xl font-semibold text-white">{sock.availability.phase === "expired" ? "Availability ended" : "Session data deleted"}</h1>
-      <SessionAvailabilitySettings sessionId={sessionId} observed={sock.availability} />
+      <p className="text-zinc-400">Answers are closed.</p>
+      {sock.availability.phase === "expired" && <button type="button" className="session-options-button" onClick={() => setShowParticipants(true)}>Extend & reopen</button>}
+      {participantsDialog}
       {sock.availability.phase === "expired" && <button type="button" className="bg-indigo-600 hover:bg-indigo-500 disabled:bg-zinc-700 text-white font-semibold py-3 px-4 rounded-xl" onClick={requestEndSession} disabled={controlsUnavailable}>End session and show results</button>}
       {errorMsg && <p role="alert" className="text-red-200">{errorMsg}</p>}
       {endSessionConfirmDialog}
@@ -1607,7 +1610,6 @@ function LiveView({
 
   return (
     <div className={isLiveSurfaceDisplay ? "slide-live-shell slide-live-shell-controls" : `min-h-dvh flex flex-col p-6 lg:p-10 ${accessInfo && sessionCode ? "lg:pr-56" : ""}`}>
-      <SessionAvailabilityInfo availability={sock.availability} />
       {/* Top bar: question progress + timer + participant count */}
       {!isLiveSurfaceDisplay && (
       <div className="flex items-center justify-between mb-6">

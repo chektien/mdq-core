@@ -77,6 +77,7 @@ export interface QuestionSummary {
 }
 
 export interface CreateSessionResponse {
+  policy?: SessionPolicy;
   availability?: SessionAvailabilityPayload;
   sessionId: string;
   sessionCode: string;
@@ -212,12 +213,12 @@ export async function reloadDecks(): Promise<ReloadDecksResponse> {
 
 export const reloadQuizzes = reloadDecks;
 
-export async function createSession(week: string, mode: string = "open", availableUntil?: number): Promise<CreateSessionResponse> {
+export async function createSession(week: string, mode: string = "open", options?: number | { pacing: SessionPolicy["pacing"]; availableUntil?: number; availableForMs?: number }): Promise<CreateSessionResponse> {
   const res = await fetchWithTimeout(apiPath(API.SESSION_CREATE), {
     method: "POST",
     credentials: "same-origin",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ week, mode, ...(availableUntil !== undefined ? { availableUntil } : {}) }),
+    body: JSON.stringify({ week, mode, ...(typeof options === "number" ? { availableUntil: options } : options ?? {}) }),
   });
   if (!res.ok) {
     const data = await res.json().catch(() => ({}));
@@ -240,10 +241,10 @@ async function sessionAction(sessionId: string, action: string): Promise<Record<
   return res.json();
 }
 
-export async function configureSessionPolicy(sessionId: string, pacing: SessionPolicy["pacing"], ranking: SessionPolicy["ranking"] = "correctness") {
+export async function configureSessionPolicy(sessionId: string, pacing: SessionPolicy["pacing"], ranking?: "correctness" | "speed") {
   const response = await fetchWithTimeout(apiPath(API.SESSION_POLICY, { id: sessionId }), {
     method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ pacing, ranking }),
+    body: JSON.stringify({ pacing, ...(ranking !== undefined ? { ranking } : {}) }),
   });
   if (!response.ok) {
     const data = await response.json().catch(() => ({}));
@@ -393,10 +394,10 @@ export async function fetchPresentationSession(sessionId: string): Promise<Prese
   return res.json();
 }
 
-export async function configureSessionAvailability(sessionId: string, availableUntil: number): Promise<SessionAvailabilityPayload> {
+export async function configureSessionAvailability(sessionId: string, choice: number | { availableUntil: number } | { extendForMs: number }): Promise<SessionAvailabilityPayload> {
   const response = await fetchWithTimeout(apiPath(API.SESSION_AVAILABILITY, { id: sessionId }), {
     method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ availableUntil }),
+    body: JSON.stringify(typeof choice === "number" ? { availableUntil: choice } : choice),
   });
   if (!response.ok) {
     const data = await response.json().catch(() => ({}));

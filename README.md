@@ -862,9 +862,10 @@ Adapters that call the engine's `apply()` route its messages by audience:
 - `participant:<id>`: that participant's own socket.
 
 New sessions carry a versioned `policy`, separate from the legacy `strict`/`open`
-identity mode. They default to presenter-paced, authored timing and correctness-only
-ranking. An authenticated presenter can select pacing and ranking through
-`POST /api/session/:id/policy` in the lobby; Start freezes both that policy and an
+identity mode. Schema-2 sessions default to presenter-paced, authored timing and automatic
+ranking. Select pacing before creating the join lobby with `pacing` on
+`POST /api/session`, or through the authenticated `POST /api/session/:id/policy`
+route before Start. Start freezes both that policy and an
 authored deck snapshot. Self-paced keeps every genuinely shown item answerable,
 uses no question countdown, and hides public results until deliberate End. It
 tracks an explicit released-item set, so an adapter's jump does not unlock skipped
@@ -872,9 +873,11 @@ content. `publicQuestionPayload(session, quiz, index, now)` is the release-gated
 audience-safe content projection; reading it never releases an item. The Core
 item REST route requires the existing participant ID and seat token.
 
-Only released scored questions count in new results. Equal correctness receives
-competition ranks (1, 1, 3); speed is an optional presenter-paced policy that falls
-back to correctness after an untimed scored release or countdown restart. Policy,
+Only released scored questions count in new results. Speed automatically breaks
+correctness ties when all released scored questions have timers in presenter-paced
+sessions. An untimed scored release or countdown restart permanently gives shared
+competition ranks (1, 1, 3) instead. Self-paced always uses shared correctness ranks.
+Schema-1 records keep their original opt-in ranking semantics. Policy,
 released/scored scope and result finality survive serialization and exports.
 Policy-less legacy records retain their historical whole-deck scope and time ranks;
 rehydration does not invent a release history. Versioned submissions must use the
@@ -999,3 +1002,12 @@ change. The Apache-2.0 licence text is at
 MDQ is provided as-is, and you use it at your own risk. This was developed for personal use and shared in the spirit of open source, but it is not a polished commercial product. It may have security vulnerabilities, bugs, or data loss risks if used in production or with sensitive data. Always review the code and test in a safe environment before using it for real classes.
 
 MDQ is an independent project and is not affiliated with, endorsed by, or sponsored by Tailscale, is.gd, or any other third-party services mentioned here.
+
+Availability setup uses server-resolved `availableForMs` durations or an exact
+`availableUntil`, never both. Omit both for the four-hour default. Deadlines must
+be future and at most seven days from creation. Private management extends with
+`extendForMs` (resolved at mutation time) or `availableUntil`, retaining the same
+session, participants, answers and clocks. The new deadline must be later than
+the old one and within seven days from mutation time. Setup is private; the join
+lobby shows QR/code/link, participant status and Start. Management controls and
+lifecycle dates live in Session options, never on the shared lobby or leaderboard.

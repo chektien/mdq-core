@@ -10,7 +10,7 @@ const quiz: Quiz = { week: "synthetic", title: "Synthetic", sourceFile: "synthet
 function setup(selfPaced = true) {
   let session = createSession("synthetic", "open");
   const step = (command: Parameters<typeof apply>[2], now = 0) => { session = apply(session, quiz, command, now).session; };
-  step({ type: "configurePolicy", role: "control", pacing: selfPaced ? "self-paced" : "presenter-paced", ranking: "correctness" });
+  step({ type: "configurePolicy", role: "control", pacing: selfPaced ? "self-paced" : "presenter-paced" });
   for (const id of ["one", "two"]) step({ type: "join", payload: { studentId: id }, socketId: id, newToken: `token-${id}` });
   step({ type: "start" });
   return { step, current: () => session };

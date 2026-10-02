@@ -2682,7 +2682,7 @@ html[data-theme="light"] .slide-action-button-warning:disabled {
   background: color-mix(in srgb, var(--mdq-slide-ink) 7%, transparent);
   color: var(--mdq-slide-ink-soft);
   padding: 0.34rem 0.56rem;
-  font-size: 0.64rem;
+  font-size: 0.875rem;
   font-weight: 700;
   letter-spacing: 0.1em;
   line-height: 1;
@@ -4820,7 +4820,7 @@ html[data-theme="light"] .quiz-html a {
   .slide-action-button,
   .slide-fullscreen-button {
     padding: 0.58rem 0.62rem;
-    font-size: 0.66rem;
+    font-size: 0.875rem;
   }
 
   .slide-next-up {
@@ -5002,7 +5002,7 @@ html[data-theme="light"] .quiz-html a {
 
   .slide-surface-student .slide-counter {
     margin-top: 0.15rem;
-    font-size: 0.64rem;
+    font-size: 0.875rem;
   }
 }
 
@@ -6637,7 +6637,7 @@ html[data-theme="light"] .slide-video-figure .slide-video-action:not(button) {
   width: 100%;
 }
 
-@media (max-width: 760px), (max-height: 820px) {
+@media (max-width: 760px), (max-height: 700px) {
   .instructor-phase-shell {
     justify-content: flex-start;
     gap: clamp(0.8rem, 2dvh, 1.25rem);
@@ -6687,29 +6687,29 @@ html[data-theme="light"] .slide-video-figure .slide-video-action:not(button) {
 
   .instructor-qr-code-label {
     margin-bottom: 0.1rem;
-    font-size: 0.64rem;
+    font-size: 0.875rem;
     letter-spacing: 0.16em;
   }
 
   .instructor-qr-code {
-    font-size: clamp(1.8rem, 4.8dvh, 2.4rem);
+    font-size: clamp(2.4rem, 9vw, 3rem);
     line-height: 1;
     letter-spacing: 0.14em;
   }
 
   .instructor-qr-url {
-    font-size: clamp(0.78rem, 1.9dvh, 1rem);
+    font-size: 1rem;
     line-height: 1.2;
   }
 
   .instructor-qr-helper {
-    font-size: 0.66rem;
+    font-size: 0.875rem;
   }
 
   .instructor-qr-presentation-link {
     margin-top: 0.35rem;
     padding: 0.4rem 0.72rem;
-    font-size: 0.62rem;
+    font-size: 0.875rem;
     letter-spacing: 0.12em;
   }
 
@@ -8077,3 +8077,24 @@ html:root[data-theme] .student-screen[data-deck-background="true"] .dist-row-she
     grid-template-areas: "previous context progress next";
   }
 }
+
+/* Setup and private session options use the deck's own controls and palette. */
+.availability-choice { width: 100%; border: 0; margin: 0; padding: 0; text-align: left; }
+.availability-choice legend { font-size: 1rem; font-weight: 600; margin-bottom: .5rem; }
+.availability-option { display: flex; align-items: center; gap: .75rem; min-height: 2.75rem; font-size: 1rem; padding: .4rem 0; cursor: pointer; }
+.availability-option:has(input:disabled) { color: var(--mdq-muted); cursor: default; }
+.availability-option input { flex: 0 0 auto; }
+.availability-day-time { display: grid; grid-template-columns: 1fr 1fr; gap: .75rem; margin: .75rem 0; }
+.availability-day-time label { display: flex; flex-direction: column; gap: .4rem; font-size: 1rem; min-width: 0; }
+.availability-day-time input, .availability-day-time select { width: 100%; min-height: 2.75rem; font-size: 1rem; background: var(--mdq-dialog); color: var(--mdq-ink); border: 1px solid var(--mdq-line-strong); border-radius: .65rem; padding: .6rem; }
+.availability-preview { font-size: .875rem; line-height: 1.5; color: var(--mdq-muted); margin: .5rem 0; }
+.session-options-button { min-height: 2.75rem; padding: .6rem 1rem; border: 1px solid var(--mdq-line-strong); border-radius: .65rem; color: var(--mdq-ink); font-size: 1rem; }
+.availability-actions { display: flex; gap: .75rem; justify-content: flex-end; margin-top: .75rem; }
+.instructor-start-button { min-height: 3rem; }
+@media (max-width: 500px) {
+  .availability-day-time { grid-template-columns: 1fr; }
+  .availability-actions { flex-direction: column; }
+}
+
+.instructor-qr-code-label, .instructor-qr-helper, .instructor-qr-presentation-link { font-size: .875rem; }
+.instructor-qr-url { font-size: max(1rem, 1em); }

@@ -2,8 +2,8 @@ import { sessionAvailabilityPhase } from "./availability";
 import { Quiz, Session, SessionPolicy, SessionResultMetadata } from "@mdq/shared";
 import { buildScoredCorrectAnswersMap } from "./scoring";
 
-export const defaultSessionPolicy = (): SessionPolicy => ({ schemaVersion: 1,
-  pacing: "presenter-paced", ranking: "correctness", effectiveTiming: "authored" });
+export const defaultSessionPolicy = (): SessionPolicy => ({ schemaVersion: 2,
+  pacing: "presenter-paced", ranking: "automatic", effectiveTiming: "authored" });
 /** Missing policy is a legacy record, not a new default or invented release history. */
 export const sessionPolicy = (session: Session): SessionPolicy | null => session.policy ?? null;
 export const isSelfPaced = (session: Session): boolean => session.policy?.pacing === "self-paced";
@@ -29,9 +29,10 @@ export const getSessionScoredQuestionCount = (session: Session, quiz: Quiz): num
 export function effectiveRanking(session: Session, quiz: Quiz): "correctness" | "speed" | "legacy" {
   quiz = session.deckSnapshot ?? quiz;
   if (!session.policy) return "legacy";
-  if (isSelfPaced(session) || session.policy.ranking !== "speed") return "correctness";
+  if (isSelfPaced(session) || session.policy.ranking === "correctness") return "correctness";
   const scored = scoredCorrectAnswersForSession(session, quiz);
-  if ([...scored.keys()].some((i) => quiz.questions[i].timeLimitSec === null)
+  if ((session.policy.schemaVersion === 2 && !scored.size) || [...scored.keys()].some((i) => session.policy?.schemaVersion === 2
+      ? !Number.isFinite(quiz.questions[i].timeLimitSec) || (quiz.questions[i].timeLimitSec ?? 0) <= 0 : quiz.questions[i].timeLimitSec === null)
     || Object.values(session.questionTiming ?? {}).some((t) => t.timingFairnessInvalidated || t.restarts.length > 0)) return "correctness";
   return "speed";
 }

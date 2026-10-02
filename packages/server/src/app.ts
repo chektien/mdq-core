@@ -679,9 +679,17 @@ export function createApp(quizDirOrOpts?: string | AppOptions) {
       return res.status(404).json({ error: `Quiz not found: ${week}` });
     }
     const session = createSession(week, mode);
-    if (req.body.availableUntil !== undefined) {
-      try { validateAvailabilityDeadline(req.body.availableUntil, Date.now()); } catch (error) { return res.status(400).json({ error: (error as Error).message }); }
-      session.availability!.availableUntil = req.body.availableUntil;
+    if (req.body.availableUntil !== undefined && req.body.availableForMs !== undefined) return res.status(400).json({ error: "Choose a duration or an exact deadline, not both." });
+    if (req.body.ranking !== undefined) return res.status(400).json({ error: "New sessions rank automatically." });
+    if (req.body.availableForMs !== undefined && (!Number.isSafeInteger(req.body.availableForMs) || req.body.availableForMs < 60_000)) return res.status(400).json({ error: "Invalid availability duration." });
+    const until = req.body.availableForMs !== undefined ? session.createdAt + req.body.availableForMs : req.body.availableUntil;
+    if (until !== undefined) {
+      try { validateAvailabilityDeadline(until, session.createdAt); } catch (error) { return res.status(400).json({ error: (error as Error).message }); }
+      session.availability!.availableUntil = until;
+    }
+    if (req.body.pacing !== undefined) {
+      try { Object.assign(session, apply(session, quiz, { type: "configurePolicy", role: "control", pacing: req.body.pacing }, session.createdAt).session); }
+      catch (error) { return res.status(400).json({ error: (error as Error).message }); }
     }
     storeSession(session);
     scheduleAvailability(session);
@@ -691,6 +699,7 @@ export function createApp(quizDirOrOpts?: string | AppOptions) {
       sessionCode: session.sessionCode,
       joinUrl: `/join/${session.sessionCode}`,
       availability: availabilityPayload(session, Date.now()),
+      policy: session.policy,
       theme: resolveDeckTheme(quiz, theme),
       palette: resolveDeckPalette(quiz, palette),
       questionHeadings: getQuestionHeadings(quiz),
@@ -795,7 +804,7 @@ export function createApp(quizDirOrOpts?: string | AppOptions) {
       const quiz = getQuizForSession(session);
       if (!quiz) return res.status(500).json({ error: "Quiz data not found" });
       try {
-        const result = apply(session, quiz, { type: "configureAvailability", role: "control", availableUntil: req.body?.availableUntil }, Date.now());
+        const result = apply(session, quiz, { type: "configureAvailability", role: "control", availableUntil: req.body?.availableUntil, extendForMs: req.body?.extendForMs }, Date.now());
         Object.assign(session, result.session);
         scheduleAvailability(session);
         // Resume notification alarms from the preserved question clock, never a new opening.
