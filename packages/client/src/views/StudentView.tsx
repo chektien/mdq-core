@@ -773,11 +773,13 @@ function QuestionView({
     if (!question) {
       return;
     }
+    // Timer metadata can change on Restart Countdown; only a different
+    // immutable item resets its unsent selection or response.
     setSelected([]);
     const nextResponse = submittedResponseText || "";
     setResponseText(nextResponse);
     lastSubmittedResponseRef.current = nextResponse;
-  }, [question, questionIndex]);
+  }, [questionIndex]);
 
   useEffect(() => {
     if (!question || questionType !== "open_response") {

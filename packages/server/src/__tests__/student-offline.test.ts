@@ -52,8 +52,8 @@ describe("student choice across a rejoin", () => {
     const open = socket.slice(socket.indexOf("socket.on(SocketEvents.QUESTION_OPEN"));
     expect(open).toContain("isSameOpening(previousQuestion, nextQuestion) ? previousQuestion : nextQuestion");
     expect(open).toContain("setCurrentQuestion(shownQuestion)");
-    // The student view clears its unsent choice only when the question object changes.
-    expect(read("views/StudentView.tsx")).toContain("}, [question, questionIndex]);");
+    // Restart updates the question object/clock but must not reset this item's draft.
+    expect(read("views/StudentView.tsx")).toContain("}, [questionIndex]);");
   });
 });
 
