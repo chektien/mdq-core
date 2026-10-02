@@ -143,6 +143,18 @@ describe("authoritative question timing", () => {
     expect(restarted.session.submissions).toEqual(submitted.submissions);
   });
 
+  it("refuses an overdue still-open restart at and beyond its deadline without changing recorded timing or submissions", () => {
+    const session = answer(joined(opened()), 2000).session;
+    const original = serializeSession(session);
+    for (const now of [10000, 10001]) {
+      expect(() => run(session, { type: "restartCountdown", role: "control" }, now)).toThrow("deadline has passed");
+      expect(serializeSession(session)).toBe(original);
+      expect(session.state).toBe("QUESTION_OPEN");
+      expect(timing(session).restarts).toEqual([]);
+      expect(session.submissions[0]).toMatchObject({ submittedAt: 2000, responseTimeMs: 2000 });
+    }
+  });
+
   it("preserves known legacy start/deadline without inventing a first-open time", () => {
     const legacy = { ...opened(), questionTiming: undefined, questionStartedAt: 0, questionDeadlineAt: 7500 };
     const restored = deserializeSession(serializeSession(legacy));
@@ -187,6 +199,13 @@ describe("portable untimed syntax and countdown", () => {
     for (const value of ["none", "10"]) expect(parseQuizMarkdown(`# Synthetic\n---\n## Slide\ntype: slide\ntime-limit: ${value}\nText.`, "synthetic.md").errors).toHaveLength(1);
     for (const value of ["0", "Infinity", "-1", "1.5", "NaN", "9007199254740992"]) expect(parseQuizMarkdown(`# Synthetic\n---\n## Question\ntime-limit: ${value}\nChoose.\n- A) One\n> Answer: A`, "synthetic.md").errors).toHaveLength(1);
   });
+  it("retains lowercase time-limit key semantics", () => {
+    for (const key of ["Time-Limit", "TIME_LIMIT"]) {
+      const parsed = parseQuizMarkdown(`# Synthetic\n---\n## Question\n${key}: none\nChoose.\nA. One\n> Correct Answer: A`, "synthetic.md");
+      expect(parsed.errors).toEqual([]);
+      expect(parsed.quiz!.questions[0].timeLimitSec).toBe(35);
+    }
+  });
   it("returns null without arithmetic on none and uses the saved authoritative deadline", () => {
     expect(localRemainingSec({ startedAt: 0, timeLimitSec: null, deadlineAt: null }, 999999)).toBeNull();
     expect(clockOffsetFromTick({ startedAt: 0, timeLimitSec: null }, 0, 999999)).toBe(0);
@@ -217,6 +236,13 @@ it("authenticates the restart REST adapter and publishes/persists the engine res
     expect(callbacks.at(-1)!.nextDeadline).toBe(session.questionTiming!["0"].deadlineAt);
     const restored = await agent.get(`/api/session/${id}/state`).expect(200);
     expect(restored.body.reviewQuestions[0].deadlineAt).toBe(session.questionTiming!["0"].deadlineAt);
+    const beforeExpiredAttempt = serializeSession(session);
+    const now = jest.spyOn(Date, "now").mockReturnValue(session.questionTiming!["0"].deadlineAt!);
+    try {
+      const expiredAttempt = await agent.post(`/api/session/${id}/restart-countdown`).expect(400);
+      expect(expiredAttempt.body.error).toContain("deadline has passed");
+      expect(serializeSession(session)).toBe(beforeExpiredAttempt);
+    } finally { now.mockRestore(); }
     await agent.post(`/api/session/${id}/close`).expect(200);
     await agent.post(`/api/session/${id}/restart-countdown`).expect(400);
   } finally {

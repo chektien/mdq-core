@@ -378,6 +378,8 @@ export function apply(input: Session, quiz: Quiz, command: Command, now: number)
       }
       const timing = timingFor(session, quiz);
       if (!timing) throw new EngineCommandError("The original countdown timing is unavailable.");
+      const due = deadline(session, quiz);
+      if (due !== null && now >= due) throw new EngineCommandError("The question deadline has passed; its countdown cannot restart.");
       timing.restarts.push({ restartedAt: now, previousStartedAt: timing.startedAt, previousDeadlineAt: timing.deadlineAt });
       timing.startedAt = now;
       timing.deadlineAt = now + q.timeLimitSec * 1000;

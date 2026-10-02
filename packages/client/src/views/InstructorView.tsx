@@ -1206,7 +1206,7 @@ function LiveView({
 
     const actions: LiveSurfaceAction[] = [...reconnect];
     if (canClose) {
-      if (q && q.timeLimitSec !== null && !sock.reveal && !isReviewing) actions.push({
+      if (q && q.timeLimitSec !== null && sock.remainingSec !== null && sock.remainingSec > 0 && !sock.reveal && !isReviewing) actions.push({
         label: "Restart Countdown",
         onClick: () => onAction(() => restartCountdown(sessionId), "restart countdown"),
         disabled: controlsUnavailable,

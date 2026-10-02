@@ -331,7 +331,7 @@ function parseQuestionBlock(
 
   // 2. Extract time_limit (optional, after H2, before question text)
   let timeLimitSec: number | null = DEFAULT_TIME_LIMIT_SEC;
-  const timeLimitMatch = block.match(/^time_limit:\s*([^\n]*)$/im);
+  const timeLimitMatch = block.match(/^time_limit:\s*([^\n]*)$/m);
   if (timeLimitMatch) {
     const value = timeLimitMatch[1].trim().toLowerCase();
     timeLimitSec = value === "none" ? null : Number(value);
