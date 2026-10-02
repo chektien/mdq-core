@@ -194,7 +194,8 @@ describe("closing early and the wording around it", () => {
     expect(view).toContain("You cannot change your vote after you submit.");
     const text = getQuestionModeText("open_response", false);
     expect(text).not.toContain("Submit one written reply");
-    expect(text).toContain("update");
+    expect(text).toContain("You can update it while answers are open.");
+    expect(text).not.toContain("time is up");
   });
 
   it("offers to send an answer that was left unsent after reconnecting", () => {

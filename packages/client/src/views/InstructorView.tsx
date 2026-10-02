@@ -701,10 +701,10 @@ export default function InstructorView({
 
             <fieldset className="session-settings w-full" disabled={loading || !sock.connected}>
               <legend className="text-sm font-semibold">Session pacing</legend>
-              <label className="block py-2"><input type="radio" name="session-pacing" value="presenter-paced" checked={pacing === "presenter-paced"} onChange={() => setPacing("presenter-paced")} /> Presenter-paced</label>
-              <label className="block py-2"><input type="radio" name="session-pacing" value="self-paced" checked={pacing === "self-paced"} onChange={() => { setPacing("self-paced"); setRanking("correctness"); }} /> Self-paced</label>
+              <label className="flex items-center gap-3 py-2"><input className="shrink-0" type="radio" name="session-pacing" value="presenter-paced" checked={pacing === "presenter-paced"} onChange={() => setPacing("presenter-paced")} /> Presenter-paced</label>
+              <label className="flex items-center gap-3 py-2"><input className="shrink-0" type="radio" name="session-pacing" value="self-paced" checked={pacing === "self-paced"} onChange={() => { setPacing("self-paced"); setRanking("correctness"); }} /> Self-paced</label>
               <p className="text-sm text-zinc-400">{pacing === "self-paced" ? "Participants can browse shown items. No countdowns or speed ranking. Results stay hidden until End." : "Participants follow the presenter. Authored question timers apply."} Pacing is fixed when you start.</p>
-              <label className="block py-2"><input type="checkbox" checked={ranking === "speed"} disabled={pacing === "self-paced" || questionSummaries.some(item => item.questionType === "multiple_choice" && item.timeLimitSec == null)} onChange={event => setRanking(event.target.checked ? "speed" : "correctness")} /> Include answer speed in ranking</label>
+              <label className="flex items-center gap-3 py-2"><input className="shrink-0" type="checkbox" checked={ranking === "speed"} disabled={pacing === "self-paced" || questionSummaries.some(item => item.questionType === "multiple_choice" && item.timeLimitSec == null)} onChange={event => setRanking(event.target.checked ? "speed" : "correctness")} /> Include answer speed in ranking</label>
               <p className="text-sm text-zinc-400">{pacing === "self-paced" ? "Speed ranking is unavailable in self-paced sessions." : questionSummaries.some(item => item.questionType === "multiple_choice" && item.timeLimitSec == null) ? "Speed ranking requires verified countdowns on every scored question." : "Correctness is the default. Restarting a countdown switches the session to correctness-only ranking."}</p>
             </fieldset>
             <button
