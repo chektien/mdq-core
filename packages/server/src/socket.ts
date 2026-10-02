@@ -90,7 +90,7 @@ export function setupSocket(httpServer: HttpServer, quizzes: Map<string, Quiz>):
       logActivity(`reject socket=${socket.id} session=${sessionId} reason=session-not-found`);
       socket.disconnect(); return;
     }
-    const quiz = quizStore.get(session.week);
+    const quiz = session.deckSnapshot ?? quizStore.get(session.week);
     if (quiz) {
       const repaired = apply(session, quiz, { type: "repairClosedSlide" }, Date.now());
       if (repaired.session.state !== session.state) {
@@ -159,9 +159,13 @@ export function setupSocket(httpServer: HttpServer, quizzes: Map<string, Quiz>):
 /** Schedule the existing ticks and automatic close using the engine deadline. */
 export function startQuestionTimer(io: Server, session: Session, sessionId: string, timeLimitSec: number | null, nextDeadline?: number | null): void {
   clearSessionTimers(sessionId);
-  if (isSelfPaced(session) || timeLimitSec === null || nextDeadline === null) return;
-  const quiz = quizStore.get(session.week);
+  if (isSelfPaced(session) || nextDeadline === null) return;
+  const quiz = session.deckSnapshot ?? quizStore.get(session.week);
   if (!quiz) return;
+  // An adapter may still pass timing from a reloaded or removed source. New sessions
+  // use only the frozen item; preserve caller-supplied timer overrides for legacy sessions.
+  if (session.deckSnapshot) timeLimitSec = session.deckSnapshot.questions[session.currentQuestionIndex]?.timeLimitSec ?? null;
+  if (timeLimitSec === null) return;
   const timedIndex = session.currentQuestionIndex;
   const timedStart = session.questionStartedAt;
   const restartCount = session.questionTiming?.[String(timedIndex)]?.restarts.length ?? 0;
@@ -191,6 +195,7 @@ export function startQuestionTimer(io: Server, session: Session, sessionId: stri
 
 /** Compatibility entry points used by existing in-process callers. */
 export function broadcastQuestionOpen(io: Server, session: Session, sessionId: string, quiz: Quiz): void {
+  quiz = session.deckSnapshot ?? quiz;
   clearSessionTimers(sessionId);
   const result = apply(session, quiz, { type: "broadcastOpen" }, Date.now());
   Object.assign(session, result.session);

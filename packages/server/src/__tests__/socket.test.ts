@@ -884,10 +884,13 @@ describe("Socket.IO Integration", () => {
       const session = createLegacySession("week01", "open");
       storeSession(session);
 
-      // Connect instructor first
+      // Consume the initial empty-room snapshot before observing the join update.
+      // Socket connect can precede its initial SESSION_PARTICIPANTS packet.
       const instructor = createInstructorClient(session.sessionId);
+      const initialParticipants = waitForEvent<{ count: number }>(instructor, SocketEvents.SESSION_PARTICIPANTS);
       instructor.connect();
       await new Promise<void>((resolve) => instructor.once("connect", resolve));
+      expect((await initialParticipants).count).toBe(0);
 
       // Register listener for participant update
       const participantsPromise = waitForEvent<{ count: number; participants: { studentId: string }[] }>(
