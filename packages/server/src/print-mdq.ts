@@ -485,7 +485,7 @@ function renderItem(question: Question, index: number, total: number, options: P
         <div class="item-kicker">
           <span>${String(index + 1).padStart(2, "0")} / ${String(total).padStart(2, "0")}</span>
           <span>${questionTypeLabel(question)}</span>
-          ${question.timeLimitSec > 0 ? `<span>${question.timeLimitSec}s</span>` : ""}
+          ${question.timeLimitSec !== null && question.timeLimitSec > 0 ? `<span>${question.timeLimitSec}s</span>` : ""}
           ${question.allowsMultiple ? "<span>Multi-select</span>" : ""}
         </div>
         <h2>${escapeHtml(heading)}</h2>

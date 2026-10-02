@@ -2,7 +2,7 @@ import { isSlideType } from "@mdq/shared";
 import {
   Quiz, Session, SessionState, SocketEvents, QuestionOpenPayload, QuestionClosePayload, FoldoutNote,
   StudentJoinPayload, AnswerSubmitPayload, Participant, STATE_TRANSITIONS, StudentAnswer,
-  LeaderboardRow, OpenResponseEntry, SessionParticipantsPayload, SocketRole,
+  LeaderboardRow, OpenResponseEntry, SessionParticipantsPayload, SocketRole, QuestionTiming,
   JOIN_LOCKED_MESSAGE, MAX_DISPLAY_NAME_LENGTH, MAX_OPEN_RESPONSE_LENGTH, MAX_STUDENT_ID_LENGTH, normalizeDisplayName, usesStudentIds,
 } from "@mdq/shared";
 import {
@@ -63,7 +63,8 @@ export type PayloadView = "control" | "public";
 export type ResponseView = "control" | "display" | "participant";
 export type Command =
   | { type: "start" | "next" | "previous" | "open" | "close" | "reveal" | "end" | "leaderboardShow" | "leaderboardHide" | "broadcastOpen" | "broadcastReveal" | "broadcastLeaderboard" | "participants" | "repairClosedSlide" }
-  | { type: "timeout"; deadline?: number }
+  | { type: "timeout"; deadline?: number; questionIndex?: number; startedAt?: number; restartCount?: number }
+  | { type: "restartCountdown"; role: SocketRole }
   | { type: "join"; payload: StudentJoinPayload; socketId: string; newToken: string; newPublicKey?: string }
   /**
    * `sessionToken` is the token the answering connection joined with. When it is given and is no longer
@@ -80,10 +81,18 @@ export type Command =
   | { type: "disconnect"; studentId: string; socketId: string }
   | { type: "snapshot"; participantId?: string; isReconnect?: boolean; view?: "control" | "display" }
   | { type: "tick"; remainingSec: number };
+/** Captured when scheduling an alarm: numeric deadlines alone are not item identities. */
+export interface QuestionAlarm {
+  questionIndex: number;
+  startedAt: number;
+  deadlineAt: number;
+  restartCount: number;
+}
 export interface EngineResult {
   session: Session;
   messages: EngineMessage[];
   nextDeadline: number | null;
+  nextAlarm: QuestionAlarm | null;
   /**
    * Set by a `join` that took over a seat the presenter freed. Every connection of that participant
    * whose token is not `sessionToken` is on a device that has lost the seat, and an adapter should
@@ -101,6 +110,8 @@ const clone = (session: Session): Session => ({
   revealedQuestionIndexes: session.revealedQuestionIndexes ? new Set(session.revealedQuestionIndexes) : undefined,
   participants: new Map([...session.participants].map(([id, p]) => [id, { ...p }])),
   submissions: session.submissions.map((s) => ({ ...s, selectedOptions: [...s.selectedOptions] })),
+  questionTiming: session.questionTiming ? Object.fromEntries(Object.entries(session.questionTiming)
+    .map(([index, timing]) => [index, { ...timing, restarts: timing.restarts.map((restart) => ({ ...restart })) }])) : undefined,
   hiddenResponses: session.hiddenResponses
     ? Object.fromEntries(Object.entries(session.hiddenResponses).map(([index, keys]) => [index, [...keys]]))
     : undefined,
@@ -110,6 +121,19 @@ const transition = (session: Session, to: SessionState): void => {
   session.state = to;
 };
 const questionAt = (session: Session, quiz: Quiz) => quiz.questions[session.currentQuestionIndex];
+/** Read legacy timing without inventing a first-open history or resetting its clock. */
+export const timingFor = (session: Session, quiz: Quiz, index = session.currentQuestionIndex): QuestionTiming | undefined => {
+  const saved = session.questionTiming?.[String(index)];
+  if (saved) return saved;
+  const q = quiz.questions[index];
+  if (!q || index !== session.currentQuestionIndex || session.questionStartedAt === undefined) return undefined;
+  return {
+    startedAt: session.questionStartedAt,
+    deadlineAt: q.timeLimitSec === null || isSlideType(getQuestionType(q)) ? null
+      : session.questionDeadlineAt !== undefined ? session.questionDeadlineAt : session.questionStartedAt + q.timeLimitSec * 1000,
+    restarts: [],
+  };
+};
 /**
  * "Question 3 of 8" counts only items that ask something: slides have no
  * position. Shared by the live payload and the instructor's restore.
@@ -126,6 +150,7 @@ const questionPayload = (session: Session, quiz: Quiz, now: number): QuestionOpe
   const q = questionAt(session, quiz);
   if (!q) return null;
   const attendeeNotes: FoldoutNote[] | undefined = q.attendeeNotes?.length ? q.attendeeNotes : undefined;
+  const timing = timingFor(session, quiz);
   return {
     questionIndex: session.currentQuestionIndex, topic: q.topic, text: q.textHtml,
     questionType: getQuestionType(q), attendeeNotes, slideMedia: q.slideMedia,
@@ -135,7 +160,9 @@ const questionPayload = (session: Session, quiz: Quiz, now: number): QuestionOpe
     ...(quiz.style ? { deckStyle: quiz.style } : {}),
     options: q.options.map((o) => ({ label: o.label, text: o.textHtml })),
     allowsMultiple: q.allowsMultiple, isPoll: q.isPoll === true,
-    timeLimitSec: q.timeLimitSec, startedAt: session.questionStartedAt || now,
+    timeLimitSec: q.timeLimitSec, startedAt: timing?.startedAt ?? now, serverNow: now,
+    ...(timing ? { deadlineAt: timing.deadlineAt, ...(timing.firstOpenedAt !== undefined ? { firstOpenedAt: timing.firstOpenedAt } : {}) }
+      : q.timeLimitSec === null || isSlideType(getQuestionType(q)) ? { deadlineAt: null } : {}),
     ...questionPosition(quiz, session.currentQuestionIndex),
   };
 };
@@ -219,14 +246,24 @@ const closePayload = (session: Session): QuestionClosePayload => ({
 });
 const deadline = (session: Session, quiz: Quiz): number | null => {
   const q = questionAt(session, quiz);
-  return session.state === "QUESTION_OPEN" && q && !isSlideType(getQuestionType(q)) && session.questionStartedAt !== undefined
-    ? session.questionStartedAt + q.timeLimitSec * 1000 : null;
+  return session.state === "QUESTION_OPEN" && q && q.timeLimitSec !== null && !isSlideType(getQuestionType(q))
+    ? timingFor(session, quiz)?.deadlineAt ?? null : null;
 };
 
 /** Calculate a session change without mutating its input or using a clock or transport. */
 export function apply(input: Session, quiz: Quiz, command: Command, now: number): EngineResult {
   const session = clone(input);
   ensureParticipantIdentity(session);
+  // Adopt only the known current legacy clock before navigating to another item.
+  const restoredTiming = timingFor(session, quiz);
+  if (restoredTiming) {
+    session.questionTiming ??= {};
+    session.questionTiming[String(session.currentQuestionIndex)] ??= restoredTiming;
+  }
+  if ((session.state === "REVEAL" || session.state === "LEADERBOARD") && session.currentQuestionIndex >= 0) {
+    session.revealedQuestionIndexes ??= new Set<number>();
+    session.revealedQuestionIndexes.add(session.currentQuestionIndex);
+  }
   const messages: EngineMessage[] = [];
   let seatTaken: EngineResult["seatTaken"];
   const emit = (event: string, payload: unknown, audience: Audience = "all") => messages.push(message(event, payload, audience));
@@ -263,24 +300,41 @@ export function apply(input: Session, quiz: Quiz, command: Command, now: number)
     session.revealedQuestionIndexes ??= new Set<number>();
     session.revealedQuestionIndexes.add(session.currentQuestionIndex);
   };
+  const preserveOpening = () => {
+    const q = questionAt(session, quiz);
+    if (!q) throw new EngineCommandError("Question not found.");
+    session.questionTiming ??= {};
+    const timing = session.questionTiming[String(session.currentQuestionIndex)] ??= {
+      firstOpenedAt: now, startedAt: now,
+      deadlineAt: q.timeLimitSec === null || isSlideType(getQuestionType(q)) ? null : now + q.timeLimitSec * 1000,
+      restarts: [],
+    };
+    session.questionStartedAt = timing.startedAt;
+    session.questionDeadlineAt = timing.deadlineAt;
+    session.closedByTimer = false;
+  };
   switch (command.type) {
     case "start":
+      if (session.state !== "LOBBY") throw new EngineCommandError("The session has already started.");
       transition(session, "QUESTION_OPEN");
       session.currentQuestionIndex = 0;
-      session.questionStartedAt = now;
+      preserveOpening();
       openContext(); state();
       if (!isSlideType(getQuestionType(questionAt(session, quiz)))) emitCount();
       break;
     case "previous": {
       const prev = session.currentQuestionIndex - 1;
       if (session.state === "LOBBY") throw new EngineCommandError("Start the session before going back.");
+      if (session.state === "ENDED") throw new EngineCommandError("Session has ended.");
       if (prev < 0) throw new EngineCommandError("Already at the first item");
       session.currentQuestionIndex = prev;
       session.state = isSlideType(getQuestionType(questionAt(session, quiz))) ? "QUESTION_OPEN" : "REVEAL";
       if (session.state === "QUESTION_OPEN") {
-        session.questionStartedAt = now;
+        preserveOpening();
         openContext(); state();
       } else {
+        session.questionStartedAt = session.questionTiming?.[String(prev)]?.startedAt;
+        session.questionDeadlineAt = session.questionTiming?.[String(prev)]?.deadlineAt;
         review(); openContext(); emitReveal(); state();
       }
       break;
@@ -295,27 +349,57 @@ export function apply(input: Session, quiz: Quiz, command: Command, now: number)
       session.currentQuestionIndex = next;
       if (!isSlideType(getQuestionType(questionAt(session, quiz))) && session.revealedQuestionIndexes?.has(next)) session.state = "REVEAL";
       if (session.state === "QUESTION_OPEN") {
-        session.questionStartedAt = now; openContext(); state();
+        preserveOpening(); openContext(); state();
         if (!isSlideType(getQuestionType(questionAt(session, quiz)))) emitCount();
       } else {
+        session.questionStartedAt = session.questionTiming?.[String(next)]?.startedAt;
+        session.questionDeadlineAt = session.questionTiming?.[String(next)]?.deadlineAt;
         openContext(); emitReveal(); state();
       }
       break;
     }
     case "open":
+      if (session.state === "REVEAL" || session.revealedQuestionIndexes?.has(session.currentQuestionIndex)) {
+        throw new EngineCommandError("Revealed questions cannot be reopened.");
+      }
       transition(session, "QUESTION_OPEN");
       if (session.currentQuestionIndex < 0) session.currentQuestionIndex = 0;
-      session.questionStartedAt = now;
+      preserveOpening();
       openContext(); state();
       if (!isSlideType(getQuestionType(questionAt(session, quiz)))) emitCount();
       break;
+    case "restartCountdown": {
+      if (command.role !== "control") throw new EngineCommandError("Only the presenter can restart the countdown.");
+      const q = questionAt(session, quiz);
+      if (session.state !== "QUESTION_OPEN" || !q || isSlideType(getQuestionType(q)) || q.timeLimitSec === null
+        || !Number.isFinite(q.timeLimitSec) || q.timeLimitSec <= 0
+        || session.revealedQuestionIndexes?.has(session.currentQuestionIndex)) {
+        throw new EngineCommandError("Only an open, unrevealed timed question can restart its countdown.");
+      }
+      const timing = timingFor(session, quiz);
+      if (!timing) throw new EngineCommandError("The original countdown timing is unavailable.");
+      timing.restarts.push({ restartedAt: now, previousStartedAt: timing.startedAt, previousDeadlineAt: timing.deadlineAt });
+      timing.startedAt = now;
+      timing.deadlineAt = now + q.timeLimitSec * 1000;
+      timing.timingFairnessInvalidated = true;
+      session.questionTiming ??= {};
+      session.questionTiming[String(session.currentQuestionIndex)] = timing;
+      session.questionStartedAt = now;
+      session.questionDeadlineAt = timing.deadlineAt;
+      openContext(); state(); emitCount();
+      break;
+    }
     case "close":
     case "timeout":
       if (command.type === "close" && isSlideType(getQuestionType(questionAt(session, quiz)))) throw new EngineCommandError("Slides do not close; advance to the next item.");
       if (command.type === "timeout") {
         const due = deadline(session, quiz);
+        const timing = timingFor(session, quiz);
         // An alarm set for an earlier question or opening carries a different deadline and is ignored.
-        if (due === null || (command.deadline !== undefined && command.deadline !== due) || now < due) break;
+        if (due === null || (command.deadline !== undefined && command.deadline !== due) || now < due
+          || (command.questionIndex !== undefined && command.questionIndex !== session.currentQuestionIndex)
+          || (command.startedAt !== undefined && command.startedAt !== timing?.startedAt)
+          || (command.restartCount !== undefined && command.restartCount !== timing?.restarts.length)) break;
       }
       transition(session, "QUESTION_CLOSED");
       session.closedByTimer = command.type === "timeout";
@@ -335,11 +419,13 @@ export function apply(input: Session, quiz: Quiz, command: Command, now: number)
     case "leaderboardShow":
       if (session.state === "QUESTION_CLOSED") transition(session, "REVEAL");
       transition(session, "LEADERBOARD");
+      review();
       emitLeaderboard(); state(false);
       break;
     case "leaderboardHide":
       if (session.currentQuestionIndex >= quiz.questions.length - 1) break;
       transition(session, "REVEAL");
+      review();
       openContext(); emitReveal(); state();
       break;
     case "join": {
@@ -400,6 +486,8 @@ export function apply(input: Session, quiz: Quiz, command: Command, now: number)
       if (seat && sessionToken !== undefined && sessionToken !== seat.sessionToken) { reject(SEAT_IN_USE_MESSAGE); break; }
       const q = questionAt(session, quiz);
       if (!q) { reject(`Question ${session.currentQuestionIndex + 1} not found.`); break; }
+      if (payload.questionIndex !== session.currentQuestionIndex) { reject(`Question index mismatch: expected ${session.currentQuestionIndex}, got ${payload.questionIndex}.`); break; }
+      if (session.revealedQuestionIndexes?.has(payload.questionIndex)) { reject("Revealed questions do not accept answers."); break; }
       if (isSlideType(getQuestionType(q))) { reject("Slides do not accept answers."); break; }
       const options = payload.selectedOptions || [];
       const responseText = payload.responseText?.trim();
@@ -408,17 +496,19 @@ export function apply(input: Session, quiz: Quiz, command: Command, now: number)
         if (!responseText) { reject("Response text cannot be blank."); break; }
         if ([...responseText].length > MAX_OPEN_RESPONSE_LENGTH) { reject(`Please use up to ${MAX_OPEN_RESPONSE_LENGTH} characters.`); break; }
       } else {
+        if (options.some((label) => !q.options.some((option) => option.label === label))) { reject("An option is not part of this question."); break; }
         if (!q.allowsMultiple && options.length > 1) { reject("This question accepts one answer only."); break; }
         if (!options.length) { reject("At least one option must be selected."); break; }
       }
       if (session.state !== "QUESTION_OPEN") { reject("Submissions only accepted during QUESTION_OPEN state."); break; }
-      if (payload.questionIndex !== session.currentQuestionIndex) { reject(`Question index mismatch: expected ${session.currentQuestionIndex}, got ${payload.questionIndex}.`); break; }
+      const due = deadline(session, quiz);
+      if (due !== null && now >= due) { reject("The question deadline has passed."); break; }
       if (!session.participants.has(studentId)) { reject(`Student "${studentId}" is not a participant in this session.`); break; }
       const existing = session.submissions.find((s) => s.studentId === studentId && s.questionIndex === payload.questionIndex);
       if (existing && !isOpenResponseQuestion(q)) { reject("Already submitted an answer for this question."); break; }
       const submission = { studentId, questionIndex: payload.questionIndex,
         selectedOptions: [...new Set(options)].sort(), responseText: responseText || undefined,
-        submittedAt: now, responseTimeMs: session.questionStartedAt ? now - session.questionStartedAt : 0 };
+        submittedAt: now, responseTimeMs: session.questionStartedAt !== undefined ? now - session.questionStartedAt : 0 };
       if (existing) Object.assign(existing, submission);
       else session.submissions.push(submission);
       emit(SocketEvents.ANSWER_ACCEPTED, { questionIndex: payload.questionIndex }, target);
@@ -483,7 +573,6 @@ export function apply(input: Session, quiz: Quiz, command: Command, now: number)
         : snapshotMessages(session, quiz, now, command.view === "display" ? "display" : "control", command.view === "display" ? "display" : "control", !!command.isReconnect));
       break;
     case "broadcastOpen":
-      session.questionStartedAt = now;
       openContext(); state();
       if (!isSlideType(getQuestionType(questionAt(session, quiz)))) emitCount();
       break;
@@ -497,13 +586,16 @@ export function apply(input: Session, quiz: Quiz, command: Command, now: number)
     case "repairClosedSlide":
       if (session.state === "QUESTION_CLOSED" && isSlideType(getQuestionType(questionAt(session, quiz)))) {
         session.state = "QUESTION_OPEN";
-        session.questionStartedAt = now;
         openContext(); state();
       }
       break;
     case "tick": emit(SocketEvents.QUESTION_TICK, { remainingSec: command.remainingSec }); break;
   }
-  return { session, messages, nextDeadline: deadline(session, quiz), ...(seatTaken ? { seatTaken } : {}) };
+  const nextDeadline = deadline(session, quiz);
+  const nextTiming = timingFor(session, quiz);
+  const nextAlarm = nextDeadline !== null && nextTiming ? { questionIndex: session.currentQuestionIndex,
+    startedAt: nextTiming.startedAt, deadlineAt: nextDeadline, restartCount: nextTiming.restarts.length } : null;
+  return { session, messages, nextDeadline, nextAlarm, ...(seatTaken ? { seatTaken } : {}) };
 }
 
 /**
@@ -525,7 +617,8 @@ function snapshotMessages(session: Session, quiz: Quiz, now: number, audience: A
   if (!q || !payload) return messages;
   if (session.state === "QUESTION_OPEN") {
     emit(SocketEvents.QUESTION_OPEN, payload);
-    if (!isSlideType(getQuestionType(q)) && session.questionStartedAt) emit(SocketEvents.QUESTION_TICK, { remainingSec: Math.max(0, q.timeLimitSec - Math.floor((now - session.questionStartedAt) / 1000)) });
+    const due = deadline(session, quiz);
+    if (due !== null) emit(SocketEvents.QUESTION_TICK, { remainingSec: Math.max(0, Math.ceil((due - now) / 1000)) });
     if (staff && !isSlideType(getQuestionType(q))) emitCount();
   } else if (session.state === "QUESTION_CLOSED") {
     emit(SocketEvents.QUESTION_OPEN, payload);

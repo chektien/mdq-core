@@ -126,7 +126,6 @@ export function repairClosedSlideState(session: Session, quiz: Quiz): boolean {
   }
 
   session.state = "QUESTION_OPEN";
-  session.questionStartedAt = Date.now();
   return true;
 }
 
@@ -220,6 +219,9 @@ export function recordSubmission(
       `Question index mismatch: expected ${session.currentQuestionIndex}, got ${questionIndex}.`,
     );
   }
+  if (session.revealedQuestionIndexes?.has(questionIndex)) {
+    throw new Error("Revealed questions do not accept answers.");
+  }
   if (normalizedSelectedOptions.length === 0 && !normalizedResponseText) {
     throw new Error("A response is required.");
   }
@@ -228,6 +230,11 @@ export function recordSubmission(
   }
 
   const now = Date.now();
+  const timing = session.questionTiming?.[String(questionIndex)];
+  const deadline = timing ? timing.deadlineAt : session.questionDeadlineAt;
+  if (deadline !== undefined && deadline !== null && now >= deadline) {
+    throw new Error("The question deadline has passed.");
+  }
   const existingSubmission = session.submissions.find(
     (s) => s.studentId === studentId && s.questionIndex === questionIndex,
   );
@@ -240,7 +247,7 @@ export function recordSubmission(
     existingSubmission.selectedOptions = [];
     existingSubmission.responseText = normalizedResponseText;
     existingSubmission.submittedAt = now;
-    existingSubmission.responseTimeMs = session.questionStartedAt ? now - session.questionStartedAt : 0;
+    existingSubmission.responseTimeMs = session.questionStartedAt !== undefined ? now - session.questionStartedAt : 0;
     return existingSubmission;
   }
 
@@ -250,7 +257,7 @@ export function recordSubmission(
     selectedOptions: normalizedSelectedOptions,
     responseText: normalizedResponseText,
     submittedAt: now,
-    responseTimeMs: session.questionStartedAt ? now - session.questionStartedAt : 0,
+    responseTimeMs: session.questionStartedAt !== undefined ? now - session.questionStartedAt : 0,
   };
   session.submissions.push(submission);
   return submission;

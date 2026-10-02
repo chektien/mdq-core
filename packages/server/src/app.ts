@@ -13,7 +13,7 @@ import {
   getOpenResponses,
 } from "./session";
 import { parseQuizMarkdown } from "./parser";
-import { apply, leaderboardRows, questionPosition, responsesFor, EngineCommandError, type Command, type EngineResult } from "./engine";
+import { apply, leaderboardRows, questionPosition, responsesFor, timingFor, EngineCommandError, type Command, type EngineResult } from "./engine";
 import {
   persistSessionOnEnd,
   computeCumulativeLeaderboard,
@@ -243,29 +243,36 @@ export function createApp(quizDirOrOpts?: string | AppOptions) {
       return [];
     }
 
-    return quiz.questions.slice(0, session.currentQuestionIndex + 1).map((question, questionIndex) => ({
-      questionIndex,
-      topic: question.topic,
-      text: question.textHtml,
-      questionType: getQuestionType(question),
-      ...questionPosition(quiz, questionIndex),
-      attendeeNotes: question.attendeeNotes && question.attendeeNotes.length > 0
-        ? question.attendeeNotes
-        : undefined,
-      slideMedia: question.slideMedia,
-      slideBackground: question.slideBackground,
-      slideLiveEmbed: question.slideLiveEmbed,
-      slideVideo: question.slideVideo,
-      slideReferences: question.slideReferences,
-      ...(quiz.style ? { deckStyle: quiz.style } : {}),
-      options: question.options.map((option) => ({ label: option.label, text: option.textHtml })),
-      allowsMultiple: question.allowsMultiple,
-      isPoll: question.isPoll === true,
-      timeLimitSec: question.timeLimitSec,
-      startedAt: questionIndex === session.currentQuestionIndex
-        ? session.questionStartedAt || Date.now()
-        : session.questionStartedAt || session.createdAt,
-    }));
+    const serverNow = Date.now();
+    return quiz.questions.slice(0, session.currentQuestionIndex + 1).map((question, questionIndex) => {
+      const timing = timingFor(session, quiz, questionIndex);
+      return {
+        questionIndex,
+        topic: question.topic,
+        text: question.textHtml,
+        questionType: getQuestionType(question),
+        ...questionPosition(quiz, questionIndex),
+        attendeeNotes: question.attendeeNotes && question.attendeeNotes.length > 0
+          ? question.attendeeNotes
+          : undefined,
+        slideMedia: question.slideMedia,
+        slideBackground: question.slideBackground,
+        slideLiveEmbed: question.slideLiveEmbed,
+        slideVideo: question.slideVideo,
+        slideReferences: question.slideReferences,
+        ...(quiz.style ? { deckStyle: quiz.style } : {}),
+        options: question.options.map((option) => ({ label: option.label, text: option.textHtml })),
+        allowsMultiple: question.allowsMultiple,
+        isPoll: question.isPoll === true,
+        timeLimitSec: question.timeLimitSec,
+        startedAt: timing?.startedAt ?? session.createdAt,
+        serverNow,
+        ...(timing ? {
+          deadlineAt: timing.deadlineAt,
+          ...(timing.firstOpenedAt !== undefined ? { firstOpenedAt: timing.firstOpenedAt } : {}),
+        } : question.timeLimitSec === null || isSlideType(getQuestionType(question)) ? { deadlineAt: null } : {}),
+      };
+    });
   }
 
   function getReviewReveals(session: Session, quiz: Quiz, view: "control" | "display") {
@@ -755,6 +762,7 @@ export function createApp(quizDirOrOpts?: string | AppOptions) {
     { path: API.SESSION_PREV, type: "previous" },
     { path: API.SESSION_NEXT, type: "next" },
     { path: API.SESSION_CLOSE, type: "close" },
+    { path: API.SESSION_RESTART_COUNTDOWN, type: "restartCountdown" },
     { path: API.SESSION_REVEAL, type: "reveal" },
     { path: API.SESSION_END, type: "end" },
     { path: API.SESSION_LEADERBOARD_SHOW, type: "leaderboardShow" },
@@ -768,7 +776,9 @@ export function createApp(quizDirOrOpts?: string | AppOptions) {
         try {
           // A session ended from the lobby has no results, so it must not replace saved ones.
           const endedUnstarted = action.type === "end" && current.state === "LOBBY";
-          const result = apply(current, quiz, { type: action.type } as Command, Date.now());
+          const command: Command = action.type === "restartCountdown" ? { type: "restartCountdown", role: "control" }
+            : { type: action.type } as Command;
+          const result = apply(current, quiz, command, Date.now());
           const session = current;
           Object.assign(session, result.session);
           const lockedOnLeaderboard = action.type === "leaderboardHide" && session.state === "LEADERBOARD"

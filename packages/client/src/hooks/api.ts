@@ -247,6 +247,10 @@ export async function closeQuestion(sessionId: string) {
   return sessionAction(sessionId, "CLOSE");
 }
 
+export async function restartCountdown(sessionId: string) {
+  return sessionAction(sessionId, "RESTART_COUNTDOWN");
+}
+
 export async function revealAnswer(sessionId: string) {
   return sessionAction(sessionId, "REVEAL");
 }

@@ -48,7 +48,7 @@ describe("dashed setting keys", () => {
     const result = parseQuizMarkdown(bad, "b.md");
     expect(result.errors.map((error) => error.detail)).toEqual([
       "Invalid presenter-notes: sometimes (expected true or false)",
-      "Invalid time-limit: 0 (must be positive)",
+      "Invalid time-limit: 0 (must be positive seconds or none)",
     ]);
     // The same positions as the underscored spelling (block line numbers keep
     // Core's existing trim offset either way).

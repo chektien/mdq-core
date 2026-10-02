@@ -156,20 +156,23 @@ export function setupSocket(httpServer: HttpServer, quizzes: Map<string, Quiz>):
 }
 
 /** Schedule the existing ticks and automatic close using the engine deadline. */
-export function startQuestionTimer(io: Server, session: Session, sessionId: string, timeLimitSec: number, nextDeadline?: number | null): void {
+export function startQuestionTimer(io: Server, session: Session, sessionId: string, timeLimitSec: number | null, nextDeadline?: number | null): void {
   clearSessionTimers(sessionId);
+  if (timeLimitSec === null || nextDeadline === null) return;
   const quiz = quizStore.get(session.week);
   if (!quiz) return;
   const timedIndex = session.currentQuestionIndex;
   const timedStart = session.questionStartedAt;
-  const due = nextDeadline ?? Date.now() + timeLimitSec * 1000;
+  const restartCount = session.questionTiming?.[String(timedIndex)]?.restarts.length ?? 0;
+  const due = nextDeadline ?? session.questionDeadlineAt ?? ((timedStart ?? Date.now()) + timeLimitSec * 1000);
   const isCurrent = () => session.state === "QUESTION_OPEN" && session.currentQuestionIndex === timedIndex
-    && session.questionStartedAt === timedStart && !isSlideType(getQuestionType(quiz.questions[timedIndex]));
-  let remaining = timeLimitSec;
+    && session.questionStartedAt === timedStart
+    && (session.questionTiming?.[String(timedIndex)]?.restarts.length ?? 0) === restartCount
+    && !isSlideType(getQuestionType(quiz.questions[timedIndex]));
   const tick = setInterval(() => {
     if (tickTimers.get(sessionId) !== tick || !isCurrent()) { if (tickTimers.get(sessionId) === tick) clearSessionTimers(sessionId); return; }
-    remaining--;
-    if (remaining >= 0) emitMessages(io, sessionId, apply(session, quiz, { type: "tick", remainingSec: remaining }, Date.now()).messages);
+    const remaining = Math.max(0, Math.ceil((due - Date.now()) / 1000));
+    emitMessages(io, sessionId, apply(session, quiz, { type: "tick", remainingSec: remaining }, Date.now()).messages);
   }, TICK_INTERVAL_MS);
   tickTimers.set(sessionId, tick);
   const timer = setTimeout(() => {
@@ -178,7 +181,7 @@ export function startQuestionTimer(io: Server, session: Session, sessionId: stri
     // A caller-supplied time limit has no engine deadline, so the adapter closes the item it has confirmed is current.
     const result = nextDeadline == null
       ? apply(session, quiz, { type: "close" }, Date.now())
-      : apply(session, quiz, { type: "timeout", deadline: due }, Math.max(Date.now(), due));
+      : apply(session, quiz, { type: "timeout", deadline: due, questionIndex: timedIndex, startedAt: timedStart, restartCount }, Math.max(Date.now(), due));
     Object.assign(session, result.session);
     emitMessages(io, sessionId, result.messages);
   }, Math.max(0, due - Date.now()));

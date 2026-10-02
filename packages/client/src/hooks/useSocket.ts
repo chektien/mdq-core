@@ -111,7 +111,9 @@ export interface QuestionState {
   options: { label: string; text: string }[];
   allowsMultiple: boolean;
   isPoll: boolean;
-  timeLimitSec: number;
+  timeLimitSec: number | null;
+  deadlineAt?: number | null;
+  firstOpenedAt?: number;
   startedAt: number;
   /** Position among the deck's questions, slides not counted; absent on a slide or from an older server. */
   questionNumber?: number;
@@ -202,7 +204,7 @@ export interface UseSocketReturn {
 
   // Question
   currentQuestion: QuestionState | null;
-  remainingSec: number;
+  remainingSec: number | null;
   /** True when the open question closed because its timer ran out, false when it was closed early. */
   timedOut: boolean;
   answerCount: AnswerCountPayload | null;
@@ -263,7 +265,7 @@ export function useSocket(
   const [answeredQuestions, setAnsweredQuestions] = useState<number[]>([]);
 
   const [currentQuestion, setCurrentQuestion] = useState<QuestionState | null>(null);
-  const [remainingSec, setRemainingSec] = useState(0);
+  const [remainingSec, setRemainingSec] = useState<number | null>(0);
   const [timedOut, setTimedOut] = useState(false);
   const [resultsEvidence, setResultsEvidence] = useState<ResultsEvidence | null>(null);
   const [answerCount, setAnswerCount] = useState<AnswerCountPayload | null>(null);
@@ -427,6 +429,8 @@ export function useSocket(
         isPoll: data.isPoll ?? false,
         timeLimitSec: data.timeLimitSec,
         startedAt: data.startedAt,
+        deadlineAt: data.deadlineAt,
+        firstOpenedAt: data.firstOpenedAt,
         questionNumber: data.questionNumber,
         questionTotal: data.questionTotal,
       };
@@ -455,10 +459,10 @@ export function useSocket(
       setSubmitted(alreadyAnswered);
       setSubmittedOptions(seeded.selectedOptions);
       setSubmittedResponseText(seeded.responseText);
-      setRemainingSec(data.timeLimitSec);
+      setRemainingSec(localRemainingSec(data, data.serverNow ?? Date.now()));
       setTimedOut(false);
-      // A live open arrives as the question starts; a replayed one is followed by a tick that corrects this.
-      clockOffsetRef.current = data.startedAt - Date.now();
+      // Observational openings carry the same deadline, not a fresh countdown.
+      if (data.serverNow !== undefined) clockOffsetRef.current = data.serverNow - Date.now();
     });
 
     socket.on(SocketEvents.QUESTION_TICK, (data: QuestionTickPayload) => {

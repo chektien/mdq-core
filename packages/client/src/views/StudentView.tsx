@@ -743,7 +743,7 @@ function QuestionView({
 }: {
   question: QuestionState | null;
   state: SessionState;
-  remainingSec: number;
+  remainingSec: number | null;
   submitted: boolean;
   submittedOptions: string[];
   submittedResponseText: string | null;

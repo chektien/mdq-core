@@ -10,6 +10,7 @@ import {
   prevQuestion,
   nextQuestion,
   closeQuestion,
+  restartCountdown,
   revealAnswer,
   endSession,
   showLeaderboard,
@@ -96,6 +97,8 @@ function questionStateFromRestore(data: NonNullable<SessionRestoreResponse["revi
     isPoll: data.isPoll ?? false,
     timeLimitSec: data.timeLimitSec,
     startedAt: data.startedAt,
+    deadlineAt: data.deadlineAt,
+    firstOpenedAt: data.firstOpenedAt,
     questionNumber: data.questionNumber,
     questionTotal: data.questionTotal,
   };
@@ -1203,6 +1206,12 @@ function LiveView({
 
     const actions: LiveSurfaceAction[] = [...reconnect];
     if (canClose) {
+      if (q && q.timeLimitSec !== null && !sock.reveal && !isReviewing) actions.push({
+        label: "Restart Countdown",
+        onClick: () => onAction(() => restartCountdown(sessionId), "restart countdown"),
+        disabled: controlsUnavailable,
+        reason: waitingReason,
+      });
       actions.push({
         label: "Close Question",
         onClick: () => onAction(() => closeQuestion(sessionId), "close"),

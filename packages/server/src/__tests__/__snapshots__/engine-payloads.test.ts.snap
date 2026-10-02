@@ -7,6 +7,8 @@ exports[`captures existing outbound transition payloads 1`] = `
     "payload": {
       "allowsMultiple": false,
       "attendeeNotes": undefined,
+      "deadlineAt": 21000,
+      "firstOpenedAt": 1000,
       "isPoll": false,
       "options": [
         {
@@ -22,6 +24,7 @@ exports[`captures existing outbound transition payloads 1`] = `
       "questionNumber": 1,
       "questionTotal": 1,
       "questionType": "multiple_choice",
+      "serverNow": 1000,
       "slideBackground": undefined,
       "slideLiveEmbed": undefined,
       "slideMedia": undefined,
@@ -56,6 +59,8 @@ exports[`captures existing outbound transition payloads 1`] = `
     "payload": {
       "allowsMultiple": false,
       "attendeeNotes": undefined,
+      "deadlineAt": 21000,
+      "firstOpenedAt": 1000,
       "isPoll": false,
       "options": [
         {
@@ -71,6 +76,7 @@ exports[`captures existing outbound transition payloads 1`] = `
       "questionNumber": 1,
       "questionTotal": 1,
       "questionType": "multiple_choice",
+      "serverNow": 1000,
       "slideBackground": undefined,
       "slideLiveEmbed": undefined,
       "slideMedia": undefined,

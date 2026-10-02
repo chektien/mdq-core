@@ -340,8 +340,15 @@ export interface QuestionOpenPayload {
   options: { label: string; text: string }[];
   allowsMultiple: boolean;
   isPoll?: boolean;
-  timeLimitSec: number;
+  /** null means the presenter closes this question; content items retain 0. */
+  timeLimitSec: number | null;
   startedAt: number; // unix ms
+  /** Authoritative deadline; null explicitly means no countdown. */
+  deadlineAt?: number | null;
+  /** Absent on restored legacy sessions whose first opening is unknown. */
+  firstOpenedAt?: number;
+  /** Server clock at payload creation, including observational replays. */
+  serverNow?: number;
   /** Position among the deck's questions, counting questions only (slides are skipped). Absent on a slide. */
   questionNumber?: number;
   /** How many questions the deck has, not counting slides. */
@@ -466,6 +473,7 @@ export const API = {
   SESSION_PREV: "/api/session/:id/prev",
   SESSION_NEXT: "/api/session/:id/next",
   SESSION_CLOSE: "/api/session/:id/close",
+  SESSION_RESTART_COUNTDOWN: "/api/session/:id/restart-countdown",
   SESSION_REVEAL: "/api/session/:id/reveal",
   SESSION_END: "/api/session/:id/end",
   SESSION_LEADERBOARD: "/api/session/:id/leaderboard",
@@ -513,7 +521,7 @@ export interface Question {
   allowsMultiple: boolean;
   isPoll?: boolean;
   explanation: string;
-  timeLimitSec: number;
+  timeLimitSec: number | null;
 }
 
 /**
@@ -597,6 +605,17 @@ export interface Submission {
   responseTimeMs: number;
 }
 
+/** Per-item timing, preserved across navigation and observational messages. */
+export interface QuestionTiming {
+  /** Unknown for legacy records: never infer a historical first opening. */
+  firstOpenedAt?: number;
+  startedAt: number;
+  deadlineAt: number | null;
+  restarts: { restartedAt: number; previousStartedAt: number; previousDeadlineAt: number | null }[];
+  /** Explicit restart invalidates fair time-based comparisons; legacy ranking is unchanged. */
+  timingFairnessInvalidated?: true;
+}
+
 export interface Session {
   sessionId: string;
   sessionCode: string;
@@ -605,6 +624,9 @@ export interface Session {
   state: SessionState;
   currentQuestionIndex: number;
   questionStartedAt?: number;
+  /** Compatibility alias for the current item's deadline. */
+  questionDeadlineAt?: number | null;
+  questionTiming?: Record<string, QuestionTiming>;
   revealedQuestionIndexes?: Set<number>;
   /**
    * Open responses the presenter has hidden from the projector: for each
@@ -637,6 +659,8 @@ export interface SessionSnapshot {
   participants: { studentId: string; displayName?: string; joinedAt: number }[];
   createdAt: number;
   endedAt: number;
+  /** Timing audit history, including explicit restart fairness invalidation. */
+  questionTiming?: Record<string, QuestionTiming>;
 }
 
 /** Per-week leaderboard results written to data/winners/weekNN.json */

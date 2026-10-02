@@ -22,6 +22,7 @@ const openPayload = (index: number) => ({
   attendeeNotes: undefined, slideMedia: undefined, slideMediaPosition: undefined, slideMediaOpacity: undefined,
   slideBackground: undefined, slideLiveEmbed: undefined, slideVideo: undefined, slideReferences: undefined,
   options: [{ label: "A", text: "One" }], allowsMultiple: false, isPoll: false, timeLimitSec: 20, startedAt: 1000,
+  deadlineAt: 21000, serverNow: 1000,
   questionNumber: index + 1, questionTotal: 2,
 });
 const count = (index: number) => ({ questionIndex: index, submitted: 0, total: 0, openResponses: undefined });
@@ -29,7 +30,7 @@ const reveal = (index: number) => ({ questionIndex: index, questionType: "multip
   explanation: "Correct", distribution: {}, isPoll: false, openResponses: undefined });
 const msg = (event: string, payload: unknown, audience: Audience = "all") => ({ audience, event, payload });
 const opened = (index: number) => [
-  msg(SocketEvents.QUESTION_OPEN, openPayload(index)),
+  msg(SocketEvents.QUESTION_OPEN, { ...openPayload(index), firstOpenedAt: 1000 }),
   msg(SocketEvents.SESSION_STATE, { state: "QUESTION_OPEN", questionIndex: index }),
   msg(SocketEvents.ANSWER_COUNT, count(index), "staff"),
 ];
@@ -61,8 +62,6 @@ const cases: Record<string, { state: SessionState; messages: ReturnType<typeof m
   "QUESTION_CLOSED:leaderboardShow": { state: "LEADERBOARD", messages: leaders },
   "QUESTION_CLOSED:end": { state: "ENDED", messages: ended },
   "REVEAL:next": { state: "QUESTION_OPEN", messages: opened(1) },
-  "REVEAL:start": { state: "QUESTION_OPEN", messages: opened(0) },
-  "REVEAL:open": { state: "QUESTION_OPEN", messages: opened(0) },
   "REVEAL:leaderboardShow": { state: "LEADERBOARD", messages: leaders },
   "REVEAL:end": { state: "ENDED", messages: ended },
   "LEADERBOARD:leaderboardHide": { state: "REVEAL", messages: revealed(0) },
@@ -169,6 +168,7 @@ for (const state of states) {
 it("previous navigation returns to a revealed quiz and a slide opens without a timer", () => {
   const input = base("QUESTION_OPEN");
   input.currentQuestionIndex = 1;
+  input.questionTiming = { "0": { startedAt: 1000, deadlineAt: 21000, restarts: [] } };
   const previous = apply(input, quiz, { type: "previous" }, 1000);
   expect(previous.session.state).toBe("REVEAL");
   expect(previous.messages).toEqual(revealed(0));

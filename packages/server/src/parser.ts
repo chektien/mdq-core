@@ -330,15 +330,16 @@ function parseQuestionBlock(
   const subtopic = colonIdx >= 0 ? topicRaw.substring(colonIdx + 1).trim() : undefined;
 
   // 2. Extract time_limit (optional, after H2, before question text)
-  let timeLimitSec = DEFAULT_TIME_LIMIT_SEC;
-  const timeLimitMatch = block.match(/^time_limit:\s*(\d+)\s*$/m);
+  let timeLimitSec: number | null = DEFAULT_TIME_LIMIT_SEC;
+  const timeLimitMatch = block.match(/^time_limit:\s*([^\n]*)$/im);
   if (timeLimitMatch) {
-    timeLimitSec = parseInt(timeLimitMatch[1], 10);
-    if (timeLimitSec <= 0) {
+    const value = timeLimitMatch[1].trim().toLowerCase();
+    timeLimitSec = value === "none" ? null : Number(value);
+    if (timeLimitSec !== null && (!/^\d+$/.test(value) || !Number.isSafeInteger(timeLimitSec) || timeLimitSec <= 0)) {
       throw new QuizParseError(
         sourceFile,
         index,
-        `Invalid time-limit: ${timeLimitMatch[1]} (must be positive)`,
+        `Invalid time-limit: ${timeLimitMatch[1]} (must be positive seconds or none)`,
         findLineNumber(lines, blockStartLine, (line) => /^time_limit:\s*/i.test(line)),
       );
     }
@@ -514,7 +515,7 @@ function parseQuestionBlock(
 
   let textLines = lines.slice(h2LineIdx + 1, contentEndLineIdx);
   // Remove time_limit line from text
-  textLines = textLines.filter((l) => !/^time_limit:\s*\d+/i.test(l.trim()));
+  textLines = textLines.filter((l) => !/^time_limit:/i.test(l.trim()));
   textLines = textLines.filter((l) => !/^(?:type|question_type):\s*[a-z_-]+$/i.test(l.trim()));
   textLines = textLines.filter((l) => !/^multi_select:\s*(true|false|yes|no|1|0)$/i.test(l.trim()));
   const liveEmbedExtraction = isSlide

@@ -129,6 +129,7 @@ export function saveSessionSnapshot(session: Session, baseDir?: string): void {
     })),
     createdAt: session.createdAt,
     endedAt: Date.now(),
+    ...(session.questionTiming ? { questionTiming: session.questionTiming } : {}),
   };
 
   const filePath = path.join(dir, `${session.sessionId}.json`);
