@@ -37,7 +37,7 @@ const server = http.createServer((req, res) => {
   if (req.url === "/bundle.js") { res.setHeader("Content-Type", "application/javascript");res.end(bundle.outputFiles[0].text);return; }
   if (req.url === "/api/session/second/availability") { setTimeout(()=>json(200,{schemaVersion:1,phase:"active",serverNow:Date.now(),availableUntil:Date.now()+604_800_000}),100);return; }
   if (req.url === "/api/session/synthetic/availability") {
-    if (req.method === "POST") { let body = "";req.on("data", chunk => body += chunk);req.on("end", () => { const data = JSON.parse(body);posts.push(data);until = data.availableUntil;phase = "active";json(200, availability()); });return; }
+    if (req.method === "POST") { let body = "";req.on("data", chunk => body += chunk);req.on("end", () => { const data = JSON.parse(body);posts.push(data);until = data.extendForMs === undefined ? data.availableUntil : Date.now() + data.extendForMs;phase = "active";json(200, availability()); });return; }
     availabilityReads.push(req.headers.authorization);json(200, availability());return;
   }
   if (req.url === "/api/session/by-code/SYNTH1") { json(200, {sessionId:"synthetic",sessionCode:"SYNTH1",state:"QUESTION_OPEN",week:"synthetic",theme:"dark",palette:"classic",availability:availability()});return; }
@@ -97,19 +97,27 @@ try {
   const instructor = await browser.newPage({ viewport: { width: 390, height: 844 } });instructor.on("pageerror", error => errors.push(String(error)));
   await instructor.goto(url + "/instructor");await instructor.getByRole("button", { name: "Synthetic availability", exact: false }).click();
   const createDate = new Date(Date.now() + 7_200_000);const createLocal = new Date(createDate.getTime() - createDate.getTimezoneOffset() * 60_000).toISOString().slice(0, 16);
-  await instructor.getByLabel(/^Available until/).fill(createLocal);
+  await instructor.getByLabel("Choose day and time", {exact:true}).check();
+  await instructor.getByLabel("Day",{exact:true}).selectOption(createLocal.slice(0,10));
+  await instructor.getByLabel(/^Time \(/).fill(createLocal.slice(11,16));
   await instructor.getByRole("button", { name: "Create Session", exact: true }).click();
   assert.equal(creates[0].availableUntil, new Date(createLocal).getTime(), "exact creation deadline uses the latest form value");
-  await instructor.getByRole("button", { name: "Extend & reopen", exact: true }).waitFor();
-  const input = instructor.getByLabel(/New available-until date and time/);
+  await instructor.getByRole("button",{name:"Session options",exact:true}).click();
+  const dialog = instructor.getByRole("dialog");
+  await dialog.getByRole("button",{name:"Extend & reopen",exact:true}).click();
+  await dialog.getByLabel("Choose day and time",{exact:true}).check();
   const chosen = new Date(Date.now() + 3_600_000);const local = new Date(chosen.getTime() - chosen.getTimezoneOffset() * 60_000).toISOString().slice(0, 16);
-  await input.fill(local);await instructor.getByRole("button", { name: "Extend & reopen", exact: true }).click();
-  await instructor.getByRole("button", { name: "Extend availability", exact: true }).waitFor();
+  await dialog.getByLabel("Day",{exact:true}).selectOption(local.slice(0,10));
+  await dialog.getByLabel(/^Time \(/).fill(local.slice(11,16));
+  await dialog.getByRole("button", { name: "Extend & reopen", exact: true }).click();
+  await dialog.getByRole("button", { name: "Extend availability", exact: true }).waitFor();
   assert.equal(posts.length, 1);assert.equal(posts[0].availableUntil, new Date(local).getTime());
+  await instructor.keyboard.press("Escape");
   for (const width of [390, 768, 1440]) {
     await instructor.setViewportSize({ width, height: 1000 });
-    assert.equal(await instructor.getByRole("heading", { name: "Waiting for Students", exact: true }).count(), 1);
+    assert.equal(await instructor.getByRole("heading", { name: "Waiting for participants", exact: true }).count(), 1);
     assert.equal(await instructor.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, "presenter controls fit");
+    assert.doesNotMatch(await instructor.locator("body").innerText(), /Recover before|Data deleted|Open until|Session pacing|Include answer speed/);
     if (screenshotDir) await instructor.screenshot({ path: path.join(screenshotDir, `core-t422-presenter-${width}.png`), fullPage: true, animations: "disabled" });
   }
   await page.setViewportSize({ width: 390, height: 844 });

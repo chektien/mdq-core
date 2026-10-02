@@ -11,9 +11,11 @@ export function localAvailabilityInput(timestamp: number): string {
 export function availabilityTimezone(): string {
   return Intl.DateTimeFormat().resolvedOptions().timeZone;
 }
-/** Phase-specific management summary, rather than a lifecycle diagnostics dump. */
-export default function SessionAvailabilityInfo({ availability }: { availability?: SessionAvailabilityPayload | null }) {
+/** Public status only by default. Lifecycle dates require a private management opt-in. */
+export default function SessionAvailabilityInfo({ availability, management = false }: { availability?: SessionAvailabilityPayload | null; management?: boolean }) {
   if (!availability) return null;
+  if (!management) return availability.phase === "expired" ? <p className="text-sm text-zinc-400">Availability ended. Released content is available for review. Answers are closed.</p>
+    : availability.phase === "deleted" ? <p className="text-sm text-zinc-400">Session data has been deleted.</p> : null;
   const date = (timestamp: number) => <time dateTime={new Date(timestamp).toISOString()}>{formatAvailabilityTime(timestamp)}</time>;
   return <div className="text-sm text-zinc-400" aria-live="polite">
     {availability.phase === "expired" ? <>

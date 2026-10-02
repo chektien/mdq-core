@@ -33,7 +33,7 @@ export function allowedDays(now: number, previous?: number): { value: string; la
   first.setHours(12, 0, 0, 0);
   const last = localAvailabilityInput(now + MAX_SESSION_AVAILABILITY_MS).slice(0, 10);
   const days: { value: string; label: string }[] = [];
-  for (let i = 0; i <= 7; i++) {
+  for (;;) {
     const value = localAvailabilityInput(first.getTime()).slice(0, 10);
     if (value > last) break;
     days.push({ value, label: new Intl.DateTimeFormat(undefined, { weekday: "short", day: "numeric", month: "short" }).format(first) });
@@ -65,11 +65,11 @@ export default function AvailabilityChoiceControl({ choice, onChange, now, previ
     })}
     <label className="availability-option"><input type="radio" name={`${id}-choice`} checked={choice.kind === "exact"} onChange={() => onChange({ kind: "exact", value: firstCustomTime(now, previous) })} />Choose day and time</label>
     {choice.kind === "exact" && <div className="availability-day-time">
-      <label htmlFor={`${id}-day`}>Day<select id={`${id}-day`} value={day} onChange={e => onChange({ kind: "exact", value: `${e.target.value}T${time || "12:00"}` })}>
+      <div className="availability-field"><label htmlFor={`${id}-day`}>Day</label><select id={`${id}-day`} value={day} onChange={e => onChange({ kind: "exact", value: `${e.target.value}T${time || "12:00"}` })}>
         {!days.some(d => d.value === day) && <option value={day} disabled>Choose an allowed day</option>}
         {days.map(d => <option key={d.value} value={d.value}>{d.label}</option>)}
-      </select></label>
-      <label htmlFor={`${id}-time`}>Time ({availabilityTimezone()})<input id={`${id}-time`} type="time" step="60" value={time} min={day === min.slice(0, 10) ? min.slice(11, 16) : undefined} max={day === max.slice(0, 10) ? max.slice(11, 16) : undefined} onChange={e => onChange({ kind: "exact", value: `${day}T${e.target.value}` })} /></label>
+      </select></div>
+      <div className="availability-field"><label htmlFor={`${id}-time`}>Time ({availabilityTimezone()})</label><input id={`${id}-time`} type="time" step="60" value={time} min={day === min.slice(0, 10) ? min.slice(11, 16) : undefined} max={day === max.slice(0, 10) ? max.slice(11, 16) : undefined} onChange={e => onChange({ kind: "exact", value: `${day}T${e.target.value}` })} /></div>
     </div>}
     {problem ? <p role="alert">{problem}{choice.kind === "exact" && day === max.slice(0, 10) && ` Latest allowed is ${formatAvailabilityTime(new Date(max).getTime())}.`}</p>
       : <p className="availability-preview">{extension ? "Until" : choice.kind === "preset" ? "Expected until" : "Until"} {formatAvailabilityTime(until)}</p>}

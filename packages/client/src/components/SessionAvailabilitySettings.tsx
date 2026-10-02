@@ -35,7 +35,7 @@ export default function SessionAvailabilitySettings({ sessionId, observed }: { s
     finally { setBusy(false); }
   }
   return <section className="session-settings w-full" aria-label="Session availability">
-    <SessionAvailabilityInfo availability={availability} />
+    <SessionAvailabilityInfo availability={availability} management />
     {editable && (!editing ? <button className="session-options-button" type="button" onClick={open}>{availability.phase === "expired" ? "Extend & reopen" : "Extend availability"}</button> : <>
       <AvailabilityChoiceControl choice={choice!} onChange={setChoice} now={now} previous={previous} disabled={busy} extension />
       <p className="text-sm text-zinc-400">Same link, participants and answers. Question timers do not restart.</p>

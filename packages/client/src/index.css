@@ -8085,7 +8085,7 @@ html:root[data-theme] .student-screen[data-deck-background="true"] .dist-row-she
 .availability-option:has(input:disabled) { color: var(--mdq-muted); cursor: default; }
 .availability-option input { flex: 0 0 auto; }
 .availability-day-time { display: grid; grid-template-columns: 1fr 1fr; gap: .75rem; margin: .75rem 0; }
-.availability-day-time label { display: flex; flex-direction: column; gap: .4rem; font-size: 1rem; min-width: 0; }
+.availability-field, .availability-day-time label { display: flex; flex-direction: column; gap: .4rem; font-size: 1rem; min-width: 0; }
 .availability-day-time input, .availability-day-time select { width: 100%; min-height: 2.75rem; font-size: 1rem; background: var(--mdq-dialog); color: var(--mdq-ink); border: 1px solid var(--mdq-line-strong); border-radius: .65rem; padding: .6rem; }
 .availability-preview { font-size: .875rem; line-height: 1.5; color: var(--mdq-muted); margin: .5rem 0; }
 .session-options-button { min-height: 2.75rem; padding: .6rem 1rem; border: 1px solid var(--mdq-line-strong); border-radius: .65rem; color: var(--mdq-ink); font-size: 1rem; }

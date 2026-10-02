@@ -253,3 +253,10 @@ it("v2 rejects ranking overrides and persists restart fairness while v1 correctn
   expect(effectiveRanking(deserializeSession(serializeSession(result.session)), deck)).toBe("correctness");
   expect(effectiveRanking(start(policy("self-paced")), deck)).toBe("correctness");
 });
+
+it("pacing-only v1 updates never change the stored policy version or original presenter ranking", () => {
+  const old = policy("presenter-paced", "correctness");
+  const changed = run(old, { type: "configurePolicy", role: "control", pacing: "presenter-paced" }).session;
+  expect(changed.policy).toEqual(old.policy);
+  expect(run(policy("presenter-paced", "speed"), { type: "configurePolicy", role: "control", pacing: "self-paced" }).session.policy).toMatchObject({ schemaVersion: 1, ranking: "correctness" });
+});

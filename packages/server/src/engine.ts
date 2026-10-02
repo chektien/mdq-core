@@ -453,6 +453,10 @@ export function apply(input: Session, quiz: Quiz, command: Command, now: number)
           || (command.pacing === "self-paced" && command.ranking === "speed")) throw new EngineCommandError("Invalid ranking policy. New sessions rank automatically.");
         session.policy = { schemaVersion: 1, pacing: command.pacing, ranking: command.ranking,
           effectiveTiming: command.pacing === "self-paced" ? "untimed" : "authored" };
+      } else if (session.policy?.schemaVersion === 1) {
+        session.policy = { ...session.policy, pacing: command.pacing,
+          ranking: command.pacing === "self-paced" ? "correctness" : session.policy.ranking,
+          effectiveTiming: command.pacing === "self-paced" ? "untimed" : "authored" };
       } else {
         session.policy = { ...defaultSessionPolicy(), pacing: command.pacing,
           effectiveTiming: command.pacing === "self-paced" ? "untimed" : "authored" };
