@@ -202,6 +202,7 @@ export function useSocket(
   role: "student" | "instructor" | "presentation",
 ): UseSocketReturn {
   const socketRef = useRef<Socket | null>(null);
+  const [socketSessionId, setSocketSessionId] = useState<string | null>(null);
   const answeredQuestionsRef = useRef<number[]>([]);
   const currentQuestionRef = useRef<QuestionState | null>(null);
   const studentIdRef = useRef<string | null>(null);
@@ -272,6 +273,7 @@ export function useSocket(
 
   // Connect socket when sessionId is available
   useEffect(() => {
+    setSocketSessionId(sessionId);
     setConnected(false);
     setError(null);
     setSessionToken(null);
@@ -688,11 +690,11 @@ export function useSocket(
   }, [role, sessionId]);
 
   return {
-    connected,
-    error,
-    sessionState,
+    connected: socketSessionId === sessionId && connected,
+    error: socketSessionId === sessionId ? error : null,
+    sessionState: socketSessionId === sessionId ? sessionState : null,
     sessionToken: credentialSessionId === sessionId ? sessionToken : null,
-    seatTaken,
+    seatTaken: socketSessionId === sessionId && seatTaken,
     studentId: studentIdState,
     publicKey,
     label,

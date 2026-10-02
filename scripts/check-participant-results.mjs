@@ -18,14 +18,15 @@ if(screenshotDir)await fs.mkdir(screenshotDir,{recursive:true});
 const payload=()=>({schemaVersion:1,resultVersion:1,endedAt:0,deckTitle:"Synthetic finality",policy:{schemaVersion:1,pacing:"self-paced",ranking:"correctness",effectiveTiming:"untimed"},publicKey:"opaque-one",summary:contentOnly?{answeredCount:0,availableQuestionCount:0}:{answeredCount:2,availableQuestionCount:2,scoredQuestionCount:1},questions:contentOnly?[]:[{question,answer:{questionIndex:0,selectedOptions:[1]},correct:false,correctOptions:["A"],explanation:"OWN_FINAL_EXPLANATION"},{question:{...question,questionIndex:1,questionType:"open_response",topic:"Written",options:[]},answer:{questionIndex:1,selectedOptions:[],responseText:"OWN_RETAINED_RESPONSE"}}],...(contentOnly?{}:{leaderboard:[{publicKey:"opaque-one",label:"Synthetic one",rank:1,score:1},{publicKey:"opaque-two",label:"Synthetic two",rank:2,score:0}]})});
 const bundle=await build({stdin:{resolveDir:root,loader:"tsx",contents:`
 import React from 'react';import {createRoot} from 'react-dom/client';
+import App from './packages/client/src/App';
 import StudentView from './packages/client/src/views/StudentView';
 import InstructorView from './packages/client/src/views/InstructorView';
 import * as seats from './packages/client/src/participantSessionStorage';
 window.seats=seats;const root=createRoot(document.getElementById('root'));
 window.openSession=id=>root.render(<StudentView initialSessionId={id}/>);
-root.render(location.pathname === '/instructor' ? <InstructorView/> : location.pathname === '/by-code' || location.pathname === '/second' ? <StudentView initialSessionCode={location.pathname === '/second' ? 'SYNTH2' : 'SYNTH1'}/> : <StudentView initialSessionId="synthetic"/>);
+root.render(location.pathname === '/routed' ? <App/> : location.pathname === '/instructor' ? <InstructorView/> : location.pathname === '/by-code' || location.pathname === '/second' ? <StudentView initialSessionCode={location.pathname === '/second' ? 'SYNTH2' : 'SYNTH1'}/> : <StudentView initialSessionId="synthetic"/>);
 `},bundle:true,jsx:"automatic",write:false,format:"iife",platform:"browser",plugins:[{name:"fake-socket",setup(builder){builder.onResolve({filter:/^socket.io-client$/},()=>({path:"mock",namespace:"synthetic"}));builder.onLoad({filter:/.*/,namespace:"synthetic"},()=>({loader:"js",contents:`
-export function io(options){const handlers={};const sock={connected:false,on(event,fn){handlers[event]=fn;return sock},emit(event,data){(window.sent??=[]).push({sessionId:options.auth.sessionId,event,data});if(event==='student:join'&&options.auth.sessionId==='second')setTimeout(()=>handlers['student:joined']?.({participantId:'synthetic-two',sessionToken:'second-seat',sessionState:'WAITING',answeredQuestions:[],answers:[],publicKey:'opaque-two',label:'Synthetic two'}),0)},connect(){if(window.socketAbsent)return;sock.connected=true;handlers.connect?.();if(options.auth.role==='student'&&options.auth.sessionId==='synthetic'&&window.rejectOnConnect)setTimeout(()=>{handlers['student:rejected']?.({reason:'Session has ended'});sock.disconnect()},0)},disconnect(){sock.connected=false;handlers.disconnect?.()}};window.serverEvent=(event,data)=>handlers[event]?.(data);window.syntheticSocket=sock;return sock}
+export function io(options){const handlers={};const sock={connected:false,on(event,fn){handlers[event]=fn;return sock},emit(event,data){(window.sent??=[]).push({sessionId:options.auth.sessionId,event,data});if(event==='student:join'&&options.auth.sessionId==='second')setTimeout(()=>handlers['student:joined']?.({participantId:'synthetic-two',sessionToken:'second-seat',sessionState:'LOBBY',answeredQuestions:[],answers:[],publicKey:'opaque-two',label:'Synthetic two'}),0)},connect(){if(window.socketAbsent)return;sock.connected=true;handlers.connect?.();if(options.auth.role==='student'&&options.auth.sessionId==='synthetic'&&window.rejectOnConnect)setTimeout(()=>{handlers['student:rejected']?.({reason:'Session has ended'});sock.disconnect()},0)},disconnect(){sock.connected=false;handlers.disconnect?.()}};window.serverEvent=(event,data)=>handlers[event]?.(data);window.syntheticSocket=sock;return sock}
 
 `}))}}]});
 const server=http.createServer((req,res)=>{
@@ -39,9 +40,9 @@ const server=http.createServer((req,res)=>{
    if(req.headers.authorization!=="Bearer retained-seat")return json(410,{error:"This session has ended"});
    return json(200,payload());
  }
- if(req.url==="/api/session/by-code/SYNTH2")return json(200,{sessionId:"second",sessionCode:"SYNTH2",state:"WAITING",week:"second",title:"Synthetic second",theme:"dark",palette:"classic"});
+ if(req.url==="/api/session/by-code/SYNTH2")return json(200,{sessionId:"second",sessionCode:"SYNTH2",state:"LOBBY",week:"second",title:"Synthetic second",theme:"dark",palette:"classic"});
  if(req.url==="/api/session/second/own-results")return json(409,{error:"Results are not available yet"});
- if(req.url==="/api/session/second/items")return json(200,{policy:{schemaVersion:1,pacing:"instructor",ranking:"correctness",effectiveTiming:"untimed"},state:"WAITING",currentQuestionIndex:0,items:[],answers:[],answeredQuestions:[],answerableQuestionIndexes:[]});
+ if(req.url==="/api/session/second/items")return json(200,{policy:{schemaVersion:1,pacing:"instructor",ranking:"correctness",effectiveTiming:"untimed"},state:"LOBBY",currentQuestionIndex:0,items:[],answers:[],answeredQuestions:[],answerableQuestionIndexes:[]});
  if(req.url==="/api/session/by-code/SYNTH1")return json(200,{sessionId:"synthetic",sessionCode:"SYNTH1",state:final?"ENDED":"QUESTION_OPEN",week:"synthetic",title:"Synthetic finality",theme:"dark",palette:"classic"});
  if(req.url==="/api/session/synthetic/items")return json(200,{policy:{schemaVersion:1,pacing:"self-paced",ranking:"correctness",effectiveTiming:"untimed"},state:final?"ENDED":"QUESTION_OPEN",currentQuestionIndex:0,items:[question],answers:[],answeredQuestions:[],answerableQuestionIndexes:[0]});
  if(req.url==="/api/decks")return json(200,[{week:"synthetic",title:"Synthetic finality",theme:"dark",palette:"classic",questionCount:3}]);
@@ -145,6 +146,14 @@ try{
  });
  await missing.waitForFunction(()=>window.seats.loadStoredSession('synthetic')===null);
  assert.equal(await missing.evaluate(()=>window.seats.loadStoredSession('second').sessionToken),'second-seat','not-found removal is session scoped');
+ // Real App hash routes reuse StudentView. End/Done must not contaminate the next join.
+ const routed=await pageWithToken();await routed.goto(url+'/routed#/s/synthetic');await routed.getByRole('heading',{name:'Your results for Synthetic finality'}).waitFor();
+ await routed.getByRole('button',{name:'Done',exact:true}).click();await routed.getByRole('heading',{name:'Done',exact:true}).waitFor();
+ await routed.evaluate(()=>{window.location.hash='/join/SYNTH2'});await routed.getByLabel('Student ID').fill('synthetic-two');
+ await routed.getByRole('button',{name:'Join',exact:true}).click();await routed.getByRole('heading',{name:'Waiting for quiz to start...'}).waitFor();
+ assert.doesNotMatch(await routed.locator('body').innerText(),/This session has ended|OWN_FINAL_EXPLANATION|OWN_RETAINED_RESPONSE/,'S1 terminal state cannot leak into live S2');
+ await routed.evaluate(()=>{window.location.hash='/s/synthetic'});await routed.getByRole('heading',{name:'Your results for Synthetic finality'}).waitFor();
+ assert.match(await routed.locator('body').innerText(),/OWN_RETAINED_RESPONSE/);
  // Switch the mounted hook between sessions, not only reload the page.
  const switching=await pageWithToken();await switching.goto(url);await switching.getByRole('heading',{name:'Your results for Synthetic finality'}).waitFor();
  await switching.evaluate(()=>{
@@ -155,6 +164,17 @@ try{
  await switching.evaluate(()=>window.openSession('synthetic'));await switching.getByRole('heading',{name:'Your results for Synthetic finality'}).waitFor();
  assert.equal(calls.some(call=>call.url==='/api/session/synthetic/own-results'&&call.authorization==='Bearer second-seat'),false,'mounted session switch never sends S2 token to S1');
  assert.equal(calls.some(call=>call.url==='/api/session/second/own-results'&&call.authorization==='Bearer retained-seat'),false,'mounted session switch never sends S1 token to S2');
+ // A rejection queued from S1 cannot clear or mark a saved S2 seat ended in the same render.
+ for(const reason of ['Session not found','Session has ended']){
+   const raced=await pageWithToken();await raced.goto(url);await raced.getByRole('heading',{name:'Your results for Synthetic finality'}).waitFor();
+   await raced.evaluate(reason=>{
+     window.seats.saveStoredSession({sessionId:'second',studentId:'synthetic-two',sessionToken:'second-seat'});
+     window.serverEvent('student:rejected',{reason});window.openSession('second');
+   },reason);
+   await raced.getByRole('heading',{name:'Waiting for quiz to start...'}).waitFor();
+   assert.equal(await raced.evaluate(()=>window.seats.loadStoredSession('second').sessionToken),'second-seat',reason+' from S1 cannot erase S2');
+   assert.doesNotMatch(await raced.locator('body').innerText(),/This session has ended|OWN_FINAL_EXPLANATION|OWN_RETAINED_RESPONSE/);
+ }
  // Miss End entirely on the socket. Only the disconnect + authoritative HTTP read recovers results.
  final=false;const live=await pageWithToken();await live.goto(url+'/active');await live.waitForFunction(()=>window.serverEvent);
  await live.evaluate(current=>{window.serverEvent('student:joined',{participantId:'synthetic-one',sessionToken:'retained-seat',sessionState:'QUESTION_OPEN',answeredQuestions:[],answers:[],publicKey:'opaque-one',label:'Synthetic one'});window.serverEvent('question:open',current)},question);
