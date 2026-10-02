@@ -1,5 +1,6 @@
 import { API } from "@mdq/shared";
 import type {
+  SessionPolicy,
   ParseDiagnostic,
   AccessInfo,
   DeckPalette,
@@ -69,6 +70,7 @@ export interface DeckSummary {
 export type QuizSummary = DeckSummary;
 
 export interface QuestionSummary {
+  timeLimitSec?: number | null;
   heading: string;
   questionType: QuestionType;
 }
@@ -86,6 +88,9 @@ export interface CreateSessionResponse {
 }
 
 export interface SessionRestoreResponse {
+  policy?: SessionPolicy | null;
+  policyFrozen?: boolean;
+  effectiveRanking?: "correctness" | "speed" | "legacy";
   sessionId: string;
   sessionCode: string;
   week: string;
@@ -229,6 +234,18 @@ async function sessionAction(sessionId: string, action: string): Promise<Record<
     throw new Error(data.error || `Failed to ${action}`);
   }
   return res.json();
+}
+
+export async function configureSessionPolicy(sessionId: string, pacing: SessionPolicy["pacing"], ranking: SessionPolicy["ranking"] = "correctness") {
+  const response = await fetchWithTimeout(apiPath(API.SESSION_POLICY, { id: sessionId }), {
+    method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ pacing, ranking }),
+  });
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    throw new Error(data.error || "Session pacing could not be saved");
+  }
+  return response.json();
 }
 
 export async function startSession(sessionId: string) {

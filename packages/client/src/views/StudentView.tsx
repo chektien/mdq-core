@@ -1,5 +1,8 @@
 import { isSlideType } from "@mdq/shared";
 import { useState, useCallback, useEffect, useMemo, useRef, useSyncExternalStore } from "react";
+import { useParticipantStudy } from "../hooks/useParticipantStudy";
+import ParticipantStudyControls from "../components/ParticipantStudyControls";
+import type { ParticipantDraft } from "../participantDrafts";
 import { useSocket } from "../hooks/useSocket";
 import type { QuestionState, RevealState } from "../hooks/useSocket";
 import { API, MAX_OPEN_RESPONSE_LENGTH, SEAT_TAKEN_MESSAGE } from "@mdq/shared";
@@ -145,6 +148,7 @@ export default function StudentView({
   }, [clearJoinError, joinError]);
 
   const sock = useSocket(sessionId, "student");
+  const study = useParticipantStudy(sessionId, sock);
   const { connected, sessionToken, joinSession, error: sockError } = sock;
 
   // Hold the theme until the deck's own theme is known (join-link lookup or
@@ -628,18 +632,25 @@ export default function StudentView({
     // Question open
     if (state === "QUESTION_OPEN" || state === "QUESTION_CLOSED") {
       return (
-        <QuestionView
-          key={sock.currentQuestion?.questionIndex ?? 0}
-          question={sock.currentQuestion}
-          state={state}
-          remainingSec={sock.remainingSec}
-          submitted={sock.submitted}
-          submittedOptions={sock.submittedOptions}
-          submittedResponseText={sock.submittedResponseText}
-          timedOut={sock.timedOut}
-          connected={connected}
-          onSubmit={sock.submitAnswer}
-        />
+        <>
+          <ParticipantStudyControls study={study} />
+          <QuestionView
+            key={`${sessionToken}:${study.question?.questionIndex ?? 0}`}
+            question={study.question}
+            state={study.selfPaced && !study.canAnswer && !study.submitted && !isSlideType(study.question?.questionType) ? "QUESTION_CLOSED" : state}
+            remainingSec={study.selfPaced ? null : sock.remainingSec}
+            submitted={study.submitted}
+            submittedOptions={study.submittedOptions}
+            submittedResponseText={study.submittedResponseText}
+            timedOut={sock.timedOut}
+            connected={connected}
+            onSubmit={study.submitAnswer}
+            draft={study.draft}
+            onDraftChange={study.setDraft}
+            draftPersisted={study.draftPersisted}
+            selfPaced={study.selfPaced}
+          />
+        </>
       );
     }
 
@@ -730,7 +741,7 @@ function subscribeToLook(onChange: () => void): () => void {
 
 // ── Question sub-view ──────────────────────
 
-function QuestionView({
+export function QuestionView({
   question,
   state,
   remainingSec,
@@ -740,6 +751,10 @@ function QuestionView({
   timedOut,
   connected,
   onSubmit,
+  draft,
+  onDraftChange,
+  draftPersisted = false,
+  selfPaced = false,
 }: {
   question: QuestionState | null;
   state: SessionState;
@@ -750,9 +765,17 @@ function QuestionView({
   timedOut: boolean;
   connected: boolean;
   onSubmit: (payload: { questionIndex: number; selectedOptions?: string[]; responseText?: string }) => void;
+  draft?: Pick<ParticipantDraft, "selectedOptions" | "responseText"> | null;
+  onDraftChange?: (patch: Partial<Pick<ParticipantDraft, "selectedOptions" | "responseText">>) => void;
+  draftPersisted?: boolean;
+  selfPaced?: boolean;
 }) {
-  const [selected, setSelected] = useState<string[]>([]);
-  const [responseText, setResponseText] = useState("");
+  const [localSelected, setLocalSelected] = useState<string[]>([]);
+  const [localResponseText, setLocalResponseText] = useState("");
+  const selected = draft?.selectedOptions ?? localSelected;
+  const responseText = draft?.responseText ?? localResponseText;
+  const setSelected = (value: string[]) => onDraftChange ? onDraftChange({ selectedOptions: value }) : setLocalSelected(value);
+  const setResponseText = (value: string) => onDraftChange ? onDraftChange({ responseText: value }) : setLocalResponseText(value);
   const lastSubmittedResponseRef = useRef<string>("");
   const appearance = usePhoneScreenAppearance(question?.deckStyle);
   const questionIndex = question?.questionIndex ?? -1;
@@ -770,7 +793,7 @@ function QuestionView({
   }
 
   useEffect(() => {
-    if (!question) {
+    if (!question || onDraftChange) {
       return;
     }
     // Timer metadata can change on Restart Countdown; only a different
@@ -782,7 +805,7 @@ function QuestionView({
   }, [questionIndex]);
 
   useEffect(() => {
-    if (!question || questionType !== "open_response") {
+    if (!question || questionType !== "open_response" || onDraftChange) {
       return;
     }
 
@@ -806,11 +829,9 @@ function QuestionView({
   const toggleOption = (label: string) => {
     if (submitted || state === "QUESTION_CLOSED") return;
     setReconnectedNote(false);
-    setSelected((prev) =>
-      question.allowsMultiple
-        ? (prev.includes(label) ? prev.filter((l) => l !== label) : [...prev, label])
-        : (prev.includes(label) ? [] : [label]),
-    );
+    setSelected(question.allowsMultiple
+      ? (selected.includes(label) ? selected.filter(l => l !== label) : [...selected, label])
+      : (selected.includes(label) ? [] : [label]));
   };
 
   const handleSubmit = () => {
@@ -834,11 +855,11 @@ function QuestionView({
     : question.isPoll
     ? question.allowsMultiple ? "Submit Votes" : "Submit Vote"
     : question.allowsMultiple ? "Submit Selections" : "Submit Answer";
-  const submittedLabel = question.questionType === "open_response"
+  const submittedLabel = selfPaced ? "Answer saved" : question.questionType === "open_response"
     ? "Response submitted"
     : question.isPoll ? "Vote submitted" : "Answer submitted";
   // Questions are counted without slides, the same on every phone and after a reload; a slide shows no number.
-  const positionLabel = question.questionNumber && question.questionTotal
+  const positionLabel = !selfPaced && question.questionNumber && question.questionTotal
     ? `Question ${question.questionNumber} of ${question.questionTotal}`
     : null;
   const questionTextId = `question-text-${question.questionIndex}`;
@@ -883,7 +904,7 @@ function QuestionView({
           slideReferences={question.slideReferences}
           deckStyle={question.deckStyle}
           mode="student"
-          statusLabel="The instructor will advance shortly"
+          statusLabel={selfPaced ? "Browse the items shown so far, or follow the presenter." : "The instructor will advance shortly"}
         />
         </div>
       </div>
@@ -897,7 +918,7 @@ function QuestionView({
         <span className="student-screen-quiet text-zinc-400 text-sm font-medium">
           {positionLabel}
         </span>
-        {!isClosed && (
+        {!isClosed && !selfPaced && (
           <Timer remainingSec={remainingSec} totalSec={question.timeLimitSec} size={64} />
         )}
       </div>
@@ -945,7 +966,7 @@ function QuestionView({
           aria-labelledby={questionTextId}
         >
           {question.options.map((opt) => {
-            const isSelected = selected.includes(opt.label);
+            const isSelected = !submitted && selected.includes(opt.label);
             const wasSubmitted = submittedOptions.includes(opt.label);
             const disabled = submitted || isClosed;
 
@@ -993,15 +1014,16 @@ function QuestionView({
 
       {/* Submit button */}
       <div className="mt-4 pt-4 border-t border-zinc-800">
+        {(!submitted || hasUnsent) && <p className="student-screen-quiet mb-3 text-sm text-zinc-400" role="status">{hasUnsent ? draftPersisted ? "Draft saved" : "Draft on this screen" : "Not answered"}</p>}
         {question.questionType === "open_response" && submittedResponseText && canEditOpenResponse ? (
           <div className="mb-3 rounded-2xl border border-emerald-500/40 bg-emerald-600/10 px-4 py-3">
-            <span className="text-emerald-400 font-semibold">{submittedLabel}</span>
+            <span className={selfPaced ? "student-screen-text text-zinc-300 font-semibold" : "text-emerald-400 font-semibold"}>{submittedLabel}</span>
             <p className="mt-2 text-sm text-zinc-300 whitespace-pre-wrap">{submittedResponseText}</p>
           </div>
         ) : null}
         {submitted && question.questionType !== "open_response" ? (
           <div className="text-center py-3">
-            <span className="student-screen-text text-emerald-400 font-semibold">{submittedLabel}</span>
+            <span className={selfPaced ? "student-screen-text text-zinc-300 font-semibold" : "student-screen-text text-emerald-400 font-semibold"}>{submittedLabel}</span>
             {isClosed && <p className="student-closed-note student-screen-quiet mt-1 text-sm text-zinc-400">{closedNote}</p>}
           </div>
         ) : question.questionType === "open_response" && isClosed ? (

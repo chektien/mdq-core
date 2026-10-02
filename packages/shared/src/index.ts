@@ -470,6 +470,7 @@ export const API = {
   QUIZ: "/api/quiz/:week",
   SESSION_CREATE: "/api/session",
   SESSION_POLICY: "/api/session/:id/policy",
+  SESSION_ITEMS: "/api/session/:id/items",
   SESSION_ITEM: "/api/session/:id/items/:index",
   SESSION_START: "/api/session/:id/start",
   SESSION_PREV: "/api/session/:id/prev",
@@ -758,3 +759,14 @@ export * from "./deck-style";
 export * from "./identity";
 export * from "./videoProviders";
 export * from "./videoLinks";
+
+/** Seat-authenticated released content and OWN answer evidence only. */
+export interface ParticipantStudyPayload {
+  policy: SessionPolicy | null;
+  items: QuestionOpenPayload[];
+  currentQuestionIndex: number;
+  state: SessionState;
+  answers: StudentAnswer[];
+  answeredQuestions: number[];
+  answerableQuestionIndexes: number[];
+}

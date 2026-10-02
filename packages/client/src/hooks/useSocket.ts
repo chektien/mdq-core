@@ -201,6 +201,9 @@ export interface UseSocketReturn {
   /** The deck's title, when the deck has one. */
   deckTitle: string | null;
   answeredQuestions: number[];
+  ownAnswers: ReadonlyMap<number, StudentAnswer>;
+  /** Changes after an accepted answer, including an update to open text. */
+  answerRevision: number;
 
   // Question
   currentQuestion: QuestionState | null;
@@ -226,7 +229,7 @@ export interface UseSocketReturn {
 
   // Actions
   joinSession: (studentId: string | undefined, displayName?: string) => void;
-  submitAnswer: (payload: AnswerSubmitPayload) => void;
+  submitAnswer: (payload: AnswerSubmitPayload, options?: readonly { label: string }[]) => void;
   reconnect: () => void;
   disconnect: () => void;
 }
@@ -245,7 +248,9 @@ export function useSocket(
   // This student's own answers by question index, from the server on join and
   // from accepted submissions, so a revisited or reloaded question shows them.
   const ownAnswersRef = useRef<Map<number, StudentAnswer>>(new Map());
-  const pendingAnswerRef = useRef<StudentAnswer | null>(null);
+  const pendingAnswerRef = useRef<Map<number, StudentAnswer[]>>(new Map());
+  const [ownAnswers, setOwnAnswers] = useState<ReadonlyMap<number, StudentAnswer>>(new Map());
+  const [answerRevision, setAnswerRevision] = useState(0);
   // Server clock minus this device's, so the countdown can run on while offline.
   const clockOffsetRef = useRef(0);
   // The token this screen joined with, and whether another device has since taken its seat.
@@ -317,7 +322,8 @@ export function useSocket(
     joinedTokenRef.current = null;
     setSeatTaken(false);
     ownAnswersRef.current = new Map();
-    pendingAnswerRef.current = null;
+    pendingAnswerRef.current = new Map();
+    setOwnAnswers(new Map());
 
     socket.on("connect", () => {
       setConnected(true);
@@ -337,6 +343,8 @@ export function useSocket(
     });
 
     socket.on("disconnect", () => {
+      // A transport's lost ACK cannot be matched to a later submission after rejoin.
+      pendingAnswerRef.current.clear();
       setConnected(false);
     });
 
@@ -347,6 +355,9 @@ export function useSocket(
     // ── Student join response ──────────────
     socket.on(SocketEvents.STUDENT_JOINED, (data: StudentJoinedPayload) => {
       if (seatTakenRef.current) return;
+      if (joinedTokenRef.current && joinedTokenRef.current !== data.sessionToken) {
+        ownAnswersRef.current = new Map(); pendingAnswerRef.current.clear();
+      }
       joinedTokenRef.current = data.sessionToken;
       setSessionToken(data.sessionToken);
       setStudentIdState(data.participantId);
@@ -357,7 +368,9 @@ export function useSocket(
       setSessionState(data.sessionState);
       setAnsweredQuestions(data.answeredQuestions || []);
       answeredQuestionsRef.current = data.answeredQuestions || [];
-      ownAnswersRef.current = mergeOwnAnswers(ownAnswersRef.current, data.answers);
+      pendingAnswerRef.current.clear();
+      ownAnswersRef.current = mergeOwnAnswers(new Map(), data.answers);
+      setOwnAnswers(new Map(ownAnswersRef.current));
       setError(null);
 
       // Fill in the question already on screen if this page lost its answer.
@@ -478,12 +491,14 @@ export function useSocket(
     });
 
     socket.on(SocketEvents.ANSWER_ACCEPTED, (data: { questionIndex: number }) => {
-      const pending = pendingAnswerRef.current;
-      if (pending?.questionIndex === data.questionIndex) {
+      const pending = pendingAnswerRef.current.get(data.questionIndex)?.shift();
+      if (pending) {
         ownAnswersRef.current = mergeOwnAnswers(ownAnswersRef.current, [pending]);
-        pendingAnswerRef.current = null;
+        setOwnAnswers(new Map(ownAnswersRef.current));
       }
-      setSubmitted(true);
+      setAnswerRevision(previous => previous + 1);
+      // An ACK for an explored item must never mark the presenter item submitted.
+      if (currentQuestionRef.current?.questionIndex === data.questionIndex) setSubmitted(true);
       setAnsweredQuestions(prev => {
         const next = appendAnsweredQuestion(prev, data.questionIndex);
         answeredQuestionsRef.current = next;
@@ -492,6 +507,7 @@ export function useSocket(
     });
 
     socket.on(SocketEvents.ANSWER_REJECTED, (data: { questionIndex: number; reason: string }) => {
+      pendingAnswerRef.current.get(data.questionIndex)?.shift();
       setError(`Answer rejected: ${data.reason}`);
       // Clear error after 3 seconds
       setTimeout(() => setError(null), 3000);
@@ -650,7 +666,7 @@ export function useSocket(
   );
 
   const submitAnswer = useCallback(
-    (payload: AnswerSubmitPayload) => {
+    (payload: AnswerSubmitPayload, options?: readonly { label: string }[]) => {
       if (!socketRef.current) return;
       // Socket.IO would buffer this and send it on reconnect before the rejoin,
       // where the server rejects it, so an offline answer is not sent at all.
@@ -659,17 +675,18 @@ export function useSocket(
         setTimeout(() => setError(null), 3000);
         return;
       }
-      socketRef.current.emit(SocketEvents.ANSWER_SUBMIT, payload);
       const nextSubmittedOptions = payload.selectedOptions ?? [];
       const nextSubmittedResponseText = payload.responseText?.trim() || null;
       const shown = currentQuestionRef.current;
-      pendingAnswerRef.current = {
+      const pending = pendingAnswerRef.current.get(payload.questionIndex) ?? [];
+      pending.push({
         questionIndex: payload.questionIndex,
-        selectedOptions: shown?.questionIndex === payload.questionIndex
-          ? toOptionIndexes(nextSubmittedOptions, shown.options)
-          : [],
+        selectedOptions: toOptionIndexes(nextSubmittedOptions, options ?? (shown?.questionIndex === payload.questionIndex ? shown.options : [])),
         ...(nextSubmittedResponseText ? { responseText: nextSubmittedResponseText } : {}),
-      };
+      });
+      pendingAnswerRef.current.set(payload.questionIndex, pending);
+      socketRef.current.emit(SocketEvents.ANSWER_SUBMIT, payload);
+      if (shown?.questionIndex !== payload.questionIndex) return;
       submittedOptionsRef.current = nextSubmittedOptions;
       submittedResponseTextRef.current = nextSubmittedResponseText;
       setSubmittedOptions(nextSubmittedOptions);
@@ -713,6 +730,8 @@ export function useSocket(
     labelNote,
     deckTitle,
     answeredQuestions,
+    ownAnswers,
+    answerRevision,
     currentQuestion,
     remainingSec,
     timedOut,

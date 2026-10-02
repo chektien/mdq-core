@@ -459,9 +459,9 @@ Name the file to edit.
         "Intro: Multi-select",
       ]);
       expect(res.body.questionSummaries).toEqual([
-        { heading: "Intro: Definitions", questionType: "multiple_choice" },
-        { heading: "Intro: Defaults", questionType: "multiple_choice" },
-        { heading: "Intro: Multi-select", questionType: "multiple_choice" },
+        { heading: "Intro: Definitions", questionType: "multiple_choice", timeLimitSec: 30 },
+        { heading: "Intro: Defaults", questionType: "multiple_choice", timeLimitSec: 35 },
+        { heading: "Intro: Multi-select", questionType: "multiple_choice", timeLimitSec: 45 },
       ]);
     });
 
@@ -845,7 +845,7 @@ type: slide
         "",
       ]);
       expect(res.body.questionSummaries).toEqual([
-        { heading: "Intro: Definitions", questionType: "multiple_choice" },
+        { heading: "Intro: Definitions", questionType: "multiple_choice", timeLimitSec: 30 },
         {},
         {},
       ]);

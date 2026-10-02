@@ -13,8 +13,8 @@ import {
   getOpenResponses,
 } from "./session";
 import { parseQuizMarkdown } from "./parser";
-import { publicResultsHidden, releasedQuestionIndexes, getSessionScoredQuestionCount, sessionPolicy } from "./policy";
-import { apply, publicQuestionPayload, leaderboardRows, questionPosition, responsesFor, timingFor, EngineCommandError, type Command, type EngineResult } from "./engine";
+import { publicResultsHidden, releasedQuestionIndexes, getSessionScoredQuestionCount, effectiveRanking, sessionPolicy } from "./policy";
+import { apply, participantStudyPayload, publicQuestionPayload, leaderboardRows, questionPosition, responsesFor, timingFor, EngineCommandError, type Command, type EngineResult } from "./engine";
 import {
   persistSessionOnEnd,
   computeCumulativeLeaderboard,
@@ -236,6 +236,7 @@ export function createApp(quizDirOrOpts?: string | AppOptions) {
     return quiz.questions.map((question) => ({
       heading: getQuestionHeading(question),
       questionType: getQuestionType(question),
+      timeLimitSec: question.timeLimitSec,
     }));
   }
 
@@ -271,6 +272,7 @@ export function createApp(quizDirOrOpts?: string | AppOptions) {
       .map(({ question, questionIndex }) => ({
         questionIndex,
         questionType: getQuestionType(question),
+      timeLimitSec: question.timeLimitSec,
         correctOptions: question.correctOptions,
         explanation: question.explanation,
         distribution: getDistribution(session, questionIndex),
@@ -708,12 +710,13 @@ export function createApp(quizDirOrOpts?: string | AppOptions) {
         state: session.state,
         policy: sessionPolicy(session),
         policyFrozen: session.policyFrozen === true,
+        effectiveRanking: effectiveRanking(session, quiz),
         releasedQuestionIndexes: session.policy ? releasedQuestionIndexes(session, quiz) : undefined,
         joinLocked: session.joinLocked === true,
         currentQuestionIndex: session.currentQuestionIndex,
         questionCount: quiz.questions.length,
         questionHeadings: isAuthenticatedInstructor(req) ? getQuestionHeadings(quiz) : quiz.questions.map((q, i) => publicQuestionPayload(session, quiz, i, Date.now()) ? getQuestionHeading(q) : ""),
-        questionSummaries: isAuthenticatedInstructor(req) ? getQuestionSummaries(quiz) : quiz.questions.map((q, i) => publicQuestionPayload(session, quiz, i, Date.now()) ? { heading: getQuestionHeading(q), questionType: getQuestionType(q) } : {}),
+        questionSummaries: isAuthenticatedInstructor(req) ? getQuestionSummaries(quiz) : quiz.questions.map((q, i) => publicQuestionPayload(session, quiz, i, Date.now()) ? { heading: getQuestionHeading(q), questionType: getQuestionType(q), timeLimitSec: q.timeLimitSec } : {}),
         studentIds: usesStudentIds(quiz),
         reviewQuestions: getReviewQuestions(session, quiz),
         // Student IDs and names only go to a logged-in instructor. With no login set, anyone can
@@ -748,6 +751,17 @@ export function createApp(quizDirOrOpts?: string | AppOptions) {
         if (error instanceof EngineCommandError) return res.status(400).json({ error: error.message });
         throw error;
       }
+    });
+  });
+  app.get(API.SESSION_ITEMS, (req, res) => {
+    withSession(req, res, session => {
+      const token = req.headers.authorization?.match(/^Bearer (.+)$/)?.[1];
+      const participant = token ? [...session.participants.values()].find(seat => seat.sessionToken === token && !seat.released) : undefined;
+      if (!participant) return res.status(401).json({ error: "Valid seat credentials are required" });
+      const quiz = getQuizForSession(session);
+      if (!quiz) return res.status(500).json({ error: "Quiz data not found" });
+      res.setHeader("Cache-Control", "no-store");
+      return res.json(participantStudyPayload(session, quiz, participant.studentId, Date.now()));
     });
   });
   app.get(API.SESSION_ITEM, (req, res) => {
@@ -980,7 +994,7 @@ export function createApp(quizDirOrOpts?: string | AppOptions) {
       joinLocked: session.joinLocked === true,
       questionCount: quiz.questions.length,
       questionHeadings: isAuthenticatedInstructor(req) ? getQuestionHeadings(quiz) : quiz.questions.map((q, i) => publicQuestionPayload(session, quiz, i, Date.now()) ? getQuestionHeading(q) : ""),
-      questionSummaries: isAuthenticatedInstructor(req) ? getQuestionSummaries(quiz) : quiz.questions.map((q, i) => publicQuestionPayload(session, quiz, i, Date.now()) ? { heading: getQuestionHeading(q), questionType: getQuestionType(q) } : {}),
+      questionSummaries: isAuthenticatedInstructor(req) ? getQuestionSummaries(quiz) : quiz.questions.map((q, i) => publicQuestionPayload(session, quiz, i, Date.now()) ? { heading: getQuestionHeading(q), questionType: getQuestionType(q), timeLimitSec: q.timeLimitSec } : {}),
       policy: sessionPolicy(session),
       accessInfo,
     });

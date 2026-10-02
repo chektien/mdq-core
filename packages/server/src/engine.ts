@@ -212,7 +212,7 @@ const revealPayload = (session: Session, quiz: Quiz, view: ResponseView) => {
   };
 };
 /** One student's own submissions, with option labels turned into option positions. */
-const ownAnswers = (session: Session, quiz: Quiz, studentId: string): StudentAnswer[] => session.submissions
+export const ownAnswers = (session: Session, quiz: Quiz, studentId: string): StudentAnswer[] => session.submissions
   .filter((s) => s.studentId === studentId)
   .map((s) => {
     const options = quiz.questions[s.questionIndex]?.options ?? [];
@@ -223,6 +223,24 @@ const ownAnswers = (session: Session, quiz: Quiz, studentId: string): StudentAns
     };
   })
   .sort((a, b) => a.questionIndex - b.questionIndex);
+/** Safe released-content projection. Adapters authenticate the seat before calling. */
+export function participantStudyPayload(session: Session, quiz: Quiz, studentId: string, now: number): import("@mdq/shared").ParticipantStudyPayload {
+  quiz = session.deckSnapshot ?? quiz;
+  const items = releasedQuestionIndexes(session, quiz)
+    .map(index => publicQuestionPayload(session, quiz, index, now))
+    .filter((item): item is QuestionOpenPayload => item !== null);
+  const answers = ownAnswers(session, quiz, studentId);
+  const answeredQuestions = [...new Set(answers.map(answer => answer.questionIndex))];
+  const answerableQuestionIndexes = items.filter(item => {
+    if (session.resultScope || session.state !== "QUESTION_OPEN" || isSlideType(item.questionType ?? "multiple_choice")
+      || session.revealedQuestionIndexes?.has(item.questionIndex)) return false;
+    if (!isSelfPaced(session) && item.questionIndex !== session.currentQuestionIndex) return false;
+    if (item.deadlineAt != null && now >= item.deadlineAt) return false;
+    return item.questionType === "open_response" || !answeredQuestions.includes(item.questionIndex);
+  }).map(item => item.questionIndex);
+  return { policy: session.policy ?? null, items, currentQuestionIndex: session.currentQuestionIndex,
+    state: session.state, answers, answeredQuestions, answerableQuestionIndexes };
+}
 /**
  * The ranked rows for one view. `public` rows name people by label and public
  * key only, so they are safe for phones and the projector.

@@ -7,6 +7,7 @@ import {
   reloadDecks,
   createSession,
   startSession,
+  configureSessionPolicy,
   prevQuestion,
   nextQuestion,
   closeQuestion,
@@ -162,6 +163,8 @@ export default function InstructorView({
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   // Session state
+  const [ranking, setRanking] = useState<"correctness" | "speed">("correctness");
+  const [pacing, setPacing] = useState<"presenter-paced" | "self-paced">("presenter-paced");
   const [sessionInfo, setSessionInfo] = useState<CreateSessionResponse | null>(null);
   const [accessInfo, setAccessInfo] = useState<AccessInfo | null>(null);
   const [phase, setPhase] = useState<InstructorPhase>("setup");
@@ -295,6 +298,8 @@ export default function InstructorView({
       };
 
       setSessionInfo(restoredInfo);
+      setPacing(snapshot.policy?.pacing ?? "presenter-paced");
+      setRanking(snapshot.effectiveRanking === "correctness" ? "correctness" : snapshot.policy?.ranking ?? "correctness");
       setSelectedWeek(snapshot.week);
       setTotalQuestionsInQuiz(snapshot.questionCount);
       setQuestionHeadings(snapshot.questionHeadings || []);
@@ -403,6 +408,8 @@ export default function InstructorView({
       const info = await createSession(selectedWeek);
       setRestoredRevealCache({});
       setSessionInfo(info);
+      setPacing("presenter-paced");
+      setRanking("correctness");
       const deck = decks.find((q) => q.week === selectedWeek);
       if (deck) setTotalQuestionsInQuiz(deck.questionCount);
       setQuestionHeadings(info.questionHeadings || []);
@@ -692,8 +699,16 @@ export default function InstructorView({
               </div>
             )}
 
+            <fieldset className="session-settings w-full" disabled={loading || !sock.connected}>
+              <legend className="text-sm font-semibold">Session pacing</legend>
+              <label className="block py-2"><input type="radio" name="session-pacing" value="presenter-paced" checked={pacing === "presenter-paced"} onChange={() => setPacing("presenter-paced")} /> Presenter-paced</label>
+              <label className="block py-2"><input type="radio" name="session-pacing" value="self-paced" checked={pacing === "self-paced"} onChange={() => { setPacing("self-paced"); setRanking("correctness"); }} /> Self-paced</label>
+              <p className="text-sm text-zinc-400">{pacing === "self-paced" ? "Participants can browse shown items. No countdowns or speed ranking. Results stay hidden until End." : "Participants follow the presenter. Authored question timers apply."} Pacing is fixed when you start.</p>
+              <label className="block py-2"><input type="checkbox" checked={ranking === "speed"} disabled={pacing === "self-paced" || questionSummaries.some(item => item.questionType === "multiple_choice" && item.timeLimitSec == null)} onChange={event => setRanking(event.target.checked ? "speed" : "correctness")} /> Include answer speed in ranking</label>
+              <p className="text-sm text-zinc-400">{pacing === "self-paced" ? "Speed ranking is unavailable in self-paced sessions." : questionSummaries.some(item => item.questionType === "multiple_choice" && item.timeLimitSec == null) ? "Speed ranking requires verified countdowns on every scored question." : "Correctness is the default. Restarting a countdown switches the session to correctness-only ranking."}</p>
+            </fieldset>
             <button
-              onClick={() => handleAction(() => startSession(sid), "start")}
+              onClick={() => handleAction(async () => { await configureSessionPolicy(sid, pacing, ranking); return startSession(sid); }, "start")}
               disabled={loading || !sock.connected}
               className="instructor-start-button bg-emerald-600 hover:bg-emerald-500 disabled:bg-zinc-700 text-white font-semibold py-4 px-12 rounded-xl transition-colors text-xl"
             >
@@ -764,6 +779,9 @@ export default function InstructorView({
   // ── Live Phase (QUESTION_OPEN, QUESTION_CLOSED, REVEAL, LEADERBOARD) ──
   return (
     <LiveView
+      selfPaced={pacing === "self-paced"}
+      speedRanking={ranking === "speed"}
+      onSpeedInvalidated={() => setRanking("correctness")}
       sock={sock}
       hasAnswers={hasAnswers}
       sessionId={sid}
@@ -796,6 +814,9 @@ export default function InstructorView({
 // ── Live sub-view ──────────────────────────
 
 function LiveView({
+  selfPaced,
+  speedRanking,
+  onSpeedInvalidated,
   sock,
   hasAnswers,
   sessionId,
@@ -822,6 +843,9 @@ function LiveView({
   onPresenterNotesToggle,
   onAction,
 }: {
+  selfPaced: boolean;
+  speedRanking: boolean;
+  onSpeedInvalidated: () => void;
   sock: ReturnType<typeof useSocket>;
   hasAnswers: boolean;
   sessionId: string;
@@ -943,10 +967,10 @@ function LiveView({
 
   // Determine which controls to show
   const liveIsSlide = isSlideType(q?.questionType);
-  const canClose = state === "QUESTION_OPEN" && !liveIsSlide;
-  const canReveal = state === "QUESTION_CLOSED" && !liveIsSlide;
+  const canClose = !selfPaced && state === "QUESTION_OPEN" && !liveIsSlide;
+  const canReveal = !selfPaced && state === "QUESTION_CLOSED" && !liveIsSlide;
   const canNext =
-    (state === "REVEAL" || (state === "QUESTION_OPEN" && liveIsSlide)) &&
+    (state === "REVEAL" || (state === "QUESTION_OPEN" && (liveIsSlide || selfPaced))) &&
     q &&
     q.questionIndex < totalQuestionsInQuiz - 1;
   const canPrev = !isReviewing && state !== "LOBBY" && state !== "ENDED" && liveQuestionIndex > 0;
@@ -954,7 +978,7 @@ function LiveView({
   const hasRevealedScoredQuestion = Object.values(revealCache).some(
     (reveal) => reveal.questionType === "multiple_choice" && !reveal.isPoll,
   );
-  const canShowLeaderboard = state === "REVEAL" && !liveIsSlide && hasRevealedScoredQuestion;
+  const canShowLeaderboard = !selfPaced && state === "REVEAL" && !liveIsSlide && hasRevealedScoredQuestion;
   const isFinalQuestion = liveQuestionIndex >= totalQuestionsInQuiz - 1;
   // "Time's up" only when the timer ran out; closing early just closes the answers.
   const closedLabel = closedLabelFor(sock.timedOut);
@@ -1208,9 +1232,10 @@ function LiveView({
     if (canClose) {
       if (q && q.timeLimitSec !== null && sock.remainingSec !== null && sock.remainingSec > 0 && !sock.reveal && !isReviewing) actions.push({
         label: "Restart Countdown",
-        onClick: () => onAction(() => restartCountdown(sessionId), "restart countdown"),
-        disabled: controlsUnavailable,
+        detail: speedRanking ? "Switches to correctness-only ranking" : null,
         reason: waitingReason,
+        onClick: () => onAction(async () => { const result = await restartCountdown(sessionId); onSpeedInvalidated(); return result; }, "restart countdown"),
+        disabled: controlsUnavailable,
       });
       actions.push({
         label: "Close Question",
@@ -1403,7 +1428,7 @@ function LiveView({
 
       return (
         <ResponsiveQuizSurface fitKey={fitKey}>
-          {state === "QUESTION_OPEN" && !isReviewing && (
+          {state === "QUESTION_OPEN" && !isReviewing && !selfPaced && (
             <Timer
               remainingSec={sock.remainingSec}
               totalSec={displayQuestion.timeLimitSec}
@@ -1729,7 +1754,7 @@ function LiveView({
               >
                 <ResponsiveQuizSurface fitKey={fitKey}>
                   {/* Timer */}
-                  {state === "QUESTION_OPEN" && !isReviewing && (
+                  {state === "QUESTION_OPEN" && !isReviewing && !selfPaced && (
                     <Timer
                       remainingSec={sock.remainingSec}
                       totalSec={displayQuestion.timeLimitSec}
