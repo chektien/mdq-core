@@ -8032,3 +8032,48 @@ html:root[data-theme] .student-screen[data-deck-background="true"] .dist-row-she
   .slide-surface:has(.slide-cover-stage) > .slide-safe { height: 100vh; padding: 5%; }
   .slide-cover-stage { break-inside: avoid; }
 }
+
+/* Released-item navigation stays in page flow, away from Submit/the keyboard.
+   Existing deck tokens/radii; 44px targets and rem-based reflow for large text. */
+.participant-study {
+  container: participant-study / inline-size;
+  padding: 0.5rem 0.75rem;
+}
+.participant-study-layout {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-areas: "previous context next" "progress progress progress";
+  align-items: center;
+  gap: 0.25rem 0.5rem;
+}
+.participant-study-button {
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0.25rem 0.625rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  line-height: 1.25rem;
+  color: var(--mdq-ink);
+}
+.participant-study-previous { grid-area: previous; white-space: nowrap; }
+.participant-study-next { grid-area: next; white-space: nowrap; }
+.participant-study-button[aria-disabled="true"] { opacity: 0.4; cursor: default; }
+.participant-study-context { grid-area: context; min-width: 0; text-align: center; font-size: 0.875rem; line-height: 1.25rem; }
+.participant-study-following { margin: 0; }
+.participant-study-back { width: 100%; border-color: var(--mdq-accent); }
+.participant-study-position { display: block; font-size: 0.75rem; font-weight: 400; }
+.participant-study-progress { grid-area: progress; margin: 0; }
+.participant-study-error { grid-column: 1 / -1; }
+.participant-study :is(button, .participant-study-following):focus-visible {
+  outline: 2px solid var(--mdq-accent);
+  outline-offset: 2px;
+}
+@container participant-study (max-width: 17rem) {
+  .participant-study-layout { grid-template-areas: "previous . next" "context context context" "progress progress progress"; }
+}
+@container participant-study (min-width: 42rem) {
+  .participant-study-layout {
+    grid-template-columns: auto minmax(0, 1fr) minmax(0, 1.5fr) auto;
+    grid-template-areas: "previous context progress next";
+  }
+}

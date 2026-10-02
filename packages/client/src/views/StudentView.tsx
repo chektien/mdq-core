@@ -637,8 +637,8 @@ export default function StudentView({
     const lobbyNote = extraLabelNote(sock.label, sock.labelNote);
 
     if (sock.availability?.phase === "expired") {
-      return <div className="w-full p-4">
-        <SessionAvailabilityInfo availability={sock.availability} />
+      return <div className="w-full">
+        <div className="p-4"><SessionAvailabilityInfo availability={sock.availability} /></div>
         <ParticipantStudyControls study={study} />
         {study.question && <QuestionView key={`${sessionToken}:${study.question.questionIndex}`} question={study.question} state="QUESTION_CLOSED" remainingSec={null} submitted={study.submitted} submittedOptions={study.submittedOptions} submittedResponseText={study.submittedResponseText} timedOut={false} connected={false} onSubmit={study.submitAnswer} draft={study.draft} onDraftChange={study.setDraft} draftPersisted={study.draftPersisted} selfPaced={study.selfPaced} />}
       </div>;
@@ -941,7 +941,7 @@ export function QuestionView({
           slideReferences={question.slideReferences}
           deckStyle={question.deckStyle}
           mode="student"
-          statusLabel={selfPaced ? "Browse the items shown so far, or follow the presenter." : "The instructor will advance shortly"}
+          statusLabel={selfPaced ? undefined : "The instructor will advance shortly"}
         />
         </div>
       </div>
@@ -950,15 +950,15 @@ export function QuestionView({
 
   return (
     <div className="student-screen min-h-dvh flex flex-col p-4 pb-safe" style={appearance.style} {...appearance.attributes}>
-      {/* Header: timer + question number */}
-      <div className="flex items-center justify-between mb-4">
+      {/* Self-paced position is already in the study bar. */}
+      {!selfPaced && <div className="flex items-center justify-between mb-4">
         <span className="student-screen-quiet text-zinc-400 text-sm font-medium">
           {positionLabel}
         </span>
         {!isClosed && !selfPaced && (
           <Timer remainingSec={remainingSec} totalSec={question.timeLimitSec} size={64} />
         )}
-      </div>
+      </div>}
 
       {/* Question text */}
       <QuizHtml id={questionTextId} className="quiz-html student-question-text text-lg text-white leading-relaxed mb-6" html={question.text} />

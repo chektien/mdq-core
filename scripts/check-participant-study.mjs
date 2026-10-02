@@ -84,8 +84,9 @@ try {
  await page.waitForFunction(()=>window.study.items.length===4);
  assert.equal(await page.locator('textarea').inputValue(),'Newer local text','new release does not move explorer');
  assert.equal(await page.evaluate(()=>window.study.progressLabel),'1 of 3 available questions answered');
- await page.getByRole('button',{name:'Back to presenter',exact:true}).click();
+ await page.getByRole('button',{name:/^Back to presenter,/}).click();
  assert.equal(await page.evaluate(()=>window.study.question.questionIndex),2);
+ assert.equal(await page.evaluate(()=>document.activeElement.classList.contains('participant-study-following')),true,'return transfers focus to following state');
  await page.getByRole('button',{name:'Previous available item',exact:true}).click();
  await page.reload(); presenter=1; await join();
  assert.equal(await page.locator('textarea').inputValue(),'Newer local text','reload restores without submission');
@@ -98,6 +99,32 @@ try {
  assert.deepEqual(await page.evaluate(()=>window.study.draft.selectedOptions),[],'seat change isolates draft');
  assert.equal(await page.evaluate(()=>window.study.following),true,'new seat initially follows');
  await page.evaluate(()=>window.study.browse(999)); assert.equal(await page.evaluate(()=>window.study.question.questionIndex),2,'future browse fails closed');
+ await page.waitForFunction(()=>window.study.items.length===4);
+ // Focusable boundaries cannot change the released item or drop keyboard focus.
+ await page.evaluate(()=>window.study.browse(0));
+ const prev=page.getByRole('button',{name:'Previous available item',exact:true});
+ await prev.focus(); await prev.press('Enter');
+ assert.equal(await prev.getAttribute('aria-disabled'),'true');
+ assert.equal(await prev.evaluate(e=>e===document.activeElement),true);
+ assert.equal(await page.evaluate(()=>window.study.question.questionIndex),0);
+ await page.evaluate(()=>window.study.browse(3));
+ await page.waitForFunction(()=>window.study.question.questionIndex===3);
+ const next=page.getByRole('button',{name:'Next available item',exact:true});
+ await next.focus(); await next.press('Space');
+ assert.equal(await next.getAttribute('aria-disabled'),'true');
+ assert.equal(await next.evaluate(e=>e===document.activeElement),true);
+ assert.equal(await page.evaluate(()=>window.study.question.questionIndex),3);
+ assert.equal(await page.locator('.participant-study-position').textContent(),'Item 4 of 4 shown');
+ // A gap in deck indexes must not disclose the full deck or miscount shown items.
+ items=[q(0,'cover'),q(2),q(7)]; presenter=2;
+ await page.evaluate(()=>window.study.refresh());
+ await page.waitForFunction(()=>window.study.items.length===3);
+ await page.evaluate(()=>window.study.browse(7));
+ await page.waitForFunction(()=>window.study.question.questionIndex===7);
+ assert.equal(await page.locator('.participant-study-position').textContent(),'Item 3 of 3 shown');
+ items=[q(0,'cover'),q(1,'open_response'),q(2),q(3)];
+ await page.evaluate(()=>window.study.refresh());
+ await page.waitForFunction(()=>window.study.items.length===4);
  // Mixed-content progress and up-to-date state are submitted evidence only.
  answers=[{questionIndex:1,selectedOptions:[],responseText:'saved'},{questionIndex:2,selectedOptions:[1]},{questionIndex:3,selectedOptions:[0]}];
  await page.evaluate(()=>window.study.refresh()); await page.waitForFunction(()=>window.study.upToDate);
