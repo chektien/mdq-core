@@ -34,10 +34,10 @@ export function effectiveRanking(session: Session, quiz: Quiz): "correctness" | 
     || Object.values(session.questionTiming ?? {}).some((t) => t.timingFairnessInvalidated || t.restarts.length > 0)) return "correctness";
   return "speed";
 }
-export const publicResultsHidden = (session: Session): boolean => isSelfPaced(session) && session.resultScope?.disclosed !== true;
+export const publicResultsHidden = (session: Session): boolean => session.resultsDisclosed === false || session.resultScope?.disclosed === false || (isSelfPaced(session) && session.resultScope?.disclosed !== true);
 export function resultMetadata(session: Session, quiz: Quiz): SessionResultMetadata | undefined {
   if (!session.policy) return undefined;
-  return { schemaVersion: 1, policy: { ...session.policy }, effectiveRanking: effectiveRanking(session, quiz) as "correctness" | "speed",
+  return { schemaVersion: 1, ...(session.resultScope ? { resultVersion: session.resultScope.resultVersion ?? 1, endedAt: session.resultScope.endedAt } : {}), policy: { ...session.policy }, effectiveRanking: effectiveRanking(session, quiz) as "correctness" | "speed",
     releasedQuestionIndexes: releasedQuestionIndexes(session, quiz), scoredQuestionIndexes: [...scoredCorrectAnswersForSession(session, quiz).keys()],
     finality: session.resultScope ? session.resultScope.disclosed ? "ended" : "undisclosed" : "provisional" };
 }

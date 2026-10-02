@@ -85,7 +85,7 @@ describe("control contrast contract", () => {
     expect(disabled).toContain("border: 1px dashed var(--mdq-control-border) !important");
     // The theme maps these fills with !important, so a button that can be
     // disabled must carry the marker class the rule above keys on.
-    const files = ["views/StudentView.tsx", "views/InstructorView.tsx", "components/InstructorLoginPrompt.tsx"];
+    const files = ["views/StudentView.tsx", "views/InstructorView.tsx", "components/InstructorLoginPrompt.tsx", "components/EndSessionConfirmation.tsx"];
     let checked = 0;
     for (const file of files) {
       for (const chunk of read(file).split("<button").slice(1).map((c) => c.slice(0, c.indexOf("</button>")))) {

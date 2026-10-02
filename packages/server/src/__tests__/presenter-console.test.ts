@@ -49,7 +49,10 @@ describe("presenter wording", () => {
   it("asks nothing vague when ending a session", () => {
     const tsx = read("views/InstructorView.tsx");
     expect(tsx).not.toContain("Are you sure?");
-    expect(tsx).toContain("Everyone&apos;s screen will show the final results.");
+    expect(tsx).toContain("EndSessionConfirmation");
+    const confirmation = read("components/EndSessionConfirmation.tsx");
+    expect(confirmation).toContain("End session and show results?");
+    expect(confirmation).toContain("Answers will close and results will be available. This cannot be reopened.");
   });
 });
 

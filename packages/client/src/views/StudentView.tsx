@@ -1,5 +1,7 @@
 import { isSlideType } from "@mdq/shared";
 import { useState, useCallback, useEffect, useMemo, useRef, useSyncExternalStore } from "react";
+import ParticipantResultsView from "../components/ParticipantResultsView";
+import { useParticipantResults } from "../hooks/useParticipantResults";
 import { useParticipantStudy } from "../hooks/useParticipantStudy";
 import ParticipantStudyControls from "../components/ParticipantStudyControls";
 import type { ParticipantDraft } from "../participantDrafts";
@@ -95,6 +97,7 @@ export default function StudentView({
   const [studentId, setStudentId] = useState("");
   const [displayName, setDisplayName] = useState("");
   const [sessionId, setSessionId] = useState<string | null>(null);
+  const [sessionEndedHint, setSessionEndedHint] = useState(false);
   const [quizKey, setQuizKey] = useState<string | null>(null);
   // The deck's own appearance once a session is known. Until then (null) the
   // page follows the defaults, including a runtime config that arrives late.
@@ -149,6 +152,7 @@ export default function StudentView({
 
   const sock = useSocket(sessionId, "student");
   const study = useParticipantStudy(sessionId, sock);
+  const ownResults = useParticipantResults(sessionId, sock.sessionToken, sock.sessionState, sock.seatTaken, sock.connected);
   const { connected, sessionToken, joinSession, error: sockError } = sock;
 
   // Hold the theme until the deck's own theme is known (join-link lookup or
@@ -183,7 +187,8 @@ export default function StudentView({
           return;
         }
         if (!response.ok) throw new Error("lookup failed");
-        const data = (await response.json()) as { studentIds?: boolean };
+        const data = (await response.json()) as { studentIds?: boolean; state?: SessionState; sessionId?: string };
+        if (!cancelled && data.state === "ENDED" && data.sessionId) { setSessionEndedHint(true); setSessionId(data.sessionId); }
         if (!cancelled) setCodeLookup({ status: "found", studentIds: data.studentIds !== false });
       })
       .catch(() => {
@@ -206,10 +211,11 @@ export default function StudentView({
     fetch(API.SESSION_BY_CODE.replace(":code", normalizedCode))
       .then(async (response) => {
         if (!response.ok) return null;
-        return response.json() as Promise<{ week?: string; theme?: DeckTheme; palette?: DeckPalette }>;
+        return response.json() as Promise<{ sessionId?: string; state?: SessionState; week?: string; theme?: DeckTheme; palette?: DeckPalette }>;
       })
       .then((data) => {
         if (cancelled || !data) return;
+        if (data.state === "ENDED" && data.sessionId) { setSessionEndedHint(true); setSessionId(data.sessionId); }
         setSessionTheme(resolveClientTheme(data.theme, defaultTheme));
         setSessionPalette(resolveClientPalette(data.palette, defaultPalette));
         if (typeof data.week === "string" && data.week.trim()) setQuizKey(data.week);
@@ -407,7 +413,8 @@ export default function StudentView({
   useEffect(() => {
     if (sockError) {
       const lowered = sockError.toLowerCase();
-      if (lowered.includes("ended") || lowered.includes("not found")) {
+      if (lowered.includes("ended")) { setSessionEndedHint(true); setJoining(false); return; }
+      if (lowered.includes("not found")) {
         clearSessionArtifacts();
         setSessionId(null);
         setQuizKey(null);
@@ -441,6 +448,18 @@ export default function StudentView({
         <h2 className="text-xl font-semibold text-white">You joined on another device</h2>
         <p role="status" className="max-w-xs text-zinc-300 text-sm">{SEAT_TAKEN_MESSAGE}</p>
       </div>
+    );
+  }
+
+  if (ownResults.status === "ready" && ownResults.results) return <ParticipantResultsView results={ownResults.results} onDone={handleDone} />;
+  if (ownResults.status === "ended" || sessionEndedHint || sock.sessionState === "ENDED") {
+    return (
+      <main className="student-screen min-h-dvh flex flex-col items-center justify-center gap-4 p-6 text-center">
+        <h1 className="text-2xl font-semibold text-white">{ownResults.status === "loading" ? "Loading your results…" : ownResults.status === "error" ? "Your results could not be loaded" : "This session has ended"}</h1>
+        {ownResults.error && <p role="alert" className="text-zinc-300">{ownResults.error}</p>}
+        {(ownResults.status === "error" || ownResults.status === "pending") && <button type="button" onClick={ownResults.refresh} className="rounded-xl border border-zinc-600 px-5 py-3">Retry results</button>}
+        {ownResults.status !== "loading" && <button type="button" onClick={handleDone} className="rounded-xl border border-zinc-600 px-5 py-3">Done</button>}
+      </main>
     );
   }
 

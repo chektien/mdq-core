@@ -86,7 +86,7 @@ export function buildResultsCsv(session: Session, quiz: Quiz, options: BuildResu
   ];
 
   const metadata = resultMetadata(session, quiz);
-  if (metadata) headers.push("results_schema_version", "pacing", "effective_timing", "ranking", "effective_ranking", "released_item_indexes", "scored_item_indexes", "finality");
+  if (metadata) headers.push("results_schema_version", "pacing", "effective_timing", "ranking", "effective_ranking", "released_item_indexes", "scored_item_indexes", "finality", "result_version", "session_ended_at_iso");
   for (const i of resultIndexes) {
     headers.push(`q${i + 1}_revealed_at_iso`);
     headers.push(`q${i + 1}_selected`);
@@ -119,7 +119,7 @@ export function buildResultsCsv(session: Session, quiz: Quiz, options: BuildResu
     ];
 
     if (metadata) row.push(metadata.schemaVersion, metadata.policy.pacing, metadata.policy.effectiveTiming, metadata.policy.ranking, metadata.effectiveRanking,
-      metadata.releasedQuestionIndexes.join("|"), metadata.scoredQuestionIndexes.join("|"), metadata.finality);
+      metadata.releasedQuestionIndexes.join("|"), metadata.scoredQuestionIndexes.join("|"), metadata.finality, metadata.resultVersion ?? "", toIso(metadata.endedAt));
     for (const i of resultIndexes) {
       const sub = subs.get(i);
       const revealedAtIso = toIso(revealTimestamps.get(i));

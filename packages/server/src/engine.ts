@@ -8,7 +8,7 @@ import {
 } from "@mdq/shared";
 import {
   StateTransitionError, computeLeaderboard, getAnsweredQuestions, getDistribution,
-  getOpenResponses, getSubmissionCount,
+  getOpenResponses, getSubmissionCount, isExactOptionMatch,
 } from "./session";
 import { getQuestionType, isOpenResponseQuestion } from "./scoring";
 import {
@@ -241,6 +241,55 @@ export function participantStudyPayload(session: Session, quiz: Quiz, studentId:
   return { policy: session.policy ?? null, items, currentQuestionIndex: session.currentQuestionIndex,
     state: session.state, answers, answeredQuestions, answerableQuestionIndexes };
 }
+/** Counts are hints for the confirmation, never a condition for finalization. */
+export function endSessionAdvisory(session: Session, quiz: Quiz): import("@mdq/shared").EndSessionAdvisory {
+  quiz = session.deckSnapshot ?? quiz;
+  const released = new Set(quiz.questions.map((_, index) => index).filter(index => isQuestionReleased(session, index)));
+  const available = [...released].filter(index => !isSlideType(getQuestionType(quiz.questions[index])));
+  const answeredBySeat = new Map<string, Set<number>>();
+  for (const answer of session.submissions) {
+    const indexes = answeredBySeat.get(answer.studentId) ?? new Set<number>();
+    indexes.add(answer.questionIndex); answeredBySeat.set(answer.studentId, indexes);
+  }
+  return {
+    unfinishedParticipantCount: [...session.participants.values()].filter(seat => !seat.released && available.some(index => !answeredBySeat.get(seat.studentId)?.has(index))).length,
+    // Legacy scoring intentionally retains its whole-deck scope, so do not promise exclusion.
+    unshownQuestionCount: session.policy ? quiz.questions.filter((question, index) => !isSlideType(getQuestionType(question)) && !released.has(index)).length : 0,
+  };
+}
+
+/** Seat authentication and retention are adapter responsibilities. Never reuse admin projections here. */
+export function participantResultsPayload(session: Session, quiz: Quiz, studentId: string): import("@mdq/shared").ParticipantResultsPayload | null {
+  if (session.state !== "ENDED" || publicResultsHidden(session) || (session.policy && session.resultScope?.disclosed !== true)) return null;
+  const seat = session.participants.get(studentId);
+  if (!seat || seat.released) return null;
+  quiz = session.deckSnapshot ?? quiz;
+  const own = new Map(ownAnswers(session, quiz, studentId).map(answer => [answer.questionIndex, answer]));
+  const scored = scoredCorrectAnswersForSession(session, quiz);
+  const endedAt = session.resultScope?.endedAt ?? session.endedAt ?? null;
+  const questions = releasedQuestionIndexes(session, quiz).flatMap(index => {
+    const q = quiz.questions[index];
+    if (!q || isSlideType(getQuestionType(q))) return [];
+    // Legacy result scope retains whole-deck scoring without inventing release history.
+    const question = publicQuestionPayload(session, quiz, index, endedAt ?? session.createdAt);
+    if (!question) return [];
+    const answer = own.get(index) ?? null;
+    const submission = session.submissions.find(s => s.studentId === studentId && s.questionIndex === index);
+    return [{ question, answer, explanation: q.explanation, ...(scored.has(index) ? {
+      correct: !!submission && isExactOptionMatch(submission.selectedOptions, scored.get(index)!),
+      correctOptions: [...scored.get(index)!],
+    } : {}) }];
+  });
+  const scoredQuestionCount = scored.size;
+  const leaderboard = scoredQuestionCount ? leaderboardRows(session, quiz, "public").map(row => ({
+    publicKey: row.publicKey, label: row.label, rank: row.rank, score: row.correctCount,
+  })) : undefined;
+  return { schemaVersion: 1, resultVersion: session.resultScope?.resultVersion ?? (session.policy ? 1 : 0), endedAt,
+    deckTitle: quiz.title, policy: session.policy ? { ...session.policy } : null, publicKey: seat.publicKey,
+    summary: { answeredCount: questions.filter(result => result.answer !== null).length, availableQuestionCount: questions.length,
+      ...(scoredQuestionCount ? { scoredQuestionCount } : {}) }, questions, ...(leaderboard ? { leaderboard } : {}) };
+}
+
 /**
  * The ranked rows for one view. `public` rows name people by label and public
  * key only, so they are safe for phones and the projector.
@@ -251,7 +300,7 @@ export function leaderboardRows(session: Session, quiz: Quiz, view: PayloadView)
     const participant = session.participants.get(entry.studentId);
     const row = {
       rank: entry.rank, publicKey: participant?.publicKey ?? "", label: participant?.label ?? "",
-      correctCount: entry.correctCount, ...(view === "control" || !session.policy || effectiveRanking(session, quiz) === "speed" ? { totalTimeMs: entry.totalTimeMs } : {}),
+      correctCount: entry.correctCount, ...(view === "control" || !session.policy || (session.state !== "ENDED" && effectiveRanking(session, quiz) === "speed") ? { totalTimeMs: entry.totalTimeMs } : {}),
     };
     return view === "control" ? { ...row, studentId: entry.studentId, displayName: entry.displayName } : row;
   });
@@ -468,14 +517,19 @@ export function apply(input: Session, quiz: Quiz, command: Command, now: number)
       openContext(); emitReveal(); state();
       break;
     case "end":
+      // Terminal old records without a scope must not acquire invented history or disclosure on retry.
+      if (session.state === "ENDED" || session.resultScope) break;
       if (session.policy) {
-        if (session.resultScope) break;
-        session.resultScope = { schemaVersion: 1, releasedQuestionIndexes: releasedQuestionIndexes(session, quiz),
+        session.resultScope = { schemaVersion: 1, resultVersion: 1, releasedQuestionIndexes: releasedQuestionIndexes(session, quiz),
           scoredQuestionIndexes: [...scoredCorrectAnswersForSession(session, quiz).keys()], endedAt: now, disclosed: command.discloseResults !== false };
         session.policyFrozen = true;
-        session.state = "ENDED"; state(false);
+        session.state = "ENDED";
+        // Final scoreboard is public-safe; HTTP own results also recover a missed terminal event.
+        if (session.resultScope.disclosed) emitLeaderboard();
+        state(false);
         break;
       }
+      session.endedAt = now; session.resultsDisclosed = command.discloseResults !== false;
       if (session.state === "QUESTION_CLOSED") transition(session, "REVEAL");
       if (session.state === "REVEAL") transition(session, "LEADERBOARD");
       transition(session, "ENDED"); state(false);

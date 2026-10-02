@@ -54,18 +54,14 @@ describe("client light-theme contract", () => {
     });
   });
 
-  describe("InstructorView end-session dialog markup", () => {
-    const tsx = read("views/InstructorView.tsx");
+  describe("shared end-session dialog markup", () => {
+    const tsx = read("components/EndSessionConfirmation.tsx");
 
     it("carries the semantic class names", () => {
       for (const cls of [
         "end-session-overlay",
         "end-session-card",
-        "end-session-eyebrow",
         "end-session-desc",
-        "end-session-stat",
-        "end-session-stat-value",
-        "end-session-stat-label",
         "end-session-keep",
         "end-session-end",
       ]) {

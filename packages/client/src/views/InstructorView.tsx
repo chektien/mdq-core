@@ -1,5 +1,7 @@
 import { isSlideType } from "@mdq/shared";
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import EndSessionConfirmation from "../components/EndSessionConfirmation";
+import { useEndSessionAdvisory } from "../hooks/useEndSessionAdvisory";
 import { useSocket } from "../hooks/useSocket";
 import { resolveSlideBackground, type QuestionState, type RevealState } from "../hooks/useSocket";
 import {
@@ -29,7 +31,7 @@ import {
   type SessionRestoreResponse,
 } from "../hooks/api";
 import { formatDiagnostic } from "@mdq/shared";
-import type { AccessInfo, DeckPalette, DeckTheme, FoldoutNote, OpenResponseEntry, QuestionType, SessionState } from "@mdq/shared";
+import type { AccessInfo, DeckPalette, DeckTheme, FoldoutNote, OpenResponseEntry, SessionState } from "@mdq/shared";
 import { applyClientPalette, applyClientTheme } from "../theme";
 import Timer from "../components/Timer";
 import Leaderboard from "../components/Leaderboard";
@@ -53,7 +55,7 @@ import PresenterNotesPanel from "../components/PresenterNotesPanel";
 import { getQuestionModeText, getRevealActionLabel } from "../questionMode";
 import { decidePresenterKey, documentHasOpenDialog, pickNavAction } from "../presenterKeys";
 import { readShowStudentIds, saveShowStudentIds } from "../showStudentIds";
-import { closedLabel as closedLabelFor, formatRemaining, pluralize, positionLabel as positionLabelFor } from "../instructorText";
+import { closedLabel as closedLabelFor, pluralize, positionLabel as positionLabelFor } from "../instructorText";
 
 type InstructorPhase = "setup" | "lobby" | "live" | "ended";
 const INSTRUCTOR_RESTORE_KEY = "mdquiz_instructor_session";
@@ -824,7 +826,6 @@ function LiveView({
   accessInfo,
   totalQuestionsInQuiz,
   questionHeadings,
-  questionSummaries,
   quizLabel,
   restoredQuestionCache,
   restoredRevealCache,
@@ -881,6 +882,8 @@ function LiveView({
 
   const [reviewQuestionIndex, setReviewQuestionIndex] = useState<number | null>(null);
   const [showEndConfirm, setShowEndConfirm] = useState(false);
+  const endAdvisory = useEndSessionAdvisory(sessionId, showEndConfirm);
+  const endOpenerRef = useRef<HTMLElement | null>(null);
   const [showParticipants, setShowParticipants] = useState(false);
   const participantsOpenerRef = useRef<HTMLElement | null>(null);
   // React runs this ref's cleanup before detaching the node, including when
@@ -1052,20 +1055,6 @@ function LiveView({
   const currentReviewListIndex = isReviewing && reviewQuestionIndex !== null
     ? availableReviewIndices.findIndex((v) => v === reviewQuestionIndex)
     : -1;
-  const itemSummaries = questionSummaries.length > 0
-    ? questionSummaries
-    : questionHeadings.map((heading) => ({
-      heading,
-      questionType: "multiple_choice" as QuestionType,
-    }));
-  const activeItemStillPending = state === "QUESTION_OPEN" || state === "QUESTION_CLOSED";
-  const remainingStartIndex = liveQuestionIndex >= 0
-    ? liveQuestionIndex + (activeItemStillPending ? 0 : 1)
-    : 0;
-  const remainingItems = itemSummaries.slice(Math.max(0, Math.min(remainingStartIndex, itemSummaries.length)));
-  const remainingSlideCount = remainingItems.filter((item) => isSlideType(item.questionType)).length;
-  const remainingQuizQuestionCount = Math.max(remainingItems.length - remainingSlideCount, 0);
-  const remainingSummary = formatRemaining(remainingQuizQuestionCount, remainingSlideCount);
   const controlsUnavailable = loading || !sock.connected;
   // Why a control is waiting, so a tap that cannot work says so instead of doing nothing.
   const waitingReason = !sock.connected ? "Reconnecting..." : null;
@@ -1083,7 +1072,8 @@ function LiveView({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [showEndConfirm]);
 
-  const requestEndSession = useCallback(() => {
+  const requestEndSession = useCallback((event?: { currentTarget: HTMLElement }) => {
+    endOpenerRef.current = event?.currentTarget ?? document.activeElement as HTMLElement | null;
     setShowEndConfirm(true);
   }, []);
 
@@ -1276,63 +1266,8 @@ function LiveView({
   })();
 
   const endSessionConfirmDialog = showEndConfirm ? (
-    <div
-      className="end-session-overlay fixed inset-0 z-[10000] flex items-center justify-center bg-[#07060b]/80 px-5 backdrop-blur-sm"
-      role="presentation"
-      onMouseDown={(event) => {
-        if (event.target === event.currentTarget) {
-          setShowEndConfirm(false);
-        }
-      }}
-    >
-      <div
-        className="end-session-card w-full max-w-lg rounded-2xl border border-[color-mix(in_srgb,var(--mdq-danger-line)_40%,transparent)] bg-[var(--mdq-dialog)] p-6 text-white shadow-2xl shadow-black/50"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="end-session-title"
-      >
-        <p className="end-session-eyebrow text-xs font-semibold uppercase tracking-[0.22em] text-red-200/80">End live session</p>
-        <h2 id="end-session-title" className="mt-3 text-2xl font-semibold">End this session?</h2>
-        <p className="end-session-desc mt-3 text-sm leading-6 text-zinc-300">
-          Everyone&apos;s screen will show the final results.
-          {remainingSummary && ` Still to come: ${remainingSummary}.`}
-        </p>
-        {remainingSummary && (
-          <div className="mt-5 flex gap-3">
-            {remainingQuizQuestionCount > 0 && (
-              <div className="end-session-stat flex-1 rounded-xl border border-white/10 bg-white/[0.045] px-4 py-3">
-                <p className="end-session-stat-value text-3xl font-semibold tabular-nums text-white">{remainingQuizQuestionCount}</p>
-                <p className="end-session-stat-label mt-1 text-xs uppercase tracking-[0.18em] text-zinc-400">{remainingQuizQuestionCount === 1 ? "Quiz question left" : "Quiz questions left"}</p>
-              </div>
-            )}
-            {remainingSlideCount > 0 && (
-              <div className="end-session-stat flex-1 rounded-xl border border-white/10 bg-white/[0.045] px-4 py-3">
-                <p className="end-session-stat-value text-3xl font-semibold tabular-nums text-white">{remainingSlideCount}</p>
-                <p className="end-session-stat-label mt-1 text-xs uppercase tracking-[0.18em] text-zinc-400">{remainingSlideCount === 1 ? "Slide left" : "Slides left"}</p>
-              </div>
-            )}
-          </div>
-        )}
-        <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-end">
-          <button
-            type="button"
-            className="end-session-keep rounded-xl border border-white/12 bg-white/[0.04] px-5 py-3 text-sm font-semibold text-zinc-100 transition-colors hover:bg-white/[0.08]"
-            onClick={() => setShowEndConfirm(false)}
-            autoFocus
-          >
-            Keep Session
-          </button>
-          <button
-            type="button"
-            className="end-session-end rounded-xl border border-red-300/35 bg-red-600 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-red-950/25 transition-colors hover:bg-red-500 disabled:cursor-not-allowed disabled:border-zinc-700 disabled:bg-zinc-700 disabled:text-zinc-400 disabled:shadow-none"
-            onClick={confirmEndSession}
-            disabled={controlsUnavailable}
-          >
-            End Session
-          </button>
-        </div>
-      </div>
-    </div>
+    <EndSessionConfirmation advisory={endAdvisory} busy={loading} endDisabled={controlsUnavailable} opener={endOpenerRef.current}
+      onKeepOpen={() => setShowEndConfirm(false)} onEnd={confirmEndSession} />
   ) : null;
 
   const participantsDialog = showParticipants ? (

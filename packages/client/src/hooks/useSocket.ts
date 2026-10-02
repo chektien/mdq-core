@@ -412,9 +412,9 @@ export function useSocket(
     socket.on(SocketEvents.STUDENT_REJECTED, (data: { reason: string }) => {
       setError(data.reason);
       const reason = data.reason.toLowerCase();
-      if (reason.includes("ended") || reason.includes("not found")) {
-        clearStoredSession();
-      }
+      if (reason.includes("ended")) setSessionState("ENDED");
+      // Preserve the retained seat credential when sockets close at End.
+      if (reason.includes("not found")) clearStoredSession();
     });
 
     // ── Question lifecycle ─────────────────

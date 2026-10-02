@@ -479,6 +479,8 @@ export const API = {
   SESSION_RESTART_COUNTDOWN: "/api/session/:id/restart-countdown",
   SESSION_REVEAL: "/api/session/:id/reveal",
   SESSION_END: "/api/session/:id/end",
+  SESSION_END_ADVISORY: "/api/session/:id/end-advisory",
+  SESSION_OWN_RESULTS: "/api/session/:id/own-results",
   SESSION_LEADERBOARD: "/api/session/:id/leaderboard",
   SESSION_LEADERBOARD_SHOW: "/api/session/:id/leaderboard-show",
   SESSION_LEADERBOARD_HIDE: "/api/session/:id/leaderboard-hide",
@@ -590,6 +592,8 @@ export interface SessionPolicy {
 }
 export interface SessionResultScope {
   schemaVersion: 1;
+  /** Fixed at first finalization. Absent on older schema-1 records, where it is 1. */
+  resultVersion?: number;
   releasedQuestionIndexes: number[];
   scoredQuestionIndexes: number[];
   endedAt: number;
@@ -597,6 +601,8 @@ export interface SessionResultScope {
 }
 export interface SessionResultMetadata {
   schemaVersion: 1;
+  resultVersion?: number;
+  endedAt?: number;
   policy: SessionPolicy;
   effectiveRanking: "correctness" | "speed";
   releasedQuestionIndexes: number[];
@@ -644,6 +650,9 @@ export interface QuestionTiming {
 }
 
 export interface Session {
+  /** Legacy End audit only; new policy sessions use resultScope. */
+  endedAt?: number;
+  resultsDisclosed?: boolean;
   /** New sessions pin authored content at first Start; effective timing stays a separate policy. */
   deckSnapshot?: Quiz;
   policy?: SessionPolicy;
@@ -770,3 +779,32 @@ export interface ParticipantStudyPayload {
   answeredQuestions: number[];
   answerableQuestionIndexes: number[];
 }
+
+/** Advisory only. An in-flight answer may change counts before End is committed. */
+export interface EndSessionAdvisory {
+  unfinishedParticipantCount: number;
+  unshownQuestionCount: number;
+}
+export interface ParticipantQuestionResult {
+  question: QuestionOpenPayload;
+  answer: StudentAnswer | null;
+  /** Only scored questions carry correctness or an answer key. */
+  correct?: boolean;
+  correctOptions?: string[];
+  explanation?: string;
+}
+/** Deliberately separate from instructor results. Never carries another participant's text or identity. */
+export interface ParticipantResultsPayload {
+  schemaVersion: 1;
+  /** Legacy records have version 0 and no invented final timestamp. */
+  resultVersion: number;
+  endedAt: number | null;
+  deckTitle: string;
+  policy: SessionPolicy | null;
+  publicKey: string;
+  summary: { answeredCount: number; availableQuestionCount: number; scoredQuestionCount?: number };
+  questions: ParticipantQuestionResult[];
+  /** Omitted entirely when no scored question was released. */
+  leaderboard?: { publicKey: string; label: string; rank: number; score: number }[];
+}
+export const PARTICIPANT_RESULT_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;

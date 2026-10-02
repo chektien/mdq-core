@@ -130,7 +130,7 @@ export function saveSessionSnapshot(session: Session, baseDir?: string): void {
       joinedAt: p.joinedAt,
     })),
     createdAt: session.createdAt,
-    endedAt: session.resultScope?.endedAt ?? Date.now(),
+    endedAt: session.resultScope?.endedAt ?? session.endedAt ?? Date.now(),
     ...(session.questionTiming ? { questionTiming: session.questionTiming } : {}),
   };
 
@@ -391,6 +391,8 @@ export function saveWeeklyResult(
   quiz: Quiz,
   baseDir?: string,
 ): void {
+  // A nondisclosing administrative stop must not publish or replace weekly rewards.
+  if (session.resultsDisclosed === false || session.resultScope?.disclosed === false) return;
   const dir = winnersDir(baseDir);
   ensureDir(dir);
 
@@ -401,7 +403,7 @@ export function saveWeeklyResult(
     week: session.week,
     sessionId: session.sessionId,
     totalQuestions: getSessionScoredQuestionCount(session, quiz),
-    completedAt: session.resultScope?.endedAt ?? Date.now(),
+    completedAt: session.resultScope?.endedAt ?? session.endedAt ?? Date.now(),
     ...(session.policy ? { metadata: resultMetadata(session, quiz) } : {}),
     entries,
   };
@@ -555,7 +557,7 @@ export function persistSessionOnEnd(
   quiz: Quiz,
   baseDir?: string,
 ): void {
-  const endedAt = Date.now();
+  const endedAt = session.resultScope?.endedAt ?? session.endedAt ?? Date.now();
 
   try {
     saveSessionSnapshot(session, baseDir);

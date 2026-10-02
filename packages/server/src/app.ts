@@ -1,7 +1,7 @@
 import { isSlideType } from "@mdq/shared";
 import express, { type Request, type Response } from "express";
 import cors from "cors";
-import { API, AccessInfo, CumulativeLeaderboardEntry, PublicCumulativeLeaderboardEntry, ParseDiagnostic, formatDiagnostic, DeckPalette, DeckTheme, JoinLockRequest, Quiz, ReleaseSeatRequest, ResponseVisibilityRequest, Session, SessionState, usesStudentIds } from "@mdq/shared";
+import { API, AccessInfo, CumulativeLeaderboardEntry, PublicCumulativeLeaderboardEntry, ParseDiagnostic, formatDiagnostic, DeckPalette, DeckTheme, JoinLockRequest, Quiz, ReleaseSeatRequest, ResponseVisibilityRequest, Session, SessionState, PARTICIPANT_RESULT_RETENTION_MS, usesStudentIds } from "@mdq/shared";
 import {
   createSession,
   storeSession,
@@ -14,7 +14,7 @@ import {
 } from "./session";
 import { parseQuizMarkdown } from "./parser";
 import { publicResultsHidden, releasedQuestionIndexes, getSessionScoredQuestionCount, effectiveRanking, sessionPolicy } from "./policy";
-import { apply, participantStudyPayload, publicQuestionPayload, leaderboardRows, questionPosition, responsesFor, timingFor, EngineCommandError, type Command, type EngineResult } from "./engine";
+import { apply, participantResultsPayload, endSessionAdvisory, participantStudyPayload, publicQuestionPayload, leaderboardRows, questionPosition, responsesFor, timingFor, EngineCommandError, type Command, type EngineResult } from "./engine";
 import {
   persistSessionOnEnd,
   computeCumulativeLeaderboard,
@@ -753,6 +753,30 @@ export function createApp(quizDirOrOpts?: string | AppOptions) {
       }
     });
   });
+  app.get(API.SESSION_END_ADVISORY, requireInstructorAuth, (req, res) => {
+    withSession(req, res, session => {
+      const quiz = getQuizForSession(session);
+      if (!quiz) return res.status(500).json({ error: "Quiz data not found" });
+      res.setHeader("Cache-Control", "no-store");
+      return res.json(endSessionAdvisory(session, quiz));
+    });
+  });
+  app.get(API.SESSION_OWN_RESULTS, (req, res) => {
+    const session = getSession(req.params.id);
+    res.setHeader("Cache-Control", "no-store");
+    if (!session) return res.status(410).json({ error: "This session has ended" });
+    const token = req.headers.authorization?.match(/^Bearer (.+)$/)?.[1];
+    const seat = token ? [...session.participants.values()].find(participant => participant.sessionToken === token && !participant.released) : undefined;
+    if (!seat) return res.status(session.state === "ENDED" ? 410 : 401).json({ error: session.state === "ENDED" ? "This session has ended" : "Valid seat credentials are required" });
+    const endedAt = session.resultScope?.endedAt ?? session.endedAt;
+    if (endedAt !== undefined && Date.now() >= endedAt + PARTICIPANT_RESULT_RETENTION_MS) return res.status(410).json({ error: "This session has ended" });
+    if (session.state !== "ENDED") return res.status(409).json({ error: "Results are not available yet" });
+    const quiz = getQuizForSession(session);
+    if (!quiz) return res.status(500).json({ error: "Quiz data not found" });
+    const results = participantResultsPayload(session, quiz, seat.studentId);
+    if (!results) return res.status(410).json({ error: "This session has ended" });
+    return res.json(results);
+  });
   app.get(API.SESSION_ITEMS, (req, res) => {
     withSession(req, res, session => {
       const token = req.headers.authorization?.match(/^Bearer (.+)$/)?.[1];
@@ -795,7 +819,9 @@ export function createApp(quizDirOrOpts?: string | AppOptions) {
         try {
           // A session ended from the lobby has no results, so it must not replace saved ones.
           const endedUnstarted = action.type === "end" && current.state === "LOBBY";
+          const alreadyEnded = current.state === "ENDED";
           const command: Command = action.type === "restartCountdown" ? { type: "restartCountdown", role: "control" }
+            : action.type === "end" ? { type: "end", discloseResults: req.body?.discloseResults !== false }
             : { type: action.type } as Command;
           const result = apply(current, quiz, command, Date.now());
           const session = current;
@@ -818,7 +844,7 @@ export function createApp(quizDirOrOpts?: string | AppOptions) {
               console.error(`Failed to persist reveal progress for ${session.sessionId}:`, e);
             }
           }
-          if (action.type === "end" && !endedUnstarted) persistSessionOnEnd(session, quiz, dataDir);
+          if (action.type === "end" && !endedUnstarted && !alreadyEnded) persistSessionOnEnd(session, quiz, dataDir);
           notifyStateChange(session, req.params.id, quiz, result);
           logActivity(`instructor ${action.type} session=${req.params.id} q=${session.currentQuestionIndex} state=${session.state}`);
           if (action.type === "end" || action.type === "leaderboardShow") return res.json({ state: session.state });

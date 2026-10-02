@@ -67,6 +67,7 @@ const cases: Record<string, { state: SessionState; messages: ReturnType<typeof m
   "LEADERBOARD:leaderboardHide": { state: "REVEAL", messages: revealed(0) },
   "LEADERBOARD:reveal": { state: "REVEAL", messages: revealed(0) },
   "LEADERBOARD:end": { state: "ENDED", messages: ended },
+  "ENDED:end": { state: "ENDED", messages: [] },
 };
 
 for (const state of states) for (const type of commands) {

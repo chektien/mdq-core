@@ -311,7 +311,7 @@ describe("palette readability, 7 palettes x 2 themes", () => {
   });
 
   it("draws the end-session dialog from theme tokens in every palette", () => {
-    const tsx = fs.readFileSync(path.join(clientSrc, "views", "InstructorView.tsx"), "utf-8");
+    const tsx = fs.readFileSync(path.join(clientSrc, "components", "EndSessionConfirmation.tsx"), "utf-8");
     const card = /className="end-session-card [^"]*"/.exec(tsx)![0];
     expect(card).toContain("bg-[var(--mdq-dialog)]");
     expect(card).toContain("var(--mdq-danger-line)");
