@@ -25,8 +25,6 @@ import type {
   SlideLiveEmbed,
   SlideVideo,
   SlideReference,
-  DeckPalette,
-  DeckTheme,
   DeckStyle,
   StudentAnswer,
 } from "@mdq/shared";
@@ -34,48 +32,13 @@ import { SocketEvents } from "@mdq/shared";
 import { clockOffsetFromTick, localRemainingSec } from "../countdown";
 import { mergeOwnAnswers, seedSubmittedAnswer, toOptionIndexes } from "../ownAnswers";
 import { isSameOpening } from "../questionOpening";
+import { loadStoredSession, saveStoredSession, clearStoredSession } from "../participantSessionStorage";
 
 // ── localStorage helpers ─────────────────────
-const STORAGE_KEY = "mdquiz_session";
 const CLIENT_INSTANCE_KEY = "mdquiz_client_instance_id";
-
-interface StoredSession {
-  sessionId: string;
-  studentId: string;
-  sessionToken: string;
-  sessionWeek?: string;
-  sessionTheme?: DeckTheme;
-  sessionPalette?: DeckPalette;
-}
 
 function appendAnsweredQuestion(current: number[], questionIndex: number): number[] {
   return current.includes(questionIndex) ? current : [...current, questionIndex];
-}
-
-function loadStoredSession(): StoredSession | null {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return null;
-    return JSON.parse(raw);
-  } catch {
-    return null;
-  }
-}
-
-function saveStoredSession(data: StoredSession) {
-  const existing = loadStoredSession();
-  const retainedMetadata = existing?.sessionId === data.sessionId
-    ? {
-      sessionWeek: existing.sessionWeek,
-      sessionTheme: existing.sessionTheme,
-      sessionPalette: existing.sessionPalette,
-    }
-    : {};
-  localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...retainedMetadata, ...data }));
-}
-
-function clearStoredSession() {
-  localStorage.removeItem(STORAGE_KEY);
 }
 
 function getClientInstanceId(): string {
@@ -231,7 +194,7 @@ export interface UseSocketReturn {
   joinSession: (studentId: string | undefined, displayName?: string) => void;
   submitAnswer: (payload: AnswerSubmitPayload, options?: readonly { label: string }[]) => void;
   reconnect: () => void;
-  disconnect: () => void;
+  disconnect: (options?: { preserveSession?: boolean }) => void;
 }
 
 export function useSocket(
@@ -262,6 +225,7 @@ export function useSocket(
 
   const [sessionState, setSessionState] = useState<SessionState | null>(null);
   const [sessionToken, setSessionToken] = useState<string | null>(null);
+  const [credentialSessionId, setCredentialSessionId] = useState<string | null>(null);
   const [studentIdState, setStudentIdState] = useState<string | null>(null);
   const [publicKey, setPublicKey] = useState<string | null>(null);
   const [label, setLabel] = useState<string | null>(null);
@@ -308,6 +272,11 @@ export function useSocket(
 
   // Connect socket when sessionId is available
   useEffect(() => {
+    setConnected(false);
+    setError(null);
+    setSessionToken(null);
+    setCredentialSessionId(null);
+    setSessionState(null);
     if (!sessionId) return;
 
     const socket = io({
@@ -331,7 +300,7 @@ export function useSocket(
 
       // Auto-rejoin for students with stored token
       if (role === "student" && !seatTakenRef.current) {
-        const stored = loadStoredSession();
+        const stored = loadStoredSession(sessionId);
         if (stored && stored.sessionId === sessionId && stored.sessionToken) {
           socket.emit(SocketEvents.STUDENT_JOIN, {
             studentId: stored.studentId,
@@ -359,6 +328,7 @@ export function useSocket(
         ownAnswersRef.current = new Map(); pendingAnswerRef.current.clear();
       }
       joinedTokenRef.current = data.sessionToken;
+      setCredentialSessionId(sessionId);
       setSessionToken(data.sessionToken);
       setStudentIdState(data.participantId);
       setPublicKey(data.publicKey ?? null);
@@ -402,8 +372,7 @@ export function useSocket(
     socket.on(SocketEvents.SEAT_TAKEN, () => {
       seatTakenRef.current = true;
       // The other device may share this browser's storage, so only clear a seat this screen still holds.
-      const stored = loadStoredSession();
-      if (stored && stored.sessionToken === joinedTokenRef.current) clearStoredSession();
+      clearStoredSession(sessionId, joinedTokenRef.current);
       setSeatTaken(true);
       setError(null);
       socket.disconnect();
@@ -414,7 +383,7 @@ export function useSocket(
       const reason = data.reason.toLowerCase();
       if (reason.includes("ended")) setSessionState("ENDED");
       // Preserve the retained seat credential when sockets close at End.
-      if (reason.includes("not found")) clearStoredSession();
+      if (reason.includes("not found")) clearStoredSession(sessionId);
     });
 
     // ── Question lifecycle ─────────────────
@@ -650,7 +619,7 @@ export function useSocket(
   const joinSession = useCallback(
     (studentId: string | undefined, displayName?: string) => {
       if (!socketRef.current) return;
-      const stored = loadStoredSession();
+      const stored = loadStoredSession(sessionId);
       const token = stored?.sessionId === sessionId ? stored.sessionToken : undefined;
       // Clear the last refusal first, so a second refusal for the same reason is shown again.
       setError(null);
@@ -705,8 +674,8 @@ export function useSocket(
     socket.connect();
   }, []);
 
-  const disconnect = useCallback(() => {
-    clearStoredSession();
+  const disconnect = useCallback((options?: { preserveSession?: boolean }) => {
+    if (role === "student" && !options?.preserveSession) clearStoredSession(sessionId, joinedTokenRef.current ?? undefined);
     socketRef.current?.disconnect();
     setConnected(false);
     setSessionState(null);
@@ -716,13 +685,13 @@ export function useSocket(
     setLabel(null);
     setLabelNote(null);
     setDeckTitle(null);
-  }, []);
+  }, [role, sessionId]);
 
   return {
     connected,
     error,
     sessionState,
-    sessionToken,
+    sessionToken: credentialSessionId === sessionId ? sessionToken : null,
     seatTaken,
     studentId: studentIdState,
     publicKey,

@@ -374,6 +374,6 @@ describe("presenter review fixes", () => {
     expect(view).toContain("SEAT_TAKEN_MESSAGE");
     expect(socket).toContain("SocketEvents.SEAT_TAKEN");
     expect(socket).toContain('role === "student" && !seatTakenRef.current');
-    expect(socket).toContain("stored.sessionToken === joinedTokenRef.current");
+    expect(socket).toContain("clearStoredSession(sessionId, joinedTokenRef.current)");
   });
 });

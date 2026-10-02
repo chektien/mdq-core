@@ -6,6 +6,7 @@ import { useParticipantStudy } from "../hooks/useParticipantStudy";
 import ParticipantStudyControls from "../components/ParticipantStudyControls";
 import type { ParticipantDraft } from "../participantDrafts";
 import { useSocket } from "../hooks/useSocket";
+import { loadStoredSession, saveStoredSession, clearStoredSession } from "../participantSessionStorage";
 import type { QuestionState, RevealState } from "../hooks/useSocket";
 import { API, MAX_OPEN_RESPONSE_LENGTH, SEAT_TAKEN_MESSAGE } from "@mdq/shared";
 import type { DeckPalette, DeckTheme, SessionState } from "@mdq/shared";
@@ -24,9 +25,9 @@ import { deckLabel, resultsHeading } from "../deckLabel";
 import type { JoinFieldName, JoinFieldSpec } from "../joinForm";
 import { applyClientPalette, applyClientTheme, resolveClientPalette, resolveClientTheme } from "../theme";
 
-function clearSessionArtifacts(): void {
+function clearSessionArtifacts(sessionId: string | null): void {
   try {
-    localStorage.removeItem("mdquiz_session");
+    clearStoredSession(sessionId);
     localStorage.removeItem("mdquiz_pending_join");
   } catch {
     // ignore
@@ -41,16 +42,8 @@ const REJOIN_GRACE_MS = 10_000;
  * the restore effect and the socket auto-rejoin use.
  */
 function hasStoredSeat(initialSessionId?: string, initialSessionCode?: string): boolean {
-  try {
-    const raw = localStorage.getItem("mdquiz_session");
-    if (!raw) return false;
-    const stored = JSON.parse(raw);
-    if (typeof stored?.sessionToken !== "string" || !stored.sessionToken || typeof stored.sessionId !== "string") return false;
-    const targetSessionId = (initialSessionId || "").trim();
-    return targetSessionId ? stored.sessionId === targetSessionId : !initialSessionCode && Boolean(stored.sessionId);
-  } catch {
-    return false;
-  }
+  const stored = initialSessionId ? loadStoredSession(initialSessionId.trim()) : !initialSessionCode ? loadStoredSession() : null;
+  return Boolean(stored?.sessionToken);
 }
 
 function createGeneratedStudentId(): string {
@@ -234,10 +227,9 @@ export default function StudentView({
   // Try to restore session from localStorage on mount
   useEffect(() => {
     try {
-      const raw = localStorage.getItem("mdquiz_session");
       const targetSessionId = (initialSessionId || "").trim();
-      if (raw) {
-        const stored = JSON.parse(raw);
+      const stored = targetSessionId ? loadStoredSession(targetSessionId) : loadStoredSession();
+      if (stored) {
         const restoresStoredSession = targetSessionId
           ? stored.sessionId === targetSessionId
           : !initialSessionCode && Boolean(stored.sessionId);
@@ -272,8 +264,9 @@ export default function StudentView({
   }, [defaultPalette, defaultTheme, initialSessionCode, initialSessionId]);
 
   const handleDone = useCallback(() => {
-    clearSessionArtifacts();
-    sock.disconnect();
+    localStorage.removeItem("mdquiz_pending_join");
+    sock.disconnect({ preserveSession: true });
+    setSessionId(null);
     setCompleted(true);
     setSessionTheme(null);
     setSessionPalette(null);
@@ -301,7 +294,7 @@ export default function StudentView({
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
         if (res.status === 404 || res.status === 410) {
-          clearSessionArtifacts();
+          clearSessionArtifacts(null);
           setSessionId(null);
           setQuizKey(null);
           setSessionTheme(null);
@@ -325,36 +318,16 @@ export default function StudentView({
         "mdquiz_pending_join",
         JSON.stringify({ studentId: identity.studentId, displayName: identity.displayName }),
       );
-      // Also update the session store so page refreshes restore the session
-      localStorage.setItem(
-        "mdquiz_session",
-        JSON.stringify({
-          sessionId: data.sessionId,
-          studentId: identity.seatKey,
-          sessionWeek: data.week,
-          sessionTheme: resolvedTheme,
-          sessionPalette: resolvedPalette,
-          sessionToken:
-            (() => {
-              try {
-                const existingRaw = localStorage.getItem("mdquiz_session");
-                if (!existingRaw) return undefined;
-                const existing = JSON.parse(existingRaw);
-                if (
-                  existing
-                  && existing.sessionId === data.sessionId
-                  && existing.studentId === identity.seatKey
-                  && typeof existing.sessionToken === "string"
-                ) {
-                  return existing.sessionToken;
-                }
-              } catch {
-                // ignore
-              }
-              return undefined;
-            })(),
-        }),
-      );
+      // Keep every prior seat while selecting this pending join as the active session.
+      const existing = loadStoredSession(data.sessionId);
+      saveStoredSession({
+        sessionId: data.sessionId,
+        studentId: identity.seatKey,
+        sessionWeek: data.week,
+        sessionTheme: resolvedTheme,
+        sessionPalette: resolvedPalette,
+        sessionToken: existing?.studentId === identity.seatKey ? existing.sessionToken : undefined,
+      });
 
       if (connected && !sessionToken && sessionId === data.sessionId) {
         // A second try after a refusal: the socket is already open, so nothing else will send the join.
@@ -415,7 +388,7 @@ export default function StudentView({
       const lowered = sockError.toLowerCase();
       if (lowered.includes("ended")) { setSessionEndedHint(true); setJoining(false); return; }
       if (lowered.includes("not found")) {
-        clearSessionArtifacts();
+        clearSessionArtifacts(sessionId);
         setSessionId(null);
         setQuizKey(null);
       }
@@ -424,7 +397,7 @@ export default function StudentView({
       setJoinErrorField(errorField(spec, sockError));
       setJoining(false);
     }
-  }, [sockError, spec]);
+  }, [sessionId, sockError, spec]);
 
   // Put the cursor in the field a message is about, so the fix is one edit away.
   useEffect(() => {
@@ -452,7 +425,8 @@ export default function StudentView({
   }
 
   if (ownResults.status === "ready" && ownResults.results) return <ParticipantResultsView results={ownResults.results} onDone={handleDone} />;
-  if (ownResults.status === "ended" || sessionEndedHint || sock.sessionState === "ENDED") {
+  if (ownResults.status === "ended" || sessionEndedHint || sock.sessionState === "ENDED"
+    || (ownResults.status === "error" && !sock.sessionToken && hasStoredSeat(sessionId ?? undefined))) {
     return (
       <main className="student-screen min-h-dvh flex flex-col items-center justify-center gap-4 p-6 text-center">
         <h1 className="text-2xl font-semibold text-white">{ownResults.status === "loading" ? "Loading your results…" : ownResults.status === "error" ? "Your results could not be loaded" : "This session has ended"}</h1>

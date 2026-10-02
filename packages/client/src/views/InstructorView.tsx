@@ -454,7 +454,7 @@ export default function InstructorView({
   }, [selectedWeek]);
 
   const handleAction = useCallback(
-    async (action: () => Promise<unknown>, label: string) => {
+    async (action: () => Promise<unknown>, label: string, onSuccess?: () => void) => {
       if (actionInFlightRef.current) return;
       actionInFlightRef.current = true;
       setRestoreNotice((current) => (
@@ -464,6 +464,7 @@ export default function InstructorView({
       setErrorMsg(null);
       try {
         await action();
+        onSuccess?.();
       } catch (e) {
         const message = e instanceof Error ? e.message : `Failed to ${label}`;
         setErrorMsg(`${message} Reconnecting to sync the current session state.`);
@@ -874,7 +875,7 @@ function LiveView({
   presenterNotesByIndex: Record<number, FoldoutNote[]>;
   presenterNotesOpen: boolean;
   onPresenterNotesToggle: (open: boolean) => void;
-  onAction: (action: () => Promise<unknown>, label: string) => void;
+  onAction: (action: () => Promise<unknown>, label: string, onSuccess?: () => void) => Promise<void>;
 }) {
   const state = sock.sessionState as SessionState;
   const q = sock.currentQuestion as QuestionState | null;
@@ -1059,27 +1060,13 @@ function LiveView({
   // Why a control is waiting, so a tap that cannot work says so instead of doing nothing.
   const waitingReason = !sock.connected ? "Reconnecting..." : null;
 
-  useEffect(() => {
-    if (!showEndConfirm) return;
-
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        setShowEndConfirm(false);
-      }
-    };
-
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [showEndConfirm]);
-
   const requestEndSession = useCallback((event?: { currentTarget: HTMLElement }) => {
     endOpenerRef.current = event?.currentTarget ?? document.activeElement as HTMLElement | null;
     setShowEndConfirm(true);
   }, []);
 
-  const confirmEndSession = useCallback(() => {
-    setShowEndConfirm(false);
-    onAction(() => endSession(sessionId), "end");
+  const confirmEndSession = useCallback(async () => {
+    await onAction(() => endSession(sessionId), "end", () => setShowEndConfirm(false));
   }, [onAction, sessionId]);
 
   const liveSurfaceNavActions: LiveSurfaceAction[] = (() => {
@@ -1266,7 +1253,7 @@ function LiveView({
   })();
 
   const endSessionConfirmDialog = showEndConfirm ? (
-    <EndSessionConfirmation advisory={endAdvisory} busy={loading} endDisabled={controlsUnavailable} opener={endOpenerRef.current}
+    <EndSessionConfirmation advisory={endAdvisory} busy={loading} endDisabled={controlsUnavailable} error={errorMsg} opener={endOpenerRef.current}
       onKeepOpen={() => setShowEndConfirm(false)} onEnd={confirmEndSession} />
   ) : null;
 

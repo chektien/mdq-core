@@ -45,7 +45,7 @@ describe("client slide palette contract", () => {
     const instructor = read("views/InstructorView.tsx");
     const student = read("views/StudentView.tsx");
     const presentation = read("views/PresentationView.tsx");
-    const socket = read("hooks/useSocket.ts");
+    const storage = read("participantSessionStorage.ts");
 
     it("normalizes and applies only supported palettes, defaulting to classic", () => {
       expect(appearance).toContain('DEFAULT_CLIENT_PALETTE: DeckPalette = "classic"');
@@ -67,8 +67,8 @@ describe("client slide palette contract", () => {
     });
 
     it("retains the deck palette across student socket reconnection", () => {
-      expect(socket).toContain("sessionPalette?: DeckPalette");
-      expect(socket).toContain("sessionPalette: existing.sessionPalette");
+      expect(storage).toContain("sessionPalette?: DeckPalette");
+      expect(storage).toContain("sessionPalette: existing?.sessionPalette");
       expect(student).toContain("sessionPalette: resolvedPalette");
       expect(student).toContain("resolveClientPalette(stored.sessionPalette, defaultPalette)");
     });

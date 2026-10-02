@@ -31,6 +31,9 @@ export default function ParticipantResultsView({ results, onDone }: { results: P
               <div key={option.label} className="student-panel-text flex items-start gap-3 text-zinc-200"><span>{option.label}</span><QuizHtml className="quiz-html student-panel-text" html={option.text} as="span" /></div>
             ))}
             {correctOptions && <div className="student-screen-quiet text-sm text-zinc-400">Correct answer{correctOptions.length === 1 ? "" : "s"}: {correctOptions.join(", ")}</div>}
+            {question.options.filter(option => correctOptions?.includes(option.label) && !selected.includes(option.label)).map(option => (
+              <div key={option.label} className="student-panel-text flex items-start gap-3 text-zinc-200"><span>{option.label}</span><QuizHtml className="quiz-html student-panel-text" html={option.text} as="span" /></div>
+            ))}
             {explanation && <InlineMarkdownText text={explanation} className="student-panel-text text-zinc-200" />}
           </section>
         );

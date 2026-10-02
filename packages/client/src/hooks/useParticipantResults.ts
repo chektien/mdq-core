@@ -1,13 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { API, type ParticipantResultsPayload, type SessionState } from "@mdq/shared";
 
-/** A retained seat credential is not a new join or identity/name-based impersonation. */
-function retainedToken(sessionId: string | null): string | null {
-  try {
-    const stored = JSON.parse(localStorage.getItem("mdquiz_session") ?? "null");
-    return stored?.sessionId === sessionId && typeof stored.sessionToken === "string" && stored.sessionToken ? stored.sessionToken : null;
-  } catch { return null; }
-}
+import { loadStoredSession } from "../participantSessionStorage";
 
 export type ParticipantResultsStatus = "loading" | "pending" | "ready" | "ended" | "error";
 /** HTTP recovery does not depend on receiving the final socket event or joining an ended session. */
@@ -18,7 +12,7 @@ export function useParticipantResults(
   seatTaken = false,
   connected = false,
 ) {
-  const token = seatTaken ? null : sessionToken ?? retainedToken(sessionId);
+  const token = seatTaken ? null : sessionToken ?? loadStoredSession(sessionId)?.sessionToken ?? null;
   const credentialKey = sessionId && !seatTaken ? JSON.stringify([sessionId, token]) : null;
   const [snapshot, setSnapshot] = useState<{ key: string; status: ParticipantResultsStatus; results: ParticipantResultsPayload | null; error: string | null } | null>(null);
   const [revision, setRevision] = useState(0);
