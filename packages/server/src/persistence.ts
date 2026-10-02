@@ -117,6 +117,7 @@ export function saveSessionSnapshot(session: Session, baseDir?: string): void {
   ensureDir(dir);
 
   const snapshot: SessionSnapshot = {
+    ...(session.availability ? { availability: { ...session.availability } } : {}),
     sessionId: session.sessionId,
     sessionCode: session.sessionCode,
     week: session.week,
@@ -609,4 +610,17 @@ function readJsonSafe<T>(filePath: string): T | null {
   } catch {
     return null;
   }
+}
+
+/** Lifecycle purge removes this session's own artifacts, never a newer week's winner. */
+export function purgeSessionArtifacts(session: Session, baseDir?: string): void {
+  const ownPaths = [path.join(sessionsDir(baseDir), `${session.sessionId}.json`),
+    getSessionResultsCsvPath(session, baseDir), getSessionSummaryMarkdownPath(session, baseDir)];
+  const winnerPath = path.join(winnersDir(baseDir), `${sanitizeFileToken(session.week)}.json`);
+  if (fs.existsSync(winnerPath)) {
+    const saved = JSON.parse(fs.readFileSync(winnerPath, "utf-8")) as { sessionId?: string };
+    if (saved.sessionId === session.sessionId) ownPaths.push(winnerPath);
+  }
+  for (const ownPath of ownPaths) if (fs.existsSync(ownPath)) fs.unlinkSync(ownPath);
+  sessionRevealTimestamps.delete(session.sessionId);
 }

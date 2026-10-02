@@ -1,3 +1,4 @@
+import { sessionAvailabilityPhase } from "./availability";
 import { isSelfPaced } from "./policy";
 import { isSlideType } from "@mdq/shared";
 import { Server as HttpServer } from "http";
@@ -90,6 +91,10 @@ export function setupSocket(httpServer: HttpServer, quizzes: Map<string, Quiz>):
       logActivity(`reject socket=${socket.id} session=${sessionId} reason=session-not-found`);
       socket.disconnect(); return;
     }
+    if (sessionAvailabilityPhase(session, Date.now()) === "deleted") {
+      socket.emit(SocketEvents.STUDENT_REJECTED, { reason: "Session data has been deleted" });
+      socket.disconnect(); return;
+    }
     const quiz = session.deckSnapshot ?? quizStore.get(session.week);
     if (quiz) {
       const repaired = apply(session, quiz, { type: "repairClosedSlide" }, Date.now());
@@ -170,7 +175,7 @@ export function startQuestionTimer(io: Server, session: Session, sessionId: stri
   const timedStart = session.questionStartedAt;
   const restartCount = session.questionTiming?.[String(timedIndex)]?.restarts.length ?? 0;
   const due = nextDeadline ?? session.questionDeadlineAt ?? ((timedStart ?? Date.now()) + timeLimitSec * 1000);
-  const isCurrent = () => session.state === "QUESTION_OPEN" && session.currentQuestionIndex === timedIndex
+  const isCurrent = () => sessionAvailabilityPhase(session, Date.now()) === "active" && session.state === "QUESTION_OPEN" && session.currentQuestionIndex === timedIndex
     && session.questionStartedAt === timedStart
     && (session.questionTiming?.[String(timedIndex)]?.restarts.length ?? 0) === restartCount
     && !isSlideType(getQuestionType(quiz.questions[timedIndex]));

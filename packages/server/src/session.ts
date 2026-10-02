@@ -1,3 +1,4 @@
+import { availabilityPayload, sessionAvailabilityPhase } from "./availability";
 import { isSlideType } from "@mdq/shared";
 import {
   Session,
@@ -10,6 +11,7 @@ import {
   STATE_TRANSITIONS,
   SESSION_CODE_LENGTH,
   normalizeDisplayName,
+  DEFAULT_SESSION_AVAILABILITY_MS,
 } from "@mdq/shared";
 import { defaultSessionPolicy } from "./policy";
 import { assignLabel, ensureParticipantIdentity, newPublicKey } from "./identity";
@@ -88,14 +90,23 @@ export function deserializeSession(json: string): Session {
   return session;
 }
 
+/** Expired sessions reserve their same code until actual deletion. */
+function unreservedSessionCode(): string {
+  let code = generateSessionCode();
+  while (sessionCodeIndex.has(code)) code = generateSessionCode();
+  return code;
+}
+
 /** Create a new Session in LOBBY state */
 export function createSession(week: string, mode: SessionMode): Session {
+  const now = Date.now();
   return {
+    availability: { schemaVersion: 1, availableUntil: now + DEFAULT_SESSION_AVAILABILITY_MS, generation: 1 },
     policy: defaultSessionPolicy(),
     policyFrozen: false,
     releasedQuestionIndexes: new Set<number>(),
     sessionId: crypto.randomUUID(),
-    sessionCode: generateSessionCode(),
+    sessionCode: unreservedSessionCode(),
     week,
     mode,
     state: "LOBBY",
@@ -103,7 +114,7 @@ export function createSession(week: string, mode: SessionMode): Session {
     revealedQuestionIndexes: new Set<number>(),
     participants: new Map<string, Participant>(),
     submissions: [],
-    createdAt: Date.now(),
+    createdAt: now,
   };
 }
 
@@ -145,7 +156,10 @@ export function addParticipant(
   sessionToken?: string,
   clientInstanceId?: string,
 ): { participant: Participant; isReconnect: boolean } {
+  const phase = sessionAvailabilityPhase(session, Date.now());
   const existing = session.participants.get(studentId);
+  if (phase === "ended" || phase === "deleted") throw new Error("Session has ended or been deleted.");
+  if (phase === "expired" && (!existing || existing.released || !sessionToken || sessionToken !== existing.sessionToken)) throw new Error("Availability ended. Valid existing seat credentials are required.");
 
   if (existing) {
     // Reconnect attempt: validate token
@@ -211,6 +225,7 @@ export function recordSubmission(
   questionIndex: number,
   response: { selectedOptions?: string[]; responseText?: string } | string[],
 ): Submission {
+  if (sessionAvailabilityPhase(session, Date.now()) !== "active") throw new Error("Availability ended or session has ended.");
   if (session.policy) throw new Error("Versioned sessions require the authenticated answerSubmit engine command.");
   const normalizedSelectedOptions = normalizeOptionSet(Array.isArray(response) ? response : (response.selectedOptions || []));
   const normalizedResponseText = normalizeResponseText(Array.isArray(response) ? undefined : response.responseText);
@@ -442,16 +457,23 @@ export function getSessionByCode(code: string): Session | undefined {
   return id ? sessionStore.get(id) : undefined;
 }
 
-export function getActiveSessions(): { sessionId: string; sessionCode: string; state: string }[] {
-  const results: { sessionId: string; sessionCode: string; state: string }[] = [];
+export function getActiveSessions(): { sessionId: string; sessionCode: string; state: string; availability: import("@mdq/shared").SessionAvailabilityPayload }[] {
+  const results: { sessionId: string; sessionCode: string; state: string; availability: import("@mdq/shared").SessionAvailabilityPayload }[] = [];
   for (const session of sessionStore.values()) {
-    if (session.state !== "ENDED") {
-      results.push({ sessionId: session.sessionId, sessionCode: session.sessionCode, state: session.state });
+    if (session.state !== "ENDED" && sessionAvailabilityPhase(session, Date.now()) !== "deleted") {
+      results.push({ sessionId: session.sessionId, sessionCode: session.sessionCode, state: session.state, availability: availabilityPayload(session, Date.now()) });
     }
   }
   return results;
 }
 
+/** Remove only the exact stored identity, so stale purges cannot delete a replacement. */
+export function deleteSession(session: Session): boolean {
+  if (sessionStore.get(session.sessionId) !== session) return false;
+  sessionStore.delete(session.sessionId);
+  if (sessionCodeIndex.get(session.sessionCode) === session.sessionId) sessionCodeIndex.delete(session.sessionCode);
+  return true;
+}
 export function clearAllSessions(): void {
   sessionStore.clear();
   sessionCodeIndex.clear();

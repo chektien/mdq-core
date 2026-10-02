@@ -109,7 +109,7 @@ it("self-paced public projections omit results, keys, explanations, distribution
   expect(publicResultsHidden(deserializeSession(serializeSession(expired)))).toBe(true);
   expect(leaderboardRows(expired, deck, "public")).toEqual([]);
   const ended = run(session, { type: "end" }).session;
-  expect(leaderboardRows(ended, deck, "public")[0]).toEqual({ rank: 1, label: expect.any(String), publicKey: expect.any(String), correctCount: 1 });
+  expect(leaderboardRows(ended, deck, "public", 0)[0]).toEqual({ rank: 1, label: expect.any(String), publicKey: expect.any(String), correctCount: 1 });
 });
 
 it("correctness competition ties are 1,1,3 despite response times and only released scored items count", () => {

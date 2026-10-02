@@ -41,6 +41,14 @@ exports[`captures existing outbound transition payloads 1`] = `
   {
     "event": "session:state",
     "payload": {
+      "availability": {
+        "availableUntil": 14401000,
+        "deleteAt": 619201000,
+        "phase": "active",
+        "recoverBefore": 619201000,
+        "schemaVersion": 1,
+        "serverNow": 1000,
+      },
       "questionIndex": 0,
       "state": "QUESTION_OPEN",
     },
@@ -107,6 +115,14 @@ exports[`captures existing outbound transition payloads 1`] = `
   {
     "event": "session:state",
     "payload": {
+      "availability": {
+        "availableUntil": 14401000,
+        "deleteAt": 619201000,
+        "phase": "active",
+        "recoverBefore": 619201000,
+        "schemaVersion": 1,
+        "serverNow": 1000,
+      },
       "questionIndex": 0,
       "state": "REVEAL",
     },
@@ -128,6 +144,14 @@ exports[`captures existing outbound transition payloads 1`] = `
   {
     "event": "session:state",
     "payload": {
+      "availability": {
+        "availableUntil": 14401000,
+        "deleteAt": 619201000,
+        "phase": "active",
+        "recoverBefore": 619201000,
+        "schemaVersion": 1,
+        "serverNow": 1000,
+      },
       "state": "LEADERBOARD",
     },
   },

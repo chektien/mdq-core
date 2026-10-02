@@ -1,3 +1,4 @@
+import { availabilityAlarmMatches, availabilityPayload, nextAvailabilityAlarm, sessionAvailabilityPhase, validateAvailabilityDeadline } from "./availability";
 import { defaultSessionPolicy, effectiveRanking, getSessionScoredQuestionCount, isQuestionReleased, isSelfPaced, publicResultsHidden, releasedQuestionIndexes, scoredCorrectAnswersForSession } from "./policy";
 import { isSlideType } from "@mdq/shared";
 import {
@@ -64,6 +65,8 @@ export type PayloadView = "control" | "public";
 export type ResponseView = "control" | "display" | "participant";
 export type Command =
   | { type: "end"; discloseResults?: boolean }
+  | { type: "configureAvailability"; role: SocketRole; availableUntil: number }
+  | { type: "expireAvailability" | "purgeAvailability"; alarm: import("@mdq/shared").SessionAvailabilityAlarm }
   | { type: "configurePolicy"; role: SocketRole; pacing: "presenter-paced" | "self-paced"; ranking: "correctness" | "speed" }
   | { type: "start" | "next" | "previous" | "open" | "close" | "reveal" | "leaderboardShow" | "leaderboardHide" | "broadcastOpen" | "broadcastReveal" | "broadcastLeaderboard" | "participants" | "repairClosedSlide" }
   | { type: "timeout"; deadline?: number; questionIndex?: number; startedAt?: number; restartCount?: number }
@@ -96,6 +99,7 @@ export interface EngineResult {
   messages: EngineMessage[];
   nextDeadline: number | null;
   nextAlarm: QuestionAlarm | null;
+  nextAvailabilityAlarm: import("@mdq/shared").SessionAvailabilityAlarm | null;
   /**
    * Set by a `join` that took over a seat the presenter freed. Every connection of that participant
    * whose token is not `sessionToken` is on a device that has lost the seat, and an adapter should
@@ -110,6 +114,7 @@ export const SEAT_IN_USE_MESSAGE = "This seat is now in use on another device.";
 const message = (event: string, payload: unknown, audience: Audience = "all"): EngineMessage => ({ audience, event, payload });
 const clone = (session: Session): Session => ({
   ...session,
+  availability: session.availability ? { ...session.availability } : undefined,
   policy: session.policy ? { ...session.policy } : undefined,
   releasedQuestionIndexes: session.releasedQuestionIndexes ? new Set(session.releasedQuestionIndexes) : undefined,
   resultScope: session.resultScope ? { ...session.resultScope, releasedQuestionIndexes: [...session.resultScope.releasedQuestionIndexes], scoredQuestionIndexes: [...session.resultScope.scoredQuestionIndexes] } : undefined,
@@ -157,7 +162,7 @@ export const questionPosition = (quiz: Quiz, questionIndex: number): { questionN
 /** Audience-safe content; reading/previewing must never release an item. */
 export const publicQuestionPayload = (session: Session, quiz: Quiz, index: number, now: number): QuestionOpenPayload | null => {
   quiz = session.deckSnapshot ?? quiz;
-  if (!isQuestionReleased(session, index)) return null;
+  if (sessionAvailabilityPhase(session, now) === "deleted" || !isQuestionReleased(session, index)) return null;
   const q = quiz.questions[index];
   if (!q) return null;
   const attendeeNotes: FoldoutNote[] | undefined = q.attendeeNotes?.length ? q.attendeeNotes : undefined;
@@ -201,9 +206,9 @@ const countPayload = (session: Session, quiz: Quiz, view: ResponseView) => ({
   openResponses: view === "control" && isOpenResponseQuestion(questionAt(session, quiz))
     ? responsesFor(getOpenResponses(session, session.currentQuestionIndex), view) : undefined,
 });
-const revealPayload = (session: Session, quiz: Quiz, view: ResponseView) => {
+const revealPayload = (session: Session, quiz: Quiz, view: ResponseView, now = Date.now()) => {
   const q = questionAt(session, quiz);
-  if (view !== "control" && publicResultsHidden(session)) return null;
+  if (view !== "control" && publicResultsHidden(session, now)) return null;
   return {
     questionIndex: session.currentQuestionIndex, questionType: getQuestionType(q),
     correctOptions: q.correctOptions, explanation: q.explanation,
@@ -225,6 +230,7 @@ export const ownAnswers = (session: Session, quiz: Quiz, studentId: string): Stu
   .sort((a, b) => a.questionIndex - b.questionIndex);
 /** Safe released-content projection. Adapters authenticate the seat before calling. */
 export function participantStudyPayload(session: Session, quiz: Quiz, studentId: string, now: number): import("@mdq/shared").ParticipantStudyPayload {
+  if (sessionAvailabilityPhase(session, now) === "deleted") return { availability: availabilityPayload(session, now), policy: null, items: [], currentQuestionIndex: -1, state: session.state, answers: [], answeredQuestions: [], answerableQuestionIndexes: [] };
   quiz = session.deckSnapshot ?? quiz;
   const items = releasedQuestionIndexes(session, quiz)
     .map(index => publicQuestionPayload(session, quiz, index, now))
@@ -232,13 +238,13 @@ export function participantStudyPayload(session: Session, quiz: Quiz, studentId:
   const answers = ownAnswers(session, quiz, studentId);
   const answeredQuestions = [...new Set(answers.map(answer => answer.questionIndex))];
   const answerableQuestionIndexes = items.filter(item => {
-    if (session.resultScope || session.state !== "QUESTION_OPEN" || isSlideType(item.questionType ?? "multiple_choice")
+    if (sessionAvailabilityPhase(session, now) !== "active" || session.resultScope || session.state !== "QUESTION_OPEN" || isSlideType(item.questionType ?? "multiple_choice")
       || session.revealedQuestionIndexes?.has(item.questionIndex)) return false;
     if (!isSelfPaced(session) && item.questionIndex !== session.currentQuestionIndex) return false;
     if (item.deadlineAt != null && now >= item.deadlineAt) return false;
     return item.questionType === "open_response" || !answeredQuestions.includes(item.questionIndex);
   }).map(item => item.questionIndex);
-  return { policy: session.policy ?? null, items, currentQuestionIndex: session.currentQuestionIndex,
+  return { availability: availabilityPayload(session, now), policy: session.policy ?? null, items, currentQuestionIndex: session.currentQuestionIndex,
     state: session.state, answers, answeredQuestions, answerableQuestionIndexes };
 }
 /** Counts are hints for the confirmation, never a condition for finalization. */
@@ -259,8 +265,8 @@ export function endSessionAdvisory(session: Session, quiz: Quiz): import("@mdq/s
 }
 
 /** Seat authentication and retention are adapter responsibilities. Never reuse admin projections here. */
-export function participantResultsPayload(session: Session, quiz: Quiz, studentId: string): import("@mdq/shared").ParticipantResultsPayload | null {
-  if (session.state !== "ENDED" || publicResultsHidden(session) || (session.policy && session.resultScope?.disclosed !== true)) return null;
+export function participantResultsPayload(session: Session, quiz: Quiz, studentId: string, now = Date.now()): import("@mdq/shared").ParticipantResultsPayload | null {
+  if (session.state !== "ENDED" || publicResultsHidden(session, now) || (session.policy && session.resultScope?.disclosed !== true)) return null;
   const seat = session.participants.get(studentId);
   if (!seat || seat.released) return null;
   quiz = session.deckSnapshot ?? quiz;
@@ -281,7 +287,7 @@ export function participantResultsPayload(session: Session, quiz: Quiz, studentI
     } : {}) }];
   });
   const scoredQuestionCount = scored.size;
-  const leaderboard = scoredQuestionCount ? leaderboardRows(session, quiz, "public").map(row => ({
+  const leaderboard = scoredQuestionCount ? leaderboardRows(session, quiz, "public", now).map(row => ({
     publicKey: row.publicKey, label: row.label, rank: row.rank, score: row.correctCount,
   })) : undefined;
   return { schemaVersion: 1, resultVersion: session.resultScope?.resultVersion ?? (session.policy ? 1 : 0), endedAt,
@@ -294,8 +300,8 @@ export function participantResultsPayload(session: Session, quiz: Quiz, studentI
  * The ranked rows for one view. `public` rows name people by label and public
  * key only, so they are safe for phones and the projector.
  */
-export function leaderboardRows(session: Session, quiz: Quiz, view: PayloadView): LeaderboardRow[] {
-  if ((view === "public" && publicResultsHidden(session)) || (session.policy && !getSessionScoredQuestionCount(session, quiz))) return [];
+export function leaderboardRows(session: Session, quiz: Quiz, view: PayloadView, now = Date.now()): LeaderboardRow[] {
+  if ((view === "public" && publicResultsHidden(session, now)) || (session.policy && !getSessionScoredQuestionCount(session, quiz))) return [];
   return computeLeaderboard(session, scoredCorrectAnswersForSession(session, quiz), effectiveRanking(session, quiz)).map((entry) => {
     const participant = session.participants.get(entry.studentId);
     const row = {
@@ -305,8 +311,8 @@ export function leaderboardRows(session: Session, quiz: Quiz, view: PayloadView)
     return view === "control" ? { ...row, studentId: entry.studentId, displayName: entry.displayName } : row;
   });
 }
-const leaderboardPayload = (session: Session, quiz: Quiz, view: PayloadView) => ({
-  entries: leaderboardRows(session, quiz, view),
+const leaderboardPayload = (session: Session, quiz: Quiz, view: PayloadView, now = Date.now()) => ({
+  entries: leaderboardRows(session, quiz, view, now),
   totalQuestions: getSessionScoredQuestionCount(session, quiz),
 });
 const participantsPayload = (session: Session, view: PayloadView): SessionParticipantsPayload => {
@@ -351,7 +357,7 @@ export function apply(input: Session, quiz: Quiz, command: Command, now: number)
   const emit = (event: string, payload: unknown, audience: Audience = "all") => messages.push(message(event, payload, audience));
   // Open responses go out in full to control only; the projector gets the count, then the visible responses at reveal.
   const emitCount = () => {
-    if (publicResultsHidden(session)) { emit(SocketEvents.ANSWER_COUNT, countPayload(session, quiz, "control"), "control"); return; }
+    if (publicResultsHidden(session, now)) { emit(SocketEvents.ANSWER_COUNT, countPayload(session, quiz, "control"), "control"); return; }
     if (isOpenResponseQuestion(questionAt(session, quiz))) {
       emit(SocketEvents.ANSWER_COUNT, countPayload(session, quiz, "control"), "control");
       emit(SocketEvents.ANSWER_COUNT, countPayload(session, quiz, "display"), "display");
@@ -359,17 +365,17 @@ export function apply(input: Session, quiz: Quiz, command: Command, now: number)
   };
   const emitReveal = () => {
     if (session.policy && !isQuestionReleased(session, session.currentQuestionIndex)) return;
-    if (publicResultsHidden(session)) { emit(SocketEvents.RESULTS_REVEAL, revealPayload(session, quiz, "control"), "control"); return; }
+    if (publicResultsHidden(session, now)) { emit(SocketEvents.RESULTS_REVEAL, revealPayload(session, quiz, "control", now), "control"); return; }
     if (isOpenResponseQuestion(questionAt(session, quiz))) {
-      emit(SocketEvents.RESULTS_REVEAL, revealPayload(session, quiz, "control"), "control");
-      emit(SocketEvents.RESULTS_REVEAL, revealPayload(session, quiz, "display"), "display");
-      emit(SocketEvents.RESULTS_REVEAL, revealPayload(session, quiz, "participant"), "participants");
-    } else emit(SocketEvents.RESULTS_REVEAL, revealPayload(session, quiz, "display"));
+      emit(SocketEvents.RESULTS_REVEAL, revealPayload(session, quiz, "control", now), "control");
+      emit(SocketEvents.RESULTS_REVEAL, revealPayload(session, quiz, "display", now), "display");
+      emit(SocketEvents.RESULTS_REVEAL, revealPayload(session, quiz, "participant", now), "participants");
+    } else emit(SocketEvents.RESULTS_REVEAL, revealPayload(session, quiz, "display", now));
   };
   const emitLeaderboard = () => {
     if (session.policy && !getSessionScoredQuestionCount(session, quiz)) return;
-    emit(SocketEvents.LEADERBOARD_UPDATE, leaderboardPayload(session, quiz, "control"), "control");
-    if (!publicResultsHidden(session)) emit(SocketEvents.LEADERBOARD_UPDATE, leaderboardPayload(session, quiz, "public"), "public");
+    emit(SocketEvents.LEADERBOARD_UPDATE, leaderboardPayload(session, quiz, "control", now), "control");
+    if (!publicResultsHidden(session, now)) emit(SocketEvents.LEADERBOARD_UPDATE, leaderboardPayload(session, quiz, "public", now), "public");
   };
   const emitParticipants = () => {
     emit(SocketEvents.SESSION_PARTICIPANTS, participantsPayload(session, "control"), "control");
@@ -380,7 +386,7 @@ export function apply(input: Session, quiz: Quiz, command: Command, now: number)
     if (payload) emit(SocketEvents.QUESTION_OPEN, payload);
   };
   const state = (includeIndex = true) => emit(SocketEvents.SESSION_STATE,
-    { ...(includeIndex ? { state: session.state, questionIndex: session.currentQuestionIndex } : { state: session.state }),
+    { ...(session.availability ? { availability: availabilityPayload(session, now) } : {}), ...(includeIndex ? { state: session.state, questionIndex: session.currentQuestionIndex } : { state: session.state }),
       ...(session.submissions.length > 0 ? { hasAnswers: true } : {}) });
   const review = () => {
     session.revealedQuestionIndexes ??= new Set<number>();
@@ -401,7 +407,36 @@ export function apply(input: Session, quiz: Quiz, command: Command, now: number)
     session.closedByTimer = false;
   };
   if (session.resultScope && ["configurePolicy", "start", "next", "previous", "open", "restartCountdown", "close", "reveal", "leaderboardShow", "leaderboardHide"].includes(command.type)) throw new EngineCommandError("Session has ended.");
+  const availabilityPhase = sessionAvailabilityPhase(session, now);
+  if (availabilityPhase === "deleted" && !["expireAvailability", "purgeAvailability", "snapshot", "join", "answerSubmit", "disconnect"].includes(command.type)) throw new EngineCommandError("Session data has been deleted.");
+  if (availabilityPhase === "expired" && ["configurePolicy", "start", "next", "previous", "open", "restartCountdown", "close", "reveal", "leaderboardShow", "leaderboardHide", "releaseSeat"].includes(command.type)) throw new EngineCommandError("Availability ended. Extend & reopen or deliberately End to show results.");
   switch (command.type) {
+    case "configureAvailability": {
+      if (command.role !== "control") throw new EngineCommandError("Only the presenter can change availability.");
+      if (session.state === "ENDED" || session.resultScope) throw new EngineCommandError("Ended sessions cannot be reopened.");
+      if (!session.availability) throw new EngineCommandError("Legacy availability must be explicitly adopted by its adapter.");
+      try { validateAvailabilityDeadline(command.availableUntil, now); } catch (error) { throw new EngineCommandError((error as Error).message); }
+      if (command.availableUntil <= session.availability.availableUntil) throw new EngineCommandError("The new deadline must be later than the previous deadline.");
+      session.availability = { ...session.availability, availableUntil: command.availableUntil, generation: session.availability.generation + 1 };
+      emit(SocketEvents.SESSION_AVAILABILITY, availabilityPayload(session, now));
+      state();
+      break;
+    }
+    case "expireAvailability":
+      if (command.alarm.phase !== "expire" || !availabilityAlarmMatches(session, command.alarm) || now < command.alarm.dueAt || availabilityPhase !== "expired") break;
+      // Expiry is observational. No End, release, reward, or clock reset.
+      emit(SocketEvents.SESSION_AVAILABILITY, availabilityPayload(session, now));
+      state();
+      break;
+    case "purgeAvailability":
+      if (command.alarm.phase !== "purge" || !availabilityAlarmMatches(session, command.alarm) || now < command.alarm.dueAt || availabilityPhase !== "deleted") break;
+      session.deletedAt = now;
+      session.participants.clear(); session.submissions = []; session.deckSnapshot = undefined;
+      session.releasedQuestionIndexes?.clear(); session.revealedQuestionIndexes?.clear();
+      session.questionTiming = undefined; session.hiddenResponses = undefined;
+      session.questionStartedAt = undefined; session.questionDeadlineAt = undefined;
+      emit(SocketEvents.SESSION_AVAILABILITY, availabilityPayload(session, now));
+      break;
     case "configurePolicy":
       if (command.role !== "control") throw new EngineCommandError("Only the presenter can select the session policy.");
       if (session.state !== "LOBBY" || session.policyFrozen) throw new EngineCommandError("The session policy is frozen after Start.");
@@ -494,6 +529,7 @@ export function apply(input: Session, quiz: Quiz, command: Command, now: number)
     }
     case "close":
     case "timeout":
+      if (command.type === "timeout" && availabilityPhase !== "active") break;
       if (isSelfPaced(session)) { if (command.type === "timeout") break; throw new EngineCommandError("Self-paced answers stay open until End."); }
       if (command.type === "close" && isSlideType(getQuestionType(questionAt(session, quiz)))) throw new EngineCommandError("Slides do not close; advance to the next item.");
       if (command.type === "timeout") {
@@ -508,7 +544,7 @@ export function apply(input: Session, quiz: Quiz, command: Command, now: number)
       transition(session, "QUESTION_CLOSED");
       session.closedByTimer = command.type === "timeout";
       emit(SocketEvents.QUESTION_CLOSE, closePayload(session)); state();
-      emit(SocketEvents.RESULTS_DISTRIBUTION, { questionIndex: session.currentQuestionIndex, distribution: getDistribution(session, session.currentQuestionIndex) }, "staff");
+      emit(SocketEvents.RESULTS_DISTRIBUTION, { questionIndex: session.currentQuestionIndex, distribution: getDistribution(session, session.currentQuestionIndex) }, publicResultsHidden(session, now) ? "control" : "staff");
       break;
     case "reveal":
       if (isSelfPaced(session)) throw new EngineCommandError("Self-paced results remain hidden until End.");
@@ -551,6 +587,7 @@ export function apply(input: Session, quiz: Quiz, command: Command, now: number)
     case "join": {
       const { payload, socketId } = command;
       const reject = (reason: string) => emit(SocketEvents.STUDENT_REJECTED, { reason }, `participant:${socketId}`);
+      if (availabilityPhase === "deleted") { reject("Session data has been deleted"); break; }
       if (session.state === "ENDED" || session.resultScope) { reject("Session has ended"); break; }
       // The name is normalised for everyone; where Student IDs are off it is also the ID.
       const usesIds = usesStudentIds(quiz);
@@ -567,6 +604,7 @@ export function apply(input: Session, quiz: Quiz, command: Command, now: number)
       if (existing) {
         // Your own seat is never a clash: the same session token, or the same browser after it went offline.
         const validToken = !!payload.sessionToken && payload.sessionToken === existing.sessionToken;
+        if (availabilityPhase === "expired" && (!validToken || existing.released)) { reject("Availability ended. Valid existing seat credentials are required."); break; }
         const validClient = !existing.connected && !!payload.clientInstanceId && !!existing.clientInstanceId && payload.clientInstanceId === existing.clientInstanceId;
         // A seat the presenter freed goes to the next join, from any device.
         const takeover = existing.released === true;
@@ -579,6 +617,7 @@ export function apply(input: Session, quiz: Quiz, command: Command, now: number)
         } else if (validToken && payload.clientInstanceId) existing.clientInstanceId = payload.clientInstanceId;
         participant = existing; isReconnect = true;
       } else {
+        if (availabilityPhase !== "active") { reject("Availability ended. No new seats are available."); break; }
         // A new seat is what a lock refuses; every rejoin above got through.
         if (session.joinLocked) { reject(JOIN_LOCKED_MESSAGE); break; }
         const { label, labelNote } = assignLabel(session, typedName);
@@ -588,7 +627,7 @@ export function apply(input: Session, quiz: Quiz, command: Command, now: number)
         session.participants.set(participant.studentId, participant);
       }
       emit(SocketEvents.STUDENT_JOINED, { participantId: participant.studentId, sessionToken: participant.sessionToken,
-        sessionState: session.state, currentQuestion: session.currentQuestionIndex >= 0 ? session.currentQuestionIndex : undefined,
+        sessionState: session.state, ...(session.availability ? { availability: availabilityPayload(session, now) } : {}), currentQuestion: session.currentQuestionIndex >= 0 ? session.currentQuestionIndex : undefined,
         answeredQuestions: getAnsweredQuestions(session, participant.studentId), answers: ownAnswers(session, quiz, participant.studentId),
         publicKey: participant.publicKey, label: participant.label, labelNote: participant.labelNote,
         ...(quiz.title ? { deckTitle: quiz.title } : {}) }, `participant:${participant.studentId}`);
@@ -601,6 +640,7 @@ export function apply(input: Session, quiz: Quiz, command: Command, now: number)
       const { payload, studentId, sessionToken } = command;
       const target: Audience = `participant:${studentId || ""}`;
       const reject = (reason: string) => emit(SocketEvents.ANSWER_REJECTED, { questionIndex: payload.questionIndex, reason }, target);
+      if (availabilityPhase !== "active") { reject(availabilityPhase === "expired" ? "Availability ended" : availabilityPhase === "ended" ? "Session has ended" : "Session data has been deleted"); break; }
       if (!studentId) { reject("Not joined to a session"); break; }
       if (session.resultScope) { reject("Session has ended"); break; }
       const seat = session.participants.get(studentId);
@@ -654,8 +694,8 @@ export function apply(input: Session, quiz: Quiz, command: Command, now: number)
       if (questionIndex === session.currentQuestionIndex && session.state !== "LOBBY" && session.state !== "ENDED") {
         emit(SocketEvents.ANSWER_COUNT, countPayload(session, quiz, "control"), "control");
         if (session.state === "REVEAL") {
-          emit(SocketEvents.RESULTS_REVEAL, revealPayload(session, quiz, "control"), "control");
-          if (!publicResultsHidden(session)) emit(SocketEvents.RESULTS_REVEAL, revealPayload(session, quiz, "display"), "display");
+          emit(SocketEvents.RESULTS_REVEAL, revealPayload(session, quiz, "control", now), "control");
+          if (!publicResultsHidden(session, now)) emit(SocketEvents.RESULTS_REVEAL, revealPayload(session, quiz, "display", now), "display");
         }
       }
       break;
@@ -706,18 +746,19 @@ export function apply(input: Session, quiz: Quiz, command: Command, now: number)
       break;
     case "participants": emitParticipants(); break;
     case "repairClosedSlide":
+      if (availabilityPhase !== "active") break;
       if (session.state === "QUESTION_CLOSED" && isSlideType(getQuestionType(questionAt(session, quiz)))) {
         session.state = "QUESTION_OPEN";
         openContext(); state();
       }
       break;
-    case "tick": if (!isSelfPaced(session)) emit(SocketEvents.QUESTION_TICK, { remainingSec: command.remainingSec }); break;
+    case "tick": if (availabilityPhase === "active" && !isSelfPaced(session)) emit(SocketEvents.QUESTION_TICK, { remainingSec: command.remainingSec }); break;
   }
-  const nextDeadline = deadline(session, quiz);
+  const nextDeadline = sessionAvailabilityPhase(session, now) === "active" ? deadline(session, quiz) : null;
   const nextTiming = timingFor(session, quiz);
   const nextAlarm = nextDeadline !== null && nextTiming ? { questionIndex: session.currentQuestionIndex,
     startedAt: nextTiming.startedAt, deadlineAt: nextDeadline, restartCount: nextTiming.restarts.length } : null;
-  return { session, messages, nextDeadline, nextAlarm, ...(seatTaken ? { seatTaken } : {}) };
+  return { session, messages, nextDeadline, nextAlarm, nextAvailabilityAlarm: nextAvailabilityAlarm(session, now), ...(seatTaken ? { seatTaken } : {}) };
 }
 
 /**
@@ -731,12 +772,18 @@ function snapshotMessages(session: Session, quiz: Quiz, now: number, audience: A
   const staff = view !== "participant";
   const payloadView: PayloadView = view === "control" ? "control" : "public";
   const emit = (event: string, payload: unknown, target: Audience = audience) => messages.push(message(event, payload, target));
-  const emitCount = () => { if (view === "control" || !publicResultsHidden(session)) emit(SocketEvents.ANSWER_COUNT, countPayload(session, quiz, view)); };
-  if (staff) emit(SocketEvents.SESSION_STATE, { state: session.state, questionIndex: session.currentQuestionIndex >= 0 ? session.currentQuestionIndex : undefined,
+  const emitCount = () => { if (view === "control" || !publicResultsHidden(session, now)) emit(SocketEvents.ANSWER_COUNT, countPayload(session, quiz, view)); };
+  if (session.availability) emit(SocketEvents.SESSION_AVAILABILITY, availabilityPayload(session, now));
+  if (sessionAvailabilityPhase(session, now) === "deleted") return messages;
+  if (staff) emit(SocketEvents.SESSION_STATE, { ...(session.availability ? { availability: availabilityPayload(session, now) } : {}), state: session.state, questionIndex: session.currentQuestionIndex >= 0 ? session.currentQuestionIndex : undefined,
     ...(session.submissions.length > 0 ? { hasAnswers: true } : {}) });
   const q = questionAt(session, quiz);
   const payload = questionPayload(session, quiz, now);
   if (!q || !payload) return messages;
+  if (view !== "control" && sessionAvailabilityPhase(session, now) === "expired") {
+    emit(SocketEvents.QUESTION_OPEN, payload);
+    return messages;
+  }
   if (session.state === "QUESTION_OPEN") {
     emit(SocketEvents.QUESTION_OPEN, payload);
     const due = deadline(session, quiz);
@@ -746,13 +793,13 @@ function snapshotMessages(session: Session, quiz: Quiz, now: number, audience: A
     emit(SocketEvents.QUESTION_OPEN, payload);
     emit(SocketEvents.QUESTION_CLOSE, closePayload(session));
     if (staff) {
-      if (view === "control" || !publicResultsHidden(session)) emit(SocketEvents.RESULTS_DISTRIBUTION, { questionIndex: session.currentQuestionIndex, distribution: getDistribution(session, session.currentQuestionIndex) });
+      if (view === "control" || !publicResultsHidden(session, now)) emit(SocketEvents.RESULTS_DISTRIBUTION, { questionIndex: session.currentQuestionIndex, distribution: getDistribution(session, session.currentQuestionIndex) });
       emitCount();
     }
   } else if (session.state === "REVEAL" && (staff || isReconnect)) {
     emit(SocketEvents.QUESTION_OPEN, payload);
-    if (view === "control" || !publicResultsHidden(session)) emit(SocketEvents.RESULTS_REVEAL, revealPayload(session, quiz, view));
+    if (view === "control" || !publicResultsHidden(session, now)) emit(SocketEvents.RESULTS_REVEAL, revealPayload(session, quiz, view, now));
     if (staff) emitCount();
-  } else if (session.state === "LEADERBOARD" && (view === "control" || !publicResultsHidden(session)) && (!session.policy || getSessionScoredQuestionCount(session, quiz) > 0)) emit(SocketEvents.LEADERBOARD_UPDATE, leaderboardPayload(session, quiz, payloadView));
+  } else if (session.state === "LEADERBOARD" && (view === "control" || !publicResultsHidden(session, now)) && (!session.policy || getSessionScoredQuestionCount(session, quiz) > 0)) emit(SocketEvents.LEADERBOARD_UPDATE, leaderboardPayload(session, quiz, payloadView, now));
   return messages;
 }

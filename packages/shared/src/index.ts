@@ -58,6 +58,7 @@ export const SocketEvents = {
   RESULTS_REVEAL: "results:reveal",
   LEADERBOARD_UPDATE: "leaderboard:update",
   SESSION_STATE: "session:state",
+  SESSION_AVAILABILITY: "session:availability",
 } as const;
 
 // ── Socket.IO Payload Types ─────────────────
@@ -88,6 +89,7 @@ export interface StudentJoinedPayload {
   participantId: string;
   sessionToken: string;
   sessionState: SessionState;
+  availability?: SessionAvailabilityPayload;
   currentQuestion?: number;
   answeredQuestions?: number[]; // question indices already answered
   /**
@@ -433,6 +435,7 @@ export interface LeaderboardUpdatePayload {
 }
 
 export interface SessionStatePayload {
+  availability?: SessionAvailabilityPayload;
   /** Present once the session has any submissions, including after it ends. */
   hasAnswers?: true;
   state: SessionState;
@@ -470,6 +473,7 @@ export const API = {
   QUIZ: "/api/quiz/:week",
   SESSION_CREATE: "/api/session",
   SESSION_POLICY: "/api/session/:id/policy",
+  SESSION_AVAILABILITY: "/api/session/:id/availability",
   SESSION_ITEMS: "/api/session/:id/items",
   SESSION_ITEM: "/api/session/:id/items/:index",
   SESSION_START: "/api/session/:id/start",
@@ -649,7 +653,39 @@ export interface QuestionTiming {
   timingFairnessInvalidated?: true;
 }
 
+/** Independent of presentation position and deliberate result finality. Missing means legacy. */
+export interface SessionAvailability {
+  schemaVersion: 1;
+  availableUntil: number;
+  generation: number;
+}
+export type SessionAvailabilityPhase = "active" | "expired" | "ended" | "deleted";
+/** Public lifecycle metadata contains no seat, content or result evidence. */
+export interface SessionAvailabilityPayload {
+  schemaVersion: 1;
+  phase: SessionAvailabilityPhase;
+  serverNow: number;
+  availableUntil?: number;
+  recoverBefore?: number;
+  deleteAt?: number;
+  resultRetainedUntil?: number;
+}
+export interface SessionAvailabilityAlarm {
+  sessionId: string;
+  generation: number;
+  availableUntil: number;
+  phase: "expire" | "purge";
+  dueAt: number;
+  endedAt?: number;
+}
+export const DEFAULT_SESSION_AVAILABILITY_MS = 4 * 60 * 60 * 1000;
+export const SESSION_RECOVERY_MS = 7 * 24 * 60 * 60 * 1000;
+export const MAX_SESSION_AVAILABILITY_MS = SESSION_RECOVERY_MS;
+
 export interface Session {
+  availability?: SessionAvailability;
+  /** Terminal tombstone, never a presentation state or result disclosure. */
+  deletedAt?: number;
   /** Legacy End audit only; new policy sessions use resultScope. */
   endedAt?: number;
   resultsDisclosed?: boolean;
@@ -692,6 +728,7 @@ export interface Session {
 
 /** Snapshot of a session written to data/sessions/<id>.json on session end */
 export interface SessionSnapshot {
+  availability?: SessionAvailability;
   deckSnapshot?: Quiz;
   policy?: SessionPolicy;
   policyFrozen?: boolean;
@@ -771,6 +808,7 @@ export * from "./videoLinks";
 
 /** Seat-authenticated released content and OWN answer evidence only. */
 export interface ParticipantStudyPayload {
+  availability?: SessionAvailabilityPayload;
   policy: SessionPolicy | null;
   items: QuestionOpenPayload[];
   currentQuestionIndex: number;

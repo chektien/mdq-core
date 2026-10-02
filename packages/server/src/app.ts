@@ -1,3 +1,4 @@
+import { availabilityPayload, nextAvailabilityAlarm, sessionAvailabilityPhase, validateAvailabilityDeadline } from "./availability";
 import { isSlideType } from "@mdq/shared";
 import express, { type Request, type Response } from "express";
 import cors from "cors";
@@ -7,6 +8,7 @@ import {
   storeSession,
   getSession,
   getSessionByCode,
+  deleteSession,
   StateTransitionError,
   getActiveSessions,
   getDistribution,
@@ -17,6 +19,7 @@ import { publicResultsHidden, releasedQuestionIndexes, getSessionScoredQuestionC
 import { apply, participantResultsPayload, endSessionAdvisory, participantStudyPayload, publicQuestionPayload, leaderboardRows, questionPosition, responsesFor, timingFor, EngineCommandError, type Command, type EngineResult } from "./engine";
 import {
   persistSessionOnEnd,
+  purgeSessionArtifacts,
   computeCumulativeLeaderboard,
   persistSessionProgressOnReveal,
   buildSessionResultsCsv,
@@ -408,6 +411,35 @@ export function createApp(quizDirOrOpts?: string | AppOptions) {
     loadQuizzesFromDir(quizDir);
   }
 
+  const availabilityTimers = new Map<string, NodeJS.Timeout>();
+  /** Node mutations run synchronously on one event loop. Validate time inside apply, never in an alarm alone. */
+  function scheduleAvailability(session: Session): void {
+    const previous = availabilityTimers.get(session.sessionId);
+    if (previous) clearTimeout(previous);
+    availabilityTimers.delete(session.sessionId);
+    const alarm = nextAvailabilityAlarm(session, Date.now());
+    if (!alarm) return;
+    const timer = setTimeout(() => {
+      if (availabilityTimers.get(session.sessionId) !== timer || getSession(session.sessionId) !== session) return;
+      availabilityTimers.delete(session.sessionId);
+      const quiz = getQuizForSession(session);
+      if (!quiz) return;
+      const result = apply(session, quiz, { type: alarm.phase === "expire" ? "expireAvailability" : "purgeAvailability", alarm }, Date.now());
+      if (result.session.deletedAt !== undefined) {
+        purgeSessionArtifacts(session, dataDir);
+        Object.assign(session, result.session);
+        onMessages?.(session, session.sessionId, result);
+        deleteSession(session);
+      } else {
+        Object.assign(session, result.session);
+        onMessages?.(session, session.sessionId, result);
+        scheduleAvailability(session);
+      }
+    }, Math.max(0, alarm.dueAt - Date.now()));
+    timer.unref();
+    availabilityTimers.set(session.sessionId, timer);
+  }
+
   /** Helper to get quiz for a session */
   function getQuizForSession(session: Session): Quiz | undefined {
     return session.deckSnapshot ?? quizzes.get(session.week);
@@ -644,12 +676,18 @@ export function createApp(quizDirOrOpts?: string | AppOptions) {
       return res.status(404).json({ error: `Quiz not found: ${week}` });
     }
     const session = createSession(week, mode);
+    if (req.body.availableUntil !== undefined) {
+      try { validateAvailabilityDeadline(req.body.availableUntil, Date.now()); } catch (error) { return res.status(400).json({ error: (error as Error).message }); }
+      session.availability!.availableUntil = req.body.availableUntil;
+    }
     storeSession(session);
+    scheduleAvailability(session);
     logActivity(`instructor created session id=${session.sessionId} code=${session.sessionCode} week=${week}`);
     res.status(201).json({
       sessionId: session.sessionId,
       sessionCode: session.sessionCode,
       joinUrl: `/join/${session.sessionCode}`,
+      availability: availabilityPayload(session, Date.now()),
       theme: resolveDeckTheme(quiz, theme),
       palette: resolveDeckPalette(quiz, palette),
       questionHeadings: getQuestionHeadings(quiz),
@@ -667,11 +705,13 @@ export function createApp(quizDirOrOpts?: string | AppOptions) {
     if (!session) {
       return res.status(404).json({ error: "Session not found for that code" });
     }
+    if (sessionAvailabilityPhase(session, Date.now()) === "deleted") return res.status(410).json({ error: "Session data has been deleted" });
     const quiz = getQuizForSession(session);
     res.json({
       sessionId: session.sessionId,
       sessionCode: session.sessionCode,
       state: session.state,
+      availability: availabilityPayload(session, Date.now()),
       policy: sessionPolicy(session),
       week: session.week,
       title: quiz?.title || undefined,
@@ -708,6 +748,7 @@ export function createApp(quizDirOrOpts?: string | AppOptions) {
         theme: resolveDeckTheme(quiz, theme),
         palette: resolveDeckPalette(quiz, palette),
         state: session.state,
+        availability: availabilityPayload(session, Date.now()),
         policy: sessionPolicy(session),
         policyFrozen: session.policyFrozen === true,
         effectiveRanking: effectiveRanking(session, quiz),
@@ -736,8 +777,35 @@ export function createApp(quizDirOrOpts?: string | AppOptions) {
     if (!session) {
       return res.status(404).json({ error: "Session not found" });
     }
+    if (sessionAvailabilityPhase(session, Date.now()) === "deleted") return res.status(410).json({ error: "Session data has been deleted" });
     callback(session);
   }
+
+  app.get(API.SESSION_AVAILABILITY, (req, res) => {
+    const session = getSession(req.params.id);
+    res.setHeader("Cache-Control", "no-store");
+    if (!session) return res.status(410).json({ error: "Session data has been deleted" });
+    return res.json(availabilityPayload(session, Date.now()));
+  });
+  app.post(API.SESSION_AVAILABILITY, requireInstructorAuth, (req, res) => {
+    withSession(req, res, session => {
+      const quiz = getQuizForSession(session);
+      if (!quiz) return res.status(500).json({ error: "Quiz data not found" });
+      try {
+        const result = apply(session, quiz, { type: "configureAvailability", role: "control", availableUntil: req.body?.availableUntil }, Date.now());
+        Object.assign(session, result.session);
+        scheduleAvailability(session);
+        // Resume notification alarms from the preserved question clock, never a new opening.
+        if (onStateChange) notifyStateChange(session, session.sessionId, quiz, result);
+        else onMessages?.(session, session.sessionId, result);
+        res.setHeader("Cache-Control", "no-store");
+        return res.json(availabilityPayload(session, Date.now()));
+      } catch (error) {
+        if (error instanceof EngineCommandError) return res.status(400).json({ error: error.message });
+        throw error;
+      }
+    });
+  });
 
   app.post(API.SESSION_POLICY, requireInstructorAuth, (req, res) => {
     withSession(req, res, (session) => {
@@ -767,6 +835,7 @@ export function createApp(quizDirOrOpts?: string | AppOptions) {
     if (!session) return res.status(410).json({ error: "This session has ended" });
     const token = req.headers.authorization?.match(/^Bearer (.+)$/)?.[1];
     const seat = token ? [...session.participants.values()].find(participant => participant.sessionToken === token && !participant.released) : undefined;
+    if (sessionAvailabilityPhase(session, Date.now()) === "deleted") return res.status(410).json({ error: "Session data has been deleted" });
     if (!seat) return res.status(session.state === "ENDED" ? 410 : 401).json({ error: session.state === "ENDED" ? "This session has ended" : "Valid seat credentials are required" });
     const endedAt = session.resultScope?.endedAt ?? session.endedAt;
     if (endedAt !== undefined && Date.now() >= endedAt + PARTICIPANT_RESULT_RETENTION_MS) return res.status(410).json({ error: "This session has ended" });
@@ -845,6 +914,7 @@ export function createApp(quizDirOrOpts?: string | AppOptions) {
             }
           }
           if (action.type === "end" && !endedUnstarted && !alreadyEnded) persistSessionOnEnd(session, quiz, dataDir);
+          if (action.type === "end") scheduleAvailability(session);
           notifyStateChange(session, req.params.id, quiz, result);
           logActivity(`instructor ${action.type} session=${req.params.id} q=${session.currentQuestionIndex} state=${session.state}`);
           if (action.type === "end" || action.type === "leaderboardShow") return res.json({ state: session.state });

@@ -1,3 +1,4 @@
+import { sessionAvailabilityPhase } from "./availability";
 import { Quiz, Session, SessionPolicy, SessionResultMetadata } from "@mdq/shared";
 import { buildScoredCorrectAnswersMap } from "./scoring";
 
@@ -34,7 +35,7 @@ export function effectiveRanking(session: Session, quiz: Quiz): "correctness" | 
     || Object.values(session.questionTiming ?? {}).some((t) => t.timingFairnessInvalidated || t.restarts.length > 0)) return "correctness";
   return "speed";
 }
-export const publicResultsHidden = (session: Session): boolean => session.resultsDisclosed === false || session.resultScope?.disclosed === false || (isSelfPaced(session) && session.resultScope?.disclosed !== true);
+export const publicResultsHidden = (session: Session, now = Date.now()): boolean => ["expired", "deleted"].includes(sessionAvailabilityPhase(session, now)) || session.resultsDisclosed === false || session.resultScope?.disclosed === false || (isSelfPaced(session) && session.resultScope?.disclosed !== true);
 export function resultMetadata(session: Session, quiz: Quiz): SessionResultMetadata | undefined {
   if (!session.policy) return undefined;
   return { schemaVersion: 1, ...(session.resultScope ? { resultVersion: session.resultScope.resultVersion ?? 1, endedAt: session.resultScope.endedAt } : {}), policy: { ...session.policy }, effectiveRanking: effectiveRanking(session, quiz) as "correctness" | "speed",

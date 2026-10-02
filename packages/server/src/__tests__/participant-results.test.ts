@@ -4,6 +4,10 @@ import { publicResultsHidden, resultMetadata } from "../policy";
 import { buildResultsCsv } from "../results-csv";
 import { createSession, serializeSession, deserializeSession } from "../session";
 
+// Pure-engine examples use the same synthetic server clock for implicit reads and writes.
+beforeEach(() => { jest.spyOn(Date, "now").mockReturnValue(100); });
+afterEach(() => jest.restoreAllMocks());
+
 const question = (index: number, type: Question["questionType"] = "multiple_choice"): Question => ({
   index, topic: `Synthetic ${index}`, textMd: "Choose", textHtml: "Choose", questionType: type, timeLimitSec: null,
   options: type === "open_response" ? [] : [{ label: "A", textMd: "One", textHtml: "One" }, { label: "B", textMd: "Two", textHtml: "Two" }],
