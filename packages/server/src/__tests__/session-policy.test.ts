@@ -260,3 +260,16 @@ it("pacing-only v1 updates never change the stored policy version or original pr
   expect(changed.policy).toEqual(old.policy);
   expect(run(policy("presenter-paced", "speed"), { type: "configurePolicy", role: "control", pacing: "self-paced" }).session.policy).toMatchObject({ schemaVersion: 1, ranking: "correctness" });
 });
+
+it("automatic speed breaks timed ties without adding response-time metrics to public boards", () => {
+  let session = join(join(start(policy("presenter-paced")), "one"), "two");
+  session = answer(session, 0, ["A"], "one", 10).session;
+  session = answer(session, 0, ["A"], "two", 20).session;
+  expect(effectiveRanking(session, deck)).toBe("speed");
+  const shown = leaderboardRows(session, deck, "public");
+  expect(shown.map(row => row.rank)).toEqual([1, 2]);
+  expect(shown.every(row => !Object.prototype.hasOwnProperty.call(row, "totalTimeMs"))).toBe(true);
+  expect(leaderboardRows(session, deck, "control").map(row => row.totalTimeMs)).toEqual([10, 20]);
+  const old = { ...session, policy: { schemaVersion: 1 as const, pacing: "presenter-paced" as const, ranking: "speed" as const, effectiveTiming: "authored" as const } };
+  expect(leaderboardRows(old, deck, "public").map(row => row.totalTimeMs)).toEqual([10, 20]);
+});

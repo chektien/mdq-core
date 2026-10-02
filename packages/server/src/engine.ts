@@ -306,7 +306,7 @@ export function leaderboardRows(session: Session, quiz: Quiz, view: PayloadView,
     const participant = session.participants.get(entry.studentId);
     const row = {
       rank: entry.rank, publicKey: participant?.publicKey ?? "", label: participant?.label ?? "",
-      correctCount: entry.correctCount, ...(view === "control" || !session.policy || (session.state !== "ENDED" && effectiveRanking(session, quiz) === "speed") ? { totalTimeMs: entry.totalTimeMs } : {}),
+      correctCount: entry.correctCount, ...(view === "control" || !session.policy || (session.policy?.schemaVersion === 1 && session.state !== "ENDED" && effectiveRanking(session, quiz) === "speed") ? { totalTimeMs: entry.totalTimeMs } : {}),
     };
     return view === "control" ? { ...row, studentId: entry.studentId, displayName: entry.displayName } : row;
   });
