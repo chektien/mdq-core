@@ -2,7 +2,7 @@ import type { useParticipantStudy } from "../hooks/useParticipantStudy";
 
 /** Released items only. Browsing never advances the shared presentation. */
 export default function ParticipantStudyControls({ study }: { study: ReturnType<typeof useParticipantStudy> }) {
-  if (!study.selfPaced) return study.error ? (
+  if (!study.canBrowse) return study.error ? (
     <div role="alert" className="participant-study student-screen p-4">{study.error} <button type="button" onClick={study.refresh}>Retry</button></div>
   ) : null;
   const position = study.items.findIndex(item => item.questionIndex === study.question?.questionIndex);

@@ -1,3 +1,4 @@
+import SessionAvailabilityInfo from "../components/SessionAvailabilityInfo";
 import { isSlideType } from "@mdq/shared";
 import { useEffect, useMemo, useState } from "react";
 import type { DeckPalette, DeckTheme, SessionState } from "@mdq/shared";
@@ -142,6 +143,9 @@ export default function PresentationView({
     return null;
   })();
 
+  if (sock.availability?.phase === "expired" || sock.availability?.phase === "deleted") {
+    return <div className="min-h-dvh p-8"><SessionAvailabilityInfo availability={sock.availability} />{sock.availability.phase === "expired" && currentQuestion && <QuizHtml html={currentQuestion.text} className="text-zinc-200" />}</div>;
+  }
   if (loading) {
     return (
       <div className="min-h-dvh flex items-center justify-center p-6 text-zinc-300">

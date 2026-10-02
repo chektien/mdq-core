@@ -1,3 +1,5 @@
+import SessionAvailabilitySettings from "../components/SessionAvailabilitySettings";
+import SessionAvailabilityInfo, { availabilityTimezone, localAvailabilityInput } from "../components/SessionAvailabilityInfo";
 import { isSlideType } from "@mdq/shared";
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import EndSessionConfirmation from "../components/EndSessionConfirmation";
@@ -169,6 +171,13 @@ export default function InstructorView({
   const [pacing, setPacing] = useState<"presenter-paced" | "self-paced">("presenter-paced");
   const [sessionInfo, setSessionInfo] = useState<CreateSessionResponse | null>(null);
   const [accessInfo, setAccessInfo] = useState<AccessInfo | null>(null);
+  const [initialDeadline, setInitialDeadline] = useState(() => {
+    try {
+      const saved = localStorage.getItem("mdquiz_available_until_preference");
+      const timestamp = saved ? new Date(saved).getTime() : NaN;
+      return timestamp > Date.now() && timestamp <= Date.now() + 7 * 24 * 60 * 60 * 1000 ? saved! : "";
+    } catch { return ""; }
+  });
   const [phase, setPhase] = useState<InstructorPhase>("setup");
   // After session end the live opener no longer exists. Focus the new screen
   // once on attachment rather than leaving focus on the removed dialog/body.
@@ -407,7 +416,11 @@ export default function InstructorView({
     setLoading(true);
     setErrorMsg(null);
     try {
-      const info = await createSession(selectedWeek);
+      const info = await createSession(selectedWeek, "open", initialDeadline ? new Date(initialDeadline).getTime() : undefined);
+      try {
+        if (initialDeadline) localStorage.setItem("mdquiz_available_until_preference", initialDeadline);
+        else localStorage.removeItem("mdquiz_available_until_preference");
+      } catch {}
       setRestoredRevealCache({});
       setSessionInfo(info);
       setPacing("presenter-paced");
@@ -435,7 +448,7 @@ export default function InstructorView({
     } finally {
       setLoading(false);
     }
-  }, [selectedWeek, decks]);
+  }, [selectedWeek, decks, initialDeadline]);
 
   const handleReloadDecks = useCallback(async () => {
     setLoading(true);
@@ -607,6 +620,10 @@ export default function InstructorView({
             >
               {loading ? "Reloading..." : "Reload Decks"}
             </button>
+            <label className="block text-sm">Available until ({availabilityTimezone()})
+              <input type="datetime-local" className="block w-full bg-zinc-800 text-white border border-zinc-700 rounded-xl p-3" value={initialDeadline} min={localAvailabilityInput(Date.now())} max={localAvailabilityInput(Date.now() + 7 * 24 * 60 * 60 * 1000)} onChange={event => setInitialDeadline(event.target.value)} />
+              <span className="block text-zinc-400 mt-2">Leave blank for four hours from creation. Choose up to seven days.</span>
+            </label>
             <button
               onClick={handleCreateSession}
               disabled={loading || !selectedWeek}
@@ -674,6 +691,7 @@ export default function InstructorView({
                 />
               </div>
             )}
+            {sessionInfo && <SessionAvailabilitySettings sessionId={sessionInfo.sessionId} observed={sock.availability} />}
             <div className="session-settings session-settings-lobby" role="group" aria-label="Session settings">
               <JoinLockToggle
                 locked={sock.participants?.joinLocked === true}
@@ -712,7 +730,7 @@ export default function InstructorView({
             </fieldset>
             <button
               onClick={() => handleAction(async () => { await configureSessionPolicy(sid, pacing, ranking); return startSession(sid); }, "start")}
-              disabled={loading || !sock.connected}
+              disabled={loading || !sock.connected || sock.availability?.phase === "expired" || sock.availability?.phase === "deleted"}
               className="instructor-start-button bg-emerald-600 hover:bg-emerald-500 disabled:bg-zinc-700 text-white font-semibold py-4 px-12 rounded-xl transition-colors text-xl"
             >
               {loading ? "Starting..." : sock.connected ? "Start Session" : "Reconnecting..."}
@@ -736,6 +754,7 @@ export default function InstructorView({
   if (phase === "ended") {
     return (
       <div className="min-h-dvh flex flex-col items-center justify-center gap-8 p-8">
+        <SessionAvailabilityInfo availability={sock.availability} />
         <h1 ref={endedHeadingRef} tabIndex={-1} className="text-3xl font-bold text-white">Session Ended</h1>
         {quizLabel && (
           <h2 className="text-xl font-semibold text-zinc-300 text-center">
@@ -1302,6 +1321,7 @@ function LiveView({
           )}
         </div>
         <div className="session-settings" role="group" aria-labelledby="session-settings-title">
+          <SessionAvailabilitySettings sessionId={sessionId} observed={sock.availability} />
           <h3 id="session-settings-title" className="session-settings-title">Session settings</h3>
           <JoinLockToggle
             locked={sock.participants?.joinLocked === true}
@@ -1527,6 +1547,16 @@ function LiveView({
     return null;
   })();
 
+  if (sock.availability?.phase === "expired" || sock.availability?.phase === "deleted") {
+    return <main className="min-h-dvh p-6 space-y-6">
+      <h1 className="text-2xl font-semibold text-white">{sock.availability.phase === "expired" ? "Availability ended" : "Session data deleted"}</h1>
+      <SessionAvailabilitySettings sessionId={sessionId} observed={sock.availability} />
+      {sock.availability.phase === "expired" && <button type="button" className="bg-indigo-600 hover:bg-indigo-500 disabled:bg-zinc-700 text-white font-semibold py-3 px-4 rounded-xl" onClick={requestEndSession} disabled={controlsUnavailable}>End session and show results</button>}
+      {errorMsg && <p role="alert" className="text-red-200">{errorMsg}</p>}
+      {endSessionConfirmDialog}
+    </main>;
+  }
+
   if (isLiveSurfaceDisplay) {
     return (
       <div className="slide-live-shell slide-live-shell-controls">
@@ -1577,6 +1607,7 @@ function LiveView({
 
   return (
     <div className={isLiveSurfaceDisplay ? "slide-live-shell slide-live-shell-controls" : `min-h-dvh flex flex-col p-6 lg:p-10 ${accessInfo && sessionCode ? "lg:pr-56" : ""}`}>
+      <SessionAvailabilityInfo availability={sock.availability} />
       {/* Top bar: question progress + timer + participant count */}
       {!isLiveSurfaceDisplay && (
       <div className="flex items-center justify-between mb-6">

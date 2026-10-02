@@ -34,11 +34,12 @@ export function useParticipantStudy(sessionId: string | null, sock: UseSocketRet
       if (!controller.signal.aborted && requestGeneration === generation.current) setError("Available items could not be refreshed. Try again.");
     }).finally(() => clearTimeout(timer));
     return () => { cancelled = true; controller.abort(); clearTimeout(timer); };
-  }, [sessionId, seatKey, sock.sessionToken, sock.connected, sock.currentQuestion, sock.sessionState, sock.answerRevision, refreshVersion]);
+  }, [sessionId, seatKey, sock.sessionToken, sock.connected, sock.currentQuestion, sock.sessionState, sock.answerRevision, sock.availability, refreshVersion]);
 
   const data = snapshot?.seatKey === seatKey ? snapshot.data : null;
   const selfPaced = data?.policy?.pacing === "self-paced";
-  const following = !selfPaced || navigation?.seatKey !== seatKey || navigation.index === null;
+  const canBrowse = selfPaced || sock.availability?.phase === "expired";
+  const following = !canBrowse || navigation?.seatKey !== seatKey || navigation.index === null;
   const items = useMemo(() => {
     const list = data?.items ?? [];
     const current = sock.currentQuestion;
@@ -70,7 +71,7 @@ export function useParticipantStudy(sessionId: string | null, sock: UseSocketRet
     const next = { ...current, ...patch, revision: current.revision + 1 };
     drafts.current.set(key, next); persisted.current.set(key, writeDraft(key, next)); setDraftVersion(v => v + 1);
   }, [key, submittedOptions, submittedResponseText]);
-  const canAnswer = !!question && sock.sessionState === "QUESTION_OPEN" && !isSlideType(question.questionType)
+  const canAnswer = (!sock.availability || sock.availability.phase === "active") && !!question && sock.sessionState === "QUESTION_OPEN" && !isSlideType(question.questionType)
     && (selfPaced ? (data?.answerableQuestionIndexes.includes(question.questionIndex) ?? false)
       : question.questionIndex === sock.currentQuestion?.questionIndex)
     && (question.questionType === "open_response" || !submitted);
@@ -79,12 +80,12 @@ export function useParticipantStudy(sessionId: string | null, sock: UseSocketRet
   const upToDate = available.length > 0 && answeredCount === available.length;
   const progressLabel = available.length ? `${answeredCount} of ${available.length} available questions answered` : null;
   const browse = (index: number) => {
-    if (selfPaced && seatKey && items.some(item => item.questionIndex === index)) setNavigation({ seatKey, index });
+    if (canBrowse && seatKey && items.some(item => item.questionIndex === index)) setNavigation({ seatKey, index });
   };
   const backToPresenter = () => { if (seatKey) setNavigation({ seatKey, index: null }); };
   const submitAnswer = (payload: AnswerSubmitPayload) => {
     if (canAnswer && sock.connected && question && payload.questionIndex === question.questionIndex) sock.submitAnswer(payload, question.options);
   };
-  return { selfPaced, following, items, question, canAnswer, submitted, submittedOptions, submittedResponseText,
+  return { selfPaced, canBrowse, following, items, question, canAnswer, submitted, submittedOptions, submittedResponseText,
     draft, draftPersisted: !!key && (persisted.current.get(key) ?? !!readDraft(key)), setDraft, submitAnswer, browse, backToPresenter, progressLabel, upToDate, error, refresh };
 }

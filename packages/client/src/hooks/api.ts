@@ -1,6 +1,7 @@
 import { API } from "@mdq/shared";
 import type {
   SessionPolicy,
+  SessionAvailabilityPayload,
   ParseDiagnostic,
   AccessInfo,
   DeckPalette,
@@ -76,6 +77,7 @@ export interface QuestionSummary {
 }
 
 export interface CreateSessionResponse {
+  availability?: SessionAvailabilityPayload;
   sessionId: string;
   sessionCode: string;
   joinUrl: string;
@@ -88,6 +90,7 @@ export interface CreateSessionResponse {
 }
 
 export interface SessionRestoreResponse {
+  availability?: SessionAvailabilityPayload;
   policy?: SessionPolicy | null;
   policyFrozen?: boolean;
   effectiveRanking?: "correctness" | "speed" | "legacy";
@@ -110,6 +113,7 @@ export interface SessionRestoreResponse {
 }
 
 export interface PresentationSessionResponse {
+  availability?: SessionAvailabilityPayload;
   sessionId: string;
   sessionCode: string;
   week: string;
@@ -208,12 +212,12 @@ export async function reloadDecks(): Promise<ReloadDecksResponse> {
 
 export const reloadQuizzes = reloadDecks;
 
-export async function createSession(week: string, mode: string = "open"): Promise<CreateSessionResponse> {
+export async function createSession(week: string, mode: string = "open", availableUntil?: number): Promise<CreateSessionResponse> {
   const res = await fetchWithTimeout(apiPath(API.SESSION_CREATE), {
     method: "POST",
     credentials: "same-origin",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ week, mode }),
+    body: JSON.stringify({ week, mode, ...(availableUntil !== undefined ? { availableUntil } : {}) }),
   });
   if (!res.ok) {
     const data = await res.json().catch(() => ({}));
@@ -387,4 +391,16 @@ export async function fetchPresentationSession(sessionId: string): Promise<Prese
     throw new Error(data.error || "Failed to load projector session");
   }
   return res.json();
+}
+
+export async function configureSessionAvailability(sessionId: string, availableUntil: number): Promise<SessionAvailabilityPayload> {
+  const response = await fetchWithTimeout(apiPath(API.SESSION_AVAILABILITY, { id: sessionId }), {
+    method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ availableUntil }),
+  });
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    throw new Error(data.error || "Availability could not be updated");
+  }
+  return response.json();
 }

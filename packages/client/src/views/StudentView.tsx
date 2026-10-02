@@ -1,3 +1,4 @@
+import SessionAvailabilityInfo from "../components/SessionAvailabilityInfo";
 import { isSlideType } from "@mdq/shared";
 import { useState, useCallback, useEffect, useMemo, useRef, useSyncExternalStore } from "react";
 import ParticipantResultsView from "../components/ParticipantResultsView";
@@ -9,7 +10,7 @@ import { useSocket } from "../hooks/useSocket";
 import { loadStoredSession, saveStoredSession, clearStoredSession } from "../participantSessionStorage";
 import type { QuestionState, RevealState } from "../hooks/useSocket";
 import { API, MAX_OPEN_RESPONSE_LENGTH, SEAT_TAKEN_MESSAGE } from "@mdq/shared";
-import type { DeckPalette, DeckTheme, SessionState } from "@mdq/shared";
+import type { DeckPalette, DeckTheme, SessionState, SessionAvailabilityPayload } from "@mdq/shared";
 import Timer from "../components/Timer";
 import Leaderboard from "../components/Leaderboard";
 import DistributionChart from "../components/DistributionChart";
@@ -107,6 +108,7 @@ export default function StudentView({
   // What the deck behind the typed code asks for. The fields wait for it, so a
   // student never fills in a form the deck does not use.
   const [codeLookup, setCodeLookup] = useState<{ status: "idle" | "checking" | "found" | "missing" | "failed"; studentIds: boolean }>({ status: "idle", studentIds: true });
+  const [lookupAvailability, setLookupAvailability] = useState<{ routeKey: string; code: string; sessionId: string; availability: SessionAvailabilityPayload } | null>(null);
   const [lookupAttempt, setLookupAttempt] = useState(0);
   // The session a join has already resolved, so returning to the form after a refusal keeps its code.
   const resolvedSessionRef = useRef<string | null>(null);
@@ -184,7 +186,11 @@ export default function StudentView({
           return;
         }
         if (!response.ok) throw new Error("lookup failed");
-        const data = (await response.json()) as { studentIds?: boolean; state?: SessionState; sessionId?: string };
+        const data = (await response.json()) as { studentIds?: boolean; state?: SessionState; sessionId?: string; availability?: SessionAvailabilityPayload };
+        if (!cancelled && data.sessionId && data.availability) {
+          setLookupAvailability({ routeKey, code, sessionId: data.sessionId, availability: data.availability });
+          if (data.availability.phase === "expired" && loadStoredSession(data.sessionId)?.sessionToken) setSessionId(data.sessionId);
+        }
         if (!cancelled && data.state === "ENDED" && data.sessionId) { setSessionEndedHint(data.sessionId); setSessionId(data.sessionId); }
         if (!cancelled) setCodeLookup({ status: "found", studentIds: data.studentIds !== false });
       })
@@ -194,7 +200,7 @@ export default function StudentView({
     return () => {
       cancelled = true;
     };
-  }, [code, lookupAttempt]);
+  }, [code, lookupAttempt, routeKey]);
 
   // Resolve QR/join links early so the join form itself uses the deck theme.
   useEffect(() => {
@@ -208,10 +214,14 @@ export default function StudentView({
     fetch(API.SESSION_BY_CODE.replace(":code", normalizedCode))
       .then(async (response) => {
         if (!response.ok) return null;
-        return response.json() as Promise<{ sessionId?: string; state?: SessionState; week?: string; theme?: DeckTheme; palette?: DeckPalette }>;
+        return response.json() as Promise<{ sessionId?: string; state?: SessionState; availability?: SessionAvailabilityPayload; week?: string; theme?: DeckTheme; palette?: DeckPalette }>;
       })
       .then((data) => {
         if (cancelled || !data) return;
+        if (data.sessionId && data.availability) {
+          setLookupAvailability({ routeKey, code: normalizedCode, sessionId: data.sessionId, availability: data.availability });
+          if (data.availability.phase === "expired" && loadStoredSession(data.sessionId)?.sessionToken) setSessionId(data.sessionId);
+        }
         if (data.state === "ENDED" && data.sessionId) { setSessionEndedHint(data.sessionId); setSessionId(data.sessionId); }
         setSessionTheme(resolveClientTheme(data.theme, defaultTheme));
         setSessionPalette(resolveClientPalette(data.palette, defaultPalette));
@@ -226,7 +236,7 @@ export default function StudentView({
     return () => {
       cancelled = true;
     };
-  }, [defaultPalette, defaultTheme, initialSessionCode, normalizeSessionCode]);
+  }, [defaultPalette, defaultTheme, initialSessionCode, normalizeSessionCode, routeKey]);
 
   // Try to restore session from localStorage on mount
   useEffect(() => {
@@ -398,6 +408,7 @@ export default function StudentView({
   useEffect(() => {
     if (sockError) {
       const lowered = sockError.toLowerCase();
+      if (lowered.includes("availability ended")) { setJoining(false); setAwaitingRejoin(false); return; }
       if (lowered.includes("ended")) { setSessionEndedHint(sessionId); setJoining(false); return; }
       if (lowered.includes("not found")) {
         clearSessionArtifacts(sessionId);
@@ -436,7 +447,7 @@ export default function StudentView({
     );
   }
 
-  if (ownResults.status === "ready" && ownResults.results) return <ParticipantResultsView results={ownResults.results} onDone={handleDone} />;
+  if (ownResults.status === "ready" && ownResults.results) return <ParticipantResultsView results={ownResults.results} onDone={handleDone} availability={sock.availability} />;
   if (ownResults.status === "ended" || (sessionId !== null && sessionEndedHint === sessionId) || sock.sessionState === "ENDED"
     || (ownResults.status === "error" && !sock.sessionToken && hasStoredSeat(sessionId ?? undefined))) {
     return (
@@ -447,6 +458,16 @@ export default function StudentView({
         {ownResults.status !== "loading" && <button type="button" onClick={handleDone} className="rounded-xl border border-zinc-600 px-5 py-3">Done</button>}
       </main>
     );
+  }
+
+  const scopedLookupAvailability = lookupAvailability?.routeKey === routeKey && lookupAvailability.code === code ? lookupAvailability.availability : null;
+  const unavailable = sock.availability?.phase === "expired" || sock.availability?.phase === "deleted" ? sock.availability : scopedLookupAvailability;
+  if (!sessionToken && unavailable && (unavailable.phase === "expired" || unavailable.phase === "deleted") && (!awaitingRejoin || sockError || !loadStoredSession(lookupAvailability?.sessionId ?? sessionId)?.sessionToken)) {
+    return <main className="student-screen min-h-dvh p-6 space-y-4">
+      <h1 className="text-2xl font-semibold text-white">{unavailable.phase === "expired" ? "Availability ended" : "Session data has been deleted"}</h1>
+      <SessionAvailabilityInfo availability={unavailable} />
+      {unavailable.phase === "expired" && <p className="text-sm text-zinc-400">New joining is closed. An existing seat can return on its original device or with its saved credentials.</p>}
+    </main>;
   }
 
   // ── Rejoining with a stored seat ──
@@ -615,11 +636,21 @@ export default function StudentView({
     const resultsLabel = sock.deckTitle || quizKey ? deckLabel(sock.deckTitle, quizKey || "") : "";
     const lobbyNote = extraLabelNote(sock.label, sock.labelNote);
 
+    if (sock.availability?.phase === "expired") {
+      return <div className="w-full p-4">
+        <SessionAvailabilityInfo availability={sock.availability} />
+        <ParticipantStudyControls study={study} />
+        {study.question && <QuestionView key={`${sessionToken}:${study.question.questionIndex}`} question={study.question} state="QUESTION_CLOSED" remainingSec={null} submitted={study.submitted} submittedOptions={study.submittedOptions} submittedResponseText={study.submittedResponseText} timedOut={false} connected={false} onSubmit={study.submitAnswer} draft={study.draft} onDraftChange={study.setDraft} draftPersisted={study.draftPersisted} selfPaced={study.selfPaced} />}
+      </div>;
+    }
+    if (sock.availability?.phase === "deleted") return <SessionAvailabilityInfo availability={sock.availability} />;
+
     // Waiting in lobby
     if (state === "LOBBY") {
       return (
         <div className="min-h-dvh flex flex-col items-center justify-center gap-4 p-6">
           <div className="w-16 h-16 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin" />
+          <SessionAvailabilityInfo availability={sock.availability} />
           <h2 className="text-xl font-semibold text-white">Waiting for quiz to start...</h2>
           <p className="text-zinc-400 text-sm">The instructor will begin shortly</p>
           {sock.label && (
@@ -638,6 +669,7 @@ export default function StudentView({
     if (state === "QUESTION_OPEN" || state === "QUESTION_CLOSED") {
       return (
         <>
+          <SessionAvailabilityInfo availability={sock.availability} />
           <ParticipantStudyControls study={study} />
           <QuestionView
             key={`${sessionToken}:${study.question?.questionIndex ?? 0}`}

@@ -1,9 +1,11 @@
+import { useSessionAvailability } from "./useSessionAvailability";
 import { isSlideType } from "@mdq/shared";
 import { hasResultsAnswers, updateResultsEvidence, type ResultsEvidence } from "../instructorResults";
 import { io, type Socket } from "socket.io-client";
 import { useState, useEffect, useCallback, useRef } from "react";
 import type {
   SessionState,
+  SessionAvailabilityPayload,
   StudentJoinedPayload,
   QuestionOpenPayload,
   QuestionTickPayload,
@@ -151,6 +153,7 @@ export interface UseSocketReturn {
   error: string | null;
 
   // Session
+  availability?: SessionAvailabilityPayload | null;
   sessionState: SessionState | null;
   sessionToken: string | null;
   /** True once the presenter's Let rejoin was used from another device: this screen has lost the seat. */
@@ -224,9 +227,13 @@ export function useSocket(
   const [connected, setConnected] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const [socketAvailability, setSocketAvailability] = useState<{ id: string; value: SessionAvailabilityPayload } | null>(null);
   const [sessionState, setSessionState] = useState<SessionState | null>(null);
   const [sessionToken, setSessionToken] = useState<string | null>(null);
   const [credentialSessionId, setCredentialSessionId] = useState<string | null>(null);
+  const scopedAvailability = socketAvailability?.id === sessionId ? socketAvailability.value : null;
+  const retainedToken = role === "student" && !seatTaken ? credentialSessionId === sessionId && sessionToken ? sessionToken : loadStoredSession(sessionId)?.sessionToken : null;
+  const { availability } = useSessionAvailability(sessionId, scopedAvailability, retainedToken);
   const [studentIdState, setStudentIdState] = useState<string | null>(null);
   const [publicKey, setPublicKey] = useState<string | null>(null);
   const [label, setLabel] = useState<string | null>(null);
@@ -279,6 +286,7 @@ export function useSocket(
     setSessionToken(null);
     setCredentialSessionId(null);
     setSessionState(null);
+    setSocketAvailability(null);
     if (!sessionId) return;
 
     const socket = io({
@@ -331,6 +339,7 @@ export function useSocket(
       }
       joinedTokenRef.current = data.sessionToken;
       setCredentialSessionId(sessionId);
+      if (data.availability) setSocketAvailability({ id: sessionId, value: data.availability });
       setSessionToken(data.sessionToken);
       setStudentIdState(data.participantId);
       setPublicKey(data.publicKey ?? null);
@@ -543,8 +552,11 @@ export function useSocket(
       setSessionState("LEADERBOARD");
     });
 
+    socket.on(SocketEvents.SESSION_AVAILABILITY, (data: SessionAvailabilityPayload) => setSocketAvailability({ id: sessionId, value: data }));
+
     // ── Session state broadcasts ──────────
     socket.on(SocketEvents.SESSION_STATE, (data: SessionStatePayload) => {
+      if (data.availability) setSocketAvailability({ id: sessionId, value: data.availability });
       setSessionState(data.state);
       setResultsEvidence(previous => updateResultsEvidence(previous, sessionId, data.hasAnswers === true));
     });
@@ -692,6 +704,7 @@ export function useSocket(
   return {
     connected: socketSessionId === sessionId && connected,
     error: socketSessionId === sessionId ? error : null,
+    availability,
     sessionState: socketSessionId === sessionId ? sessionState : null,
     sessionToken: credentialSessionId === sessionId ? sessionToken : null,
     seatTaken: socketSessionId === sessionId && seatTaken,
@@ -711,9 +724,9 @@ export function useSocket(
     submitted,
     submittedOptions,
     submittedResponseText,
-    reveal,
-    distribution,
-    leaderboard,
+    reveal: role !== "instructor" && (availability?.phase === "expired" || availability?.phase === "deleted") ? null : reveal,
+    distribution: role !== "instructor" && (availability?.phase === "expired" || availability?.phase === "deleted") ? null : distribution,
+    leaderboard: role !== "instructor" && (availability?.phase === "expired" || availability?.phase === "deleted") ? [] : leaderboard,
     totalQuestions,
     participants,
     joinSession,

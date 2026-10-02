@@ -1,15 +1,17 @@
-import type { ParticipantResultsPayload } from "@mdq/shared";
+import SessionAvailabilityInfo from "./SessionAvailabilityInfo";
+import type { SessionAvailabilityPayload, ParticipantResultsPayload } from "@mdq/shared";
 import QuizHtml from "./QuizHtml";
 import InlineMarkdownText from "./InlineMarkdownText";
 import Leaderboard from "./Leaderboard";
 import { toOptionLabels } from "../ownAnswers";
 
 /** Own answers plus the deliberately narrow public board, never an instructor result record. */
-export default function ParticipantResultsView({ results, onDone }: { results: ParticipantResultsPayload; onDone?: () => void }) {
+export default function ParticipantResultsView({ results, onDone, availability }: { results: ParticipantResultsPayload; onDone?: () => void; availability?: SessionAvailabilityPayload | null }) {
   const scored = results.summary.scoredQuestionCount ?? 0;
   return (
     <main className="student-screen min-h-dvh p-4 pb-safe space-y-6">
       <h1 className="text-2xl font-semibold text-white">{scored ? "Your results" : "Your participation"}{results.deckTitle ? ` for ${results.deckTitle}` : ""}</h1>
+      <SessionAvailabilityInfo availability={availability} />
       <p className="student-screen-quiet text-sm text-zinc-400">
         {results.summary.availableQuestionCount > 0
           ? `${results.summary.answeredCount} of ${results.summary.availableQuestionCount} available questions answered.`
