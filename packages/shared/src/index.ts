@@ -690,6 +690,9 @@ export const SESSION_RECOVERY_MS = 7 * 24 * 60 * 60 * 1000;
 export const MAX_SESSION_AVAILABILITY_MS = SESSION_RECOVERY_MS;
 
 export interface Session {
+  /** Adapter-owned retention durations. Never accepted from participant commands.
+   * Omitted values preserve the standalone engine defaults. */
+  retention?: { recoveryMs: number; resultsMs: number };
   availability?: SessionAvailability;
   /** Terminal tombstone, never a presentation state or result disclosure. */
   deletedAt?: number;

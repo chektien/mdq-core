@@ -132,3 +132,33 @@ it("duration extension resolves at command time and rejects ambiguous, shorter o
     expect(() => apply(changed, quiz, { type: "configureAvailability", role: "control", ...request }, 5000)).toThrow();
   }
 });
+
+
+it("adapter retention survives restore, keeps expiry private, and leaves the seven-day access ceiling unchanged", () => {
+  const day = 86_400_000, retention = 90 * day;
+  let session = answer(open(), 5).session;
+  session.retention = { recoveryMs: retention, resultsMs: retention };
+  session = deserializeSession(serializeSession(session));
+  const until = session.availability!.availableUntil;
+  expect(sessionAvailabilityPhase(session, until + 7 * day)).toBe("expired");
+  expect(availabilityPayload(session, until)).toMatchObject({ recoverBefore: until + retention, deleteAt: until + retention });
+  expect(participantResultsPayload(session, quiz, "synthetic-seat", until + 30 * day)).toBeNull();
+  expect(() => apply(session, quiz, { type: "configureAvailability", role: "control", availableUntil: until + 30 * day + MAX_SESSION_AVAILABILITY_MS + 1 }, until + 30 * day)).toThrow("seven days");
+  const recovered = apply(session, quiz, { type: "configureAvailability", role: "control", extendForMs: day }, until + 30 * day).session;
+  expect(recovered.retention).toEqual(session.retention);
+  expect(recovered.submissions).toEqual(session.submissions);
+  const endedAt = until + 40 * day;
+  const ended = apply(session, quiz, { type: "end" }, endedAt).session;
+  expect(nextAvailabilityAlarm(ended, endedAt)?.dueAt).toBe(endedAt + retention);
+  expect(sessionAvailabilityPhase(ended, endedAt + 7 * day)).toBe("ended");
+  expect(sessionAvailabilityPhase(ended, endedAt + retention - 1)).toBe("ended");
+  expect(sessionAvailabilityPhase(ended, endedAt + retention)).toBe("deleted");
+  expect(sessionAvailabilityPhase(session, until + retention - 1)).toBe("expired");
+  expect(sessionAvailabilityPhase(session, until + retention)).toBe("deleted");
+});
+it("invalid adapter retention cannot invent an infinite or negative window", () => {
+  for (const value of [NaN, Infinity, -1, 0, 1.5]) {
+    const session = open(); session.retention = { recoveryMs: value, resultsMs: value };
+    expect(nextAvailabilityAlarm(session, 10_000)?.dueAt).toBe(10_000 + SESSION_RECOVERY_MS);
+  }
+});

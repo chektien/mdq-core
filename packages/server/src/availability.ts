@@ -1,5 +1,12 @@
 import { MAX_SESSION_AVAILABILITY_MS, PARTICIPANT_RESULT_RETENTION_MS, SESSION_RECOVERY_MS, type Session, type SessionAvailabilityAlarm, type SessionAvailabilityPayload, type SessionAvailabilityPhase } from "@mdq/shared";
 
+/** Trusted adapters can choose retention without changing Core defaults or access limits. */
+function retentionMs(session: Session, key: "recoveryMs" | "resultsMs"): number {
+  const value = session.retention?.[key];
+  return typeof value === "number" && Number.isSafeInteger(value) && value > 0
+    ? value : key === "recoveryMs" ? SESSION_RECOVERY_MS : PARTICIPANT_RESULT_RETENTION_MS;
+}
+
 export function availabilityEndTimestamp(session: Session): number | undefined {
   return session.resultScope?.endedAt ?? session.endedAt;
 }
@@ -8,10 +15,10 @@ export function sessionAvailabilityPhase(session: Session, now: number): Session
   if (session.deletedAt !== undefined) return "deleted";
   if (session.state === "ENDED" || session.resultScope) {
     const endedAt = availabilityEndTimestamp(session);
-    return session.availability && endedAt !== undefined && now >= endedAt + PARTICIPANT_RESULT_RETENTION_MS ? "deleted" : "ended";
+    return session.availability && endedAt !== undefined && now >= endedAt + retentionMs(session, "resultsMs") ? "deleted" : "ended";
   }
   if (!session.availability) return "active";
-  if (now >= session.availability.availableUntil + SESSION_RECOVERY_MS) return "deleted";
+  if (now >= session.availability.availableUntil + retentionMs(session, "recoveryMs")) return "deleted";
   return now >= session.availability.availableUntil ? "expired" : "active";
 }
 export function availabilityPayload(session: Session, now: number): SessionAvailabilityPayload {
@@ -20,11 +27,11 @@ export function availabilityPayload(session: Session, now: number): SessionAvail
   return { schemaVersion: 1, phase, serverNow: now,
     ...(session.availability ? { availableUntil: session.availability.availableUntil } : {}),
     ...(phase === "active" || phase === "expired" ? session.availability ? {
-      recoverBefore: session.availability.availableUntil + SESSION_RECOVERY_MS,
-      deleteAt: session.availability.availableUntil + SESSION_RECOVERY_MS,
+      recoverBefore: session.availability.availableUntil + retentionMs(session, "recoveryMs"),
+      deleteAt: session.availability.availableUntil + retentionMs(session, "recoveryMs"),
     } : {} : phase === "ended" && endedAt !== undefined ? {
-      resultRetainedUntil: endedAt + PARTICIPANT_RESULT_RETENTION_MS,
-      deleteAt: endedAt + PARTICIPANT_RESULT_RETENTION_MS,
+      resultRetainedUntil: endedAt + retentionMs(session, "resultsMs"),
+      deleteAt: endedAt + retentionMs(session, "resultsMs"),
     } : {}) };
 }
 export function validateAvailabilityDeadline(availableUntil: unknown, now: number): asserts availableUntil is number {
@@ -40,8 +47,8 @@ export function nextAvailabilityAlarm(session: Session, now: number): SessionAva
   const phase = !ended && now < session.availability.availableUntil ? "expire" : "purge";
   return { sessionId: session.sessionId, generation: session.availability.generation,
     availableUntil: session.availability.availableUntil, phase,
-    dueAt: ended ? endedAt! + PARTICIPANT_RESULT_RETENTION_MS : phase === "expire"
-      ? session.availability.availableUntil : session.availability.availableUntil + SESSION_RECOVERY_MS,
+    dueAt: ended ? endedAt! + retentionMs(session, "resultsMs") : phase === "expire"
+      ? session.availability.availableUntil : session.availability.availableUntil + retentionMs(session, "recoveryMs"),
     ...(ended ? { endedAt } : {}) };
 }
 export function availabilityAlarmMatches(session: Session, alarm: SessionAvailabilityAlarm): boolean {
