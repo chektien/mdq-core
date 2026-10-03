@@ -170,13 +170,16 @@ export default function LiveSurface({
   // The join card floats over the bottom corner from 761px up. Its height and
   // its distance from the bottom edge go to the safe area as --slide-join-clear,
   // so a question on a tablet can keep its options clear of the card (the
-  // stylesheet uses it from 761px to 1180px). A card in the flow needs none.
+  // stylesheet uses it from 761px to 1499px). Its intrinsic width also reserves
+  // room beside media; unlike the old fixed width it follows the real address.
+  // A card in the flow needs no bottom clearance.
   useLayoutEffect(() => {
     const safe = safeRef.current;
     const card = hasJoinInfo ? safe?.querySelector<HTMLElement>(":scope > .slide-join-panel") : null;
     if (!safe || !card) return undefined;
     const measure = () => {
       const style = window.getComputedStyle(card);
+      safe.style.setProperty("--slide-expanded-join-width", `${Math.ceil(card.offsetWidth)}px`);
       if (style.position !== "absolute" && style.position !== "fixed") {
         safe.style.removeProperty("--slide-join-clear");
         return;
@@ -184,13 +187,17 @@ export default function LiveSurface({
       safe.style.setProperty("--slide-join-clear", `${Math.ceil((parseFloat(style.bottom) || 0) + card.offsetHeight)}px`);
     };
     measure();
-    if (typeof ResizeObserver === "undefined") return () => safe.style.removeProperty("--slide-join-clear");
+    if (typeof ResizeObserver === "undefined") return () => {
+      safe.style.removeProperty("--slide-join-clear");
+      safe.style.removeProperty("--slide-expanded-join-width");
+    };
     const observer = new ResizeObserver(measure);
     observer.observe(card);
     if (surfaceRef.current) observer.observe(surfaceRef.current);
     return () => {
       observer.disconnect();
       safe.style.removeProperty("--slide-join-clear");
+      safe.style.removeProperty("--slide-expanded-join-width");
     };
   }, [hasJoinInfo]);
 

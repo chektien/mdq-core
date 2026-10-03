@@ -5531,7 +5531,6 @@ body.image-expansion-lock {
 }
 
 .image-expansion-overlay {
-  --image-expansion-max-height: calc(100dvh - clamp(7rem, 14dvh, 10rem));
   position: fixed;
   inset: 0;
   z-index: 10000;
@@ -5555,8 +5554,11 @@ body.image-expansion-lock {
 .image-expansion-frame {
   position: relative;
   display: flex;
-  width: min(96vw, 118rem);
-  max-height: calc(100dvh - 2rem);
+  width: max-content;
+  max-width: 100%;
+  min-width: 4.25rem;
+  max-height: 100%;
+  flex: 0 0 auto;
   flex-direction: column;
   align-items: center;
   justify-content: center;
@@ -5575,8 +5577,10 @@ body.image-expansion-lock {
 
 .image-expansion-media {
   display: flex;
-  width: 100%;
+  width: max-content;
+  max-width: 100%;
   min-height: 0;
+  flex: 0 0 auto;
   align-items: center;
   justify-content: center;
 }
@@ -5586,7 +5590,6 @@ body.image-expansion-lock {
   width: auto;
   max-width: 100%;
   height: auto;
-  max-height: var(--image-expansion-max-height);
   object-fit: contain;
   border-radius: calc(var(--mdq-panel-radius) - 0.2rem);
   background: rgba(12, 12, 12, 0.44);
@@ -5594,7 +5597,14 @@ body.image-expansion-lock {
 }
 
 .image-expansion-caption {
-  max-width: min(92vw, 78rem);
+  /* Captions wrap within the image-sized frame instead of widening it. Long
+     captions scroll independently so the full image remains in the viewport. */
+  width: 0;
+  min-width: 100%;
+  max-height: min(24dvh, 8rem);
+  flex: 0 0 auto;
+  overflow-y: auto;
+  overflow-wrap: anywhere;
   color: var(--mdq-media-caption-ink);
   font-size: clamp(0.72rem, 1vw, 0.94rem);
   font-weight: 650;
@@ -5608,8 +5618,8 @@ body.image-expansion-lock {
   top: clamp(0.52rem, 1.2vw, 0.86rem);
   right: clamp(0.52rem, 1.2vw, 0.86rem);
   display: inline-grid;
-  width: 2.4rem;
-  height: 2.4rem;
+  width: 2.75rem;
+  height: 2.75rem;
   place-items: center;
   border: 1px solid rgba(238, 238, 235, 0.18);
   border-radius: 999px;
@@ -5662,7 +5672,6 @@ body.image-expansion-lock {
 
 @media (max-width: 640px) {
   .image-expansion-overlay {
-    --image-expansion-max-height: calc(100dvh - 8.25rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
     align-items: center;
     padding:
       calc(0.75rem + env(safe-area-inset-top, 0px))
@@ -5671,25 +5680,10 @@ body.image-expansion-lock {
   }
 
   .image-expansion-frame {
-    width: 100%;
-    max-height: calc(100dvh - 1.5rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
+    max-height: 100%;
     justify-content: flex-start;
     gap: 0.6rem;
     padding: 0.75rem;
-  }
-
-  .image-expansion-media {
-    flex: 1 1 auto;
-    min-height: min(46dvh, 18rem);
-  }
-
-  .image-expansion-image {
-    max-height: min(var(--image-expansion-max-height), 62dvh);
-  }
-
-  .image-expansion-caption {
-    width: 100%;
-    max-width: 100%;
   }
 }
 
@@ -6960,15 +6954,40 @@ html[data-theme="light"] .slide-video-figure .slide-video-action:not(button) {
   align-items: center;
 }
 
-/* The open join card is wide enough for the join address to wrap to two lines, and the QR is a little
-   larger than it was. On a phone the card is a row (QR beside the text) and keeps its own layout. */
-@media (min-width: 761px) {
-  .slide-safe {
-    --slide-expanded-join-width: clamp(11.5rem, 16cqi, 16rem);
+/* Fit the open card to its unbroken join address, with a fixed scannable QR.
+   Only a viewport-constrained card wraps the address. LiveSurface measures its
+   real width for the adjacent content reserve; it does not determine the width. */
+@media (max-width: 760px) {
+  .slide-join-panel.session-code-card-expanded {
+    width: max-content;
+    max-width: 100%;
+    grid-template-columns: minmax(0, 1fr);
   }
 
+  .slide-join-panel.session-code-card-expanded .session-code-card-qr-button {
+    width: 4.8rem;
+    justify-self: center;
+  }
+
+  .quiz-surface .slide-join-panel.session-code-card-expanded {
+    grid-template-columns: minmax(0, 1fr) 4.4rem;
+  }
+
+  .quiz-surface .slide-join-panel.session-code-card-expanded .session-code-card-qr-button {
+    grid-column: 2;
+    grid-row: 1;
+    width: 4.4rem;
+  }
+
+  .quiz-surface .slide-join-panel.session-code-card-expanded .session-code-card-qr {
+    grid-column: auto;
+    grid-row: auto;
+  }
+}
+
+@media (min-width: 761px) {
   .slide-safe:has(.slide-join-panel.session-code-card-expanded) {
-    --slide-join-reserve: var(--slide-expanded-join-width);
+    --slide-join-reserve: var(--slide-expanded-join-width, 0px);
   }
 
   /* Video/still compositions keep their nested grids full-width. Reserve
@@ -6979,12 +6998,13 @@ html[data-theme="light"] .slide-video-figure .slide-video-action:not(button) {
 
   .slide-join-panel.session-code-card-expanded,
   .slide-live-shell-controls:has(.presenter-notes-panel) .slide-join-panel.session-code-card-expanded {
-    width: var(--slide-expanded-join-width);
-    max-width: 100%;
+    width: max-content;
+    max-width: calc(100% - 2 * clamp(1.2rem, 3.2cqi, 3.5rem));
   }
 
   .slide-join-panel.session-code-card-expanded .session-code-card-qr {
-    width: min(100%, 9rem);
+    width: 9rem;
+    max-width: 100%;
     justify-self: center;
   }
 }
@@ -7019,7 +7039,7 @@ html[data-theme="light"] .slide-video-figure .slide-video-action:not(button) {
     grid-template-columns: minmax(0, 1fr) auto 5.25rem;
     align-items: center;
     column-gap: 0.75rem;
-    width: min(26rem, 100%);
+    width: max-content;
   }
 
   .quiz-surface .slide-join-panel.session-code-card-expanded .session-code-card-toggle {
