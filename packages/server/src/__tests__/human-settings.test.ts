@@ -1,4 +1,5 @@
 import { DECK_STYLE_KEYS, FONT_SIZE_ROLES, deckStylePresets, readDeckStyleHeader, resolveDeckStyleSetting } from "@mdq/shared";
+import { printDeckStyle } from "../print-deck-style";
 import { parseQuizMarkdown } from "../parser";
 
 const deck = (header: string) => `# Synthetic\n${header}\n---\n## Example\ntype: slide\nText\n`;
@@ -62,4 +63,11 @@ describe("participant ID canonical and compatible syntax", () => {
       expect(parsed.quiz?.studentId).toBe(false);
     }
   });
+});
+
+it("new and older body presets feed identical native Core print CSS", () => {
+  const older = parseQuizMarkdown(deck("body-size: large"), "synthetic.md").quiz!;
+  const human = parseQuizMarkdown(deck("body-font-size: large"), "synthetic.md").quiz!;
+  expect(printDeckStyle(human)).toEqual(printDeckStyle(older));
+  expect(printDeckStyle(human).tokens).toContain("--mdq-body-scale: 1.2;");
 });
