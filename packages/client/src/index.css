@@ -3468,9 +3468,15 @@ html[data-theme="light"] .slide-action-button-warning:disabled {
 
 .question-media .slide-media-expand-button {
   height: auto;
+  /* A question's image is a compact intrinsic-height item, not the 16:9
+     content-slide canvas. Otherwise a wide tablet creates an empty tall
+     band above the bitmap and pushes it below the answer controls. */
+  aspect-ratio: auto;
 }
 
-.question-media .slide-media-figure img {
+.question-media .slide-media-grid .slide-media-figure img {
+  width: auto;
+  height: auto;
   max-height: 22dvh;
 }
 
