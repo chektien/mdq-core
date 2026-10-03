@@ -100,8 +100,8 @@ describe("Student IDs on the instructor's console", () => {
     // Every toggle sits behind idsAvailable: the lobby and the Participants dialog (switch rows) and the ended screen (a button).
     expect(tsx.match(/className="student-ids-toggle/g)?.length).toBe(1);
     expect(tsx.match(/\{idsAvailable && \(\s*<button\s+type="button"\s+className="student-ids-toggle/g)?.length).toBe(1);
-    expect(tsx.match(/<SettingSwitch\s+label="Show Student IDs"/g)?.length).toBe(2);
-    expect(tsx.match(/\{idsAvailable && \(\s*<SettingSwitch\s+label="Show Student IDs"/g)?.length).toBe(2);
+    expect(tsx.match(/<SettingSwitch\s+label="Show Participant IDs"/g)?.length).toBe(2);
+    expect(tsx.match(/\{idsAvailable && \(\s*<SettingSwitch\s+label="Show Participant IDs"/g)?.length).toBe(2);
     // With the toggle gone, idsVisible is false, and that reaches every list.
     expect(tsx).toContain("const idsVisible = idsAvailable && showStudentIds;");
     expect(tsx).toContain('nameOnly ? "name" : idsAvailable ? "ID" : "ID or name"');
@@ -216,11 +216,11 @@ describe("Participants dialog", () => {
     expect(lastRule(read("index.css"), ".participants-close")).toMatch(/width: 2\.75rem;\s*height: 2\.75rem/);
   });
 
-  it("groups Lock joining and Show Student IDs under a labelled Session settings area, each with its description", () => {
+  it("groups Lock joining and Show Participant IDs under a labelled Session settings area, each with its description", () => {
     expect(dialog).toContain('aria-labelledby="session-settings-title"');
     expect(dialog).toContain("Session settings");
     expect(dialog).toContain("<JoinLockToggle");
-    expect(dialog).toContain('label="Show Student IDs"');
+    expect(dialog).toContain('label="Show Participant IDs"');
     expect(dialog).toContain("description={STUDENT_IDS_DESCRIPTION}");
     // The settings come after the participant list, which stays the main content.
     expect(dialog.indexOf("<ParticipantList")).toBeLessThan(dialog.indexOf("session-settings-title"));
