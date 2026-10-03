@@ -194,7 +194,7 @@ export default function InstructorView({
   const [questionHeadings, setQuestionHeadings] = useState<string[]>([]);
   const [questionSummaries, setQuestionSummaries] = useState<QuestionSummary[]>([]);
   const [quizLabel, setQuizLabel] = useState("");
-  // Whether the deck uses Student IDs. With `student-id: false` the name is the ID, so the console has no IDs to show.
+  // Whether the deck uses Participant IDs. With `participant-id: false` the name is the ID, so the console has no IDs to show.
   const [deckUsesStudentIds, setDeckUsesStudentIds] = useState(true);
   const [sessionTheme, setSessionTheme] = useState<DeckTheme | undefined>();
   const [sessionPalette, setSessionPalette] = useState<DeckPalette | undefined>();
@@ -732,7 +732,7 @@ export default function InstructorView({
                 <SessionAvailabilitySettings sessionId={sid} observed={sock.availability} />
                 <div className="session-settings" role="group" aria-label="Joining options"><JoinLockToggle locked={sock.participants?.joinLocked === true} onChange={handleJoinLock} disabled={!sock.connected} />
                 {idsAvailable && (
-                  <SettingSwitch label="Show Student IDs" description={STUDENT_IDS_DESCRIPTION} checked={showStudentIds} onToggle={toggleShowStudentIds} />
+                  <SettingSwitch label="Show Participant IDs" description={STUDENT_IDS_DESCRIPTION} checked={showStudentIds} onToggle={toggleShowStudentIds} />
                 )}</div>
               </div>
             </dialog>}
@@ -774,7 +774,7 @@ export default function InstructorView({
             aria-pressed={showStudentIds}
             onClick={toggleShowStudentIds}
           >
-            Show Student IDs
+            Show Participant IDs
           </button>
         )}
         <div className="flex flex-wrap items-center justify-center gap-3">
@@ -881,11 +881,11 @@ function LiveView({
   loading: boolean;
   errorMsg: string | null;
   restoreNotice: string | null;
-  /** False when the deck hides Student IDs altogether. */
+  /** False when the deck hides Participant IDs altogether. */
   idsAvailable: boolean;
-  /** True when the deck has no Student IDs and the name is the ID. */
+  /** True when the deck has no Participant IDs and the name is the ID. */
   nameOnly: boolean;
-  /** Whether Student IDs show beside names on this console. */
+  /** Whether Participant IDs show beside names on this console. */
   showStudentIds: boolean;
   onToggleShowStudentIds: () => void;
   onReleaseSeat: (publicKey: string) => Promise<void>;
@@ -1331,7 +1331,7 @@ function LiveView({
           />
           {idsAvailable && (
             <SettingSwitch
-              label="Show Student IDs"
+              label="Show Participant IDs"
               description={STUDENT_IDS_DESCRIPTION}
               checked={showStudentIds}
               onToggle={onToggleShowStudentIds}

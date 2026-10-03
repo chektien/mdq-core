@@ -10,6 +10,7 @@ export const DECK_SETTING_KEYS: readonly string[] = [
   "theme",
   "presenter-notes",
   "presenter-notes-default-open",
+  "participant-id",
   "student-id",
   "type",
   "question-type",

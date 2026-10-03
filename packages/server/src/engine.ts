@@ -22,11 +22,11 @@ export class EngineCommandError extends Error {}
  * Who a message is for. An adapter decides which of its sockets get a message
  * with `audienceReaches`, so every adapter routes the same way:
  *
- * - `all`: control, display and participant sockets. Never carries a Student ID.
- * - `staff`: control and display sockets. Never carries a Student ID.
- * - `control`: control sockets only (the instructor). May carry Student IDs and names.
- * - `display`: display sockets only (the projector). Carries labels, never Student IDs.
- * - `public`: display and participant sockets. Carries labels, never Student IDs.
+ * - `all`: control, display and participant sockets. Never carries a Participant ID.
+ * - `staff`: control and display sockets. Never carries a Participant ID.
+ * - `control`: control sockets only (the instructor). May carry Participant IDs and names.
+ * - `display`: display sockets only (the projector). Carries labels, never Participant IDs.
+ * - `public`: display and participant sockets. Carries labels, never Participant IDs.
  * - `participants`: every participant socket, and nothing else.
  * - `participant:<id>`: one participant's own socket.
  *
@@ -59,7 +59,7 @@ export function audienceReaches(audience: Audience, role: SocketRole): boolean {
   return AUDIENCE_ROLES[audience as keyof typeof AUDIENCE_ROLES].includes(role);
 }
 
-/** Which payload a view gets: `control` has Student IDs and names, `public` has labels only. */
+/** Which payload a view gets: `control` has Participant IDs and names, `public` has labels only. */
 export type PayloadView = "control" | "public";
 /** Who an open-response payload is built for: only `control` sees every response. */
 export type ResponseView = "control" | "display" | "participant";
@@ -606,14 +606,14 @@ export function apply(input: Session, quiz: Quiz, command: Command, now: number)
       const reject = (reason: string) => emit(SocketEvents.STUDENT_REJECTED, { reason }, `participant:${socketId}`);
       if (availabilityPhase === "deleted") { reject("Session data has been deleted"); break; }
       if (session.state === "ENDED" || session.resultScope) { reject("Session has ended"); break; }
-      // The name is normalised for everyone; where Student IDs are off it is also the ID.
+      // The name is normalised for everyone; where Participant IDs are off it is also the ID.
       const usesIds = usesStudentIds(quiz);
       const typedName = normalizeDisplayName(payload.displayName);
       const id = usesIds
         ? (typeof payload.studentId === "string" ? payload.studentId.trim() : "")
         : typedName || normalizeDisplayName(payload.studentId);
-      if (!id) { reject(usesIds ? "Student ID is required" : "Please enter your name to join."); break; }
-      if (usesIds && id.length > MAX_STUDENT_ID_LENGTH) { reject(`Student ID can be at most ${MAX_STUDENT_ID_LENGTH} characters.`); break; }
+      if (!id) { reject(usesIds ? "Participant ID is required" : "Please enter your name to join."); break; }
+      if (usesIds && id.length > MAX_STUDENT_ID_LENGTH) { reject(`Participant ID can be at most ${MAX_STUDENT_ID_LENGTH} characters.`); break; }
       if (typedName.length > MAX_DISPLAY_NAME_LENGTH) { reject(`Name can be at most ${MAX_DISPLAY_NAME_LENGTH} characters.`); break; }
       const existing = usesIds ? session.participants.get(id) : findSeatByName(session, id);
       let participant: Participant;

@@ -1,4 +1,4 @@
-import { DECK_SETTING_KEYS, DECK_STYLE_KEYS, deckStylePresets, formatDiagnostic, safeDeckStyle } from "@mdq/shared";
+import { DECK_SETTING_KEYS, DECK_STYLE_KEYS, FONT_SIZE_ROLES, deckStylePresets, formatDiagnostic, safeDeckStyle } from "@mdq/shared";
 import * as parserModule from "../parser";
 import { parseQuizMarkdown } from "../parser";
 import { printDeckStyle } from "../print-deck-style";
@@ -48,8 +48,11 @@ const COLOR_KEYS = ["accent-color", "link-color", "text-color", "muted-color", "
 
 describe("deck header appearance settings", () => {
   it("lists exactly the fixed vocabulary as setting keys", () => {
-    expect([...DECK_STYLE_KEYS].sort()).toEqual([...Object.keys(PRESET_TABLE), ...COLOR_KEYS].sort());
-    expect(DECK_STYLE_KEYS).toHaveLength(25);
+    const olderVocabulary = DECK_STYLE_KEYS.filter(key => !FONT_SIZE_ROLES.some(([human]) => human === key));
+    expect([...olderVocabulary].sort()).toEqual([...Object.keys(PRESET_TABLE), ...COLOR_KEYS].sort());
+    expect(olderVocabulary).toHaveLength(25);
+    expect([...DECK_STYLE_KEYS].sort()).toEqual([...olderVocabulary, ...FONT_SIZE_ROLES.map(([human]) => human)].sort());
+    expect(DECK_STYLE_KEYS).toHaveLength(30);
     for (const key of DECK_STYLE_KEYS) expect(DECK_SETTING_KEYS).toContain(key);
   });
 

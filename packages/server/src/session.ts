@@ -194,7 +194,7 @@ export function addParticipant(
 
     // Different token or no token: conflict
     throw new Error(
-      `Student ID "${studentId}" is already in use with a different session token.`,
+      `Participant ID "${studentId}" is already in use with a different session token.`,
     );
   }
 

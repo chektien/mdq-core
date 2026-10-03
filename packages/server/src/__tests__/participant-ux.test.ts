@@ -210,8 +210,8 @@ describe("join form messages", () => {
     expect(joinRefusalMessage("Session not found")).toBe(SESSION_MISSING_MESSAGE);
   });
 
-  it("adds the next step when a Student ID is already in use, once", () => {
-    const clash = 'The Student ID "S0001" is already in this session on another device. Use that device, or check that you typed your own ID.';
+  it("adds the next step when a Participant ID is already in use, once", () => {
+    const clash = 'The Participant ID "S0001" is already in this session on another device. Use that device, or check that you typed your own ID.';
     const shown = joinRefusalMessage(clash);
     expect(shown.startsWith(clash)).toBe(true);
     expect(shown).toContain("If that device is not working, ask your instructor to let you join again.");
@@ -342,7 +342,7 @@ describe("presenter review fixes", () => {
     expect(restore).toContain("questionTotal: data.questionTotal");
   });
 
-  it("says ID or name in the participants help when Student IDs are off", () => {
+  it("says ID or name in the participants help when Participant IDs are off", () => {
     expect(instructor).toContain('join with their {nameOnly ? "name" : idsAvailable ? "ID" : "ID or name"} from any device');
   });
 

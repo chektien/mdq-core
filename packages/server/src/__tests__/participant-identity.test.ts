@@ -29,7 +29,7 @@ describe("name normalisation", () => {
   });
 });
 
-describe("joining with a Student ID", () => {
+describe("joining with a Participant ID", () => {
   it("keeps the ID and the optional name, and gives the participant a random public key", () => {
     const first = join(createSession("ids", "open"), withIds, { studentId: "S0001", displayName: "  Alex   Tan " });
     expect(first.joined).toMatchObject({ participantId: "S0001", label: "Alex Tan" });
@@ -48,8 +48,8 @@ describe("joining with a Student ID", () => {
 
   it("requires an ID and limits its length", () => {
     const session = createSession("ids", "open");
-    expect(join(session, withIds, { displayName: "Alex" }).rejected?.reason).toBe("Student ID is required");
-    expect(join(session, withIds, { studentId: "   " }).rejected?.reason).toBe("Student ID is required");
+    expect(join(session, withIds, { displayName: "Alex" }).rejected?.reason).toBe("Participant ID is required");
+    expect(join(session, withIds, { studentId: "   " }).rejected?.reason).toBe("Participant ID is required");
     expect(join(session, withIds, { studentId: "x".repeat(65) }).rejected?.reason).toMatch(/at most 64/);
     expect(join(session, withIds, { studentId: "x".repeat(64) }).joined).toBeTruthy();
     expect(join(session, withIds, { studentId: "S1", displayName: "n".repeat(61) }).rejected?.reason).toMatch(/at most 60/);
@@ -59,7 +59,7 @@ describe("joining with a Student ID", () => {
     const first = join(createSession("ids", "open"), withIds, { studentId: "S0001", displayName: "Alex" });
     const clash = join(first.session, withIds, { studentId: "S0001", displayName: "Sam" }, "other");
     expect(clash.joined).toBeUndefined();
-    expect(clash.rejected?.reason).toBe('The Student ID "S0001" is already in this session on another device. Use that device, or check that you typed your own ID.');
+    expect(clash.rejected?.reason).toBe('The Participant ID "S0001" is already in this session on another device. Use that device, or check that you typed your own ID.');
     expect(clash.messages).toHaveLength(1);
     expect(clash.session.participants.size).toBe(1);
     expect(clash.session.participants.get("S0001")?.socketId).toBe("socket-1");
@@ -128,7 +128,7 @@ describe("public labels", () => {
 });
 
 describe("joining by name only (student-id: false)", () => {
-  it("uses the normalised name as the ID and needs no Student ID", () => {
+  it("uses the normalised name as the ID and needs no Participant ID", () => {
     const result = join(createSession("names", "open"), nameOnly, { displayName: "  Alex \n Tan " });
     expect(result.joined).toMatchObject({ participantId: "Alex Tan", label: "Alex Tan" });
     expect(result.joined?.labelNote).toBeUndefined();
@@ -143,7 +143,7 @@ describe("joining by name only (student-id: false)", () => {
     expect(join(session, nameOnly, { displayName: "n".repeat(61) }).rejected?.reason).toMatch(/at most 60/);
   });
 
-  it("ignores a Student ID sent with the name", () => {
+  it("ignores a Participant ID sent with the name", () => {
     const result = join(createSession("names", "open"), nameOnly, { studentId: "S0001", displayName: "Alex" });
     expect(result.joined?.participantId).toBe("Alex");
   });

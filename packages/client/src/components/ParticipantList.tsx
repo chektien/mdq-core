@@ -6,7 +6,7 @@ type OnlineEntry = SessionParticipantsPayload["participants"][number];
 type OfflineEntry = NonNullable<SessionParticipantsPayload["offline"]>[number];
 
 /**
- * Who has joined, for the instructor. Names always show; Student IDs show only
+ * Who has joined, for the instructor. Names always show; Participant IDs show only
  * when `showStudentIds` is on. Each person has a "Let rejoin" action for a
  * phone that died: it asks in place, then frees their seat so the next join
  * with their ID (or name) from any device takes it over and keeps their answers.

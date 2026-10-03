@@ -17,8 +17,7 @@ import {
   parseDeckPalette,
   dashedSettingKey,
   normalizeDeckSettingKeys,
-  DECK_STYLE_KEYS,
-  resolveDeckStyleSetting,
+  readDeckStyleHeader,
   type ParseDiagnostic,
   type DeckStyle,
   type DeckStyleSettings,
@@ -87,7 +86,11 @@ export function parseQuizMarkdown(source: string, sourceFile: string): ParseResu
     sourceFile,
     errors,
   );
-  const studentId = extractDeckBooleanMetadata(markdown, "student_id", sourceFile, errors);
+  // Read both aliases, including invalid values, so diagnostics stay truthful.
+  // A valid canonical value wins regardless of line order; protocol fields stay unchanged.
+  const participantId = extractDeckBooleanMetadata(markdown, "participant_id", sourceFile, errors);
+  const legacyStudentId = extractDeckBooleanMetadata(markdown, "student_id", sourceFile, errors);
+  const studentId = participantId ?? legacyStudentId;
   const deckStyle = extractDeckStyleMetadata(markdown, diagnostics, sourceFile);
 
   // Extract deck key from filename (e.g., "week01.md" -> "week01", "featured-demo.md" -> "featured-demo")
@@ -250,7 +253,7 @@ function extractDeckPaletteMetadata(
 
 function extractDeckBooleanMetadata(
   markdown: string,
-  key: "presenter_notes" | "presenter_notes_default_open" | "student_id",
+  key: "presenter_notes" | "presenter_notes_default_open" | "participant_id" | "student_id",
   sourceFile: string,
   errors: QuizParseError[],
 ): boolean | undefined {
@@ -286,23 +289,12 @@ function extractDeckStyleMetadata(
   diagnostics: ParseDiagnostic[],
   sourceFile: string,
 ): { settings: DeckStyleSettings; style: DeckStyle } | undefined {
-  const preamble = markdown.split(/^---+\s*$/m, 1)[0] || markdown;
-  const settings: DeckStyleSettings = {};
-  const style: DeckStyle = {};
-  for (const key of DECK_STYLE_KEYS) {
-    const match = preamble.match(new RegExp(`^${key.replace(/-/g, "_")}:[ \\t]*(.*?)\\s*$`, "im"));
-    if (!match) continue;
-    const result = resolveDeckStyleSetting(key, match[1]);
-    if (result.ok) {
-      settings[key] = result.value;
-      Object.assign(style, result.style);
-      continue;
-    }
-    const lineNumber = preamble.slice(0, match.index).split("\n").length;
-    diagnostics.push({ severity: "warning", sourceFile, questionIndex: -1, lineNumber, message: result.message });
+  const parsed = readDeckStyleHeader(markdown);
+  for (const warning of parsed.warnings) {
+    diagnostics.push({ severity: "warning", sourceFile, questionIndex: -1, lineNumber: warning.line, message: warning.message });
   }
   diagnostics.sort((a, b) => (a.lineNumber ?? 0) - (b.lineNumber ?? 0));
-  return Object.keys(settings).length > 0 ? { settings, style } : undefined;
+  return Object.keys(parsed.settings).length ? { settings: parsed.settings, style: parsed.style } : undefined;
 }
 
 /**

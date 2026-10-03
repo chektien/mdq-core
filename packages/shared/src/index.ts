@@ -65,7 +65,7 @@ export const SocketEvents = {
 
 export interface StudentJoinPayload {
   /**
-   * The Student ID. A deck that turns Student IDs off (`student-id: false`)
+   * The Participant ID. A deck that turns Participant IDs off (`participant-id: false`)
    * takes the name as the ID, so a first join carries only `displayName`; a
    * rejoin may send the `participantId` it was given here instead.
    */
@@ -99,7 +99,7 @@ export interface StudentJoinedPayload {
   answers?: StudentAnswer[];
   /**
    * The random key public payloads use for this participant instead of the
-   * Student ID. A phone matches it against leaderboard and response rows to
+   * Participant ID. A phone matches it against leaderboard and response rows to
    * find its own.
    */
   publicKey: string;
@@ -571,7 +571,7 @@ export interface Quiz {
   /** Optional per-deck override for the panel's initial expanded state. */
   presenterNotesDefaultOpen?: boolean;
   /**
-   * Whether the join form asks for a Student ID (`student-id:` in the deck
+   * Whether the join form asks for a Participant ID (`student-id:` in the deck
    * header). Absent means on; `false` asks for a name only and uses it as the ID.
    */
   studentId?: boolean;
@@ -777,7 +777,7 @@ export interface CumulativeLeaderboardEntry {
   weeksParticipated: number;
 }
 
-/** A saved-results row with the Student ID and typed name replaced by a label. */
+/** A saved-results row with the Participant ID and typed name replaced by a label. */
 export interface PublicCumulativeLeaderboardEntry {
   rank: number;
   label: string;
@@ -856,3 +856,5 @@ export interface ParticipantResultsPayload {
   leaderboard?: { publicKey: string; label: string; rank: number; score: number }[];
 }
 export const PARTICIPANT_RESULT_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
+
+export * from "./deck-style-header";

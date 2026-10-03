@@ -299,23 +299,23 @@ Tip for classroom privacy and mobility: open Projector on the laptop, then keep 
 
 #### Student join form and privacy
 
-The deck's `student-id` header setting decides what the join form asks for. It accepts only `true` or `false` (any other value is a deck parse error) and defaults to `true`. The form learns it from the session code before it shows any fields.
+The deck's `participant-id` header setting decides what the join form asks for. It accepts only `true` or `false` (any other value is a deck parse error) and defaults to `true`. The form learns it from the session code before it shows any fields.
 
 | Setting | Join form |
 | --- | --- |
-| `student-id: true` (or absent) | Student ID (required, up to 64 characters) and Name (optional, up to 60) |
-| `student-id: false` | Name only (required, up to 60), and the name is the participant's ID |
+| `participant-id: true` (or absent) | Participant ID (required, up to 64 characters) and Name (optional, up to 60) |
+| `participant-id: false` | Name only (required, up to 60), and the name is the participant's ID |
 
 Either way, each participant has one ID that is unique in the session.
 
-- **Names as IDs.** With `student-id: false` the name is normalised (Unicode NFC, trimmed, runs of whitespace collapsed to one space) and compared without regard to case. A name another seat holds is refused straight away, with a message such as `Someone here is already using the name "Alex Tan". Add an initial or your surname, for example "Alex Tan B."`. A name stays held for the whole session, even after its holder leaves.
-- **Student IDs.** An ID that is already in the session follows the usual seat rules: the same session token, or the same browser after it went offline, takes the seat back; anyone else is told `The Student ID "..." is already in this session on another device. Use that device, or check that you typed your own ID.`
+- **Names as IDs.** With `participant-id: false` the name is normalised (Unicode NFC, trimmed, runs of whitespace collapsed to one space) and compared without regard to case. A name another seat holds is refused straight away, with a message such as `Someone here is already using the name "Alex Tan". Add an initial or your surname, for example "Alex Tan B."`. A name stays held for the whole session, even after its holder leaves.
+- **Participant IDs.** An ID that is already in the session follows the usual seat rules: the same session token, or the same browser after it went offline, takes the seat back; anyone else is told `The Participant ID "..." is already in this session on another device. Use that device, or check that you typed your own ID.`
 - **Your own seat is never a clash.** Rejoining with your session token (a reload, a dropped connection) always works.
 - **Labels.** Everyone gets a public label, fixed when they join and never reused in that session: their name (`Alex`), `Alex (2)` for the next participant with the same name (ignoring case), or `Participant 3` (in join order) when a participant with IDs on gave no name. A participant whose label differs from what they typed is told why on the waiting screen (`Another participant is also called Alex, so you appear as Alex (2).`).
-- **Who sees IDs.** The projector, the leaderboard on phones and on the projector, and other students see labels only, never Student IDs. Each participant also gets a random per-session public key (not derived from the ID) which public payloads use in place of the ID, so a phone can still highlight its own leaderboard row. The instructor's view, and the results CSV, show Student IDs and names. `GET /api/session/:id/leaderboard` is public, so it returns labels and public keys only. `GET /api/leaderboard/cumulative` (saved results) and the open responses in the instructor's restore (`GET /api/session/:id/state`) return Student IDs and names only to a request that is logged in as the instructor. With an instructor login set, everyone else gets a 401 for both. With no login set nobody can prove they are the instructor, so both return labels only: saved results as `label` (the name, or `Participant N` by rank, with `(2)` added to repeats) instead of `studentId`, and restored open responses by label.
-- **What the instructor view needs from a server.** The bundled instructor view hides its "Show Student IDs" button, and every place it would show an ID, for a deck with `student-id: false`, because the name is the ID. It learns this from a `studentIds` boolean in the `POST /api/session` response and in the `GET /api/session/:id/state` restore response (`false` when the deck turns IDs off). A server or adapter that serves this view should send it in both; when it is missing the view treats IDs as on.
-- **Set an instructor login to keep IDs private.** Without an instructor login (`INSTRUCTOR_PASSWORD`), anyone who can reach the server on the network can open the instructor view or connect as the instructor and see Student IDs and names. That is how MDQ has always worked without a login. The labels-only rules above stop the projector, phones and public pages from showing IDs, but they cannot stop someone who joins as the instructor, so set a login whenever the network is not just your own class. The same goes for the results CSV and the Hide control: they are for the instructor, but without a login anyone who can reach the server can use them.
-- **`autoGenerateStudentIds`.** The runtime option keeps working exactly as before for decks that use Student IDs: the ID field is hidden, the name is required, and an ID generated on the device is sent. A deck with `student-id: false` takes priority: it asks for a name only and the name is the ID, so no ID is generated, whether or not `autoGenerateStudentIds` is on.
+- **Who sees IDs.** The projector, the leaderboard on phones and on the projector, and other students see labels only, never Participant IDs. Each participant also gets a random per-session public key (not derived from the ID) which public payloads use in place of the ID, so a phone can still highlight its own leaderboard row. The instructor's view, and the results CSV, show Participant IDs and names. `GET /api/session/:id/leaderboard` is public, so it returns labels and public keys only. `GET /api/leaderboard/cumulative` (saved results) and the open responses in the instructor's restore (`GET /api/session/:id/state`) return Participant IDs and names only to a request that is logged in as the instructor. With an instructor login set, everyone else gets a 401 for both. With no login set nobody can prove they are the instructor, so both return labels only: saved results as `label` (the name, or `Participant N` by rank, with `(2)` added to repeats) instead of `studentId`, and restored open responses by label.
+- **What the instructor view needs from a server.** The bundled instructor view hides its "Show Participant IDs" button, and every place it would show an ID, for a deck with `participant-id: false`, because the name is the ID. It learns this from a `studentIds` boolean in the `POST /api/session` response and in the `GET /api/session/:id/state` restore response (`false` when the deck turns IDs off). A server or adapter that serves this view should send it in both; when it is missing the view treats IDs as on.
+- **Set an instructor login to keep IDs private.** Without an instructor login (`INSTRUCTOR_PASSWORD`), anyone who can reach the server on the network can open the instructor view or connect as the instructor and see Participant IDs and names. That is how MDQ has always worked without a login. The labels-only rules above stop the projector, phones and public pages from showing IDs, but they cannot stop someone who joins as the instructor, so set a login whenever the network is not just your own class. The same goes for the results CSV and the Hide control: they are for the instructor, but without a login anyone who can reach the server can use them.
+- **`autoGenerateStudentIds`.** The runtime option keeps working exactly as before for decks that use Participant IDs: the ID field is hidden, the name is required, and an ID generated on the device is sent. A deck with `participant-id: false` takes priority: it asks for a name only and the name is the ID, so no ID is generated, whether or not `autoGenerateStudentIds` is on.
 
 Port fallback retries default to 10 attempts (`PORT_FALLBACKS=10`).
 
@@ -354,7 +354,7 @@ Student QR behavior:
 - Open the session-scoped `Projector` link from the authenticated instructor screen when you want a second display that mirrors the instructor presentation without controls.
 - The Projector route is intentionally not linked from the public home page. A code-based public entry point would let students discover the live projector feed and monitor the session outside the instructor flow.
 - Projector stays read-only. It never renders instructor action buttons or calls instructor REST actions.
-- The projector names participants by label only (lobby, leaderboard and open responses). It never receives Student IDs.
+- The projector names participants by label only (lobby, leaderboard and open responses). It never receives Participant IDs.
 - A common classroom setup is to connect the laptop to the projector, open the `Projector` there, then open the authenticated instructor view on a phone. Advancing, reviewing, revealing feedback, and ending the session from the phone updates the projected laptop view in real time.
 - This keeps instructor-only controls and route details off the projector while still allowing the instructor to move around the room.
 
@@ -430,17 +430,15 @@ PDF images keep their source aspect ratio. MDQ only scales images down to fit th
 
 ## Slide Appearance Settings
 
-A deck can change how its slides look from the header, in plain settings with no CSS. Write them in the header above the first `---`, one per line, with dashes like every other key (`title-size:`, and `title_size:` still works):
+A deck can change how its slides look from the header, in plain settings with no CSS. Write them in the header above the first `---`, one per line, with dashes like every other key (`title-font-size:`, and `title_font_size:` also works):
 
 ```markdown
 # My Deck
 theme: light
-title-size: large
-body-size: large
-accent-color: teal
-background-color: #fdf6e3
-slide-padding: roomy
-image-corners: square
+palette: gruvbox
+title-font-size: large
+body-font-size: large
+note-font-size: small
 
 ---
 ```
@@ -455,7 +453,21 @@ title-size: huge is not a size. Use small, medium, large, x-large, or a length s
 
 The deck still loads and every other setting still applies, because this is a note and not a parse error. Colour contrast is your choice, so check that text stays readable on the colours you pick.
 
-### Sizes
+### Font sizes
+
+| Key | Text it sizes |
+| --- | --- |
+| `title-font-size` | Slide titles and cover titles (×1.25) |
+| `heading-font-size` | Subtitles and `###` headings |
+| `body-font-size` | Slide text, lists, questions, answers and print body |
+| `note-font-size` | Fold-out notes, references and cover details |
+| `caption-font-size` | Image and video captions |
+
+Use `title-font-size`, `heading-font-size`, `body-font-size`, `note-font-size` or `caption-font-size` with `small`, `medium`, `large` or `x-large`. These scale each role’s responsive size. `medium` leaves it unchanged. `note-font-size` sizes fold-out notes, references and cover details, not the presenter panel.
+
+A valid new font key wins over its older twin, even when that twin uses an exact length. An invalid new key is ignored with a warning and falls back to the older key. These new names require a Core version that supports them. Older Core versions ignore them, so existing decks are never automatically renamed.
+
+### Older size names (still read)
 
 `title-size`, `heading-size`, `body-size`, `small-size` and `caption-size` take a preset or a length in `px`, `rem` or `em`. A preset scales Core's own size for that text, so `medium` leaves it unchanged. A length sets the exact size on every screen, phones included.
 
@@ -473,6 +485,8 @@ The deck still loads and every other setting still applies, because this is a no
 | `body-size` | Slide body text |
 | `small-size` | Fold-out note text and slide references |
 | `caption-size` | Image captions |
+
+## Fine-tuning
 
 ### Colours
 
@@ -561,16 +575,16 @@ title: Demo Presentation Session
 
 If the preamble title is omitted, MDQ falls back to the first `# ...` heading for backward compatibility.
 
-A deck can also choose what its join form asks for with `student-id:` in the same preamble (see [Student join form and privacy](#student-join-form-and-privacy)):
+A deck can also choose what its join form asks for with `participant-id:` in the same preamble (see [Student join form and privacy](#student-join-form-and-privacy)):
 
 ```markdown
 title: Demo Presentation Session
-student-id: false
+participant-id: false
 
 ---
 ```
 
-`student-id` accepts `true` or `false` (case-insensitive, with optional quotes) and defaults to `true` when it is omitted. `student_id` works too. Any other value is a deck parse error.
+`participant-id` accepts `true` or `false` (case-insensitive, with optional quotes) and defaults to `true` when it is omitted. `participant_id`, `student-id` and `student_id` work too. A valid `participant-id` takes precedence over a valid `student-id`, independent of line order. Invalid aliases still produce parse errors. Any other value is a deck parse error.
 
 Each interactive question supports the existing `time-limit:` metadata plus optional `multi-select:` and `type:` flags. `question-type:` remains accepted as a backward-compatible alias. Questions default to multiple choice when `type:` is omitted, and `type: multiple_choice` can be written explicitly. Type values also accept hyphens in place of underscores, such as `open-response` for `open_response`. Question stems, slide bodies, and option text can also include standard markdown images.
 
@@ -626,7 +640,7 @@ Rules:
 - Poll questions still respect `multi-select:`. Omit it for a single-choice poll, or set `multi-select: true` for a multi-select poll.
 - Use `type: open_response` for a written, non-scored response prompt.
 - Open responses can be up to 1000 characters. The instructor sees every response live, each with a Hide / Show button. While the question is open the projector shows only how many responses are in; once you reveal, it shows the responses that are not hidden, and hiding or showing one updates it at once. Phones never receive other participants' responses. The same control is available as `POST /api/session/:id/response-visibility` with `{ "questionIndex": 2, "publicKey": "...", "hidden": true }` (instructor login when one is configured).
-- If a participant's phone dies, the instructor's participant list has a "Let rejoin" button beside their name. It frees their seat and keeps everything that belongs to it: their answers, label and public key. Between the release and the next join, any join with that Student ID (or the same name, when Student IDs are off) from any device takes the seat over, so share the moment with the person it is for. Once it is taken, the old device is told "You joined on another device. This screen is no longer in the session.", stops receiving the session and cannot answer; the new device carries on. Two tabs of the same seat that share one token keep working together.
+- If a participant's phone dies, the instructor's participant list has a "Let rejoin" button beside their name. It frees their seat and keeps everything that belongs to it: their answers, label and public key. Between the release and the next join, any join with that Participant ID (or the same name, when Participant IDs are off) from any device takes the seat over, so share the moment with the person it is for. Once it is taken, the old device is told "You joined on another device. This screen is no longer in the session.", stops receiving the session and cannot answer; the new device carries on. Two tabs of the same seat that share one token keep working together.
 - The same control is `POST /api/session/:id/release-seat` with `{ "publicKey": "..." }` (the participant's public key from the instructor's participant list, at most 128 characters). It needs the instructor login. With no login set, anyone who knows the session ID can call it, so set a login for real classes. It answers 400 for a missing, too long or unknown key and 404 for an unknown session.
 - To stop new people joining, for example once the class is in, choose "Lock joining" beside the participant list (in the lobby and in the Participants dialog). It then reads "Joining locked"; choose it again to open joining. While it is locked, a phone that would take a new seat is told "This session is not taking new participants. Ask the presenter." Anyone who already has a seat can still rejoin it, with their token or browser, and a seat freed with "Let rejoin" can still be taken over. The projector's join card says "Joining is closed" instead of showing the code and QR. Only the instructor's screen and the projector receive the state, as `joinLocked: true` on the participants list (absent when open); phones only see the refusal. The lock is saved with the session.
 - The same control is `POST /api/session/:id/join-lock` with `{ "locked": true }` or `{ "locked": false }`, answering `{ "locked": true|false }`. It needs the instructor login (with no login set, anyone who knows the session ID can call it). It answers 400 when `locked` is not a boolean and 404 for an unknown session. `GET /api/session/:id/state` and `GET /api/session/:id/presentation` also report `joinLocked`.
@@ -857,8 +871,8 @@ Design notes:
 
 Adapters that call the engine's `apply()` route its messages by audience:
 
-- `all`: every socket; `staff`: control and display sockets. These payloads never carry a Student ID.
-- `control`: the instructor only, with Student IDs and names. `display`: the projector only. `public`: the projector and participants. Their payloads carry `label` and `publicKey` in place of the ID.
+- `all`: every socket; `staff`: control and display sockets. These payloads never carry a Participant ID.
+- `control`: the instructor only, with Participant IDs and names. `display`: the projector only. `public`: the projector and participants. Their payloads carry `label` and `publicKey` in place of the ID.
 - `participant:<id>`: that participant's own socket.
 
 New sessions carry a versioned `policy`, separate from the legacy `strict`/`open`
@@ -929,7 +943,7 @@ The primary protection model is instructor authentication plus session scoping a
 Worst-case scenarios and realistic impact:
 
 - **Link sharing outside class**: Someone with the join URL could submit answers, mitigated by short-lived sessions, visible participant counts, and per-session closure. Likelihood low, impact low to medium.
-- **Student impersonation (same room)**: A student could type another student ID. This affects fairness, not host compromise. Token-based reconnect protection prevents easy socket hijack after first join, and a second device using a joined ID is refused with a clear message. Only the instructor's view sees Student IDs; other students and the projector see labels. Likelihood low, impact medium for grading integrity.
+- **Student impersonation (same room)**: A student could type another student ID. This affects fairness, not host compromise. Token-based reconnect protection prevents easy socket hijack after first join, and a second device using a joined ID is refused with a clear message. Only the instructor's view sees Participant IDs; other students and the projector see labels. Likelihood low, impact medium for grading integrity.
 - **DoS on a session URL**: Spam joins/submits could disrupt one session, but does not expose host secrets by design. Likelihood low in typical classroom context, impact medium for that class period.
 - **Accidental data exposure from git push**: If runtime files were tracked, URLs/session data could leak. This repo structure avoids that by keeping `data/` local-only and gitignored. Likelihood low when workflow is followed, impact medium if ignored.
 
