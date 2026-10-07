@@ -112,15 +112,28 @@ export interface EngineResult {
 export const SEAT_IN_USE_MESSAGE = "This seat is now in use on another device.";
 
 const message = (event: string, payload: unknown, audience: Audience = "all"): EngineMessage => ({ audience, event, payload });
-const clone = (session: Session): Session => ({
+// Answers read seats but never change them. Preserve structural sharing for
+// current identities, copying legacy seats before identity adoption writes them.
+const answerParticipants = (session: Session): Session["participants"] => {
+  let participants = session.participants;
+  for (const [id, participant] of session.participants) {
+    if (participant.publicKey && participant.label) continue;
+    if (participants === session.participants) participants = new Map(participants);
+    participants.set(id, { ...participant });
+  }
+  return participants;
+};
+const clone = (session: Session, answering = false): Session => ({
   ...session,
   availability: session.availability ? { ...session.availability } : undefined,
   policy: session.policy ? { ...session.policy } : undefined,
   releasedQuestionIndexes: session.releasedQuestionIndexes ? new Set(session.releasedQuestionIndexes) : undefined,
   resultScope: session.resultScope ? { ...session.resultScope, releasedQuestionIndexes: [...session.resultScope.releasedQuestionIndexes], scoredQuestionIndexes: [...session.resultScope.scoredQuestionIndexes] } : undefined,
   revealedQuestionIndexes: session.revealedQuestionIndexes ? new Set(session.revealedQuestionIndexes) : undefined,
-  participants: new Map([...session.participants].map(([id, p]) => [id, { ...p }])),
-  submissions: session.submissions.map((s) => ({ ...s, selectedOptions: [...s.selectedOptions] })),
+  participants: answering ? answerParticipants(session) : new Map([...session.participants].map(([id, p]) => [id, { ...p }])),
+  // An answer appends or replaces one submission below, so old submissions and
+  // their option arrays need no copy. Other commands retain the full clone.
+  submissions: answering ? [...session.submissions] : session.submissions.map((s) => ({ ...s, selectedOptions: [...s.selectedOptions] })),
   questionTiming: session.questionTiming ? Object.fromEntries(Object.entries(session.questionTiming)
     .map(([index, timing]) => [index, { ...timing, restarts: timing.restarts.map((restart) => ({ ...restart })) }])) : undefined,
   hiddenResponses: session.hiddenResponses
@@ -339,7 +352,7 @@ const deadline = (session: Session, quiz: Quiz): number | null => {
 
 /** Calculate a session change without mutating its input or using a clock or transport. */
 export function apply(input: Session, quiz: Quiz, command: Command, now: number): EngineResult {
-  const session = clone(input);
+  const session = clone(input, command.type === "answerSubmit");
   quiz = session.deckSnapshot ?? quiz;
   ensureParticipantIdentity(session);
   // Adopt only the known current legacy clock before navigating to another item.
@@ -683,12 +696,13 @@ export function apply(input: Session, quiz: Quiz, command: Command, now: number)
       const due = deadline(session, quiz);
       if (due !== null && now >= due) { reject("The question deadline has passed."); break; }
       if (!session.participants.has(studentId)) { reject(`Student "${studentId}" is not a participant in this session.`); break; }
-      const existing = session.submissions.find((s) => s.studentId === studentId && s.questionIndex === payload.questionIndex);
+      const existingIndex = session.submissions.findIndex((s) => s.studentId === studentId && s.questionIndex === payload.questionIndex);
+      const existing = session.submissions[existingIndex];
       if (existing && !isOpenResponseQuestion(q)) { reject("Already submitted an answer for this question."); break; }
       const submission = { studentId, questionIndex: payload.questionIndex,
         selectedOptions: [...new Set(options)].sort(), responseText: responseText || undefined,
         submittedAt: now, responseTimeMs: timingFor(session, quiz, payload.questionIndex)?.startedAt !== undefined ? now - timingFor(session, quiz, payload.questionIndex)!.startedAt : 0 };
-      if (existing) Object.assign(existing, submission);
+      if (existing) session.submissions[existingIndex] = { ...existing, ...submission };
       else session.submissions.push(submission);
       emit(SocketEvents.ANSWER_ACCEPTED, { questionIndex: payload.questionIndex }, target);
       emitCount();
