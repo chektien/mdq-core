@@ -170,6 +170,7 @@ export const DECK_PALETTES = [
   "seoul256",
   "ayu",
   "tokyo-night",
+  "tomorrow",
 ] as const;
 /** Slide color palette, chosen independently of the light/dark theme. */
 export type DeckPalette = (typeof DECK_PALETTES)[number];

@@ -1,7 +1,7 @@
 import fs from "fs";
 import path from "path";
 
-// Table-driven readability contract for every palette in both themes (14
+// Table-driven readability contract for every palette in both themes (16
 // combinations): the classic look, gruvbox, Rosé Pine, Catppuccin, seoul256,
 // Ayu and Tokyo Night. Each block reads the shipped CSS, resolves the tokens
 // a screen really uses in a combination and asserts WCAG contrast: text 4.5:1
@@ -13,7 +13,7 @@ const theme = fs.readFileSync(path.join(clientSrc, "theme.css"), "utf-8");
 
 type Tokens = Record<string, string>;
 
-const PALETTES = ["classic", "gruvbox", "rose-pine", "catppuccin", "seoul256", "ayu", "tokyo-night"] as const;
+const PALETTES = ["classic", "gruvbox", "rose-pine", "catppuccin", "seoul256", "ayu", "tokyo-night", "tomorrow"] as const;
 const MODES = ["dark", "light"] as const;
 type Palette = (typeof PALETTES)[number];
 type Mode = (typeof MODES)[number];
@@ -137,9 +137,9 @@ function expectPairs(label: string, foregrounds: Record<string, string | Rgba>, 
   expect(failures).toEqual([]);
 }
 
-describe("palette readability, 7 palettes x 2 themes", () => {
+describe("palette readability, 8 palettes x 2 themes", () => {
   it("covers every palette and both themes", () => {
-    expect(COMBOS).toHaveLength(14);
+    expect(COMBOS).toHaveLength(16);
     for (const { name } of COMBOS) expect(Object.keys(TOKENS[name]).length).toBeGreaterThan(40);
   });
 

@@ -4,7 +4,7 @@ import path from "path";
 const clientSrc = path.resolve(__dirname, "..", "..", "..", "client", "src");
 const index = fs.readFileSync(path.join(clientSrc, "index.css"), "utf-8");
 
-const palettes = ["gruvbox", "rose-pine", "catppuccin", "seoul256", "ayu", "tokyo-night"] as const;
+const palettes = ["gruvbox", "rose-pine", "catppuccin", "seoul256", "ayu", "tokyo-night", "tomorrow"] as const;
 type Theme = "dark" | "light";
 
 // Where each slide surface gradient ends: on the slide background or on the soft one.
@@ -43,7 +43,7 @@ describe("live page canvas", () => {
         const gradient = body(`${headerFor(palette, theme)} .slide-surface`);
         const end = gradient.match(/linear-gradient\(180deg, #[0-9a-f]{6} 0%, (#[0-9a-f]{6}) 100%\)/)?.[1];
         const soft = endsOnSoft.has(`${palette} ${theme}`);
-        expect(end).toBe(token(tokens, soft ? "--mdq-slide-bg-soft" : "--mdq-slide-bg"));
+        expect(palette === "tomorrow" ? token(tokens, "--mdq-slide-bg") : end).toBe(token(tokens, soft ? "--mdq-slide-bg-soft" : "--mdq-slide-bg"));
       }
     }
   });

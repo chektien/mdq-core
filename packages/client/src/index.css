@@ -2258,6 +2258,276 @@ html[data-palette="tokyo-night"][data-theme="light"] .leaderboard-row.rank-stand
   --leaderboard-rank-color: var(--mdq-muted);
 }
 
+/* Tomorrow (deck palette: tomorrow)
+   Chris Kempson, https://github.com/chriskempson/tomorrow-theme, MIT.
+   Tomorrow light is flat pure white; dark uses Tomorrow Night.
+   Readability shades: blue #4271ae to #38649e, green #718c00 to #526600,
+   aqua #3e999f to #247278, purple #8959a8 to #794898, orange #f5871f
+   to #935000, yellow #eab700 to #7a5e00, red #c82829 to #b32223.
+   Muted light ink #8e908c to #666666; dark red fill #cc6666 to #d16b6b, danger text to #e08787.
+   Highlighted third-place ink #de935f to #e4a77c; light silver #666666 to #585858.
+   These retain the palette hues while meeting text/control contrast. */
+html[data-palette="tomorrow"]:not([data-theme="light"]) {
+  --mdq-slide-bg: #1d1f21;
+  --mdq-slide-bg-soft: #1d1f21;
+  --mdq-slide-frame: rgba(197, 200, 198, 0.16);
+  --mdq-slide-heading: #81a2be;
+  --mdq-slide-ink: #c5c8c6;
+  --mdq-slide-ink-soft: #b0b2b0;
+  --mdq-slide-eyebrow: #b0b2b0;
+  --mdq-slide-rule: rgba(197, 200, 198, 0.16);
+  --mdq-slide-accent: #81a2be;
+  --mdq-slide-accent-strong: #81a2be;
+  --mdq-slide-accent-warm: #de935f;
+  --mdq-slide-accent-cool: #8abeb7;
+  --mdq-slide-blue: #81a2be;
+  --mdq-slide-scene: #b5bd68;
+  --mdq-slide-maroon: #b294bb;
+  --mdq-slide-glass: #1d1f21;
+  --mdq-slide-glass-strong: #1d1f21;
+  --mdq-slide-glass-line: rgba(197, 200, 198, 0.16);
+  --mdq-note-attendee: #81a2be;
+  --mdq-note-attendee-tint: rgba(129, 162, 190, 0.12);
+  --mdq-note-presenter: #b294bb;
+  --mdq-note-presenter-tint: rgba(178, 148, 187, 0.12);
+  --mdq-panel-radius: 0.2rem;
+  --mdq-paper: #1d1f21;
+  --mdq-paper-strong: #1d1f21;
+  --mdq-card: rgba(40, 42, 46, 0.92);
+  --mdq-card-strong: #282a2e;
+  --mdq-dialog: #1d1f21;
+  --mdq-line: rgba(197, 200, 198, 0.14);
+  --mdq-line-strong: rgba(197, 200, 198, 0.28);
+  --mdq-control-border: #858785;
+  --mdq-ink: #c5c8c6;
+  --mdq-ink-strong: #ffffff;
+  --mdq-ink-soft: #c5c8c6;
+  --mdq-muted: #b0b2b0;
+  --mdq-soft: #a4a6a4;
+  --mdq-accent: #81a2be;
+  --mdq-accent-hover: #91b2ce;
+  --mdq-accent-text: #81a2be;
+  --mdq-on-accent: #1d1f21;
+  --mdq-accent-soft: rgba(129, 162, 190, 0.1);
+  --mdq-accent-soft-strong: rgba(129, 162, 190, 0.18);
+  --mdq-accent-ink: #c5c8c6;
+  --mdq-secondary: #b294bb;
+  --mdq-secondary-text: #b294bb;
+  --mdq-on-secondary: #1d1f21;
+  --mdq-secondary-soft: rgba(178, 148, 187, 0.1);
+  --mdq-success: #b5bd68;
+  --mdq-success-text: #b5bd68;
+  --mdq-on-success: #1d1f21;
+  --mdq-success-soft: rgba(181, 189, 104, 0.1);
+  --mdq-success-ink: #c5c8c6;
+  --mdq-success-line: #b5bd68;
+  --mdq-warning: #f0c674;
+  --mdq-warning-text: #f0c674;
+  --mdq-on-warning: #1d1f21;
+  --mdq-warning-soft: rgba(240, 198, 116, 0.1);
+  --mdq-warning-ink: #c5c8c6;
+  --mdq-danger: #d16b6b;
+  --mdq-danger-text: #e08787;
+  --mdq-on-danger: #1d1f21;
+  --mdq-danger-soft: rgba(209, 107, 107, 0.1);
+  --mdq-danger-ink: #c5c8c6;
+  --mdq-danger-line: #d16b6b;
+  --mdq-info: #8abeb7;
+  --mdq-info-text: #8abeb7;
+  --mdq-on-info: #1d1f21;
+  --mdq-info-soft: rgba(138, 190, 183, 0.1);
+  --mdq-info-ink: #c5c8c6;
+  --mdq-info-line: #8abeb7;
+  --mdq-bar: #81a2be;
+  --mdq-on-bar: #1d1f21;
+  --mdq-bar-muted: #969896;
+  --mdq-on-bar-muted: #1d1f21;
+  --mdq-bar-wash: rgba(129, 162, 190, 0.26);
+  --mdq-timer-ok: #b5bd68;
+  --mdq-timer-warn: #f0c674;
+  --mdq-timer-urgent: #d16b6b;
+  --mdq-timer-track: #858785;
+  background: #1d1f21;
+}
+
+html[data-palette="tomorrow"]:not([data-theme="light"]) body {
+  background: #1d1f21;
+}
+
+html[data-palette="tomorrow"]:not([data-theme="light"]) .slide-surface {
+  background: var(--mdq-slide-bg);
+}
+
+html[data-palette="tomorrow"]:not([data-theme="light"]) .slide-surface .quiz-html strong {
+  color: #ffffff;
+}
+
+html[data-palette="tomorrow"][data-theme="light"] {
+  --mdq-slide-bg: #ffffff;
+  --mdq-slide-bg-soft: #ffffff;
+  --mdq-slide-frame: rgba(55, 96, 191, 0.18);
+  --mdq-slide-heading: #4d4d4c;
+  --mdq-slide-ink: #4d4d4c;
+  --mdq-slide-ink-soft: #666666;
+  --mdq-slide-eyebrow: #666666;
+  --mdq-slide-rule: rgba(55, 96, 191, 0.18);
+  --mdq-slide-accent: #38649e;
+  --mdq-slide-accent-strong: #38649e;
+  --mdq-slide-accent-warm: #935000;
+  --mdq-slide-accent-cool: #247278;
+  --mdq-slide-blue: #38649e;
+  --mdq-slide-scene: #526600;
+  --mdq-slide-maroon: #794898;
+  --mdq-slide-glass: #f5f5f5;
+  --mdq-slide-glass-strong: #f5f5f5;
+  --mdq-slide-glass-line: rgba(55, 96, 191, 0.18);
+  --mdq-note-attendee: #38649e;
+  --mdq-note-attendee-tint: rgba(56, 100, 158, 0.09);
+  --mdq-note-presenter: #794898;
+  --mdq-note-presenter-tint: rgba(121, 72, 152, 0.09);
+  --mdq-panel-radius: 0.2rem;
+  --mdq-paper: #ffffff;
+  --mdq-paper-strong: #ffffff;
+  --mdq-card: rgba(255, 255, 255, 0.92);
+  --mdq-card-strong: #ffffff;
+  --mdq-dialog: #ffffff;
+  --mdq-field: #ffffff;
+  --mdq-line: rgba(55, 96, 191, 0.14);
+  --mdq-line-strong: rgba(55, 96, 191, 0.26);
+  --mdq-control-border: #757575;
+  --mdq-ink: #4d4d4c;
+  --mdq-ink-strong: #4d4d4c;
+  --mdq-ink-soft: #4d4d4c;
+  --mdq-muted: #666666;
+  --mdq-soft: #6b6b6b;
+  --mdq-accent: #38649e;
+  --mdq-accent-hover: #38649e;
+  --mdq-accent-text: #38649e;
+  --mdq-on-accent: #ffffff;
+  --mdq-accent-soft: rgba(56, 100, 158, 0.08);
+  --mdq-accent-soft-strong: rgba(56, 100, 158, 0.14);
+  --mdq-accent-ink: #304a6a;
+  --mdq-accent-wash: linear-gradient(135deg, #ffffff, #f5f5f5);
+  --mdq-secondary: #794898;
+  --mdq-secondary-text: #794898;
+  --mdq-on-secondary: #ffffff;
+  --mdq-secondary-soft: rgba(121, 72, 152, 0.08);
+  --mdq-success: #526600;
+  --mdq-success-text: #526600;
+  --mdq-on-success: #ffffff;
+  --mdq-success-soft: rgba(82, 102, 0, 0.08);
+  --mdq-success-ink: #3f4d00;
+  --mdq-success-line: #526600;
+  --mdq-success-wash: linear-gradient(135deg, #ffffff, #f5f5f5);
+  --mdq-warning: #7a5e00;
+  --mdq-warning-text: #7a5e00;
+  --mdq-on-warning: #ffffff;
+  --mdq-warning-soft: rgba(122, 94, 0, 0.08);
+  --mdq-warning-ink: #574300;
+  --mdq-danger: #b32223;
+  --mdq-danger-text: #b32223;
+  --mdq-on-danger: #ffffff;
+  --mdq-danger-soft: rgba(179, 34, 35, 0.08);
+  --mdq-danger-ink: #82191a;
+  --mdq-danger-line: #b32223;
+  --mdq-danger-wash: linear-gradient(135deg, #ffffff, #f5f5f5);
+  --mdq-info: #247278;
+  --mdq-info-text: #247278;
+  --mdq-on-info: #ffffff;
+  --mdq-info-soft: rgba(36, 114, 120, 0.08);
+  --mdq-info-ink: #1a5358;
+  --mdq-info-line: #247278;
+  --mdq-bar: #38649e;
+  --mdq-on-bar: #ffffff;
+  --mdq-bar-muted: #6b6b6b;
+  --mdq-on-bar-muted: #ffffff;
+  --mdq-bar-wash: rgba(56, 100, 158, 0.16);
+  --mdq-timer-ok: #526600;
+  --mdq-timer-warn: #7a5e00;
+  --mdq-timer-urgent: #b32223;
+  --mdq-timer-track: #757575;
+  --mdq-rank-first: #7a5e00;
+  --mdq-rank-second: #585858;
+  --mdq-rank-third: #935000;
+  --mdq-page-glow-top: transparent;
+  --mdq-page-glow-cool: transparent;
+  --mdq-page-glow-warm: transparent;
+  background: #ffffff;
+}
+
+html[data-palette="tomorrow"][data-theme="light"] .slide-surface {
+  background: var(--mdq-slide-bg);
+}
+
+html[data-palette="tomorrow"][data-theme="light"] .slide-surface .quiz-html strong {
+  color: #4d4d4c;
+}
+
+/* Tomorrow link on the white join QR panel (theme.css). */
+html[data-palette="tomorrow"][data-theme="dark"] .instructor-qr-panel,
+html[data-palette="tomorrow"][data-theme="light"] .instructor-qr-panel {
+  --mdq-qr-link: #38649e;
+}
+
+/* The dark selection-mode card and chips carry classic purple and green in
+   their base rules; the light theme already reads the tokens. */
+html[data-palette="tomorrow"]:not([data-theme="light"]) .selection-mode-card-single {
+  border-color: rgba(129, 162, 190, 0.34);
+  background: linear-gradient(135deg, #282a2e, #1d1f21);
+}
+html[data-palette="tomorrow"]:not([data-theme="light"]) .selection-mode-card-single::after {
+  background: rgba(129, 162, 190, 0.22);
+}
+html[data-palette="tomorrow"]:not([data-theme="light"]) .selection-mode-card-multi {
+  border-color: rgba(178, 148, 187, 0.32);
+  background: linear-gradient(135deg, #282a2e, #1d1f21);
+}
+html[data-palette="tomorrow"]:not([data-theme="light"]) .selection-mode-card-multi::after {
+  background: rgba(178, 148, 187, 0.2);
+}
+html[data-palette="tomorrow"]:not([data-theme="light"]) .selection-mode-label {
+  color: #ffffff;
+}
+html[data-palette="tomorrow"]:not([data-theme="light"]) .selection-mode-text {
+  color: #b0b2b0;
+}
+html[data-palette="tomorrow"]:not([data-theme="light"]) .selection-mode-chip-single {
+  color: #81a2be;
+  border-color: rgba(129, 162, 190, 0.4);
+  background: #1d1f21;
+}
+html[data-palette="tomorrow"]:not([data-theme="light"]) .selection-mode-chip-multi {
+  color: #b294bb;
+  border-color: rgba(178, 148, 187, 0.4);
+  background: #1d1f21;
+}
+
+html[data-palette="tomorrow"]:not([data-theme="light"]) .leaderboard-row.rank-first {
+  --leaderboard-rank-color: #f0c674;
+}
+html[data-palette="tomorrow"]:not([data-theme="light"]) .leaderboard-row.rank-second {
+  --leaderboard-rank-color: #b0b2b0;
+}
+html[data-palette="tomorrow"]:not([data-theme="light"]) .leaderboard-row.rank-third {
+  --leaderboard-rank-color: #e4a77c;
+}
+
+/* Below the podium the row keeps a neutral tint, so fourth place does not
+   pick up the accent that third place uses. */
+html[data-palette="tomorrow"]:not([data-theme="light"]) .leaderboard-row.rank-standard {
+  --leaderboard-rank-color: #b0b2b0;
+}
+
+/* The viewer's own row adds an accent wash; third place keeps the palette
+   colour there instead of the classic orange. */
+html[data-palette="tomorrow"]:not([data-theme="light"]) .leaderboard-row.leaderboard-row-highlight.rank-third {
+  --leaderboard-rank-color: #e4a77c;
+}
+
+html[data-palette="tomorrow"][data-theme="light"] .leaderboard-row.rank-standard {
+  --leaderboard-rank-color: var(--mdq-muted);
+}
+
 /* The viewer's own row adds an accent wash, so a dark theme lightens the
    third-place orange to hold 4.5:1 on it. */
 html:not([data-theme="light"]) .leaderboard-row.leaderboard-row-highlight.rank-third {

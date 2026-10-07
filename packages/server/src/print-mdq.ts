@@ -910,6 +910,63 @@ function renderTokyoNightTokens(theme: PrintTheme): string {
     `;
 }
 
+// Tomorrow / Tomorrow Night, Chris Kempson (MIT). Same readability shades as the live palette.
+function renderTomorrowTokens(theme: PrintTheme): string {
+  if (theme === "light") {
+    return `
+      --page-bg: #ffffff;
+      --ink: #4d4d4c;
+      --body: #4d4d4c;
+      --muted: #666666;
+      --line: rgba(55, 96, 191, 0.28);
+      --soft-line: rgba(55, 96, 191, 0.14);
+      --paper: #ffffff;
+      --wash: #f5f5f5;
+      --option-bg: #ffffff;
+      --media-bg: #f5f5f5;
+      --accent: #38649e;
+      --accent-soft: rgba(56, 100, 158, 0.1);
+      --teal: #38649e;
+      --teal-line: rgba(56, 100, 158, 0.35);
+      --teal-soft: rgba(56, 100, 158, 0.09);
+      --amber: #794898;
+      --amber-line: rgba(121, 72, 152, 0.38);
+      --amber-soft: rgba(121, 72, 152, 0.09);
+      --green: #526600;
+      --green-line: rgba(82, 102, 0, 0.45);
+      --green-soft: rgba(82, 102, 0, 0.12);
+      --reference: #666666;
+      --shadow: rgba(77, 77, 76, 0.04);
+    `;
+  }
+
+  return `
+      --page-bg: #1d1f21;
+      --ink: #ffffff;
+      --body: #c5c8c6;
+      --muted: #b0b2b0;
+      --line: rgba(197, 200, 198, 0.32);
+      --soft-line: rgba(197, 200, 198, 0.16);
+      --paper: #1d1f21;
+      --wash: #282a2e;
+      --option-bg: #1d1f21;
+      --media-bg: #1d1f21;
+      --accent: #81a2be;
+      --accent-soft: rgba(129, 162, 190, 0.16);
+      --teal: #81a2be;
+      --teal-line: rgba(129, 162, 190, 0.42);
+      --teal-soft: rgba(129, 162, 190, 0.12);
+      --amber: #b294bb;
+      --amber-line: rgba(178, 148, 187, 0.42);
+      --amber-soft: rgba(178, 148, 187, 0.12);
+      --green: #b5bd68;
+      --green-line: rgba(181, 189, 104, 0.46);
+      --green-soft: rgba(181, 189, 104, 0.16);
+      --reference: #b0b2b0;
+      --shadow: rgba(0, 0, 0, 0.18);
+    `;
+}
+
 function printPageBackground(theme: PrintTheme, palette: PrintPalette): string {
   switch (palette) {
     case "gruvbox":
@@ -929,6 +986,9 @@ function printPageBackground(theme: PrintTheme, palette: PrintPalette): string {
 
     case "tokyo-night":
       return theme === "dark" ? "#1a1b26" : "#e1e2e7";
+
+    case "tomorrow":
+      return theme === "dark" ? "#1d1f21" : "#ffffff";
 
     case "classic":
       break;
@@ -955,6 +1015,9 @@ function renderThemeTokens(theme: PrintTheme, palette: PrintPalette): string {
 
     case "tokyo-night":
       return renderTokyoNightTokens(theme);
+
+    case "tomorrow":
+      return renderTomorrowTokens(theme);
 
     case "classic":
       break;

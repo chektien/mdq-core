@@ -14,7 +14,7 @@ describe("client boot appearance", () => {
   });
 
   it("keeps every supported palette served on <html> and ignores the rest", () => {
-    for (const palette of ["classic", "gruvbox", "rose-pine", "catppuccin", "seoul256", "ayu", "tokyo-night"]) {
+    for (const palette of ["classic", "gruvbox", "rose-pine", "catppuccin", "seoul256", "ayu", "tokyo-night", "tomorrow"]) {
       expect(readServedAppearance({ palette })).toEqual({ theme: undefined, palette });
       expect(resolveClientPalette(palette)).toBe(palette);
     }
