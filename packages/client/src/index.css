@@ -4361,13 +4361,17 @@ html[data-theme="light"] .mdq-orbit-callout {
   margin-top: auto;
   color: var(--mdq-slide-ink-soft);
   font-size: var(--mdq-small-size, calc(clamp(0.62rem, 0.78cqi, 0.82rem) * var(--mdq-small-scale, 1)));
-  line-height: 1.28;
+  /* Long reference lists wrap. Leave the link underlines room between lines,
+     and balance the lines so a wrapped list does not end in a short orphan. */
+  line-height: 1.5;
   text-align: right;
+  text-wrap: balance;
 }
 
+/* Separate references sit further apart than the wrapped lines of one. */
 .slide-references ol {
   display: grid;
-  gap: 0.18rem;
+  gap: 0.4em;
   margin: 0;
   padding: 0;
   list-style: none;
@@ -4382,6 +4386,7 @@ html[data-theme="light"] .mdq-orbit-callout {
   color: inherit;
   text-decoration: underline;
   text-decoration-color: color-mix(in srgb, var(--mdq-slide-ink-soft) 44%, transparent);
+  text-decoration-thickness: max(1px, 0.06em);
   text-underline-offset: 0.18em;
 }
 
@@ -5437,7 +5442,7 @@ html[data-theme="light"] .quiz-html a {
   .slide-references {
     margin-top: 0.12rem;
     font-size: var(--mdq-small-size, calc(0.62rem * var(--mdq-small-scale, 1)));
-    line-height: 1.16;
+    line-height: 1.45;
   }
 
   .slide-notes {
