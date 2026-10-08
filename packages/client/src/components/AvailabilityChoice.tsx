@@ -28,6 +28,16 @@ export function firstCustomTime(now: number, previous?: number): string {
   const lower = Math.max(now, previous ?? now);
   return localAvailabilityInput(Math.ceil((lower + 1) / 900_000) * 900_000);
 }
+export function latestCustomTime(now: number): string {
+  return localAvailabilityInput(Math.floor((now + MAX_SESSION_AVAILABILITY_MS) / 900_000) * 900_000);
+}
+/** Browsers do not enforce a time input's min and max, and a day change keeps
+ * the old time. Pull a complete local day and time into the allowed window. */
+export function boundedCustomTime(value: string, now: number, previous?: number): string {
+  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(value)) return value;
+  const first = firstCustomTime(now, previous), last = latestCustomTime(now);
+  return value < first ? first : value > last ? last : value;
+}
 export function allowedDays(now: number, previous?: number): { value: string; label: string }[] {
   const first = new Date(Math.max(now, previous ?? now));
   first.setHours(12, 0, 0, 0);
@@ -51,8 +61,10 @@ export default function AvailabilityChoiceControl({ choice, onChange, now, previ
   const days = allowedDays(now, previous);
   const custom = choice.kind === "exact" ? choice.value : firstCustomTime(now, previous);
   const day = custom.slice(0, 10), time = custom.slice(11, 16);
-  const max = localAvailabilityInput(Math.floor((now + MAX_SESSION_AVAILABILITY_MS) / 900_000) * 900_000);
+  const max = latestCustomTime(now);
   const min = localAvailabilityInput(Math.max(now, previous ?? now));
+  const exact = (value: string) => onChange({ kind: "exact", value: boundedCustomTime(value, now, previous) });
+  const latest = new Date(max).getTime();
   const presets = extension ? AVAILABILITY_PRESETS.filter(p => p.key !== "4h") : AVAILABILITY_PRESETS;
   return <fieldset className="availability-choice" disabled={disabled}>
     <legend>{extension ? "New end time" : "Available until"}</legend>
@@ -65,14 +77,14 @@ export default function AvailabilityChoiceControl({ choice, onChange, now, previ
     })}
     <label className="availability-option"><input type="radio" name={`${id}-choice`} checked={choice.kind === "exact"} onChange={() => onChange({ kind: "exact", value: firstCustomTime(now, previous) })} />Choose day and time</label>
     {choice.kind === "exact" && <div className="availability-day-time">
-      <div className="availability-field"><label htmlFor={`${id}-day`}>Day</label><select id={`${id}-day`} value={day} onChange={e => onChange({ kind: "exact", value: `${e.target.value}T${time || "12:00"}` })}>
+      <div className="availability-field"><label htmlFor={`${id}-day`}>Day</label><select id={`${id}-day`} value={day} onChange={e => exact(`${e.target.value}T${time || "12:00"}`)}>
         {!days.some(d => d.value === day) && <option value={day} disabled>Choose an allowed day</option>}
         {days.map(d => <option key={d.value} value={d.value}>{d.label}</option>)}
       </select></div>
-      <div className="availability-field"><label htmlFor={`${id}-time`}>Time ({availabilityTimezone()})</label><input id={`${id}-time`} type="time" step="60" value={time} min={day === min.slice(0, 10) ? min.slice(11, 16) : undefined} max={day === max.slice(0, 10) ? max.slice(11, 16) : undefined} onChange={e => onChange({ kind: "exact", value: `${day}T${e.target.value}` })} /></div>
+      <div className="availability-field"><label htmlFor={`${id}-time`}>Time ({availabilityTimezone()})</label><input id={`${id}-time`} type="time" step="60" value={time} min={day === min.slice(0, 10) ? min.slice(11, 16) : undefined} max={day === max.slice(0, 10) ? max.slice(11, 16) : undefined} onChange={e => exact(`${day}T${e.target.value}`)} /></div>
     </div>}
-    {problem ? <p role="alert">{problem}{choice.kind === "exact" && day === max.slice(0, 10) && ` Latest allowed is ${formatAvailabilityTime(new Date(max).getTime())}.`}</p>
-      : <p className="availability-preview">{extension ? "Until" : choice.kind === "preset" ? "Expected until" : "Until"} {formatAvailabilityTime(until)}</p>}
+    {problem ? <p role="alert">{problem}{choice.kind === "exact" && day === max.slice(0, 10) && ` Latest allowed is ${formatAvailabilityTime(latest)}.`}</p>
+      : <p className="availability-preview">{extension ? "Until" : choice.kind === "preset" ? "Expected until" : "Until"} {formatAvailabilityTime(until)}{choice.kind === "exact" && until === latest && ", the latest allowed"}</p>}
     {!extension && <p className="availability-preview">Up to seven days. Availability ending closes answers without showing results.</p>}
   </fieldset>;
 }
