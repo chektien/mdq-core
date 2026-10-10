@@ -66,6 +66,38 @@ B. Second
       expect(explicit.quiz!.questions[0].textMd).toBe("**Which option is correct?**");
     });
 
+    it.each(["type: question", "type: Question", "question-type: question", "type: multiple-choice"])(
+      "parses %s like the implicit default, single and multi-select",
+      (line) => {
+        const md = `# Quiz
+
+---
+
+## Topic
+
+**Which options are correct?**
+
+A. First
+B. Second
+C. Third
+
+> Correct Answer: B
+
+---
+`;
+        const implicit = parseQuizMarkdown(md, "week01.md");
+        const explicit = parseQuizMarkdown(md.replace("## Topic", `## Topic\n${line}`), "week01.md");
+        expect(explicit.errors).toHaveLength(0);
+        expect(explicit.quiz!.questions[0]).toEqual(implicit.quiz!.questions[0]);
+        expect(explicit.quiz!.questions[0].questionType).toBe("multiple_choice");
+        const multi = (source: string) => source.replace("> Correct Answer: B", "multi-select: true\n\n> Correct Answers: A, C");
+        const implicitMulti = parseQuizMarkdown(multi(md), "week01.md");
+        const explicitMulti = parseQuizMarkdown(multi(md).replace("## Topic", `## Topic\n${line}`), "week01.md");
+        expect(explicitMulti.errors).toHaveLength(0);
+        expect(explicitMulti.quiz!.questions[0]).toEqual(implicitMulti.quiz!.questions[0]);
+      },
+    );
+
     it.each(["type: multiple-choice", "question_type: multiple-choice", "question-type: multiple-choice"])(
       "parses %s like multiple_choice",
       (typeLine) => {

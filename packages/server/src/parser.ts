@@ -338,7 +338,9 @@ function parseQuestionBlock(
   }
 
   const questionTypeMatch = block.match(/^(?:type|question_type):\s*([a-z_-]+)\s*$/im);
-  const questionType = questionTypeMatch?.[1].toLowerCase().replace(/-/g, "_");
+  // `type: question` names the default explicitly: a multiple-choice question, single or multi-select.
+  const writtenType = questionTypeMatch?.[1].toLowerCase().replace(/-/g, "_");
+  const questionType = writtenType === "question" ? "multiple_choice" : writtenType;
   if (questionType && questionType !== "multiple_choice" && questionType !== "poll" && questionType !== "open_response" && questionType !== "slide" && questionType !== "cover") {
     throw new QuizParseError(
       sourceFile,
