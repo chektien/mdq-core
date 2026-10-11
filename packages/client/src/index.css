@@ -5352,8 +5352,11 @@ html[data-theme="light"] .quiz-html a {
   border-radius: var(--mdq-code-radius);
   font-family: var(--font-mono);
 }
+/* No vertical padding: slide text is set at line-height 1.22, so a padded
+   chip was taller than its line and chips on wrapped lines overlapped.
+   Without it the chip, border included, stays inside its line. */
 .quiz-html :not(pre) > code {
-  padding: 0.15em 0.4em;
+  padding: 0 0.4em;
   font-size: 0.9em;
 }
 .quiz-html pre {
