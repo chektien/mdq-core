@@ -9,6 +9,17 @@ MDQ Core turns a markdown file into a live class session: sparse slides, quiz
 questions, polls, open responses, fold-out notes, live embedded demos, answer
 reveals, leaderboards, and printable PDF packets all come from the same deck.
 
+## How This Project Is Built
+
+MDQ Core is developed entirely through an AI-agent-driven workflow. We understand
+that this approach to open-source development may not be everyone's cup of tea,
+so we're highlighting it upfront for anyone considering using or contributing
+to the project.
+
+Our maintainers guide each iteration with care and remain responsible for the
+code. MDQ Core also serves as the foundation for [MDQ Cloud](https://mdqcloud.com),
+an upcoming commercial product.
+
 ## Demo
 
 https://github.com/user-attachments/assets/6ce84fce-3841-4ec1-979c-29df1631967e
