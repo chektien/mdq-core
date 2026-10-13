@@ -7956,14 +7956,44 @@ html:root[data-theme] .student-screen[data-deck-background="true"] .dist-row-she
 .slide-cover-block .slide-cover-meta :is(p, li) + :is(p, li) { margin-top: 0.3em; }
 .slide-cover-block .slide-cover-meta li::before { display: none; }
 .slide-cover-block .slide-cover-meta li::marker { content: ""; }
+/* Cover images below the title: one row whose height is a real share of the
+   slide and scales with --cover-fit, so the fit loop shrinks text and images
+   together and the title always stays on the slide. Each card fits its own
+   image, keeps its aspect ratio, never enlarges a small image, and shares the
+   row's width with its neighbours; a caption sits under its image. */
 .slide-cover-media {
+  --cover-media-height: calc(clamp(7rem, 40dvh, 34rem) * var(--cover-fit));
   display: flex;
   justify-content: center;
-  gap: 1em;
-  margin-top: 1em;
+  align-items: center;
+  gap: calc(clamp(0.75rem, 2.4cqi, 2.5rem) * var(--cover-fit));
+  margin-top: calc(1.6rem * var(--cover-fit));
 }
-.slide-cover-media .slide-media-figure { flex: 0 1 20%; min-width: 0; }
-.slide-cover-media img { max-height: 12dvh; object-fit: contain; }
+/* Four or more images wrap, three to a row, rather than squeezing into one. */
+.slide-cover-media:has(> :nth-child(4)) { flex-wrap: wrap; }
+.slide-cover-media .slide-media-figure {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: min(100%, var(--mdq-image-width, 100%));
+  padding: calc(clamp(0.42rem, 0.7cqi, 0.72rem) * var(--cover-fit));
+}
+.slide-cover-media:has(> :nth-child(4)) .slide-media-figure { flex: 0 1 30%; }
+.slide-cover-media .slide-media-expand-button {
+  width: auto;
+  height: auto;
+  max-width: 100%;
+  aspect-ratio: auto;
+}
+.slide-cover-media img {
+  width: auto;
+  height: auto;
+  max-width: 100%;
+  max-height: var(--cover-media-height);
+  object-fit: contain;
+}
+.slide-cover-media .slide-media-figure:has(figcaption) img {
+  max-height: calc(var(--cover-media-height) - 2.4em);
+}
 .slide-cover-background {
   position: absolute;
   inset: 0;
