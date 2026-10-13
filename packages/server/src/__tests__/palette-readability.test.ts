@@ -1,9 +1,8 @@
 import fs from "fs";
 import path from "path";
+import { DECK_PALETTES } from "@mdq/shared";
 
-// Table-driven readability contract for every palette in both themes (16
-// combinations): the classic look, gruvbox, Rosé Pine, Catppuccin, seoul256,
-// Ayu. Each block reads the shipped CSS, resolves the tokens
+// Table-driven readability contract for every palette in both themes: every palette from the shared registry. Each block reads the shipped CSS, resolves the tokens
 // a screen really uses in a combination and asserts WCAG contrast: text 4.5:1
 // and boundaries 3:1, measured against the worst stop of a gradient.
 
@@ -13,7 +12,7 @@ const theme = fs.readFileSync(path.join(clientSrc, "theme.css"), "utf-8");
 
 type Tokens = Record<string, string>;
 
-const PALETTES = ["classic", "gruvbox", "rose-pine", "catppuccin", "seoul256", "ayu", "tomorrow"] as const;
+const PALETTES = DECK_PALETTES;
 const MODES = ["dark", "light"] as const;
 type Palette = (typeof PALETTES)[number];
 type Mode = (typeof MODES)[number];

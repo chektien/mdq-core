@@ -67,7 +67,7 @@ describe("loadRuntimeConfig", () => {
   });
 
   it("accepts each supported palette from the file, case-insensitively", () => {
-    for (const name of ["classic", "gruvbox", "rose-pine", "catppuccin", "seoul256", "ayu", "tomorrow"]) {
+    for (const name of ["classic", "gruvbox", "rose-pine", "catppuccin", "seoul256", "ayu", "tomorrow", "nord-aurora"]) {
       const root = createRoot();
       fs.writeFileSync(path.join(root, "data", "config.json"), JSON.stringify({ palette: ` ${name.toUpperCase()} ` }));
       expect(loadRuntimeConfig({ rootDir: root, env: {} }).palette).toBe(name);

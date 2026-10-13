@@ -906,6 +906,112 @@ function renderTomorrowTokens(theme: PrintTheme): string {
     `;
 }
 
+// Nord Aurora mirrors the live Polar Night / Snow Storm adaptation with
+// Aurora accents. Adjusted text shades and the full upstream notice are kept.
+function renderNordAuroraTokens(theme: PrintTheme): string {
+  if (theme === "light") {
+    return `
+      /*! Nord palette (Nord Aurora adaptation)
+MIT License (MIT)
+
+Copyright (c) 2016-present Sven Greb <development@svengreb.de> (https://www.svengreb.de)
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+      */
+      --page-bg: #eceff4;
+      --ink: #2e3440;
+      --body: #3b4252;
+      --muted: #4c566a;
+      --line: rgba(59, 66, 82, 0.28);
+      --soft-line: rgba(59, 66, 82, 0.14);
+      --paper: #eceff4;
+      --wash: #e5e9f0;
+      --option-bg: #eceff4;
+      --media-bg: #d8dee9;
+      --accent: #604c5d;
+      --accent-soft: rgba(96, 76, 93, 0.1);
+      --teal: #604c5d;
+      --teal-line: rgba(96, 76, 93, 0.35);
+      --teal-soft: rgba(96, 76, 93, 0.09);
+      --amber: #71493c;
+      --amber-line: rgba(113, 73, 60, 0.38);
+      --amber-soft: rgba(113, 73, 60, 0.09);
+      --green: #46523c;
+      --on-green: #eceff4;
+      --green-line: rgba(70, 82, 60, 0.45);
+      --green-soft: rgba(70, 82, 60, 0.12);
+      --reference: #4c566a;
+      --shadow: rgba(46, 52, 64, 0.04);
+    `;
+  }
+
+  return `
+      /*! Nord palette (Nord Aurora adaptation)
+MIT License (MIT)
+
+Copyright (c) 2016-present Sven Greb <development@svengreb.de> (https://www.svengreb.de)
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+      */
+      --page-bg: #2e3440;
+      --ink: #e5e9f0;
+      --body: #e5e9f0;
+      --muted: #d8dee9;
+      --line: rgba(229, 233, 240, 0.32);
+      --soft-line: rgba(229, 233, 240, 0.16);
+      --paper: #3b4252;
+      --wash: #3b4252;
+      --option-bg: #3b4252;
+      --media-bg: #2e3440;
+      --accent: #d1bacd;
+      --accent-soft: rgba(209, 186, 205, 0.16);
+      --teal: #d1bacd;
+      --teal-line: rgba(209, 186, 205, 0.42);
+      --teal-soft: rgba(209, 186, 205, 0.12);
+      --amber: #ead0c6;
+      --amber-line: rgba(234, 208, 198, 0.42);
+      --amber-soft: rgba(234, 208, 198, 0.12);
+      --green: #c5d6b7;
+      --on-green: #2e3440;
+      --green-line: rgba(197, 214, 183, 0.46);
+      --green-soft: rgba(197, 214, 183, 0.16);
+      --reference: #d8dee9;
+      --shadow: rgba(0, 0, 0, 0.18);
+    `;
+}
+
 function printPageBackground(theme: PrintTheme, palette: PrintPalette): string {
   switch (palette) {
     case "gruvbox":
@@ -925,6 +1031,9 @@ function printPageBackground(theme: PrintTheme, palette: PrintPalette): string {
 
     case "tomorrow":
       return theme === "dark" ? "#1d1f21" : "#ffffff";
+
+    case "nord-aurora":
+      return theme === "dark" ? "#2e3440" : "#eceff4";
 
     case "classic":
       break;
@@ -951,6 +1060,9 @@ function renderThemeTokens(theme: PrintTheme, palette: PrintPalette): string {
 
     case "tomorrow":
       return renderTomorrowTokens(theme);
+
+    case "nord-aurora":
+      return renderNordAuroraTokens(theme);
 
     case "classic":
       break;
@@ -1548,7 +1660,7 @@ function renderStyles(
 
     .option-correct .option-label {
       background: var(--green);
-      color: #fff;
+      color: var(--on-green, #fff);
     }
 
     .option-text > :first-child {

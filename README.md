@@ -126,7 +126,7 @@ ID.
 Optional local runtime settings live in `data/config.json` (copy from
 `data/config.example.json`). The tracked example includes `theme`, which accepts
 `dark` or `light`, and `palette`, which accepts `classic` (the default),
-`gruvbox`, `rose-pine`, `catppuccin`, `seoul256`, `ayu`, or `tomorrow`.
+`gruvbox`, `rose-pine`, `catppuccin`, `seoul256`, `ayu`, `tomorrow`, or `nord-aurora`.
 `MDQ_PALETTE` overrides the file's `palette`.
 
 Individual decks can override those global fallbacks in the Markdown preamble:
@@ -148,11 +148,11 @@ global runtime theme. The PDF export theme remains controlled independently by
 its `--theme` command-line option.
 
 `palette` chooses the slide colours independently of the light/dark theme. It
-accepts `classic`, `gruvbox`, `rose-pine`, `catppuccin`, `seoul256`, `ayu`, or `tomorrow` (case-insensitive, with optional quotes); any other value is a
+accepts `classic`, `gruvbox`, `rose-pine`, `catppuccin`, `seoul256`, `ayu`, `tomorrow`, or `nord-aurora`
+(case-insensitive, with optional quotes); any other value is a
 deck parse error. Retired palette settings fall back to `classic` for
 compatibility without rewriting the saved Markdown. `classic` is MDQ's standard look. Every other palette applies
-in both the light and dark theme, and each theme uses one official variant of
-the upstream palette:
+in both the light and dark theme, using the upstream variants or the documented MDQ adaptation:
 
 | Palette | Light theme | Dark theme |
 | --- | --- | --- |
@@ -162,6 +162,7 @@ the upstream palette:
 | `seoul256` | seoul256 light | seoul256 dark |
 | `ayu` | Ayu Light | Ayu Dark |
 | `tomorrow` | Tomorrow (pure white) | Tomorrow Night |
+| `nord-aurora` | MDQ Nord Aurora on Snow Storm | MDQ Nord Aurora on Polar Night |
 
 Where an official colour is too faint to read as text, MDQ uses the nearest
 shade from the same palette, or darkens or lightens it slightly, so text stays
@@ -413,7 +414,7 @@ Options:
 - `--no-answers` hides correct answers and feedback. This is the default.
 - `--page-size A4|Letter` chooses the print page size. A4 is the default.
 - `--theme dark|light` chooses the PDF color theme. Dark is the default and recommended for submission packets that should preserve the original deck styling.
-- `--palette classic|gruvbox|rose-pine|catppuccin|seoul256|ayu|tomorrow` chooses the PDF color palette. It defaults to the deck's `palette:` setting, else `classic`.
+- `--palette classic|gruvbox|rose-pine|catppuccin|seoul256|ayu|tomorrow|nord-aurora` chooses the PDF color palette. It defaults to the deck's `palette:` setting, else `classic`.
 - `--title <title>` overrides the cover title.
 - `--html <file>` also writes the generated print HTML for visual debugging.
 
@@ -1004,6 +1005,12 @@ authors.
 | seoul256 | [junegunn/seoul256.vim](https://github.com/junegunn/seoul256.vim) | MIT |
 | Ayu | [ayu-theme/ayu-colors](https://github.com/ayu-theme/ayu-colors) | MIT |
 | Tomorrow | [chriskempson/tomorrow-theme](https://github.com/chriskempson/tomorrow-theme) | MIT |
+| Nord Aurora (MDQ adaptation) | [nordtheme/nord](https://github.com/nordtheme/nord) | MIT |
+
+Nord Aurora uses Nord’s neutral surfaces with Aurora-led accents. It is not an
+official Nord theme. Set `palette: nord-aurora` with `theme: light` or
+`theme: dark`. The full Nord notice is in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)
+and is included in browser and print styles.
 
 The colours are adapted. Where an upstream colour misses 4.5:1 for text or 3:1
 for a control boundary, MDQ uses a darker or lighter shade of the same hue, and

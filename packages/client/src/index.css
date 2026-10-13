@@ -1,5 +1,29 @@
 @import "tailwindcss";
 
+/*! Nord palette (Nord Aurora adaptation)
+MIT License (MIT)
+
+Copyright (c) 2016-present Sven Greb <development@svengreb.de> (https://www.svengreb.de)
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+*/
+
 @theme {
   --font-sans: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "IBM Plex Mono", ui-monospace, monospace;
@@ -771,6 +795,301 @@ html[data-palette="gruvbox"]:not([data-theme="light"]) .leaderboard-row.rank-sta
 
 html[data-palette="gruvbox"][data-theme="light"] .leaderboard-row.rank-standard {
   --leaderboard-rank-color: var(--mdq-muted);
+}
+
+/* ── Nord Aurora palette (deck palette: nord-aurora) ── */
+/* MDQ adaptation of nordtheme/nord (MIT, https://www.nordtheme.com/).
+   Polar Night #2e3440/#3b4252 and Snow Storm #eceff4/#e5e9f0 are the
+   surfaces. Aurora, rather than Frost blue, supplies the primary accents.
+   For AA text on the surfaces and tinted states, dark purple #b48ead to
+   #d1bacd, orange #d08770 to #ead0c6, green #a3be8c to #c5d6b7, red
+   #bf616a to #e7c4c8 (danger text #f0dadd) and Frost blue #81a1c1 to #b2c5d9 (info text #d0dde9) are lightened.
+   Light text darkens purple to #604c5d, orange to #71493c, yellow #ebcb8b
+   to #574b33, green to #46523c and red to #753b41. Neutral outlines use
+   #66758c (light) or #8c98ab (dark). This is not an official Nord variant.
+   Existing MDQ font, spacing, radius and semantic control layout remain.
+   The gentle surface gradient and status washes inherit MDQ's depth and
+   status cues; no new decorative gradient, glow or motion is introduced. */
+html[data-palette="nord-aurora"]:not([data-theme="light"]) {
+  --mdq-slide-bg: #2e3440;
+  --mdq-slide-bg-soft: #3b4252;
+  --mdq-slide-frame: rgba(229, 233, 240, 0.16);
+  --mdq-slide-heading: #ebcb8b;
+  --mdq-slide-ink: #e5e9f0;
+  --mdq-slide-ink-soft: #d8dee9;
+  --mdq-slide-eyebrow: #d8dee9;
+  --mdq-slide-rule: rgba(229, 233, 240, 0.16);
+  --mdq-slide-accent: #d1bacd;
+  --mdq-slide-accent-strong: #d1bacd;
+  --mdq-slide-accent-warm: #ead0c6;
+  --mdq-slide-accent-cool: #c5d6b7;
+  --mdq-slide-blue: #c5d6b7;
+  --mdq-slide-scene: #b2c5d9;
+  --mdq-slide-maroon: #ead0c6;
+  --mdq-slide-glass: #2e3440;
+  --mdq-slide-glass-strong: #2e3440;
+  --mdq-slide-glass-line: rgba(229, 233, 240, 0.16);
+  --mdq-note-attendee: #d1bacd;
+  --mdq-note-attendee-tint: rgba(209, 186, 205, 0.12);
+  --mdq-note-presenter: #ead0c6;
+  --mdq-note-presenter-tint: rgba(234, 208, 198, 0.12);
+  --mdq-panel-radius: 0.2rem;
+  --mdq-paper: #2e3440;
+  --mdq-paper-strong: #3b4252;
+  --mdq-card: rgba(59, 66, 82, 0.92);
+  --mdq-card-strong: #3b4252;
+  --mdq-dialog: #2e3440;
+  --mdq-line: rgba(229, 233, 240, 0.14);
+  --mdq-line-strong: rgba(229, 233, 240, 0.28);
+  --mdq-control-border: #8c98ab;
+  --mdq-ink: #e5e9f0;
+  --mdq-ink-strong: #eceff4;
+  --mdq-ink-soft: #e5e9f0;
+  --mdq-muted: #d8dee9;
+  --mdq-soft: #c0c8d4;
+  --mdq-accent: #d1bacd;
+  --mdq-accent-hover: #d1bacd;
+  --mdq-accent-text: #d1bacd;
+  --mdq-on-accent: #2e3440;
+  --mdq-accent-soft: rgba(209, 186, 205, 0.14);
+  --mdq-accent-soft-strong: rgba(209, 186, 205, 0.22);
+  --mdq-accent-ink: #eceff4;
+  --mdq-secondary: #c5d6b7;
+  --mdq-secondary-text: #c5d6b7;
+  --mdq-on-secondary: #2e3440;
+  --mdq-secondary-soft: rgba(197, 214, 183, 0.14);
+  --mdq-success: #c5d6b7;
+  --mdq-success-text: #c5d6b7;
+  --mdq-on-success: #2e3440;
+  --mdq-success-soft: rgba(197, 214, 183, 0.14);
+  --mdq-success-ink: #eceff4;
+  --mdq-success-line: #c5d6b7;
+  --mdq-warning: #ebcb8b;
+  --mdq-warning-text: #ebcb8b;
+  --mdq-on-warning: #2e3440;
+  --mdq-warning-soft: rgba(235, 203, 139, 0.14);
+  --mdq-warning-ink: #eceff4;
+  --mdq-danger: #e7c4c8;
+  --mdq-danger-text: #f0dadd;
+  --mdq-on-danger: #2e3440;
+  --mdq-danger-soft: rgba(231, 196, 200, 0.16);
+  --mdq-danger-ink: #eceff4;
+  --mdq-danger-line: #e7c4c8;
+  --mdq-info: #b2c5d9;
+  --mdq-info-text: #d0dde9;
+  --mdq-on-info: #2e3440;
+  --mdq-info-soft: rgba(178, 197, 217, 0.16);
+  --mdq-info-ink: #e5e9f0;
+  --mdq-info-line: #b2c5d9;
+  --mdq-bar: #d1bacd;
+  --mdq-on-bar: #2e3440;
+  --mdq-bar-muted: #c0c8d4;
+  --mdq-on-bar-muted: #2e3440;
+  --mdq-bar-wash: rgba(209, 186, 205, 0.26);
+  --mdq-timer-ok: #c5d6b7;
+  --mdq-timer-warn: #ebcb8b;
+  --mdq-timer-urgent: #e7c4c8;
+  --mdq-timer-track: #8c98ab;
+  background: #2e3440;
+}
+
+html[data-palette="nord-aurora"]:not([data-theme="light"]) body {
+  background: #2e3440;
+}
+
+html[data-palette="nord-aurora"]:not([data-theme="light"]) .slide-surface {
+  background: linear-gradient(180deg, #3b4252 0%, #2e3440 100%);
+}
+
+/* Bold text: theme.css colours .quiz-html strong per theme, which out-ranks
+   the slide rule, so name the Nord Aurora foreground explicitly. */
+html[data-palette="nord-aurora"]:not([data-theme="light"]) .slide-surface .quiz-html strong {
+  color: #eceff4;
+}
+
+/* Nord Aurora link on the white join QR panel (theme.css). */
+html[data-palette="nord-aurora"][data-theme="dark"] .instructor-qr-panel,
+html[data-palette="nord-aurora"][data-theme="light"] .instructor-qr-panel {
+  --mdq-qr-link: #46523c;
+}
+
+html[data-palette="nord-aurora"][data-theme="light"] {
+  --mdq-slide-bg: #eceff4;
+  --mdq-slide-bg-soft: #e5e9f0;
+  --mdq-slide-frame: rgba(59, 66, 82, 0.18);
+  --mdq-slide-heading: #2e3440;
+  --mdq-slide-ink: #3b4252;
+  --mdq-slide-ink-soft: #4c566a;
+  --mdq-slide-eyebrow: #4c566a;
+  --mdq-slide-rule: rgba(59, 66, 82, 0.18);
+  --mdq-slide-accent: #604c5d;
+  --mdq-slide-accent-strong: #604c5d;
+  --mdq-slide-accent-warm: #71493c;
+  --mdq-slide-accent-cool: #46523c;
+  --mdq-slide-blue: #46523c;
+  --mdq-slide-scene: #574b33;
+  --mdq-slide-maroon: #71493c;
+  --mdq-slide-glass: #d8dee9;
+  --mdq-slide-glass-strong: #d8dee9;
+  --mdq-slide-glass-line: rgba(59, 66, 82, 0.18);
+  --mdq-note-attendee: #604c5d;
+  --mdq-note-attendee-tint: rgba(96, 76, 93, 0.09);
+  --mdq-note-presenter: #71493c;
+  --mdq-note-presenter-tint: rgba(113, 73, 60, 0.09);
+  --mdq-panel-radius: 0.2rem;
+  --mdq-paper: #eceff4;
+  --mdq-paper-strong: #eceff4;
+  --mdq-card: rgba(236, 239, 244, 0.92);
+  --mdq-card-strong: #eceff4;
+  --mdq-dialog: #eceff4;
+  --mdq-field: #eceff4;
+  --mdq-line: rgba(59, 66, 82, 0.14);
+  --mdq-line-strong: rgba(59, 66, 82, 0.26);
+  --mdq-control-border: #66758c;
+  --mdq-ink: #3b4252;
+  --mdq-ink-strong: #2e3440;
+  --mdq-ink-soft: #3b4252;
+  --mdq-muted: #4c566a;
+  --mdq-soft: #4c566a;
+  --mdq-accent: #604c5d;
+  --mdq-accent-hover: #503f4d;
+  --mdq-accent-text: #604c5d;
+  --mdq-on-accent: #eceff4;
+  --mdq-accent-soft: rgba(96, 76, 93, 0.1);
+  --mdq-accent-soft-strong: rgba(96, 76, 93, 0.16);
+  --mdq-accent-ink: #503f4d;
+  --mdq-accent-wash: linear-gradient(135deg, #eceff4, #e5dfe7);
+  --mdq-secondary: #46523c;
+  --mdq-secondary-text: #46523c;
+  --mdq-on-secondary: #eceff4;
+  --mdq-secondary-soft: rgba(70, 82, 60, 0.1);
+  --mdq-success: #46523c;
+  --mdq-success-text: #46523c;
+  --mdq-on-success: #eceff4;
+  --mdq-success-soft: rgba(70, 82, 60, 0.12);
+  --mdq-success-ink: #384230;
+  --mdq-success-line: #46523c;
+  --mdq-success-wash: linear-gradient(135deg, #eceff4, #e0e7db);
+  --mdq-warning: #574b33;
+  --mdq-warning-text: #574b33;
+  --mdq-on-warning: #eceff4;
+  --mdq-warning-soft: rgba(87, 75, 51, 0.14);
+  --mdq-warning-ink: #453b28;
+  --mdq-danger: #753b41;
+  --mdq-danger-text: #753b41;
+  --mdq-on-danger: #eceff4;
+  --mdq-danger-soft: rgba(117, 59, 65, 0.1);
+  --mdq-danger-ink: #5e2f34;
+  --mdq-danger-line: #753b41;
+  --mdq-danger-wash: linear-gradient(135deg, #eceff4, #e9dde0);
+  --mdq-info: #46523c;
+  --mdq-info-text: #46523c;
+  --mdq-on-info: #eceff4;
+  --mdq-info-soft: rgba(70, 82, 60, 0.1);
+  --mdq-info-ink: #384230;
+  --mdq-info-line: #46523c;
+  --mdq-bar: #604c5d;
+  --mdq-on-bar: #eceff4;
+  --mdq-bar-muted: #4c566a;
+  --mdq-on-bar-muted: #eceff4;
+  --mdq-bar-wash: rgba(96, 76, 93, 0.16);
+  --mdq-timer-ok: #46523c;
+  --mdq-timer-warn: #574b33;
+  --mdq-timer-urgent: #753b41;
+  --mdq-timer-track: #66758c;
+  --mdq-rank-first: #574b33;
+  --mdq-rank-second: #3b4252;
+  --mdq-rank-third: #503f4d;
+  --mdq-page-glow-top: transparent;
+  --mdq-page-glow-cool: transparent;
+  --mdq-page-glow-warm: transparent;
+  background: #eceff4;
+}
+
+html[data-palette="nord-aurora"][data-theme="light"] .slide-surface {
+  background: linear-gradient(180deg, #eceff4 0%, #e5e9f0 100%);
+}
+
+html[data-palette="nord-aurora"][data-theme="light"] .slide-surface .quiz-html strong {
+  color: #2e3440;
+}
+
+/* The Nord Aurora light green and yellow text tokens sit just under 4.5:1 on
+   their own tinted pill over the lower slide gradient, so the pills use the
+   deeper ink shade. */
+html[data-palette="nord-aurora"][data-theme="light"] .slide-status-pill-success {
+  color: var(--mdq-success-ink);
+}
+
+html[data-palette="nord-aurora"][data-theme="light"] .slide-status-pill-warning {
+  color: var(--mdq-warning-ink);
+}
+
+
+/* The dark selection-mode card and chips carry classic purple and green in
+   their base rules; the light theme already reads the tokens. */
+html[data-palette="nord-aurora"]:not([data-theme="light"]) .selection-mode-card-single {
+  border-color: rgba(209, 186, 205, 0.34);
+  background: linear-gradient(135deg, #3b4252, #3b4252);
+}
+
+html[data-palette="nord-aurora"]:not([data-theme="light"]) .selection-mode-card-single::after {
+  background: rgba(209, 186, 205, 0.22);
+}
+
+html[data-palette="nord-aurora"]:not([data-theme="light"]) .selection-mode-card-multi {
+  border-color: rgba(197, 214, 183, 0.32);
+  background: linear-gradient(135deg, #3b4252, #3b4252);
+}
+
+html[data-palette="nord-aurora"]:not([data-theme="light"]) .selection-mode-card-multi::after {
+  background: rgba(197, 214, 183, 0.2);
+}
+
+html[data-palette="nord-aurora"]:not([data-theme="light"]) .selection-mode-label {
+  color: #eceff4;
+}
+
+html[data-palette="nord-aurora"]:not([data-theme="light"]) .selection-mode-text {
+  color: #d8dee9;
+}
+
+html[data-palette="nord-aurora"]:not([data-theme="light"]) .selection-mode-chip-single {
+  color: #d1bacd;
+  border-color: rgba(209, 186, 205, 0.4);
+  background: #2e3440;
+}
+
+html[data-palette="nord-aurora"]:not([data-theme="light"]) .selection-mode-chip-multi {
+  color: #c5d6b7;
+  border-color: rgba(197, 214, 183, 0.4);
+  background: #2e3440;
+}
+
+html[data-palette="nord-aurora"]:not([data-theme="light"]) .leaderboard-row.rank-first {
+  --leaderboard-rank-color: #ebcb8b;
+}
+
+html[data-palette="nord-aurora"]:not([data-theme="light"]) .leaderboard-row.rank-second {
+  --leaderboard-rank-color: #d8dee9;
+}
+
+html[data-palette="nord-aurora"]:not([data-theme="light"]) .leaderboard-row.rank-third {
+  --leaderboard-rank-color: #ead0c6;
+}
+
+/* Below the podium the row keeps a neutral tint, so fourth place does not
+   pick up the orange accent that third place uses. */
+html[data-palette="nord-aurora"]:not([data-theme="light"]) .leaderboard-row.rank-standard {
+  --leaderboard-rank-color: #d8dee9;
+}
+
+html[data-palette="nord-aurora"][data-theme="light"] .leaderboard-row.rank-standard {
+  --leaderboard-rank-color: var(--mdq-muted);
+}
+
+html[data-palette="nord-aurora"]:not([data-theme="light"]) .leaderboard-row.leaderboard-row-highlight.rank-third {
+  --leaderboard-rank-color: #ead0c6;
 }
 
 /* ── Rosé Pine palette (deck palette: rose-pine) ── */

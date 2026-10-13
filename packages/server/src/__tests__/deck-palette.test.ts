@@ -28,7 +28,7 @@ function deck(title: string, palette?: string, theme?: string): string {
   return `# ${title}\n${theme ? `theme: ${theme}\n` : ""}${palette ? `palette: ${palette}\n` : ""}${QUESTION}`;
 }
 
-const ALL_PALETTES = ["classic", "gruvbox", "rose-pine", "catppuccin", "seoul256", "ayu", "tomorrow"];
+const ALL_PALETTES = ["classic", "gruvbox", "rose-pine", "catppuccin", "seoul256", "ayu", "tomorrow", "nord-aurora"];
 
 describe("per-deck palette", () => {
   afterEach(() => clearAllSessions());
@@ -93,7 +93,7 @@ describe("per-deck palette", () => {
   it("reports invalid palette metadata at deck level", () => {
     const result = parseQuizMarkdown(deck("Invalid", "solarized"), "invalid.md");
     expect(result.errors.map((error) => error.detail)).toContain(
-      "Invalid palette: solarized (expected classic, gruvbox, rose-pine, catppuccin, seoul256, ayu, or tomorrow)",
+      "Invalid palette: solarized (expected classic, gruvbox, rose-pine, catppuccin, seoul256, ayu, tomorrow, or nord-aurora)",
     );
     // A near miss is still rejected, so only the exact hyphenated names work.
     for (const nearMiss of ["rosepine", "rose_pine", "mocha", ""]) {
