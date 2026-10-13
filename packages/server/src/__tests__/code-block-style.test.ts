@@ -39,7 +39,7 @@ it("keeps one fenced panel; every colour/border rule excludes its code child", (
   expect(css).toContain("--mdq-code-line-height: 1.45;");
 });
 
-const palettes = ["classic", "gruvbox", "rose-pine", "catppuccin", "seoul256", "ayu", "tokyo-night", "tomorrow"] as const;
+const palettes = ["classic", "gruvbox", "rose-pine", "catppuccin", "seoul256", "ayu", "tomorrow"] as const;
 const quiz = parseQuizMarkdown("# Sample\n\n---\n\n## Code\n\ntype: slide\n\nInline `value`.\n\n```js\nconst value = 1;\n```\n", "sample.md").quiz!;
 const luminance = (hex: string): number => {
   const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255)

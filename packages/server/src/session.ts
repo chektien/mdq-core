@@ -1,5 +1,5 @@
 import { availabilityPayload, sessionAvailabilityPhase } from "./availability";
-import { isSlideType } from "@mdq/shared";
+import { isSlideType, parseDeckPalette } from "@mdq/shared";
 import {
   Session,
   SessionState,
@@ -85,6 +85,12 @@ function restoreSessionValue(value: unknown): unknown {
 /** Restore a session previously returned by serializeSession. */
 export function deserializeSession(json: string): Session {
   const session = restoreSessionValue(JSON.parse(json)) as Session;
+  // Frozen decks saved before palette retirement must use the same fallback
+  // as newly parsed decks, without changing their saved source or progress.
+  if (session.deckSnapshot) {
+    const palette = parseDeckPalette(session.deckSnapshot.palette);
+    if (palette) session.deckSnapshot.palette = palette;
+  }
   // A session saved before public keys and labels existed gets them now.
   ensureParticipantIdentity(session);
   return session;

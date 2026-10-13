@@ -11,6 +11,17 @@ describe("loadRuntimeConfig", () => {
     return root;
   }
 
+  it("resolves the retired palette in saved config and environment overrides to classic", () => {
+    const root = createRoot();
+    const filename = path.join(root, "data", "config.json");
+    const configText = JSON.stringify({ palette: "tokyo-night", theme: "light" });
+    fs.writeFileSync(filename, configText);
+    expect(loadRuntimeConfig({ rootDir: root, env: {} }).palette).toBe("classic");
+    expect(fs.readFileSync(filename, "utf-8")).toBe(configText);
+    fs.writeFileSync(filename, JSON.stringify({ palette: "gruvbox" }));
+    expect(loadRuntimeConfig({ rootDir: root, env: { MDQ_PALETTE: " TOKYO-NIGHT " } }).palette).toBe("classic");
+  });
+
   it("uses existing defaults when config is absent", () => {
     const root = createRoot();
     const config = loadRuntimeConfig({ rootDir: root, env: {} });
@@ -56,7 +67,7 @@ describe("loadRuntimeConfig", () => {
   });
 
   it("accepts each supported palette from the file, case-insensitively", () => {
-    for (const name of ["classic", "gruvbox", "rose-pine", "catppuccin", "seoul256", "ayu", "tokyo-night", "tomorrow"]) {
+    for (const name of ["classic", "gruvbox", "rose-pine", "catppuccin", "seoul256", "ayu", "tomorrow"]) {
       const root = createRoot();
       fs.writeFileSync(path.join(root, "data", "config.json"), JSON.stringify({ palette: ` ${name.toUpperCase()} ` }));
       expect(loadRuntimeConfig({ rootDir: root, env: {} }).palette).toBe(name);
@@ -69,7 +80,7 @@ describe("loadRuntimeConfig", () => {
     expect(loadRuntimeConfig({ rootDir: root, env: {} }).palette).toBe("classic");
     fs.writeFileSync(path.join(root, "data", "config.json"), JSON.stringify({ palette: "ayu" }));
     expect(loadRuntimeConfig({ rootDir: root, env: { MDQ_PALETTE: "solarized" } }).palette).toBe("ayu");
-    expect(loadRuntimeConfig({ rootDir: root, env: { MDQ_PALETTE: "tokyo-night" } }).palette).toBe("tokyo-night");
+    expect(loadRuntimeConfig({ rootDir: root, env: { MDQ_PALETTE: "ayu" } }).palette).toBe("ayu");
   });
 
   it("lets environment variables override file config", () => {

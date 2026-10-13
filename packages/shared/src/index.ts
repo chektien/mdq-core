@@ -169,7 +169,6 @@ export const DECK_PALETTES = [
   "catppuccin",
   "seoul256",
   "ayu",
-  "tokyo-night",
   "tomorrow",
 ] as const;
 /** Slide color palette, chosen independently of the light/dark theme. */
@@ -180,10 +179,13 @@ export function isDeckPalette(value: unknown): value is DeckPalette {
   return typeof value === "string" && (DECK_PALETTES as readonly string[]).includes(value);
 }
 
-/** The palette named by `value` (case-insensitive, trimmed), or undefined when it is not a supported one. */
+/** Resolve a palette name, including retired names mapped to the standard look. */
 export function parseDeckPalette(value: unknown): DeckPalette | undefined {
   if (typeof value !== "string") return undefined;
   const normalized = value.trim().toLowerCase();
+  // Keep existing decks/configuration readable without retaining the retired
+  // theme's colours or offering it as a supported choice.
+  if (normalized === "tokyo-night") return "classic";
   return isDeckPalette(normalized) ? normalized : undefined;
 }
 

@@ -126,7 +126,7 @@ ID.
 Optional local runtime settings live in `data/config.json` (copy from
 `data/config.example.json`). The tracked example includes `theme`, which accepts
 `dark` or `light`, and `palette`, which accepts `classic` (the default),
-`gruvbox`, `rose-pine`, `catppuccin`, `seoul256`, `ayu`, `tokyo-night`, or `tomorrow`.
+`gruvbox`, `rose-pine`, `catppuccin`, `seoul256`, `ayu`, or `tomorrow`.
 `MDQ_PALETTE` overrides the file's `palette`.
 
 Individual decks can override those global fallbacks in the Markdown preamble:
@@ -140,7 +140,7 @@ palette: gruvbox
 ```
 
 Use any palette name from the list below in place of `gruvbox`, for example
-`palette: rose-pine` or `palette: tokyo-night`.
+`palette: rose-pine` or `palette: ayu`.
 
 `theme` accepts only `light` or `dark` (case-insensitive, with optional quotes).
 When it is omitted, every instructor, student, and projector view uses the
@@ -148,8 +148,9 @@ global runtime theme. The PDF export theme remains controlled independently by
 its `--theme` command-line option.
 
 `palette` chooses the slide colours independently of the light/dark theme. It
-accepts `classic`, `gruvbox`, `rose-pine`, `catppuccin`, `seoul256`, `ayu`, `tokyo-night`, or `tomorrow` (case-insensitive, with optional quotes); any other value is a
-deck parse error. `classic` is MDQ's standard look. Every other palette applies
+accepts `classic`, `gruvbox`, `rose-pine`, `catppuccin`, `seoul256`, `ayu`, or `tomorrow` (case-insensitive, with optional quotes); any other value is a
+deck parse error. Retired palette settings fall back to `classic` for
+compatibility without rewriting the saved Markdown. `classic` is MDQ's standard look. Every other palette applies
 in both the light and dark theme, and each theme uses one official variant of
 the upstream palette:
 
@@ -160,7 +161,6 @@ the upstream palette:
 | `catppuccin` | Catppuccin Latte | Catppuccin Mocha |
 | `seoul256` | seoul256 light | seoul256 dark |
 | `ayu` | Ayu Light | Ayu Dark |
-| `tokyo-night` | Tokyo Night Day | Tokyo Night (night style) |
 | `tomorrow` | Tomorrow (pure white) | Tomorrow Night |
 
 Where an official colour is too faint to read as text, MDQ uses the nearest
@@ -413,7 +413,7 @@ Options:
 - `--no-answers` hides correct answers and feedback. This is the default.
 - `--page-size A4|Letter` chooses the print page size. A4 is the default.
 - `--theme dark|light` chooses the PDF color theme. Dark is the default and recommended for submission packets that should preserve the original deck styling.
-- `--palette classic|gruvbox|rose-pine|catppuccin|seoul256|ayu|tokyo-night|tomorrow` chooses the PDF color palette. It defaults to the deck's `palette:` setting, else `classic`.
+- `--palette classic|gruvbox|rose-pine|catppuccin|seoul256|ayu|tomorrow` chooses the PDF color palette. It defaults to the deck's `palette:` setting, else `classic`.
 - `--title <title>` overrides the cover title.
 - `--html <file>` also writes the generated print HTML for visual debugging.
 
@@ -1003,14 +1003,12 @@ authors.
 | Catppuccin | [catppuccin/palette](https://github.com/catppuccin/palette) | MIT |
 | seoul256 | [junegunn/seoul256.vim](https://github.com/junegunn/seoul256.vim) | MIT |
 | Ayu | [ayu-theme/ayu-colors](https://github.com/ayu-theme/ayu-colors) | MIT |
-| Tokyo Night | [folke/tokyonight.nvim](https://github.com/folke/tokyonight.nvim) | Apache-2.0 |
 | Tomorrow | [chriskempson/tomorrow-theme](https://github.com/chriskempson/tomorrow-theme) | MIT |
 
 The colours are adapted. Where an upstream colour misses 4.5:1 for text or 3:1
 for a control boundary, MDQ uses a darker or lighter shade of the same hue, and
 the comment above each palette in `packages/client/src/index.css` names the
-change. The Apache-2.0 licence text is at
-<https://www.apache.org/licenses/LICENSE-2.0>.
+change.
 
 ## Disclaimer
 

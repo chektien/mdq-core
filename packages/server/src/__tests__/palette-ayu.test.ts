@@ -202,7 +202,7 @@ describe("Ayu palette", () => {
   }
 
   it("has print tokens for both themes that mirror the live palette", () => {
-    const print = printBlock("renderAyuTokens", "renderTokyoNightTokens");
+    const print = printBlock("renderAyuTokens", "renderTomorrowTokens");
     expect(print).not.toContain("TODO");
     expect(print).toContain("--page-bg: #10141c;");
     expect(print).toContain("--page-bg: #fcfcfc;");

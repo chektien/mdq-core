@@ -4,12 +4,12 @@ import path from "path";
 const clientSrc = path.resolve(__dirname, "..", "..", "..", "client", "src");
 const index = fs.readFileSync(path.join(clientSrc, "index.css"), "utf-8");
 
-const palettes = ["gruvbox", "rose-pine", "catppuccin", "seoul256", "ayu", "tokyo-night", "tomorrow"] as const;
+const palettes = ["gruvbox", "rose-pine", "catppuccin", "seoul256", "ayu", "tomorrow"] as const;
 type Theme = "dark" | "light";
 
 // Where each slide surface gradient ends: on the slide background or on the soft one.
 const endsOnSoft = new Set([
-  "gruvbox light", "rose-pine light", "catppuccin dark", "catppuccin light", "seoul256 dark", "ayu light", "tokyo-night dark",
+  "gruvbox light", "rose-pine light", "catppuccin dark", "catppuccin light", "seoul256 dark", "ayu light",
 ]);
 
 const body = (selector: string): string => {
@@ -36,7 +36,7 @@ describe("live page canvas", () => {
     expect(LIVE).toContain(":not(.slide-surface-student)");
   });
 
-  it("uses each palette surface's own end colour, for all fourteen palette and theme pairs", () => {
+  it("uses each palette surface's own end colour, for all remaining palette and theme pairs", () => {
     for (const palette of palettes) {
       for (const theme of ["dark", "light"] as const) {
         const tokens = body(headerFor(palette, theme));
@@ -60,7 +60,6 @@ describe("live page canvas", () => {
       'html:root[data-palette="catppuccin"][data-theme="light"]',
       'html:root[data-palette="catppuccin"]:not([data-theme="light"])',
       'html:root[data-palette="seoul256"]:not([data-theme="light"])',
-      'html:root[data-palette="tokyo-night"]:not([data-theme="light"])',
     ];
     const selectors = rule.slice(0, rule.indexOf(" {\n")).split(",\n");
     expect(selectors.map((selector) => selector.replace(`:has(${LIVE})`, ""))).toEqual(expected);

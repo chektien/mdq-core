@@ -18,7 +18,7 @@ Supported keys:
 - `quizDir`: legacy alias for `deckDir`
 - `instanceId`: stable label for this machine or classroom instance
 - `theme`: UI theme, `dark` by default, or set `light` to reuse the optional light palette
-- `palette`: slide colour palette, `classic` by default, or set `gruvbox`, `rose-pine`, `catppuccin`, `seoul256`, `ayu`, or `tokyo-night` (case-insensitive). Each non-classic palette uses one official variant per theme: Rosé Pine Dawn and Rosé Pine, Catppuccin Latte and Mocha, seoul256 light and dark, Ayu Light and Ayu Dark, Tokyo Night Day and Tokyo Night (night style). It applies in both themes, a deck's `palette:` preamble line overrides it, and the `MDQ_PALETTE` environment variable overrides the file value
+- `palette`: slide colour palette, `classic` by default, or set `gruvbox`, `rose-pine`, `catppuccin`, `seoul256`, or `ayu` (case-insensitive). Each non-classic palette uses one official variant per theme: Rosé Pine Dawn and Rosé Pine, Catppuccin Latte and Mocha, seoul256 light and dark, Ayu Light and Ayu Dark. It applies in both themes, a deck's `palette:` preamble line overrides it, and the `MDQ_PALETTE` environment variable overrides the file value
 - `autoGenerateStudentIds`: set `true` to ask students only for their name and generate a hidden student ID automatically. A deck whose header says `student-id: false` already asks for a name only and uses the name as the ID, so it never generates one, whether this is on or off
 
 Example:
