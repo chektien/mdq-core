@@ -96,7 +96,7 @@ describe(`${NAME} palette`, () => {
   });
 
   it("uses no !important in its rules", () => {
-    const start = css.indexOf(`/* ── Catppuccin palette (deck palette: ${NAME}) ── */`);
+    const start = css.indexOf(`/* ── Catppuccin palette (deck theme: ${NAME}) ── */`);
     const end = css.indexOf("/* ── ", start + 10);
     expect(start).toBeGreaterThan(0);
     expect(css.slice(start, end)).not.toContain("!important");

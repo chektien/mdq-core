@@ -20,7 +20,7 @@ interface PrintOptions {
   includeAnswers: boolean;
   pageSize: "A4" | "Letter";
   theme: PrintTheme;
-  /** Explicit --palette. When omitted, the deck palette (else classic) is used. */
+  /** Explicit --theme. When omitted, the deck palette (else classic) is used. */
   palette?: PrintPalette;
   title?: string;
   htmlOut?: string;
@@ -64,17 +64,17 @@ Options:
   --answers            Include correct-answer highlights and feedback.
   --no-answers         Hide correct answers and feedback. Default.
   --page-size <size>   A4 or Letter. Default: A4.
-  --theme <theme>      dark or light. Default: dark.
-  --palette <palette>  ${DECK_PALETTES.join(", ")}. Default: the deck's palette, else classic.
+  --dark <on|off>      Dark or light slides. Default: on.
+  --theme <scheme>     ${DECK_PALETTES.join(", ")}. Default: the deck's theme setting, else classic.
   --title <title>      Override the PDF cover title.
   --html <file>        Also write the generated print HTML for debugging.
   -h, --help           Show this help.
 
 Examples:
-  npm run print:pdf -- data/decks/week00.md --theme light --out exports/week00.pdf
-  npm run print:pdf -- data/decks/sample-session.md --theme dark --no-foldouts --page-size Letter
-  npm run print:pdf -- data/decks/sample-session.md --theme dark --answers --presenter-notes
-  npm run print:pdf -- data/decks/sample-session.md --theme light --palette gruvbox
+  npm run print:pdf -- data/decks/week00.md --dark off --out exports/week00.pdf
+  npm run print:pdf -- data/decks/sample-session.md --dark on --no-foldouts --page-size Letter
+  npm run print:pdf -- data/decks/sample-session.md --dark on --answers --presenter-notes
+  npm run print:pdf -- data/decks/sample-session.md --dark off --theme gruvbox
 `;
 }
 
@@ -86,7 +86,7 @@ function readValue(args: string[], index: number, flag: string): string {
   return value;
 }
 
-function parseArgs(argv: string[]): CliResult {
+export function parseArgs(argv: string[]): CliResult {
   let inputFile = "";
   let outputFile = "";
   let imagesDir = path.resolve("data/images");
@@ -160,21 +160,28 @@ function parseArgs(argv: string[]): CliResult {
       i++;
       continue;
     }
-    if (arg === "--theme") {
+    if (arg === "--dark") {
       const value = readValue(argv, i, arg);
       const normalized = value.toLowerCase();
-      if (normalized !== "dark" && normalized !== "light") {
-        throw new Error(`Unsupported theme "${value}". Use dark or light.`);
+      if (normalized !== "on" && normalized !== "off") {
+        throw new Error(`Unsupported dark "${value}". Use on or off.`);
       }
-      theme = normalized;
+      theme = normalized === "on" ? "dark" : "light";
       i++;
       continue;
     }
     if (arg === "--palette") {
+      throw new Error("--palette is not supported. Use --theme <scheme>.");
+    }
+    if (arg === "--theme") {
       const value = readValue(argv, i, arg);
+      const mode = value.trim().toLowerCase();
+      if (mode === "dark" || mode === "light") {
+        throw new Error(`Unsupported theme "${value}". Use --dark ${mode === "dark" ? "on" : "off"}.`);
+      }
       const normalized = parseDeckPalette(value);
       if (!normalized) {
-        throw new Error(`Unsupported palette "${value}". Use ${describeDeckPalettes()}.`);
+        throw new Error(`Unsupported theme "${value}". Use ${describeDeckPalettes()}.`);
       }
       palette = normalized;
       i++;

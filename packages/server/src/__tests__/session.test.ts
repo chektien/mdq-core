@@ -70,7 +70,7 @@ describe("Session Engine", () => {
   describe("session JSON round trips", () => {
     it("restores a frozen retired-palette deck as classic without changing the saved record", () => {
       const original = createSession("retired", "open");
-      const source = "# Retired\ntheme: light\npalette: classic\n\n---\n\n## Only\n\ntype: slide\n\nKept content.\n";
+      const source = "# Retired\ndark: off\ntheme: classic\n\n---\n\n## Only\n\ntype: slide\n\nKept content.\n";
       original.deckSnapshot = parseQuizMarkdown(source, "retired.md").quiz!;
       Object.assign(original.deckSnapshot, { palette: "tokyo-night" });
       const serialized = serializeSession(original);

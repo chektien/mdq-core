@@ -605,9 +605,9 @@ export function formatDiagnostic(diagnostic: ParseDiagnostic): string {
 export interface Quiz {
   week: string;
   title: string;
-  /** Optional per-deck color theme. The runtime theme remains the fallback. */
+  /** Optional per-deck mode from `dark: on|off`. The runtime theme remains the fallback. */
   theme?: DeckTheme;
-  /** Optional per-deck slide palette. The runtime palette remains the fallback. */
+  /** Optional per-deck colour scheme from `theme: <scheme>`. The runtime palette remains the fallback. */
   palette?: DeckPalette;
   /** Optional per-deck override. `false` disables globally enabled presenter notes. */
   presenterNotes?: boolean;

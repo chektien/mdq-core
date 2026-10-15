@@ -213,7 +213,7 @@ async function main() {
   const deckDir = path.join(tmp, "decks");
   fs.mkdirSync(deckDir);
   // A dark palette under a light deck background is the hard case for the controls, which must keep the palette's own colours.
-  const PALETTE = "theme: dark\npalette: ayu";
+  const PALETTE = "dark: on\ntheme: ayu";
   fs.writeFileSync(path.join(deckDir, "plain.md"), `# Plain deck\n${PALETTE}\n\n---\n\n${BODY}\n\n---\n`);
   fs.writeFileSync(path.join(deckDir, "styled.md"), `# Styled deck\n${PALETTE}\n${HEADER}\n\n---\n\n${BODY}\n\n---\n`);
   fs.writeFileSync(path.join(deckDir, "qplain.md"), `# Question plain\n${PALETTE}\n\n---\n\n${QUESTION}\n\n---\n`);

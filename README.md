@@ -133,28 +133,33 @@ Individual decks can override those global fallbacks in the Markdown preamble:
 
 ```markdown
 # My Deck
-theme: light
-palette: gruvbox
+theme: gruvbox
+dark: off
 
 ---
 ```
 
 Use any palette name from the list below in place of `gruvbox`, for example
-`palette: rose-pine` or `palette: ayu`.
+`theme: rose-pine` or `theme: ayu`.
 
-`theme` accepts only `light` or `dark` (case-insensitive, with optional quotes).
+`dark` accepts only `on` or `off` (case-insensitive, with optional quotes).
 When it is omitted, every instructor, student, and projector view uses the
-global runtime theme. The PDF export theme remains controlled independently by
-its `--theme` command-line option.
+global runtime theme. The PDF export mode is controlled independently by
+`--dark on|off`, defaulting to `on` even when the deck says `dark: off`.
 
-`palette` chooses the slide colours independently of the light/dark theme. It
+`theme` names the colour scheme independently of the light/dark mode. It
 accepts `classic`, `gruvbox`, `rose-pine`, `catppuccin`, `seoul256`, `ayu`, `tomorrow`, or `nord-aurora`
-(case-insensitive, with optional quotes); any other value is a
-deck parse error. Retired palette settings fall back to `classic` for
-compatibility without rewriting the saved Markdown. `classic` is MDQ's standard look. Every other palette applies
-in both the light and dark theme, using the upstream variants or the documented MDQ adaptation:
+(case-insensitive, with optional quotes); unknown values are deck parse errors.
+Retired scheme names already recognised by MDQ fall back to `classic`.
+`palette:` is not a deck setting, and `theme: light` and `theme: dark` are
+rejected; write `dark: off` and `dark: on` for the mode.
+These deck keys differ from operator configuration: `data/config.json` still
+uses `"theme": "dark"` or `"theme": "light"`, and `"palette": "<scheme>"`. The environment
+variables remain `MDQ_THEME` and `MDQ_PALETTE`.
+`classic` is MDQ's standard look. Every other scheme applies in both modes,
+using the upstream variants or the documented MDQ adaptation:
 
-| Palette | Light theme | Dark theme |
+| Colour scheme | `dark: off` | `dark: on` |
 | --- | --- | --- |
 | `gruvbox` | Gruvbox light accents on a neutral grey | Gruvbox dark |
 | `rose-pine` | Rosé Pine Dawn | Rosé Pine |
@@ -167,9 +172,9 @@ in both the light and dark theme, using the upstream variants or the documented 
 Where an official colour is too faint to read as text, MDQ uses the nearest
 shade from the same palette, or darkens or lightens it slightly, so text stays
 legible. Upstream sources and licences are listed under
-[Palette credits](#palette-credits). When `palette` is omitted, every instructor, student, and projector view
+[Palette credits](#palette-credits). When `theme` is omitted, every instructor, student, and projector view
 uses the global runtime palette. The PDF exporter follows the deck's palette
-unless you pass `--palette`.
+unless you pass `--theme`.
 
 Build and run the app:
 
@@ -277,8 +282,8 @@ Tip for classroom privacy and mobility: open Projector on the laptop, then keep 
 ### 2) instructor live surface controls
 
 - The deck picker shows each deck summary as separate quiz question and slide counts, for example `(22 questions, 17 slides)`.
-- The live surface uses the configured global presentation theme by default; a deck-level `theme: light` or `theme: dark` preamble setting overrides it for that session.
-- The slide palette works the same way: the configured global `palette` applies by default, and a deck-level `palette:` preamble setting (any of the seven palette names) overrides it for that session.
+- The live surface uses the configured global presentation theme by default; a deck-level `dark: on` or `dark: off` header setting overrides it for that session.
+- The slide palette works the same way: the configured global `palette` applies by default, and a deck-level `theme:` header setting (any of the eight scheme names) overrides it for that session.
 - `Prev` and `Next` stay pinned together near the top-left of the live surface so their click targets do not drift when other controls appear or disappear.
 - In live mode, `Next` includes the next item's markdown heading inside the button and `Prev` includes the previous item's heading, cut with an ellipsis when the two do not fit beside the other controls. In review mode, both stay plain buttons.
 - The slide's top padding follows the toolbar's measured height plus a gap of 1.4 rem, so the slide title stays clear of the buttons however the toolbar wraps or fills.
@@ -392,7 +397,7 @@ Export a full MDQ markdown deck as a clean PDF packet from the CLI:
 npm run print:pdf -- data/decks/week00.md --out exports/week00.pdf
 ```
 
-The exporter builds the shared/server packages, parses the same markdown used by live sessions, renders a print-specific HTML view in Chromium, then writes a mostly vector PDF with crisp text and proportionally scaled images. Dark mode is the default so exported decks keep the original MDQ color direction; use `--theme light` when you want a conventional ink-friendly handout.
+The exporter builds the shared/server packages, parses the same markdown used by live sessions, renders a print-specific HTML view in Chromium, then writes a mostly vector PDF with crisp text and proportionally scaled images. Dark mode is the default so exported decks keep the original MDQ color direction; use `--dark off` when you want a conventional ink-friendly handout.
 
 Printed decks hide correct-answer highlights, answer blocks, and feedback by default so submission/review packets do not become answer keys. Use `--answers` only when you intentionally need an instructor answer-key export.
 
@@ -413,18 +418,18 @@ Options:
 - `--answers` includes correct-answer highlights, answer blocks, and feedback for an answer-key packet.
 - `--no-answers` hides correct answers and feedback. This is the default.
 - `--page-size A4|Letter` chooses the print page size. A4 is the default.
-- `--theme dark|light` chooses the PDF color theme. Dark is the default and recommended for submission packets that should preserve the original deck styling.
-- `--palette classic|gruvbox|rose-pine|catppuccin|seoul256|ayu|tomorrow|nord-aurora` chooses the PDF color palette. It defaults to the deck's `palette:` setting, else `classic`.
+- `--dark on|off` chooses the PDF mode. Dark (`on`) is the default and recommended for submission packets that should preserve the original deck styling.
+- `--theme classic|gruvbox|rose-pine|catppuccin|seoul256|ayu|tomorrow|nord-aurora` chooses the PDF color palette. It defaults to the deck's `theme:` setting, else `classic`.
 - `--title <title>` overrides the cover title.
 - `--html <file>` also writes the generated print HTML for visual debugging.
 
 Examples:
 
 ```bash
-npm run print:pdf -- data/decks/sample-session.md --theme dark --no-foldouts
-npm run print:pdf -- data/decks/sample-session.md --theme dark --answers --presenter-notes
-npm run print:pdf -- data/decks/week00.md --theme light --page-size Letter --out exports/week00-letter.pdf
-npm run print:pdf -- data/decks/week00.md --theme light --palette gruvbox
+npm run print:pdf -- data/decks/sample-session.md --dark on --no-foldouts
+npm run print:pdf -- data/decks/sample-session.md --dark on --answers --presenter-notes
+npm run print:pdf -- data/decks/week00.md --dark off --page-size Letter --out exports/week00-letter.pdf
+npm run print:pdf -- data/decks/week00.md --dark off --theme gruvbox
 ```
 
 PDF images keep their source aspect ratio. MDQ only scales images down to fit the print layout, so portrait screenshots and wide diagrams are not stretched, cropped, or reframed.
@@ -435,8 +440,8 @@ A deck can change how its slides look from the header, in plain settings with no
 
 ```markdown
 # My Deck
-theme: light
-palette: gruvbox
+theme: gruvbox
+dark: off
 title-font-size: large
 body-font-size: large
 note-font-size: small
@@ -444,7 +449,7 @@ note-font-size: small
 ---
 ```
 
-If a file starts with `---`, it has no header, and MDQ looks for these keys anywhere in the file and takes the first line that matches, so keep them in a header. A deck without these keys looks exactly as it always did. The settings apply to question screens on the presenter and projector, to slides on the presenter, projector and phone, and to the phone's own question and result screens. Theme and palette work as before, and the colour settings below replace the palette's own colours where a deck sets them. `text-color`, `muted-color` and `accent-color` colour the slide's own content and the text that sits straight on the background of a question screen, such as the question, the closed label, the no-votes note, the timer count and the explanation. The answer panels keep their own fills, and correct answers keep their green. The toolbar buttons, status labels that have their own fill and the join card keep the palette's colours, so they stay readable on their own fills. The plain status label and the slide counter follow the deck colours, and the timer count does too until time runs low, when it keeps the ring's warning colour. `background-color` also colours the page behind the slide, and `surface-color` alone leaves that page on the palette's own background, which is where the slide ends.
+If a file starts with `---`, it has no header: `theme:` and `dark:` have no effect. The other appearance settings below retain their existing whole-file fallback in that case, so keep them in a header. A deck without these keys looks exactly as it always did. The settings apply to question screens on the presenter and projector, to slides on the presenter, projector and phone, and to the phone's own question and result screens. `theme:` names the colour scheme and `dark:` selects the mode; both are read only above the first `---`. The colour settings below replace the palette's own colours where a deck sets them. `text-color`, `muted-color` and `accent-color` colour the slide's own content and the text that sits straight on the background of a question screen, such as the question, the closed label, the no-votes note, the timer count and the explanation. The answer panels keep their own fills, and correct answers keep their green. The toolbar buttons, status labels that have their own fill and the join card keep the palette's colours, so they stay readable on their own fills. The plain status label and the slide counter follow the deck colours, and the timer count does too until time runs low, when it keeps the ring's warning colour. `background-color` also colours the page behind the slide, and `surface-color` alone leaves that page on the palette's own background, which is where the slide ends.
 
 A value is a preset word, a plain length, or a colour, and nothing else. A length is a number with a unit, such as `4rem`, `18px`, `1.5em`, `60ch` or `80%`, and each setting below lists the units it takes. A colour is a CSS colour name such as `teal` or `navy`, or a hex colour such as `#0f766e` or `#0af`. Functions (`rgb()`, `var()`, `calc()`, `url()`), semicolons, braces and angle brackets are never accepted. A value that does not fit is ignored, never applied. It is reported as a note that gives its place (`header, line 2`), the key, the value and what is allowed. The server and the print command log it, and the instructor's deck list shows it under the deck:
 
@@ -1008,8 +1013,8 @@ authors.
 | Nord Aurora (MDQ adaptation) | [nordtheme/nord](https://github.com/nordtheme/nord) | MIT |
 
 Nord Aurora uses Nord’s neutral surfaces with Aurora-led accents. It is not an
-official Nord theme. Set `palette: nord-aurora` with `theme: light` or
-`theme: dark`. The full Nord notice is in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)
+official Nord theme. Set `theme: nord-aurora` with `dark: off` or
+`dark: on`. The full Nord notice is in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)
 and is included in browser and print styles.
 
 The colours are adapted. Where an upstream colour misses 4.5:1 for text or 3:1

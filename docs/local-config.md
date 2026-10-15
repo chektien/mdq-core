@@ -10,6 +10,10 @@ cp data/config.example.json data/config.json
 
 Then edit the values you want. If `data/config.json` is missing, mdq keeps the existing defaults.
 
+These are operator settings: `theme` / `MDQ_THEME` still select `dark` or `light`,
+and `palette` / `MDQ_PALETTE` still select a colour scheme. Deck headers use
+`dark: on|off` and `theme: <scheme>` instead; `palette:` is refused in decks.
+
 Supported keys:
 
 - `port`: server port, defaults to `3000`
@@ -18,7 +22,7 @@ Supported keys:
 - `quizDir`: legacy alias for `deckDir`
 - `instanceId`: stable label for this machine or classroom instance
 - `theme`: UI theme, `dark` by default, or set `light` to reuse the optional light palette
-- `palette`: slide colour palette, `classic` by default, or set `gruvbox`, `rose-pine`, `catppuccin`, `seoul256`, `ayu`, `tomorrow`, or `nord-aurora` (case-insensitive). Non-classic palettes use upstream variants or the documented MDQ adaptation: Rosé Pine Dawn and Rosé Pine, Catppuccin Latte and Mocha, seoul256 light and dark, Ayu Light and Ayu Dark; Tomorrow Light and Tomorrow Night; Nord Aurora combines Snow Storm light or Polar Night dark surfaces with Aurora accents and contrast-adjusted text (an MDQ adaptation). It applies in both themes, a deck's `palette:` preamble line overrides it, and the `MDQ_PALETTE` environment variable overrides the file value
+- `palette`: slide colour palette, `classic` by default, or set `gruvbox`, `rose-pine`, `catppuccin`, `seoul256`, `ayu`, `tomorrow`, or `nord-aurora` (case-insensitive). Non-classic palettes use upstream variants or the documented MDQ adaptation: Rosé Pine Dawn and Rosé Pine, Catppuccin Latte and Mocha, seoul256 light and dark, Ayu Light and Ayu Dark; Tomorrow Light and Tomorrow Night; Nord Aurora combines Snow Storm light or Polar Night dark surfaces with Aurora accents and contrast-adjusted text (an MDQ adaptation). It applies in both themes, a deck's `theme:` preamble line overrides it, and the `MDQ_PALETTE` environment variable overrides the file value
 - `autoGenerateStudentIds`: set `true` to ask students only for their name and generate a hidden student ID automatically. A deck whose header says `student-id: false` already asks for a name only and uses the name as the ID, so it never generates one, whether this is on or off
 
 Example:

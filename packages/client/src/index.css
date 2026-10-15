@@ -505,7 +505,7 @@ html[data-theme="light"] .slide-surface::after {
   touch-action: pan-y pinch-zoom;
 }
 
-/* ── Slide palettes (deck `palette:` key) ──────────
+/* ── Slide palettes (deck `theme:` key) ──────────
    `classic` adds no rules: it is the look defined above. `gruvbox` follows
    the morhetz/gruvbox palette (MIT/X11, https://github.com/morhetz/gruvbox).
    The light variant puts Gruvbox's faded accents on a neutral concrete grey
@@ -797,7 +797,7 @@ html[data-palette="gruvbox"][data-theme="light"] .leaderboard-row.rank-standard 
   --leaderboard-rank-color: var(--mdq-muted);
 }
 
-/* ── Nord Aurora palette (deck palette: nord-aurora) ── */
+/* ── Nord Aurora palette (deck theme: nord-aurora) ── */
 /* MDQ adaptation of nordtheme/nord (MIT, https://www.nordtheme.com/).
    Polar Night #2e3440/#3b4252 and Snow Storm #eceff4/#e5e9f0 are the
    surfaces. Aurora, rather than Frost blue, supplies the primary accents.
@@ -1092,7 +1092,7 @@ html[data-palette="nord-aurora"]:not([data-theme="light"]) .leaderboard-row.lead
   --leaderboard-rank-color: #ead0c6;
 }
 
-/* ── Rosé Pine palette (deck palette: rose-pine) ── */
+/* ── Rosé Pine palette (deck theme: rose-pine) ── */
 /* The -ink tokens and rank colours are darker (light) or lighter (dark)
    shades of the named accents, so they are not listed one by one. */
 /* Rosé Pine follows the rose-pine/rose-pine-palette colours (MIT,
@@ -1395,7 +1395,7 @@ html[data-palette="rose-pine"][data-theme="light"] .leaderboard-row.rank-standar
   --leaderboard-rank-color: #5d5a73;
 }
 
-/* ── Catppuccin palette (deck palette: catppuccin) ── */
+/* ── Catppuccin palette (deck theme: catppuccin) ── */
 /* The -ink tokens and rank colours are darker (light) or lighter (dark)
    shades of the named accents, so they are not listed one by one. */
 /* Catppuccin follows the catppuccin/palette colours (MIT,
@@ -1693,7 +1693,7 @@ html[data-palette="catppuccin"][data-theme="light"] .leaderboard-row.rank-standa
   --leaderboard-rank-color: #525465;
 }
 
-/* ── seoul256 palette (deck palette: seoul256) ── */
+/* ── seoul256 palette (deck theme: seoul256) ── */
 /* The -ink tokens and rank colours are darker (light) or lighter (dark)
    shades of the named accents, so they are not listed one by one. */
 /* seoul256 follows Junegunn Choi's seoul256.vim colour scheme (MIT, as stated
@@ -1983,7 +1983,7 @@ html[data-palette="seoul256"][data-theme="light"] .leaderboard-row.rank-standard
   --leaderboard-rank-color: var(--mdq-muted);
 }
 
-/* ── Ayu palette (deck palette: ayu) ── */
+/* ── Ayu palette (deck theme: ayu) ── */
 /* The -ink tokens and rank colours are darker (light) or lighter (dark)
    shades of the named accents, so they are not listed one by one. */
 /* Ayu follows the ayu-colors themes by the Ayu theme authors (MIT,
@@ -2269,7 +2269,7 @@ html[data-palette="ayu"][data-theme="light"] .leaderboard-row.rank-standard {
   --leaderboard-rank-color: var(--mdq-muted);
 }
 
-/* Tomorrow (deck palette: tomorrow)
+/* Tomorrow (deck theme: tomorrow)
    Chris Kempson, https://github.com/chriskempson/tomorrow-theme, MIT.
    Tomorrow light is flat pure white; dark uses Tomorrow Night.
    Readability shades: blue #4271ae to #38649e, green #718c00 to #526600,

@@ -14,7 +14,7 @@ const { getSession, clearAllSessions } = require('../packages/server/dist/sessio
 const root = path.resolve(import.meta.dirname, '..');
 const out = process.env.MDQ_PACING_SCREENSHOT_DIR;
 const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'mdq-pacing-browser-'));
-await fs.writeFile(path.join(dir, 'synthetic.md'), '# Synthetic pacing\ntheme: light\n---\n## Timed question\ntime-limit: 900\nChoose.\nA. One\nB. Two\n> Correct Answer: A\n---\n## Untimed question\ntime-limit: none\nChoose.\nA. One\nB. Two\n> Correct Answer: B\n');
+await fs.writeFile(path.join(dir, 'synthetic.md'), '# Synthetic pacing\ndark: off\n---\n## Timed question\ntime-limit: 900\nChoose.\nA. One\nB. Two\n> Correct Answer: A\n---\n## Untimed question\ntime-limit: none\nChoose.\nA. One\nB. Two\n> Correct Answer: B\n');
 const originalPassword = process.env.INSTRUCTOR_PASSWORD, originalKey = process.env.INSTRUCTOR_KEY;
 delete process.env.INSTRUCTOR_PASSWORD; delete process.env.INSTRUCTOR_KEY;
 let io, browser;

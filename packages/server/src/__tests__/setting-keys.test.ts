@@ -78,5 +78,8 @@ describe("dashed setting keys", () => {
     expect(DECK_SETTING_KEYS.every((key) => /^[a-z]+(-[a-z]+)*$/.test(key))).toBe(true);
     expect(DECK_SETTING_KEYS).toContain("presenter-notes-default-open");
     expect(DECK_SETTING_KEYS).toContain("slide-background-size");
+    expect(DECK_SETTING_KEYS).toContain("theme");
+    expect(DECK_SETTING_KEYS).toContain("dark");
+    expect(DECK_SETTING_KEYS).not.toContain("palette");
   });
 });

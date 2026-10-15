@@ -57,7 +57,7 @@ describe("deck header appearance settings", () => {
   });
 
   it("gives a deck without the keys no style at all", () => {
-    const { quiz, errors } = parse("theme: light\npalette: gruvbox");
+    const { quiz, errors } = parse("dark: off\ntheme: gruvbox");
     expect(errors).toEqual([]);
     expect(quiz!.style).toBeUndefined();
     expect(quiz!.styleSettings).toBeUndefined();
@@ -239,7 +239,7 @@ describe("deck header appearance settings", () => {
     });
 
     it("reads them beside theme and palette without changing either", () => {
-      const { quiz, errors } = parse("theme: light\npalette: gruvbox\naccent-color: teal");
+      const { quiz, errors } = parse("dark: off\ntheme: gruvbox\naccent-color: teal");
       expect(errors).toEqual([]);
       expect(quiz!.theme).toBe("light");
       expect(quiz!.palette).toBe("gruvbox");
@@ -315,7 +315,7 @@ describe("deck header appearance settings", () => {
     it("still lists the deck and reports the ignored setting with it", async () => {
       const quizDir = fs.mkdtempSync(path.join(os.tmpdir(), "mdq-style-"));
       fs.writeFileSync(path.join(quizDir, "styled.md"), deck("title-size: huge\nbody-size: large"));
-      fs.writeFileSync(path.join(quizDir, "plain.md"), deck("theme: light").replace("# Style deck", "# Plain deck"));
+      fs.writeFileSync(path.join(quizDir, "plain.md"), deck("dark: off").replace("# Style deck", "# Plain deck"));
       const warn = jest.spyOn(console, "warn").mockImplementation(() => undefined);
       try {
         const app = createApp({ quizDir });
@@ -349,7 +349,7 @@ describe("deck header appearance settings", () => {
     });
 
     it("leaves the field out for a deck without the keys", () => {
-      expect("deckStyle" in opened("theme: light")).toBe(false);
+      expect("deckStyle" in opened("dark: off")).toBe(false);
     });
   });
 

@@ -76,7 +76,7 @@ describe("Nord Aurora palette", () => {
   });
 
   it("credits the upstream palette and names its adjusted shades", () => {
-    const start = index.indexOf(`deck palette: ${NAME})`);
+    const start = index.indexOf(`deck theme: ${NAME})`);
     const header = index.slice(start, index.indexOf(DARK, start));
     expect(header).toContain("nordtheme/nord");
     expect(header).toContain("MIT");
@@ -237,7 +237,7 @@ function declarations(body: string): Record<string, string> {
 
 // Verify the real export path, rather than only the source token strings.
 it.each(["dark", "light"] as const)("exports a Nord Aurora %s deck with its upstream notice", (mode) => {
-  const markdown = `# Aurora sample\ntheme: ${mode}\npalette: nord-aurora\n\n---\n\n## Readable content\ntype: slide\n\nBody with **emphasis** and a [reference](https://www.nordtheme.com/).\n`;
+  const markdown = `# Aurora sample\ndark: ${mode === "dark" ? "on" : "off"}\ntheme: nord-aurora\n\n---\n\n## Readable content\ntype: slide\n\nBody with **emphasis** and a [reference](https://www.nordtheme.com/).\n`;
   const parsed = parseQuizMarkdown(markdown, "aurora.md");
   expect(parsed.errors).toEqual([]);
   expect(parsed.quiz?.palette).toBe("nord-aurora");
@@ -252,7 +252,7 @@ it.each(["dark", "light"] as const)("exports a Nord Aurora %s deck with its upst
 });
 
 it.each(["dark", "light"] as const)("keeps correct-answer labels readable in actual %s print HTML", (mode) => {
-  const quiz = parseQuizMarkdown("# Aurora\npalette: nord-aurora\n\n---\n\n## Check\nWhat stays portable?\n\nA. Markdown\nB. Nothing\n\n> Correct Answer: A\n", "check.md").quiz!;
+  const quiz = parseQuizMarkdown("# Aurora\ntheme: nord-aurora\n\n---\n\n## Check\nWhat stays portable?\n\nA. Markdown\nB. Nothing\n\n> Correct Answer: A\n", "check.md").quiz!;
   const html = buildHtml(quiz, { inputFile: "/tmp/check.md", outputFile: "/tmp/check.pdf", imagesDir: "/tmp",
     includeFoldouts: true, includePresenterNotes: false, includeAnswers: true, pageSize: "A4", theme: mode });
   expect(html).toContain("option-correct");

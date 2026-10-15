@@ -25,7 +25,7 @@ B. No
 `;
 
 function deck(title: string, palette?: string, theme?: string): string {
-  return `# ${title}\n${theme ? `theme: ${theme}\n` : ""}${palette ? `palette: ${palette}\n` : ""}${QUESTION}`;
+  return `# ${title}\n${theme ? `dark: ${theme === "dark" ? "on" : "off"}\n` : ""}${palette ? `theme: ${palette}\n` : ""}${QUESTION}`;
 }
 
 const ALL_PALETTES = ["classic", "gruvbox", "rose-pine", "catppuccin", "seoul256", "ayu", "tomorrow", "nord-aurora"];
@@ -84,7 +84,7 @@ describe("per-deck palette", () => {
   });
 
   it("only reads palette from the deck preamble", () => {
-    const markdown = `# Body only\n${QUESTION.replace("**Ready?**", "palette: gruvbox\n\n**Ready?**")}`;
+    const markdown = `# Body only\n${QUESTION.replace("**Ready?**", "theme: gruvbox\n\n**Ready?**")}`;
     const result = parseQuizMarkdown(markdown, "body.md");
     expect(result.errors).toEqual([]);
     expect(result.quiz?.palette).toBeUndefined();
@@ -93,15 +93,15 @@ describe("per-deck palette", () => {
   it("reports invalid palette metadata at deck level", () => {
     const result = parseQuizMarkdown(deck("Invalid", "solarized"), "invalid.md");
     expect(result.errors.map((error) => error.detail)).toContain(
-      "Invalid palette: solarized (expected classic, gruvbox, rose-pine, catppuccin, seoul256, ayu, tomorrow, or nord-aurora)",
+      "Invalid theme: solarized (expected classic, gruvbox, rose-pine, catppuccin, seoul256, ayu, tomorrow, or nord-aurora)",
     );
     // A near miss is still rejected, so only the exact hyphenated names work.
     for (const nearMiss of ["rosepine", "rose_pine", "mocha", ""]) {
       const rejected = parseQuizMarkdown(deck("Near miss", nearMiss || "''"), "near-miss.md");
-      expect(rejected.errors.some((error) => error.detail.startsWith("Invalid palette"))).toBe(true);
+      expect(rejected.errors.some((error) => error.detail.startsWith("Invalid theme"))).toBe(true);
       expect(rejected.quiz?.palette).toBeUndefined();
     }
-    expect(result.errors.find((error) => error.detail.startsWith("Invalid palette"))?.questionIndex).toBe(-1);
+    expect(result.errors.find((error) => error.detail.startsWith("Invalid theme"))?.questionIndex).toBe(-1);
   });
 
   it("defaults the runtime palette to classic and accepts MDQ_PALETTE", () => {
@@ -203,8 +203,8 @@ describe("print exporter palette", () => {
     expect(printSource).not.toMatch(/tokyo.?night|folke\/tokyonight/i);
   });
 
-  it("accepts every palette through --palette and defaults to the deck palette", () => {
-    expect(printSource).toContain('arg === "--palette"');
+  it("accepts every palette through --theme and defaults to the deck palette", () => {
+    expect(printSource).toContain('arg === "--theme"');
     expect(printSource).toContain("parseDeckPalette(value)");
     expect(printSource).toContain("Use ${describeDeckPalettes()}.");
     expect(printSource).toContain('options.palette ?? quiz.palette ?? "classic"');

@@ -77,8 +77,9 @@ export function parseQuizMarkdown(source: string, sourceFile: string): ParseResu
   const diagnostics: ParseDiagnostic[] = [];
 
   const title = extractDeckTitle(markdown);
-  const theme = extractDeckThemeMetadata(markdown, sourceFile, errors);
-  const palette = extractDeckPaletteMetadata(markdown, sourceFile, errors);
+  const theme = extractDeckDarkMetadata(markdown, sourceFile, errors);
+  const palette = extractDeckSchemeMetadata(markdown, sourceFile, errors);
+  rejectDeckPaletteMetadata(markdown, sourceFile, errors);
   const presenterNotes = extractDeckBooleanMetadata(markdown, "presenter_notes", sourceFile, errors);
   const presenterNotesDefaultOpen = extractDeckBooleanMetadata(
     markdown,
@@ -203,52 +204,60 @@ function stripOptionalQuotes(value: string): string {
   return trimmed;
 }
 
-function extractDeckThemeMetadata(
+function extractDeckDarkMetadata(
   markdown: string,
   sourceFile: string,
   errors: QuizParseError[],
 ): DeckTheme | undefined {
-  const preamble = markdown.split(/^---+\s*$/m, 1)[0] || markdown;
-  const match = preamble.match(/^theme:\s*(.*?)\s*$/im);
+  const preamble = markdown.split(/^---+\s*$/m, 1)[0];
+  const match = preamble.match(/^dark:[ \t]*(.*?)[ \t\r]*$/im);
   if (!match) return undefined;
 
   const value = stripOptionalQuotes(match[1]).toLowerCase();
-  if (value === "dark" || value === "light") return value;
+  if (value === "on") return "dark";
+  if (value === "off") return "light";
 
   const lineNumber = preamble.slice(0, match.index).split("\n").length;
-  errors.push(
-    new QuizParseError(
-      sourceFile,
-      -1,
-      `Invalid theme: ${match[1].trim()} (expected dark or light)`,
-      lineNumber,
-    ),
-  );
+  errors.push(new QuizParseError(
+    sourceFile, -1, `Invalid dark: ${match[1].trim()} (expected on or off)`, lineNumber,
+  ));
   return undefined;
 }
 
-function extractDeckPaletteMetadata(
+function extractDeckSchemeMetadata(
   markdown: string,
   sourceFile: string,
   errors: QuizParseError[],
 ): DeckPalette | undefined {
-  const preamble = markdown.split(/^---+\s*$/m, 1)[0] || markdown;
-  const match = preamble.match(/^palette:\s*(.*?)\s*$/im);
+  const preamble = markdown.split(/^---+\s*$/m, 1)[0];
+  const match = preamble.match(/^theme:[ \t]*(.*?)[ \t\r]*$/im);
   if (!match) return undefined;
 
-  const palette = parseDeckPalette(stripOptionalQuotes(match[1]));
+  const value = stripOptionalQuotes(match[1]);
+  const palette = parseDeckPalette(value);
   if (palette) return palette;
 
+  const mode = value.toLowerCase();
+  const detail = mode === "dark" || mode === "light"
+    ? `Invalid theme: ${match[1].trim()} (write dark: ${mode === "dark" ? "on" : "off"})`
+    : `Invalid theme: ${match[1].trim()} (expected ${describeDeckPalettes()})`;
   const lineNumber = preamble.slice(0, match.index).split("\n").length;
-  errors.push(
-    new QuizParseError(
-      sourceFile,
-      -1,
-      `Invalid palette: ${match[1].trim()} (expected ${describeDeckPalettes()})`,
-      lineNumber,
-    ),
-  );
+  errors.push(new QuizParseError(sourceFile, -1, detail, lineNumber));
   return undefined;
+}
+
+function rejectDeckPaletteMetadata(
+  markdown: string,
+  sourceFile: string,
+  errors: QuizParseError[],
+): void {
+  const preamble = markdown.split(/^---+\s*$/m, 1)[0];
+  for (const match of preamble.matchAll(/^palette:[^\n]*$/gim)) {
+    const lineNumber = preamble.slice(0, match.index).split("\n").length;
+    errors.push(new QuizParseError(
+      sourceFile, -1, "palette: is not a deck setting (write theme: <scheme>)", lineNumber,
+    ));
+  }
 }
 
 function extractDeckBooleanMetadata(

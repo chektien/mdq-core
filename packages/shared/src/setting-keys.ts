@@ -8,6 +8,7 @@ import { DECK_STYLE_KEYS } from "./deck-style";
 export const DECK_SETTING_KEYS: readonly string[] = [
   "title",
   "theme",
+  "dark",
   "presenter-notes",
   "presenter-notes-default-open",
   "participant-id",
