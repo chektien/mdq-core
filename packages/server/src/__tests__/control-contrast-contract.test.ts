@@ -62,12 +62,16 @@ describe("control contrast contract", () => {
   it("sizes the timer count to fit inside the ring", () => {
     expect(timerLabel(119)).toBe("1:59");
     expect(timerLabel(59)).toBe("59");
-    // The student ring shrinks m:ss to fit, the projector sizes keep theirs.
-    expect(timerFontSize(64, "1:59")).toBeCloseTo(14.67, 2);
-    expect(timerFontSize(64, "59")).toBeCloseTo(20.48, 2);
-    expect(timerFontSize(120, "1:59")).toBeCloseTo(31.2, 2);
-    expect(timerFontSize(140, "5:00")).toBeCloseTo(36.4, 2);
-    expect(timerFontSize(64, "10:00")).toBeLessThan(timerFontSize(64, "1:59"));
+    // At every call-site diameter (plus the component default), the whole
+    // text rectangle fits inside the inner circle with 25% breathing room.
+    for (const size of [64, 120, 140]) {
+      for (const label of ["1:20", "10:00", "59"]) {
+        const fontSize = timerFontSize(size, label);
+        expect(fontSize).toBeGreaterThan(0);
+        expect(Math.hypot(label.length * 0.65 * fontSize, fontSize)).toBeLessThanOrEqual((size - 20) * 0.75 + 0.001);
+      }
+      expect(timerFontSize(size, "10:00")).toBeLessThan(timerFontSize(size, "1:20"));
+    }
   });
 
   it("keeps a disabled warning button on the control outline in light themes", () => {

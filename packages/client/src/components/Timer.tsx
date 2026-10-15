@@ -55,9 +55,9 @@ export default function Timer({
         />
       </svg>
       <span
-        className="timer-label absolute font-mono font-bold"
+        className="timer-label absolute font-mono font-bold tabular-nums"
         data-timer-state={state}
-        style={{ fontSize: labelFontSize, color }}
+        style={{ fontSize: labelFontSize, lineHeight: 1, letterSpacing: 0, color }}
       >
         {label}
       </span>
