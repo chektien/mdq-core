@@ -18,7 +18,6 @@ export default function OpenResponseList({
   onSetAllHidden,
   hiddenByDefault = false,
   total = responses.length,
-  live = false,
 }: {
   responses: OpenResponseEntry[];
   title?: string;
@@ -29,7 +28,7 @@ export default function OpenResponseList({
   hiddenByDefault?: boolean;
   /** All submitted responses, including ones omitted from a display payload. */
   total?: number;
-  /** Projector summary before reveal, with no empty list when all are hidden. */
+  /** Before the reveal (the projector's live total); the same heading either way. */
   live?: boolean;
   /** A short message about the last hide or show, such as why it did not work. */
   notice?: string | null;
@@ -44,16 +43,19 @@ export default function OpenResponseList({
 
   return (
     <div className="open-response-list w-full max-w-3xl rounded-2xl border p-4">
-      {live ? (
-        <p className="open-response-count-label mb-3 text-lg">{total} {total === 1 ? "response" : "responses"}{responses.length > 0 && ` · ${responses.length} shown`}</p>
-      ) : <div className="open-response-heading mb-3 flex items-center justify-between gap-3">
+      {/* One heading before and after the reveal: the title and the real total, never a count of hidden ones. */}
+      <div className="open-response-heading mb-3 flex items-center justify-between gap-3">
         <h3 className="open-response-title text-sm font-semibold uppercase tracking-[0.2em]">
           {title}<span className="open-response-inline-count"> · {total}</span>
         </h3>
         <span className="open-response-count text-xs tabular-nums">{total}</span>
-      </div>}
-      {hiddenCount > 0 && <p className="open-response-empty mb-3 text-sm">{hiddenCount} hidden</p>}
-      {onToggleHidden && hiddenByDefault && <p className="open-response-empty mb-3 text-sm">Responses start hidden. Show the ones you want on the projector.</p>}
+      </div>
+      {/* Only the presenter is told what is hidden; the projector simply shows what has been shown. */}
+      {onToggleHidden && (hiddenCount > 0 || hiddenByDefault) && (
+        <p className="open-response-summary mb-3 text-left text-sm">
+          {hiddenCount > 0 && `${hiddenCount} hidden from the projector.`}{hiddenCount > 0 && hiddenByDefault && " "}{hiddenByDefault && "New responses start hidden."}
+        </p>
+      )}
       {onSetAllHidden && (
         <div className="mb-3 flex flex-wrap gap-2">
           <button type="button" className="open-response-toggle" disabled={total === 0} onClick={() => onSetAllHidden(false)}>Show all</button>
@@ -62,7 +64,7 @@ export default function OpenResponseList({
       )}
       {notice && <p role="alert" className="open-response-notice mb-3 text-sm">{notice}</p>}
       {responses.length === 0 ? (
-        !live && <p className="open-response-empty text-sm">{total === 0 ? emptyLabel : "All responses are hidden from the projector."}</p>
+        total === 0 && <p className="open-response-empty text-sm">{emptyLabel}</p>
       ) : (
         <div className="max-h-[340px] space-y-2 overflow-y-auto pr-1">
           {responses.map((response) => {

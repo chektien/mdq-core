@@ -29,16 +29,18 @@ describe("open response moderation in the client", () => {
     expect(projector).toContain("answerCount?.openResponseTotal");
     expect(projector).toContain("answerCount?.openResponses");
     expect(projector.match(/total={currentReveal.openResponseTotal}/g)).toHaveLength(2);
-    expect(list).toContain('total === 0 ? emptyLabel : "All responses are hidden from the projector."');
-    expect(list).toContain("!live &&");
+    // The projector names the real total and lists what is shown; the empty label only when nothing was submitted.
+    expect(list).toContain("total === 0 && <p className=\"open-response-empty text-sm\">{emptyLabel}</p>");
+    expect(list).not.toContain("All responses are hidden from the projector.");
+    // Only the presenter is told how many are hidden.
+    expect(list).toContain("{onToggleHidden && (hiddenCount > 0 || hiddenByDefault) && (");
   });
 
   it("offers bulk controls and a default-hidden hint only to the presenter", () => {
     expect(list).toContain("{onSetAllHidden && (");
     expect(list).toContain(">Show all</button>");
     expect(list).toContain(">Hide all</button>");
-    expect(list).toContain("onToggleHidden && hiddenByDefault");
-    expect(list).toContain("Responses start hidden. Show the ones you want on the projector.");
+    expect(list).toContain("New responses start hidden.");
     expect(instructor).toContain("onSetAllHidden: setAllHidden");
     expect(projector).not.toContain("onSetAllHidden");
   });
