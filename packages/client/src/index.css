@@ -8555,12 +8555,17 @@ html:root[data-theme] .student-screen[data-deck-background="true"] .dist-row-she
   box-shadow: none;
   transform: none;
 }
+/* The hugging frame clips what reaches past it, so the focus ring sits inside the image. */
+.question-media .slide-media-expand-button:focus-visible {
+  outline-offset: -3px;
+}
 
 @media (min-width: 761px) {
   /* Measured by LiveSurface, including compact/expanded cards and fixed cards
      in short windows. Reserve a full card plus the existing 1rem gap, at all
      console widths and on reveal as well as open/closed questions. */
-  .slide-live-shell-controls .slide-surface > .slide-safe:has(> .slide-join-panel) {
+  /* Not a full-screen live embed: its surface keeps its deliberate zero padding. */
+  .slide-live-shell-controls .slide-surface:not(.slide-surface-live-embed) > .slide-safe:has(> .slide-join-panel) {
     padding-bottom: max(clamp(2.8rem, 5cqi, 5.5rem), calc(var(--slide-join-clear, 0px) + 1rem));
   }
 }

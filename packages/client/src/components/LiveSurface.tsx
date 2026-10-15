@@ -1,3 +1,4 @@
+import { shortTitle } from "../shortTitle";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { safeDeckStyle, type DeckStyle } from "@mdq/shared";
 import SessionCodeCard from "./SessionCodeCard";
@@ -298,9 +299,12 @@ export default function LiveSurface({
     variant: "nav" | "action",
   ) => {
     const tone = action.tone || "neutral";
-    const detail = action.detail?.trim();
+    // Prev/Next titles can be long: shorten at a word, so the clamp never has to cut one.
+    const fullDetail = action.detail?.trim();
+    const detail = variant === "nav" ? shortTitle(fullDetail) : fullDetail;
     const hasDetail = !!detail;
-    const fullLabel = hasDetail ? `${action.label}: ${detail}` : action.label;
+    // The tooltip and accessible name keep the whole title.
+    const fullLabel = hasDetail ? `${action.label}: ${fullDetail}` : action.label;
     const className = [
       "slide-action-button",
       `slide-action-button-${tone}`,

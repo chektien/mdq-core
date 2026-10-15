@@ -2,6 +2,7 @@ import fs from "fs";
 import path from "path";
 import { answeredLabel, restartCountdownDetail, closedLabel, formatRemaining, pluralize, positionLabel } from "../../../client/src/instructorText";
 import { readShowStudentIds, saveShowStudentIds } from "../../../client/src/showStudentIds";
+import { shortTitle } from "../../../client/src/shortTitle";
 
 const clientSrc = path.resolve(__dirname, "..", "..", "..", "client", "src");
 const read = (rel: string): string => fs.readFileSync(path.join(clientSrc, rel), "utf-8");
@@ -289,3 +290,17 @@ describe("participant list", () => {
     expect(read("hooks/api.ts")).toContain("API.SESSION_RELEASE_SEAT");
   });
 });
+
+describe("Prev/Next titles", () => {
+  it("shorten at a word with no space before the ellipsis, keeping short titles whole", () => {
+    expect(shortTitle("Hear preferences with a poll")).toBe("Hear preferences with a poll");
+    expect(shortTitle("A very long synthetic title that keeps going well beyond the two line limit of the button")).toBe("A very long synthetic title that keeps going well…");
+    expect(shortTitle("A title, with punctuation - that keeps going past the limit of the button")).not.toMatch(/[\s,-]…$/);
+    expect(shortTitle(undefined)).toBeUndefined();
+  });
+  it("keep the whole title in the tooltip and accessible name", () => {
+    const source = fs.readFileSync(path.resolve(__dirname, "../../../client/src/components/LiveSurface.tsx"), "utf8");
+    expect(source).toMatch(/fullLabel = hasDetail \? `\$\{action\.label\}: \$\{fullDetail\}`/);
+  });
+});
+
