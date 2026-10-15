@@ -7978,9 +7978,13 @@ html:root[data-theme] .student-screen[data-deck-background="true"] .dist-row-she
   padding: calc(clamp(0.42rem, 0.7cqi, 0.72rem) * var(--cover-fit));
 }
 .slide-cover-media:has(> :nth-child(4)) .slide-media-figure { flex: 0 1 30%; }
+/* Fill the card's image row so a theme's fixed-height card can limit its image
+   with max-height: 100%; an auto-height button leaves that percentage unresolved
+   and the image overflows the card. Plain covers are unchanged: an auto-height
+   card's row sizes to its content. */
 .slide-cover-media .slide-media-expand-button {
   width: auto;
-  height: auto;
+  height: 100%;
   max-width: 100%;
   aspect-ratio: auto;
 }
