@@ -291,6 +291,8 @@ describe("payload privacy over real sockets", () => {
     students.forEach(({ recorder }, i) => recorder.socket.emit(SocketEvents.ANSWER_SUBMIT, { questionIndex: 2, responseText: `Thought ${i}` }));
     await until(() => control.events.some((e) => e.event === SocketEvents.ANSWER_COUNT && e.text.includes("Thought 2")), "open responses counted");
     await post(sessionId, "close");
+    // Open responses start hidden; the presenter shows them before the reveal.
+    await request(app).post(`/api/session/${sessionId}/responses-visibility`).send({ questionIndex: 2, hidden: false }).expect(200);
     await post(sessionId, "reveal");
     await post(sessionId, "leaderboard-show");
     await until(() => students.every(({ recorder }) => recorder.events.some((e) => e.event === SocketEvents.LEADERBOARD_UPDATE)), "leaderboard delivered");

@@ -58,7 +58,7 @@ describe("REST routes that could carry Student IDs", () => {
   const build = () => createApp({ quizDir: dir, dataDir: path.join(dir, "data"), shortUrlProviders: [] });
 
   /** A session that has revealed one open response from ZQ-1001. */
-  async function sessionWithOpenResponse(agent: { post: (url: string) => request.Test; get: (url: string) => request.Test }) {
+  async function sessionWithOpenResponse(agent: { post: (url: string) => request.Test; get: (url: string) => request.Test }, shown = true) {
     const created = await (agent.post("/api/session") as request.Test).send({ week: "rest" }).expect(201);
     const sessionId: string = created.body.sessionId;
     const quiz = parseQuizMarkdown(DECK, "rest.md").quiz as Quiz;
@@ -68,6 +68,8 @@ describe("REST routes that could carry Student IDs", () => {
     step({ type: "answerSubmit", studentId: "ZQ-1001", sessionToken: "tok", payload: { questionIndex: 0, responseText: "A thought" } }, 2);
     await agent.post(`/api/session/${sessionId}/close`).expect(200);
     await agent.post(`/api/session/${sessionId}/reveal`).expect(200);
+    // Open responses start hidden; these tests restore one the presenter showed.
+    if (shown) await (agent.post(`/api/session/${sessionId}/responses-visibility`) as request.Test).send({ questionIndex: 0, hidden: false }).expect(200);
     await agent.post(`/api/session/${sessionId}/leaderboard-show`).expect(200);
     return sessionId;
   }
@@ -92,6 +94,13 @@ describe("REST routes that could carry Student IDs", () => {
       expect(JSON.stringify(res.body)).not.toContain("ZQ-1001");
       expect(response.studentId).toBeUndefined();
       expect(response.displayName).toBeUndefined();
+    });
+
+    it("leaves a response the presenter never showed out of a restored review", async () => {
+      const sessionId = await sessionWithOpenResponse(request(app), false);
+      const res = await request(app).get(`/api/session/${sessionId}/state`).expect(200);
+      expect(res.body.reviewReveals[0].openResponses).toEqual([]);
+      expect(JSON.stringify(res.body)).not.toContain("A thought");
     });
 
     it("leaves a hidden response out of a restored review, and does not reveal the flag", async () => {
