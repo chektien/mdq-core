@@ -43,7 +43,7 @@ describe("presenter toolbar", () => {
   it("grows titles into the available column, caps them at 30rem, shortens them at a word and cuts at most two lines between words", () => {
     expect(index).toMatch(/\.slide-nav-button\.slide-action-button-with-detail \{[^}]*flex: 1 1 0;\s*min-width: 0;\s*max-width: 30rem;/);
     // Two lines cut between lines, never a clamp ellipsis inside a word; shortTitle supplies the ellipsis.
-    expect(index).toMatch(/\.slide-nav-button \.slide-button-detail \{[^}]*max-height: calc\(2 \* 1\.25em\);\s*line-height: 1\.25;\s*overflow: hidden;\s*white-space: normal;\s*word-break: normal;/);
+    expect(index).toMatch(/\.slide-nav-button \.slide-button-detail \{[^}]*max-height: calc\(2 \* 1\.25em\);\s*line-height: 1\.25;\s*overflow: hidden;[^}]*text-overflow: clip;\s*white-space: normal;\s*word-break: normal;\s*overflow-wrap: break-word;/);
     expect(index).not.toMatch(/\.slide-nav-button \.slide-button-detail \{[^}]*line-clamp/);
     expect(surface).toContain('const detail = variant === "nav" ? shortTitle(fullDetail) : fullDetail;');
     expect(surface).toContain('title={variant === "nav" ? fullLabel');

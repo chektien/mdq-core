@@ -2917,9 +2917,12 @@ html[data-theme="light"] .image-expansion-close:focus-visible {
   max-height: calc(2 * 1.25em);
   line-height: 1.25;
   overflow: hidden;
+  /* No ellipsis inside a word: a word wider than a narrow button breaks onto
+     the next line instead of being cut. */
+  text-overflow: clip;
   white-space: normal;
   word-break: normal;
-  overflow-wrap: normal;
+  overflow-wrap: break-word;
   hyphens: none;
 }
 
