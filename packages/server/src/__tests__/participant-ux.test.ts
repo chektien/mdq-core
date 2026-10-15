@@ -293,6 +293,10 @@ describe("screen reader and touch details", () => {
   it("labels the leaderboard numbers and caps the phone leaderboard's width", () => {
     const board = read("components/Leaderboard.tsx");
     expect(board).toContain("of ${totalQuestions} correct");
+    expect(board).toContain('{entry.rank}');
+    expect(board).toContain('aria-label={`Rank ${entry.rank}`}');
+    expect(board).toContain('isHighlighted && <span className="leaderboard-you">You</span>');
+    expect(board).not.toMatch(/animationDelay|rankLabel|"1st"|"2nd"|"3rd"/);
     expect(board).toContain(" s<span");
     const css = read("index.css");
     expect(css).toMatch(/\.leaderboard-board-compact \{\s*width: min\(100%, 32rem\);/);
@@ -320,8 +324,8 @@ describe("reduced motion", () => {
     expect(start).toBeGreaterThan(0);
   });
 
-  it("stops the timer pulse and the leaderboard slide-in", () => {
-    expect(block).toMatch(/\.timer-urgent,\s*\.leaderboard-row \{\s*animation: none;/);
+  it("stops the timer pulse and the whole leaderboard fade", () => {
+    expect(block).toMatch(/\.timer-urgent,\s*\.leaderboard-list \{\s*animation: none;/);
   });
 
   it("swaps the spinning loader for a fade", () => {
@@ -348,7 +352,7 @@ describe("reduced motion", () => {
 
   it("covers every animation and transition the stylesheet declares", () => {
     const animated = [...css.matchAll(/animation:\s*([a-z-]+)/g)].map((m) => m[1]).filter((n) => n !== "none");
-    expect(new Set(animated)).toEqual(new Set(["timer-pulse", "slide-in", "reduced-motion-fade", "mdq-status-fade"]));
+    expect(new Set(animated)).toEqual(new Set(["timer-pulse", "leaderboard-fade", "reduced-motion-fade", "mdq-status-fade"]));
   });
 });
 

@@ -189,12 +189,12 @@ describe("Tomorrow palette", () => {
           if (mode === "light") return hex(t[`--mdq-rank-${name}`] ?? t["--mdq-muted"], `rank ${name}`);
           return hex(declarations(ruleBody(index, `${selector} .leaderboard-row.rank-${name}`))["--leaderboard-rank-color"], name);
         };
-        const glass = c("--mdq-slide-glass");
-        const highlight = mode === "dark" ? over(`rgba(${channels(c("--mdq-accent")).join(", ")}, 0.24)`, c("--mdq-slide-glass-strong")) : over(`rgba(${channels(c("--mdq-accent")).join(", ")}, 0.07)`, c("--mdq-card-strong"));
+        const ground = c("--mdq-paper");
+        const highlight = over(`rgba(${channels(c("--mdq-accent")).join(", ")}, 0.06)`, ground);
         for (const name of ["first", "second", "third", "standard"]) {
           const color = rank(name);
           if (mode === "light" && name === "standard") continue;
-          expect([name, contrast(color, over(`rgba(${channels(color).join(", ")}, 0.16)`, glass)) >= 4.5]).toEqual([name, true]);
+          expect([name, contrast(color, ground) >= 4.5]).toEqual([name, true]);
           expect([name, "own row", contrast(color, highlight) >= 4.5]).toEqual([name, "own row", true]);
         }
       });

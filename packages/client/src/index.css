@@ -1103,10 +1103,8 @@ html[data-palette="nord-aurora"]:not([data-theme="light"]) .leaderboard-row.lead
    toward the foreground (#779eb7) so it holds 4.5:1 as text on the dark
    surfaces, and by 50 percent (#89a9c2) for success text, which also sits on
    the tinted reveal panel. Dark headings are rose #ebbcba, Dawn headings are
-   pine because every lightness-lowered rose is a saturated red. Leaderboard
-   rows wash their rank colour at 8 to 10 percent so the secondary text
-   holds 4.5:1 on them. Secondary text sits on
-   tinted cards, pills and leaderboard rows, so it is moved further from the
+   pine because every lightness-lowered rose is a saturated red. Secondary text sits on
+   tinted cards, pills and the flat leaderboard, so it is moved further from the
    page: dark subtle #908caa to #a4a0bc (25 percent toward text), Dawn subtle
    #797593 to #5f5b7a (both still #908caa and #797593 for outlines and the
    timer track). Where another Dawn colour misses 4.5:1 on the cream surfaces
@@ -1383,23 +1381,12 @@ html[data-palette="rose-pine"]:not([data-theme="light"]) .leaderboard-row.rank-t
   --leaderboard-rank-color: #ebbcba;
 }
 
-/* Below the podium the row keeps a neutral tint, so fourth place does not
-   pick up the accent that the podium places use. */
-/* Rank washes are lighter than the default 16 and 24 percent, so the muted id
-   and score label (#a4a0bc) hold 4.5:1 on every row, including the viewer's
-   own. Fourth place and below keep the text colour for their rank on a still
-   lighter wash. */
-html[data-palette="rose-pine"]:not([data-theme="light"]) .leaderboard-row {
-  --leaderboard-wash: 10%;
-  --leaderboard-highlight-wash: 10%;
-}
+/* Below the podium the rank uses neutral ink so the top three stand out. */
 html[data-palette="rose-pine"]:not([data-theme="light"]) .leaderboard-row.rank-standard {
   --leaderboard-rank-color: #e0def4;
-  --leaderboard-wash: 8%;
 }
 
-/* The viewer's own row adds an accent wash. Third place keeps its own
-   colour there, which holds 4.5:1 on that wash. */
+/* The viewer's third-place rank keeps its palette colour. */
 html[data-palette="rose-pine"]:not([data-theme="light"]) .leaderboard-row.leaderboard-row-highlight.rank-third {
   --leaderboard-rank-color: #ebbcba;
 }
@@ -1692,14 +1679,12 @@ html[data-palette="catppuccin"]:not([data-theme="light"]) .leaderboard-row.rank-
   --leaderboard-rank-color: #fab387;
 }
 
-/* Below the podium the row keeps a neutral tint, so fourth place does not
-   pick up the accent that the podium places use. */
+/* Below the podium the rank uses neutral ink so the top three stand out. */
 html[data-palette="catppuccin"]:not([data-theme="light"]) .leaderboard-row.rank-standard {
   --leaderboard-rank-color: #a6adc8;
 }
 
-/* The viewer's own row adds an accent wash. Third place keeps its own
-   colour there, which holds 4.5:1 on that wash. */
+/* The viewer's third-place rank keeps its palette colour. */
 html[data-palette="catppuccin"]:not([data-theme="light"]) .leaderboard-row.leaderboard-row-highlight.rank-third {
   --leaderboard-rank-color: #fab387;
 }
@@ -1735,7 +1720,7 @@ html[data-palette="catppuccin"][data-theme="light"] .leaderboard-row.rank-standa
    label 255, accent text is 89 (#9b1d72) and danger is 88 (#9b1300).
    Leaderboard ranks are darkened from gold #9a7200 to #654b00 and from
    #be7572 to #7c3c39, and muted text from 238 (#565656) to #525252 so
-   leaderboard ids hold 4.5:1 on the tinted rows. The dark poll bar wash is
+   leaderboard ids hold 4.5:1 on their grounds. The dark poll bar wash is
    18 percent of the accent so option text holds 4.5:1 on it. Dark is the
    default theme, so the dark variant also applies when data-theme is absent. */
 html[data-palette="seoul256"]:not([data-theme="light"]) {
@@ -1989,12 +1974,7 @@ html[data-palette="seoul256"]:not([data-theme="light"]) .leaderboard-row.rank-st
   --leaderboard-rank-color: #d1d0d1;
 }
 
-/* The viewer's own row adds an accent wash, lightened to 18 percent so the
-   third-place peach holds 4.5:1 on it, and third place keeps the palette
-   colour there instead of the classic orange. */
-html[data-palette="seoul256"]:not([data-theme="light"]) .leaderboard-row {
-  --leaderboard-highlight-wash: 18%;
-}
+/* The viewer's third-place rank keeps the palette peach. */
 html[data-palette="seoul256"]:not([data-theme="light"]) .leaderboard-row.leaderboard-row-highlight.rank-third {
   --leaderboard-rank-color: #ffbd98;
 }
@@ -2280,8 +2260,7 @@ html[data-palette="ayu"]:not([data-theme="light"]) .leaderboard-row.rank-standar
   --leaderboard-rank-color: #b1afaa;
 }
 
-/* The viewer's own row adds an accent wash; third place keeps the palette
-   colour there instead of the classic orange. */
+/* The viewer's third-place rank keeps the palette colour. */
 html[data-palette="ayu"]:not([data-theme="light"]) .leaderboard-row.leaderboard-row-highlight.rank-third {
   --leaderboard-rank-color: #ff8f40;
 }
@@ -2550,8 +2529,7 @@ html[data-palette="tomorrow"]:not([data-theme="light"]) .leaderboard-row.rank-st
   --leaderboard-rank-color: #b0b2b0;
 }
 
-/* The viewer's own row adds an accent wash; third place keeps the palette
-   colour there instead of the classic orange. */
+/* The viewer's third-place rank keeps the palette colour. */
 html[data-palette="tomorrow"]:not([data-theme="light"]) .leaderboard-row.leaderboard-row-highlight.rank-third {
   --leaderboard-rank-color: #e4a77c;
 }
@@ -2560,16 +2538,13 @@ html[data-palette="tomorrow"][data-theme="light"] .leaderboard-row.rank-standard
   --leaderboard-rank-color: var(--mdq-muted);
 }
 
-/* The viewer's own row adds an accent wash, so a dark theme lightens the
-   third-place orange to hold 4.5:1 on it. */
+/* Retain classic's lighter third-place orange on the accent-tinted own row. */
 html:not([data-theme="light"]) .leaderboard-row.leaderboard-row-highlight.rank-third {
   --leaderboard-rank-color: #ffa552;
 }
 
-/* The classic dark rank colour below the podium is the soft eyebrow grey, which
-   falls under 4.5:1 on the purple wash of the viewer's own row, so that row
-   uses the muted ink. Every dark palette sets its own colour for this row in a
-   more specific rule. */
+/* The classic viewer's rank below the podium uses muted ink. Each dark
+   palette keeps its own rank colour through a more specific rule. */
 html:not([data-theme="light"]) .leaderboard-row-highlight.rank-standard {
   --leaderboard-rank-color: var(--mdq-muted);
 }
@@ -6120,9 +6095,9 @@ body.image-expansion-lock {
 }
 
 /* ── Leaderboard surface ─────────────────── */
-@keyframes slide-in {
-  from { opacity: 0; transform: translateY(16px); }
-  to { opacity: 1; transform: translateY(0); }
+@keyframes leaderboard-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
 .leaderboard-board {
@@ -6132,27 +6107,31 @@ body.image-expansion-lock {
 
 .leaderboard-list {
   display: grid;
-  gap: 0.55rem;
   padding: 0;
   margin: 0;
   list-style: none;
+  overflow: hidden;
+  border: 1px solid var(--mdq-line);
+  border-radius: var(--mdq-panel-radius);
+  background: var(--mdq-paper);
+  animation: leaderboard-fade 160ms ease-out both;
 }
 
+/* One solid paper ground keeps the palette inks readable independently of
+   the slide behind it. Shared rules separate rows without rank washes. */
 .leaderboard-row {
   display: grid;
   grid-template-columns: minmax(3.8rem, auto) minmax(0, 1fr) auto;
   align-items: center;
   gap: clamp(0.75rem, 1.5vw, 1.1rem);
-  min-height: 4.25rem;
-  border: 1px solid var(--mdq-slide-glass-line);
-  border-radius: var(--mdq-panel-radius);
-  background:
-    linear-gradient(90deg, color-mix(in srgb, var(--leaderboard-rank-color, var(--mdq-slide-accent)) var(--leaderboard-wash, 16%), transparent), transparent 34%),
-    var(--mdq-slide-glass);
-  padding: clamp(0.72rem, 1.2vw, 0.95rem) clamp(0.82rem, 1.8vw, 1.25rem);
-  color: var(--mdq-slide-ink);
-  animation: slide-in 0.3s ease-out both;
-  backdrop-filter: blur(18px);
+  min-height: 3.5rem;
+  background: var(--mdq-paper);
+  padding: 0.5rem clamp(0.82rem, 1.8vw, 1.25rem);
+  color: var(--mdq-ink);
+}
+
+.leaderboard-row + .leaderboard-row {
+  border-top: 1px solid var(--mdq-line);
 }
 
 .leaderboard-row.rank-first {
@@ -6168,17 +6147,16 @@ body.image-expansion-lock {
 }
 
 .leaderboard-row-highlight {
-  border-color: color-mix(in srgb, var(--mdq-slide-accent) 44%, var(--mdq-slide-glass-line));
-  background:
-    linear-gradient(90deg, color-mix(in srgb, var(--mdq-slide-accent) var(--leaderboard-highlight-wash, 24%), transparent), transparent 42%),
-    var(--mdq-slide-glass-strong);
+  /* Six percent identifies the viewer without weakening small-text contrast. */
+  background: color-mix(in srgb, var(--mdq-accent) 6%, var(--mdq-paper));
 }
 
 .leaderboard-rank {
   min-width: 3.15rem;
   color: var(--leaderboard-rank-color, var(--mdq-slide-eyebrow));
   font-size: clamp(0.92rem, 1.5vw, 1.15rem);
-  font-weight: 900;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
   letter-spacing: 0.02em;
   text-align: center;
 }
@@ -6190,11 +6168,26 @@ body.image-expansion-lock {
   text-align: left;
 }
 
+.leaderboard-name-line {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+.leaderboard-you {
+  flex: none;
+  color: var(--mdq-accent-ink);
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
 .leaderboard-name {
+  min-width: 0;
   overflow: hidden;
-  color: var(--mdq-slide-heading);
+  color: var(--mdq-ink);
   font-size: clamp(1rem, 1.55vw, 1.28rem);
-  font-weight: 760;
+  font-weight: 600;
   line-height: 1.12;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -6204,8 +6197,8 @@ body.image-expansion-lock {
 .leaderboard-score small,
 .leaderboard-overflow,
 .leaderboard-empty {
-  color: var(--mdq-slide-ink-soft);
-  font-size: clamp(0.72rem, 1vw, 0.86rem);
+  color: var(--mdq-muted);
+  font-size: clamp(0.875rem, 1vw, 0.9rem);
   font-weight: 700;
 }
 
@@ -6213,9 +6206,9 @@ body.image-expansion-lock {
   display: grid;
   justify-items: end;
   gap: 0.1rem;
-  color: var(--mdq-slide-heading);
+  color: var(--mdq-ink);
   font-size: clamp(1rem, 1.45vw, 1.18rem);
-  font-weight: 860;
+  font-weight: 600;
   line-height: 1.1;
   text-align: right;
   white-space: nowrap;
@@ -6233,9 +6226,9 @@ body.image-expansion-lock {
 
 .leaderboard-empty {
   margin: 0;
-  border: 1px solid var(--mdq-slide-glass-line);
+  border: 1px solid var(--mdq-line);
   border-radius: var(--mdq-panel-radius);
-  background: var(--mdq-slide-glass);
+  background: var(--mdq-paper);
   padding: 1rem;
   text-align: center;
 }
@@ -7958,7 +7951,7 @@ dialog.participants-overlay::backdrop {
 /* ── Reduced motion ───────────────────────
    People who ask their device for less motion get none of the movement here:
    the loading spinner fades instead of turning, the last-seconds timer pulse
-   and the leaderboard slide-in stop, the resumed label leaves without fading,
+   and the leaderboard list fade stop, the resumed label leaves without fading,
    and bars and buttons change at once. */
 @keyframes reduced-motion-fade {
   0%, 100% { opacity: 1; }
@@ -7971,7 +7964,7 @@ dialog.participants-overlay::backdrop {
   }
 
   .timer-urgent,
-  .leaderboard-row {
+  .leaderboard-list {
     animation: none;
   }
 

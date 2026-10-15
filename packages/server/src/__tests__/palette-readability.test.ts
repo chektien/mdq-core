@@ -43,8 +43,6 @@ function declarationsOf(css: string, selector: string): Tokens {
   return result;
 }
 
-const hasRule = (css: string, selector: string): boolean => css.includes(`\n${selector} {`);
-
 /** Every token a combination sets: the shared base, the theme, then the palette. */
 function tokensOf(palette: Palette, mode: Mode): Tokens {
   const base =
@@ -169,60 +167,36 @@ describe(`palette readability, ${PALETTES.length} palettes x 2 themes`, () => {
       expectPairs(`${name} reveal explanation`, { "explanation heading": token(t, "--mdq-success-text") }, grounds);
     });
 
-    it("keeps the leaderboard rank and the id and time text at 4.5:1 on every row, including the viewer's own", () => {
-      const glass = (strong: boolean): Rgba[] => {
-        const g = parseColor(token(t, strong ? "--mdq-slide-glass-strong" : "--mdq-slide-glass"));
-        return stops.map((stop) => over(g, stop));
+    it("keeps every leaderboard ink at 4.5:1 on flat rows and the viewer's own row", () => {
+      const row = declarationsOf(index, ".leaderboard-row");
+      const highlight = declarationsOf(index, ".leaderboard-row-highlight");
+      expect(row.background).toBe("var(--mdq-paper)");
+      expect(highlight.background).toBe("color-mix(in srgb, var(--mdq-accent) 6%, var(--mdq-paper))");
+      const grounds = {
+        row: token(t, "--mdq-paper"),
+        "own row": mixColors(token(t, "--mdq-accent"), token(t, "--mdq-paper"), 0.06),
       };
-      const washOf = (rowSelector: string): number => {
-        let value = mode === "light" ? Number.parseFloat(declarationsOf(theme, 'html[data-theme="light"] .leaderboard-row')["--leaderboard-wash"]) : 16;
-        for (const rule of [`${selector} .leaderboard-row`, `${selector} ${rowSelector}`]) {
-          const own = declarationsOf(index, rule)["--leaderboard-wash"];
-          if (own) value = Number.parseFloat(own);
-        }
-        return value / 100;
-      };
-      /** Rank text colour, and the colour of the wash behind it (the accent when no rank colour is set). */
-      const rankColors = (rank: string): { text: string; wash: string } => {
-        const rule = declarationsOf(index, `${selector} .leaderboard-row.rank-${rank}`)["--leaderboard-rank-color"];
-        const set =
-          rule ??
-          (mode === "light"
-            ? declarationsOf(theme, `html[data-theme="light"] .leaderboard-row.rank-${rank}`)["--leaderboard-rank-color"]
-            : declarationsOf(index, `.leaderboard-row.rank-${rank}`)["--leaderboard-rank-color"]);
-        if (set) {
-          const color = set.startsWith("var(") ? token(t, set.slice(4, -1)) : set;
-          return { text: color, wash: color };
-        }
-        return { text: token(t, "--mdq-slide-eyebrow"), wash: token(t, "--mdq-slide-accent") };
-      };
-      const secondary = mode === "light" ? token(t, "--mdq-muted") : token(t, "--mdq-slide-ink-soft");
+      const resolve = (value: string): string => value.startsWith("var(") ? token(t, value.slice(4, -1)) : value;
+      const ranks: Record<string, string> = {};
       for (const rank of ["first", "second", "third", "standard"]) {
-        const { text, wash } = rankColors(rank);
-        const grounds: Record<string, Rgba> = {};
-        for (const [i, base] of glass(false).entries()) grounds[`row ${rank} stop ${i + 1}`] = over(wash, base, washOf(`.leaderboard-row.rank-${rank}`));
-        expectPairs(`${name} leaderboard ${rank}`, { rank: text, "id and time": secondary }, grounds);
+        const base = mode === "light"
+          ? declarationsOf(theme, `html[data-theme="light"] .leaderboard-row.rank-${rank}`)["--leaderboard-rank-color"]
+          : declarationsOf(index, `.leaderboard-row.rank-${rank}`)["--leaderboard-rank-color"];
+        const specific = declarationsOf(index, `${selector} .leaderboard-row.rank-${rank}`)["--leaderboard-rank-color"];
+        ranks[rank] = resolve(specific ?? base ?? "var(--mdq-slide-eyebrow)");
+        const own = mode === "dark"
+          ? declarationsOf(index, `${selector} .leaderboard-row.leaderboard-row-highlight.rank-${rank}`)["--leaderboard-rank-color"] ??
+            (!specific ? declarationsOf(index, `html:not([data-theme="light"]) .leaderboard-row-highlight.rank-${rank}`)["--leaderboard-rank-color"] : undefined) ??
+            declarationsOf(index, `html:not([data-theme="light"]) .leaderboard-row.leaderboard-row-highlight.rank-${rank}`)["--leaderboard-rank-color"]
+          : undefined;
+        expectPairs(`${name} own ${rank}`, { rank: own ? resolve(own) : ranks[rank] }, { "own row": grounds["own row"] });
       }
-      // The viewer's own row: the dark theme adds an accent wash on the strong glass.
-      if (mode === "dark") {
-        const highlightWash = Number.parseFloat(declarationsOf(index, `${selector} .leaderboard-row`)["--leaderboard-highlight-wash"] ?? "24") / 100;
-        const own: Record<string, Rgba> = {};
-        for (const [i, base] of glass(true).entries()) own[`own row stop ${i + 1}`] = over(token(t, "--mdq-slide-accent"), base, highlightWash);
-        // Below the podium the viewer's own row takes the palette's rule, or the generic dark rule for classic.
-        const ownStandard = hasRule(index, `${selector} .leaderboard-row.rank-standard`)
-          ? rankColors("standard").text
-          : token(t, (declarationsOf(index, 'html:not([data-theme="light"]) .leaderboard-row-highlight.rank-standard')["--leaderboard-rank-color"] ?? "").replace(/^var\((.*)\)$/, "$1"));
-        const third =
-          declarationsOf(index, `${selector} .leaderboard-row.leaderboard-row-highlight.rank-third`)["--leaderboard-rank-color"] ??
-          declarationsOf(index, 'html:not([data-theme="light"]) .leaderboard-row.leaderboard-row-highlight.rank-third')["--leaderboard-rank-color"];
-        expectPairs(`${name} own row`, {
-          first: rankColors("first").text,
-          second: rankColors("second").text,
-          third,
-          standard: ownStandard,
-          "id and time": secondary,
-        }, own);
-      }
+      expectPairs(`${name} ranks`, ranks, { row: grounds.row });
+      expectPairs(`${name} leaderboard text`, {
+        name: token(t, "--mdq-ink"), score: token(t, "--mdq-ink"),
+        id: token(t, "--mdq-muted"), time: token(t, "--mdq-muted"),
+        You: token(t, "--mdq-accent-ink"),
+      }, grounds);
     });
 
     it("keeps the attendee fold-out note title at 4.5:1 on its wash", () => {
@@ -292,6 +266,21 @@ describe(`palette readability, ${PALETTES.length} palettes x 2 themes`, () => {
       });
       expectPairs(`${name} links`, { link }, grounds);
     });
+  });
+
+  it("keeps leaderboard rows flat in every palette, theme and responsive override", () => {
+    for (const css of [index, theme]) {
+      expect(css).not.toMatch(/--leaderboard-(?:highlight-)?wash/);
+      for (const match of css.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+        if (!/\.leaderboard-(?:row|list|empty)\b/.test(match[1])) continue;
+        expect(match[2]).not.toMatch(/gradient\(|blur\(/);
+        expect(match[2]).not.toMatch(/(?:backdrop-filter|box-shadow)\s*:\s*(?!none)[^;]+;/);
+      }
+    }
+    expect(declarationsOf(index, ".leaderboard-name").color).toBe("var(--mdq-ink)");
+    expect(declarationsOf(index, ".leaderboard-score").color).toBe("var(--mdq-ink)");
+    expect(declarationsOf(index, ".leaderboard-you").color).toBe("var(--mdq-accent-ink)");
+    expect(declarationsOf(index, ".leaderboard-id,\n.leaderboard-score small,\n.leaderboard-overflow,\n.leaderboard-empty").color).toBe("var(--mdq-muted)");
   });
 
   it("draws the presenter notes panel from palette tokens, with no fixed amber", () => {

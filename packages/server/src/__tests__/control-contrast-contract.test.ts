@@ -103,6 +103,17 @@ describe("control contrast contract", () => {
     expect(checked).toBeGreaterThanOrEqual(6);
   });
 
+  it("uses solid leaderboard grounds and palette accent ink for the visible own-row marker", () => {
+    expect(ruleBody(index, '.leaderboard-row')).toContain('background: var(--mdq-paper);');
+    expect(ruleBody(index, '.leaderboard-row-highlight')).toContain('background: color-mix(in srgb, var(--mdq-accent) 6%, var(--mdq-paper));');
+    expect(ruleBody(index, '.leaderboard-you')).toContain('color: var(--mdq-accent-ink);');
+    for (const css of [index, theme]) {
+      for (const match of css.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+        if (/\.leaderboard-row\b/.test(match[1])) expect(match[2]).not.toMatch(/gradient\(|blur\(|box-shadow:/);
+      }
+    }
+  });
+
   it("paints leaderboard names and scores in the ink so first place's gold stands out", () => {
     for (const mode of ["dark", "light"]) {
       expect(ruleBody(theme, `html[data-theme="${mode}"] .leaderboard-score`)).toContain("color: var(--mdq-ink) !important");
