@@ -4,7 +4,7 @@ import { isSlideType } from "@mdq/shared";
 import {
   Quiz, Session, SessionState, SocketEvents, QuestionOpenPayload, QuestionClosePayload, FoldoutNote,
   StudentJoinPayload, AnswerSubmitPayload, Participant, STATE_TRANSITIONS, StudentAnswer,
-  LeaderboardRow, OpenResponseEntry, SessionParticipantsPayload, SocketRole, QuestionTiming,
+  LeaderboardRow, OpenResponseEntry, SessionParticipantsPayload, SocketRole, QuestionTiming, PollLivePayload,
   JOIN_LOCKED_MESSAGE, MAX_DISPLAY_NAME_LENGTH, MAX_OPEN_RESPONSE_LENGTH, MAX_STUDENT_ID_LENGTH, normalizeDisplayName, usesStudentIds,
 } from "@mdq/shared";
 import {
@@ -80,6 +80,8 @@ export type Command =
   | { type: "answerSubmit"; studentId?: string; sessionToken?: string; payload: AnswerSubmitPayload }
   /** Hide or show one open response on the projector. `role` is who is asking; only `control` may. */
   | { type: "responseVisibility"; role: SocketRole; questionIndex: number; publicKey: string; hidden: boolean }
+  /** A session-only poll override. Public hiding keeps the presenter's private counts. */
+  | { type: "liveResults"; role: SocketRole; questionIndex: number; visible: boolean }
   /** Free one participant's seat so the next join with that ID (or name) takes it over. `role` is who is asking; only `control` may. */
   | { type: "releaseSeat"; role: SocketRole; publicKey: string; newToken: string }
   /** Stop (or allow again) new participants joining. `role` is who is asking; only `control` may. Someone who already has a seat can still rejoin it. */
@@ -130,6 +132,7 @@ const clone = (session: Session, answering = false): Session => ({
   releasedQuestionIndexes: session.releasedQuestionIndexes ? new Set(session.releasedQuestionIndexes) : undefined,
   resultScope: session.resultScope ? { ...session.resultScope, releasedQuestionIndexes: [...session.resultScope.releasedQuestionIndexes], scoredQuestionIndexes: [...session.resultScope.scoredQuestionIndexes] } : undefined,
   revealedQuestionIndexes: session.revealedQuestionIndexes ? new Set(session.revealedQuestionIndexes) : undefined,
+  liveResultsOverrides: session.liveResultsOverrides ? { ...session.liveResultsOverrides } : undefined,
   participants: answering ? answerParticipants(session) : new Map([...session.participants].map(([id, p]) => [id, { ...p }])),
   // An answer appends or replaces one submission below, so old submissions and
   // their option arrays need no copy. Other commands retain the full clone.
@@ -172,6 +175,54 @@ export const questionPosition = (quiz: Quiz, questionIndex: number): { questionN
     questionTotal: quiz.questions.filter((item) => !isSlideType(getQuestionType(item))).length,
   };
 };
+const liveResultsEnabled = (session: Session, quiz: Quiz, index: number): boolean =>
+  getQuestionType(quiz.questions[index]) === "poll" && (session.liveResultsOverrides?.[String(index)] ?? quiz.questions[index].liveResults === true);
+
+/** Accepted submissions are the voter list, never the connected roster or the current item. */
+const pollVotes = (session: Session, index: number) => new Map(session.submissions
+  .filter(submission => submission.questionIndex === index)
+  .map(submission => [submission.studentId, submission.selectedOptions]));
+
+const pollCounts = (session: Session, quiz: Quiz, index: number) => {
+  const votes = pollVotes(session, index);
+  const counts = Object.fromEntries(quiz.questions[index].options.map(option => [option.label, 0]));
+  for (const selections of votes.values()) for (const label of new Set(selections)) {
+    if (Object.prototype.hasOwnProperty.call(counts, label)) counts[label]++;
+  }
+  return { voters: votes.size, counts };
+};
+
+/** Only live polls bypass the self-paced public-results boundary. */
+const pollLivePayload = (session: Session, quiz: Quiz, index: number, now: number, view: ResponseView, participantId?: string): PollLivePayload | null => {
+  const phase = sessionAvailabilityPhase(session, now);
+  if (phase === "expired" || phase === "deleted" || session.resultsDisclosed === false || session.resultScope?.disclosed === false
+    || !isQuestionReleased(session, index) || getQuestionType(quiz.questions[index]) !== "poll") return null;
+  const enabled = liveResultsEnabled(session, quiz, index);
+  // An explicit Hide retains the private feed, even for a poll enabled by an override.
+  if (!enabled && session.liveResultsOverrides?.[String(index)] !== false) return null;
+  if (view === "participant" && (!participantId || !session.participants.has(participantId)
+    || session.participants.get(participantId)?.released || !pollVotes(session, index).has(participantId))) return null;
+  if (view !== "control" && !enabled) return { questionIndex: index, hidden: true };
+  const { voters, counts } = pollCounts(session, quiz, index);
+  return view !== "control" && voters < 3 ? { questionIndex: index, voters, counts: null, floor: 3 }
+    : { questionIndex: index, voters, counts };
+};
+
+const pollLiveMessages = (session: Session, quiz: Quiz, index: number, now: number): EngineMessage[] => {
+  const control = pollLivePayload(session, quiz, index, now, "control");
+  if (!control) return [];
+  const messages = [message(SocketEvents.POLL_LIVE, control, "control")];
+  const payload = pollLivePayload(session, quiz, index, now, "display");
+  if (!payload) return messages;
+  messages.push(message(SocketEvents.POLL_LIVE, payload, "display"));
+  // Build the aggregate once per public audience, then address each accepted voter.
+  for (const id of pollVotes(session, index).keys()) {
+    const seat = session.participants.get(id);
+    if (seat && !seat.released) messages.push(message(SocketEvents.POLL_LIVE, payload, `participant:${id}`));
+  }
+  return messages;
+};
+
 /** Audience-safe content; reading/previewing must never release an item. */
 export const publicQuestionPayload = (session: Session, quiz: Quiz, index: number, now: number): QuestionOpenPayload | null => {
   quiz = session.deckSnapshot ?? quiz;
@@ -189,6 +240,8 @@ export const publicQuestionPayload = (session: Session, quiz: Quiz, index: numbe
     ...(quiz.style ? { deckStyle: quiz.style } : {}),
     options: q.options.map((o) => ({ label: o.label, text: o.textHtml })),
     allowsMultiple: q.allowsMultiple, isPoll: q.isPoll === true,
+    ...(getQuestionType(q) === "poll" && (q.liveResults || session.liveResultsOverrides?.[String(index)] !== undefined)
+      ? { liveResults: liveResultsEnabled(session, quiz, index) } : {}),
     timeLimitSec: isSelfPaced(session) ? null : q.timeLimitSec, startedAt: timing?.startedAt ?? now, serverNow: now,
     ...(isSelfPaced(session) ? { deadlineAt: null, ...(timing?.firstOpenedAt !== undefined ? { firstOpenedAt: timing.firstOpenedAt } : {}) } : timing ? { deadlineAt: timing.deadlineAt, ...(timing.firstOpenedAt !== undefined ? { firstOpenedAt: timing.firstOpenedAt } : {}) }
       : q.timeLimitSec === null || isSlideType(getQuestionType(q)) ? { deadlineAt: null } : {}),
@@ -242,12 +295,20 @@ export const ownAnswers = (session: Session, quiz: Quiz, studentId: string): Stu
   })
   .sort((a, b) => a.questionIndex - b.questionIndex);
 /** Safe released-content projection. Adapters authenticate the seat before calling. */
+export function participantStudyItemPayload(session: Session, quiz: Quiz, index: number, studentId: string, now: number): import("@mdq/shared").ParticipantStudyItemPayload | null {
+  quiz = session.deckSnapshot ?? quiz;
+  const item = publicQuestionPayload(session, quiz, index, now);
+  if (!item) return null;
+  const pollLive = pollLivePayload(session, quiz, index, now, "participant", studentId);
+  return { ...item, ...(pollLive ? { pollLive } : {}) };
+}
+
 export function participantStudyPayload(session: Session, quiz: Quiz, studentId: string, now: number): import("@mdq/shared").ParticipantStudyPayload {
   if (sessionAvailabilityPhase(session, now) === "deleted") return { availability: availabilityPayload(session, now), policy: null, items: [], currentQuestionIndex: -1, state: session.state, answers: [], answeredQuestions: [], answerableQuestionIndexes: [] };
   quiz = session.deckSnapshot ?? quiz;
   const items = releasedQuestionIndexes(session, quiz)
-    .map(index => publicQuestionPayload(session, quiz, index, now))
-    .filter((item): item is QuestionOpenPayload => item !== null);
+    .map(index => participantStudyItemPayload(session, quiz, index, studentId, now))
+    .filter((item): item is import("@mdq/shared").ParticipantStudyItemPayload => item !== null);
   const answers = ownAnswers(session, quiz, studentId);
   const answeredQuestions = [...new Set(answers.map(answer => answer.questionIndex))];
   const answerableQuestionIndexes = items.filter(item => {
@@ -294,7 +355,9 @@ export function participantResultsPayload(session: Session, quiz: Quiz, studentI
     if (!question) return [];
     const answer = own.get(index) ?? null;
     const submission = session.submissions.find(s => s.studentId === studentId && s.questionIndex === index);
-    return [{ question, answer, explanation: q.explanation, ...(scored.has(index) ? {
+    const live = answer && liveResultsEnabled(session, quiz, index) ? pollLivePayload(session, quiz, index, now, "participant", studentId) : null;
+    return [{ question, answer, explanation: q.explanation,
+      ...(live && "counts" in live ? { pollLive: { voters: live.voters, counts: live.counts } } : {}), ...(scored.has(index) ? {
       correct: !!submission && isExactOptionMatch(submission.selectedOptions, scored.get(index)!),
       correctOptions: [...scored.get(index)!],
     } : {}) }];
@@ -397,6 +460,7 @@ export function apply(input: Session, quiz: Quiz, command: Command, now: number)
   const openContext = () => {
     const payload = questionPayload(session, quiz, now);
     if (payload) emit(SocketEvents.QUESTION_OPEN, payload);
+    messages.push(...pollLiveMessages(session, quiz, session.currentQuestionIndex, now));
   };
   const state = (includeIndex = true) => {
     const payload = { ...(session.availability ? { availability: availabilityPayload(session, now) } : {}),
@@ -423,10 +487,10 @@ export function apply(input: Session, quiz: Quiz, command: Command, now: number)
     session.questionDeadlineAt = timing.deadlineAt;
     session.closedByTimer = false;
   };
-  if (session.resultScope && ["configurePolicy", "start", "next", "previous", "open", "restartCountdown", "close", "reveal", "leaderboardShow", "leaderboardHide"].includes(command.type)) throw new EngineCommandError("Session has ended.");
+  if (session.resultScope && ["configurePolicy", "start", "next", "previous", "open", "restartCountdown", "close", "reveal", "leaderboardShow", "leaderboardHide", "liveResults"].includes(command.type)) throw new EngineCommandError("Session has ended.");
   const availabilityPhase = sessionAvailabilityPhase(session, now);
   if (availabilityPhase === "deleted" && !["expireAvailability", "purgeAvailability", "snapshot", "join", "answerSubmit", "disconnect"].includes(command.type)) throw new EngineCommandError("Session data has been deleted.");
-  if (availabilityPhase === "expired" && ["configurePolicy", "start", "next", "previous", "open", "restartCountdown", "close", "reveal", "leaderboardShow", "leaderboardHide", "releaseSeat"].includes(command.type)) throw new EngineCommandError("Availability ended. Extend & reopen or deliberately End to show results.");
+  if (availabilityPhase === "expired" && ["configurePolicy", "start", "next", "previous", "open", "restartCountdown", "close", "reveal", "leaderboardShow", "leaderboardHide", "releaseSeat", "liveResults"].includes(command.type)) throw new EngineCommandError("Availability ended. Extend & reopen or deliberately End to show results.");
   switch (command.type) {
     case "configureAvailability": {
       if (command.role !== "control") throw new EngineCommandError("Only the presenter can change availability.");
@@ -454,6 +518,7 @@ export function apply(input: Session, quiz: Quiz, command: Command, now: number)
       session.participants.clear(); session.submissions = []; session.deckSnapshot = undefined;
       session.releasedQuestionIndexes?.clear(); session.revealedQuestionIndexes?.clear();
       session.questionTiming = undefined; session.hiddenResponses = undefined;
+      session.liveResultsOverrides = undefined;
       session.questionStartedAt = undefined; session.questionDeadlineAt = undefined;
       emit(SocketEvents.SESSION_AVAILABILITY, availabilityPayload(session, now));
       break;
@@ -706,6 +771,18 @@ export function apply(input: Session, quiz: Quiz, command: Command, now: number)
       else session.submissions.push(submission);
       emit(SocketEvents.ANSWER_ACCEPTED, { questionIndex: payload.questionIndex }, target);
       emitCount();
+      messages.push(...pollLiveMessages(session, quiz, payload.questionIndex, now));
+      break;
+    }
+    case "liveResults": {
+      if (command.role !== "control") throw new EngineCommandError("Only the presenter can show or hide live results.");
+      if (session.state === "ENDED") throw new EngineCommandError("Session has ended.");
+      const { questionIndex, visible } = command;
+      if (!Number.isInteger(questionIndex) || getQuestionType(quiz.questions[questionIndex]) !== "poll") throw new EngineCommandError("live-results only applies to polls");
+      if (typeof visible !== "boolean") throw new EngineCommandError("Send visible as true or false.");
+      session.liveResultsOverrides ??= {};
+      session.liveResultsOverrides[String(questionIndex)] = visible;
+      messages.push(...pollLiveMessages(session, quiz, questionIndex, now));
       break;
     }
     case "responseVisibility": {
@@ -833,5 +910,11 @@ function snapshotMessages(session: Session, quiz: Quiz, now: number, audience: A
     if (view === "control" || !publicResultsHidden(session, now)) emit(SocketEvents.RESULTS_REVEAL, revealPayload(session, quiz, view, now));
     if (staff) emitCount();
   } else if (session.state === "LEADERBOARD" && (view === "control" || !publicResultsHidden(session, now)) && (!session.policy || getSessionScoredQuestionCount(session, quiz) > 0)) emit(SocketEvents.LEADERBOARD_UPDATE, leaderboardPayload(session, quiz, payloadView, now));
+  // Self-paced voters may be on a different released item from the presenter.
+  const indexes = isSelfPaced(session) && view !== "display" ? releasedQuestionIndexes(session, quiz) : [session.currentQuestionIndex];
+  for (const index of indexes) {
+    const live = pollLivePayload(session, quiz, index, now, view, view === "participant" ? audience.slice("participant:".length) : undefined);
+    if (live) emit(SocketEvents.POLL_LIVE, live);
+  }
   return messages;
 }

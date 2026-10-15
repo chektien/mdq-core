@@ -50,6 +50,7 @@ export const SocketEvents = {
   SESSION_PARTICIPANTS: "session:participants",
   ANSWER_COUNT: "answer:count",
   RESULTS_DISTRIBUTION: "results:distribution",
+  POLL_LIVE: "poll:live",
 
   // Server -> All
   QUESTION_OPEN: "question:open",
@@ -346,6 +347,8 @@ export interface QuestionOpenPayload {
   options: { label: string; text: string }[];
   allowsMultiple: boolean;
   isPoll?: boolean;
+  /** Effective session setting. Absent means live results are off. */
+  liveResults?: boolean;
   /** null means the presenter closes this question; content items retain 0. */
   timeLimitSec: number | null;
   startedAt: number; // unix ms
@@ -399,6 +402,17 @@ export interface ResultsDistributionPayload {
   questionIndex: number;
   distribution: Record<string, number>;
 }
+
+/** Aggregate voters, with each option counted at most once per voter. */
+export interface PollLiveCounts {
+  voters: number;
+  counts: Record<string, number> | null;
+}
+/** Public counts are suppressed below three voters; control has no floor. */
+export type PollLivePayload =
+  | { questionIndex: number; voters: number; counts: Record<string, number> }
+  | { questionIndex: number; voters: number; counts: null; floor: 3 }
+  | { questionIndex: number; hidden: true };
 
 export interface ResultsRevealPayload {
   questionIndex: number;
@@ -535,6 +549,8 @@ export interface Question {
   correctOptions: string[];
   allowsMultiple: boolean;
   isPoll?: boolean;
+  /** Poll-only authored setting; defaults to false. */
+  liveResults?: boolean;
   explanation: string;
   timeLimitSec: number | null;
 }
@@ -726,6 +742,8 @@ export interface Session {
    * Plain data, so it survives session serialisation.
    */
   hiddenResponses?: Record<string, string[]>;
+  /** Per-poll presenter overrides, keyed by item index. Never edits the deck. */
+  liveResultsOverrides?: Record<string, boolean>;
   /** Whether the question now closed was closed by its timer running out, not by the presenter. */
   closedByTimer?: boolean;
   /**
@@ -742,6 +760,7 @@ export interface Session {
 
 /** Snapshot of a session written to data/sessions/<id>.json on session end */
 export interface SessionSnapshot {
+  liveResultsOverrides?: Record<string, boolean>;
   availability?: SessionAvailability;
   deckSnapshot?: Quiz;
   policy?: SessionPolicy;
@@ -820,11 +839,16 @@ export * from "./identity";
 export * from "./videoProviders";
 export * from "./videoLinks";
 
-/** Seat-authenticated released content and OWN answer evidence only. */
+export interface ParticipantStudyItemPayload extends QuestionOpenPayload {
+  /** Only present for a live poll this seat has voted on. */
+  pollLive?: PollLivePayload;
+}
+
+/** Seat-authenticated released content, own answers and eligible live aggregates. */
 export interface ParticipantStudyPayload {
   availability?: SessionAvailabilityPayload;
   policy: SessionPolicy | null;
-  items: QuestionOpenPayload[];
+  items: ParticipantStudyItemPayload[];
   currentQuestionIndex: number;
   state: SessionState;
   answers: StudentAnswer[];
@@ -844,6 +868,8 @@ export interface ParticipantQuestionResult {
   correct?: boolean;
   correctOptions?: string[];
   explanation?: string;
+  /** Final aggregate only for a live poll this participant voted on. */
+  pollLive?: PollLiveCounts;
 }
 /** Deliberately separate from instructor results. Never carries another participant's text or identity. */
 export interface ParticipantResultsPayload {

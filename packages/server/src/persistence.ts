@@ -124,6 +124,7 @@ export function saveSessionSnapshot(session: Session, baseDir?: string): void {
     mode: session.mode,
     questionCount: session.policy ? (session.resultScope?.releasedQuestionIndexes ?? [...(session.releasedQuestionIndexes ?? [])]).length : session.currentQuestionIndex + 1,
     ...(session.policy ? { deckSnapshot: session.deckSnapshot, policy: session.policy, policyFrozen: session.policyFrozen, releasedQuestionIndexes: [...(session.releasedQuestionIndexes ?? [])], resultScope: session.resultScope } : {}),
+    ...(session.liveResultsOverrides ? { liveResultsOverrides: session.liveResultsOverrides } : {}),
     participantCount: session.participants.size,
     participants: [...session.participants.values()].map((p) => ({
       studentId: p.studentId,

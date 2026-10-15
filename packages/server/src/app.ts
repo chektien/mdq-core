@@ -16,7 +16,7 @@ import {
 } from "./session";
 import { parseQuizMarkdown } from "./parser";
 import { publicResultsHidden, releasedQuestionIndexes, getSessionScoredQuestionCount, effectiveRanking, sessionPolicy } from "./policy";
-import { apply, participantResultsPayload, endSessionAdvisory, participantStudyPayload, publicQuestionPayload, leaderboardRows, questionPosition, responsesFor, timingFor, EngineCommandError, type Command, type EngineResult } from "./engine";
+import { apply, participantResultsPayload, endSessionAdvisory, participantStudyPayload, participantStudyItemPayload, publicQuestionPayload, leaderboardRows, questionPosition, responsesFor, timingFor, EngineCommandError, type Command, type EngineResult } from "./engine";
 import {
   persistSessionOnEnd,
   purgeSessionArtifacts,
@@ -875,7 +875,7 @@ export function createApp(quizDirOrOpts?: string | AppOptions) {
       if (!quiz) return res.status(500).json({ error: "Quiz data not found" });
       const participant = session.participants.get(String(req.query.participantId ?? ""));
       if (!participant || !req.query.sessionToken || participant.sessionToken !== req.query.sessionToken || participant.released) return res.status(401).json({ error: "Valid seat credentials are required" });
-      const item = publicQuestionPayload(session, quiz, Number(req.params.index), Date.now());
+      const item = participantStudyItemPayload(session, quiz, Number(req.params.index), participant.studentId, Date.now());
       if (!item) return res.status(404).json({ error: "Item unavailable" });
       res.setHeader("Cache-Control", "no-store"); return res.json(item);
     });

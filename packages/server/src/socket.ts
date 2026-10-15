@@ -148,8 +148,9 @@ export function setupSocket(httpServer: HttpServer, quizzes: Map<string, Quiz>):
       const result = apply(session, quiz, { type: "answerSubmit", studentId, sessionToken, payload }, Date.now());
       Object.assign(session, result.session);
       // The answer's own outcome goes to the socket that asked, not to whichever socket holds the seat now.
+      // Live poll counts addressed to other voters go to those voters, through the usual routing.
       for (const item of result.messages) {
-        if (item.audience.startsWith("participant:")) socket.emit(item.event, item.payload);
+        if (item.audience.startsWith("participant:") && item.event !== SocketEvents.POLL_LIVE) socket.emit(item.event, item.payload);
         else emitMessages(io, sessionId, [item]);
       }
     });

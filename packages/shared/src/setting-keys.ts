@@ -16,6 +16,7 @@ export const DECK_SETTING_KEYS: readonly string[] = [
   "question-type",
   "time-limit",
   "multi-select",
+  "live-results",
   "media-group",
   "live-url",
   "live-title-overlay",

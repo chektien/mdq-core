@@ -355,6 +355,16 @@ function parseQuestionBlock(
   const isCover = normalizedQuestionType === "cover";
   const isSlide = normalizedQuestionType === "slide" || isCover;
 
+  const liveResultsMatch = block.match(/^live_results:[^\S\n]*([^\n]*)$/im);
+  let liveResults = false;
+  if (liveResultsMatch) {
+    const lineNumber = findLineNumber(lines, blockStartLine, (line) => /^live_results:/i.test(line));
+    if (!isPoll) throw new QuizParseError(sourceFile, index, "live-results only applies to polls", lineNumber);
+    const value = liveResultsMatch[1].trim().toLowerCase();
+    if (value !== "on" && value !== "off") throw new QuizParseError(sourceFile, index, "Invalid live-results (must be on or off)", lineNumber);
+    liveResults = value === "on";
+  }
+
   if (isSlide && timeLimitMatch) {
     throw new QuizParseError(
       sourceFile,
@@ -510,6 +520,7 @@ function parseQuestionBlock(
   let textLines = lines.slice(h2LineIdx + 1, contentEndLineIdx);
   // Remove time_limit line from text
   textLines = textLines.filter((l) => !/^time_limit:/i.test(l.trim()));
+  textLines = textLines.filter((l) => !/^live_results:/i.test(l.trim()));
   textLines = textLines.filter((l) => !/^(?:type|question_type):\s*[a-z_-]+$/i.test(l.trim()));
   textLines = textLines.filter((l) => !/^multi_select:\s*(true|false|yes|no|1|0)$/i.test(l.trim()));
   const liveEmbedExtraction = isSlide
@@ -611,6 +622,7 @@ function parseQuestionBlock(
     correctOptions,
     allowsMultiple,
     isPoll,
+    ...(isPoll ? { liveResults } : {}),
     explanation,
     timeLimitSec: isSlide ? 0 : timeLimitSec,
   };
@@ -626,7 +638,7 @@ function findQuestionPromptLineNumber(lines: string[], blockStartLine: number, f
     const trimmed = lines[i].trim();
     if (!trimmed) continue;
     if (/^##\s+/.test(trimmed)) continue;
-    if (/^(time_limit|type|question_type|multi_select):/i.test(trimmed)) continue;
+    if (/^(time_limit|type|question_type|multi_select|live_results):/i.test(trimmed)) continue;
     if (/^>/.test(trimmed)) continue;
     return blockStartLine + i;
   }
