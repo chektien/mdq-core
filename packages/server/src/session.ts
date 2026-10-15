@@ -120,6 +120,7 @@ export function createSession(week: string, mode: SessionMode): Session {
     revealedQuestionIndexes: new Set<number>(),
     participants: new Map<string, Participant>(),
     submissions: [],
+    openResponsesHiddenByDefault: true,
     createdAt: now,
   };
 }
@@ -309,6 +310,9 @@ export function getDistribution(
 
 /** Whether the presenter has hidden this participant's response to a question from the projector. */
 export function isResponseHidden(session: Session, questionIndex: number, publicKey: string): boolean {
+  if (session.openResponsesHiddenByDefault === true) {
+    return session.shownResponses?.[String(questionIndex)]?.includes(publicKey) !== true;
+  }
   return session.hiddenResponses?.[String(questionIndex)]?.includes(publicKey) === true;
 }
 

@@ -2,7 +2,7 @@ import { availabilityPayload, nextAvailabilityAlarm, sessionAvailabilityPhase, v
 import { isSlideType } from "@mdq/shared";
 import express, { type Request, type Response } from "express";
 import cors from "cors";
-import { API, AccessInfo, CumulativeLeaderboardEntry, PublicCumulativeLeaderboardEntry, ParseDiagnostic, formatDiagnostic, DeckPalette, DeckTheme, JoinLockRequest, LiveResultsRequest, Quiz, ReleaseSeatRequest, ResponseVisibilityRequest, Session, SessionState, PARTICIPANT_RESULT_RETENTION_MS, usesStudentIds } from "@mdq/shared";
+import { API, AccessInfo, CumulativeLeaderboardEntry, PublicCumulativeLeaderboardEntry, ParseDiagnostic, formatDiagnostic, DeckPalette, DeckTheme, JoinLockRequest, LiveResultsRequest, Quiz, ReleaseSeatRequest, ResponseVisibilityRequest, ResponsesVisibilityRequest, Session, SessionState, PARTICIPANT_RESULT_RETENTION_MS, usesStudentIds } from "@mdq/shared";
 import {
   createSession,
   storeSession,
@@ -280,6 +280,7 @@ export function createApp(quizDirOrOpts?: string | AppOptions) {
         explanation: question.explanation,
         distribution: getDistribution(session, questionIndex),
         isPoll: question.isPoll === true,
+        ...(isOpenResponseQuestion(question) ? { openResponseTotal: getOpenResponses(session, questionIndex).length } : {}),
         openResponses: isOpenResponseQuestion(question) ? responsesFor(getOpenResponses(session, questionIndex), view) : undefined,
       }));
   }
@@ -955,6 +956,26 @@ export function createApp(quizDirOrOpts?: string | AppOptions) {
         onMessages?.(session, req.params.id, result);
         logActivity(`instructor ${hidden ? "hid" : "showed"} a response session=${req.params.id} q=${questionIndex}`);
         return res.json({ questionIndex, publicKey, hidden });
+      } catch (e) {
+        if (e instanceof EngineCommandError) return res.status(400).json({ error: e.message });
+        throw e;
+      }
+    });
+  });
+
+  // Show or hide the current item's existing responses together.
+  app.post(API.SESSION_RESPONSES_VISIBILITY, requireInstructorAuth, (req, res) => {
+    withSession(req, res, (session) => {
+      const quiz = getQuizForSession(session);
+      if (!quiz) return res.status(500).json({ error: "Quiz data not found" });
+      const { questionIndex, hidden } = (req.body ?? {}) as Partial<ResponsesVisibilityRequest>;
+      if (!Number.isInteger(questionIndex) || typeof hidden !== "boolean") return res.status(400).json({ error: "Send questionIndex and hidden." });
+      try {
+        const result = apply(session, quiz, { type: "responsesVisibility", role: "control", questionIndex: questionIndex as number, hidden }, Date.now());
+        Object.assign(session, result.session);
+        storeSession(session);
+        onMessages?.(session, req.params.id, result);
+        return res.json({ questionIndex, hidden });
       } catch (e) {
         if (e instanceof EngineCommandError) return res.status(400).json({ error: e.message });
         throw e;

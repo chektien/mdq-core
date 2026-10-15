@@ -104,8 +104,9 @@ export default function PresentationView({
     reveal && currentQuestion && reveal.questionIndex === currentQuestion.questionIndex
       ? reveal
       : null;
-  // While a question is open the projector only knows how many responses are in; the text comes with the reveal.
-  const liveResponseCount = sock.answerCount?.submitted ?? 0;
+  // Live totals include hidden responses; the payload contains only the responses shown by the presenter.
+  const liveResponseCount = sock.answerCount?.openResponseTotal ?? sock.answerCount?.submitted ?? 0;
+  const liveOpenResponses = sock.answerCount?.openResponses ?? [];
 
   const currentHeading = useMemo(() => {
     if (!currentQuestion) return null;
@@ -298,7 +299,7 @@ export default function PresentationView({
           {noVotesClosed && <p className="no-votes-note">No votes yet</p>}
 
           {currentQuestion.questionType === "open_response" ? (
-            <OpenResponseCount count={liveResponseCount} />
+            <OpenResponseCount count={liveResponseCount} responses={liveOpenResponses} />
           ) : (() => {
             const dist = state === "QUESTION_CLOSED" ? sock.distribution?.distribution : null;
             const totalResponses = sock.answerCount?.submitted ?? 0;
@@ -350,7 +351,7 @@ export default function PresentationView({
           {noVotesRevealed && <p className="no-votes-note">No votes yet</p>}
 
           {currentQuestion.questionType === "open_response" ? (
-            <OpenResponseList responses={currentReveal.openResponses} title="Responses" emptyLabel="No responses were submitted." showStudentIds={false} />
+            <OpenResponseList total={currentReveal.openResponseTotal} responses={currentReveal.openResponses} title="Responses" emptyLabel="No responses were submitted." showStudentIds={false} />
           ) : (() => {
             const dist = currentReveal.distribution;
             const maxCount = Math.max(1, ...Object.values(dist));
@@ -562,7 +563,7 @@ export default function PresentationView({
                   {noVotesClosed && <p className="no-votes-note">No votes yet</p>}
 
                   {currentQuestion.questionType === "open_response" ? (
-                    <OpenResponseCount count={liveResponseCount} />
+                    <OpenResponseCount count={liveResponseCount} responses={liveOpenResponses} />
                   ) : (() => {
                     const dist = state === "QUESTION_CLOSED" ? sock.distribution?.distribution : null;
                     const totalResponses = sock.answerCount?.submitted ?? 0;
@@ -630,7 +631,7 @@ export default function PresentationView({
               {noVotesRevealed && <p className="no-votes-note">No votes yet</p>}
 
               {currentQuestion.questionType === "open_response" ? (
-                <OpenResponseList responses={currentReveal.openResponses} title="Responses" emptyLabel="No responses were submitted." showStudentIds={false} />
+                <OpenResponseList total={currentReveal.openResponseTotal} responses={currentReveal.openResponses} title="Responses" emptyLabel="No responses were submitted." showStudentIds={false} />
               ) : (() => {
                 const dist = currentReveal.distribution;
                 const maxCount = Math.max(1, ...Object.values(dist));

@@ -15,16 +15,28 @@ export default function OpenResponseList({
   showStudentIds = true,
   onToggleHidden,
   notice,
+  onSetAllHidden,
+  hiddenByDefault = false,
+  total = responses.length,
+  live = false,
 }: {
   responses: OpenResponseEntry[];
   title?: string;
   emptyLabel?: string;
   showStudentIds?: boolean;
   onToggleHidden?: (response: OpenResponseEntry, hidden: boolean) => void;
+  onSetAllHidden?: (hidden: boolean) => void;
+  hiddenByDefault?: boolean;
+  /** All submitted responses, including ones omitted from a display payload. */
+  total?: number;
+  /** Projector summary before reveal, with no empty list when all are hidden. */
+  live?: boolean;
   /** A short message about the last hide or show, such as why it did not work. */
   notice?: string | null;
 }) {
   const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({});
+
+  const hiddenCount = Math.max(0, total - responses.filter((response) => !response.hidden).length);
 
   const toggleRow = (rowKey: string) => {
     setExpandedRows((prev) => ({ ...prev, [rowKey]: !prev[rowKey] }));
@@ -32,15 +44,25 @@ export default function OpenResponseList({
 
   return (
     <div className="open-response-list w-full max-w-3xl rounded-2xl border p-4">
-      <div className="open-response-heading mb-3 flex items-center justify-between gap-3">
+      {live ? (
+        <p className="open-response-count-label mb-3 text-lg">{total} {total === 1 ? "response" : "responses"}{responses.length > 0 && ` · ${responses.length} shown`}</p>
+      ) : <div className="open-response-heading mb-3 flex items-center justify-between gap-3">
         <h3 className="open-response-title text-sm font-semibold uppercase tracking-[0.2em]">
-          {title}<span className="open-response-inline-count"> · {responses.length}</span>
+          {title}<span className="open-response-inline-count"> · {total}</span>
         </h3>
-        <span className="open-response-count text-xs tabular-nums">{responses.length}</span>
-      </div>
+        <span className="open-response-count text-xs tabular-nums">{total}</span>
+      </div>}
+      {hiddenCount > 0 && <p className="open-response-empty mb-3 text-sm">{hiddenCount} hidden</p>}
+      {onToggleHidden && hiddenByDefault && <p className="open-response-empty mb-3 text-sm">Responses start hidden. Show the ones you want on the projector.</p>}
+      {onSetAllHidden && (
+        <div className="mb-3 flex flex-wrap gap-2">
+          <button type="button" className="open-response-toggle" disabled={total === 0} onClick={() => onSetAllHidden(false)}>Show all</button>
+          <button type="button" className="open-response-toggle" disabled={total === 0} onClick={() => onSetAllHidden(true)}>Hide all</button>
+        </div>
+      )}
       {notice && <p role="alert" className="open-response-notice mb-3 text-sm">{notice}</p>}
       {responses.length === 0 ? (
-        <p className="open-response-empty text-sm">{emptyLabel}</p>
+        !live && <p className="open-response-empty text-sm">{total === 0 ? emptyLabel : "All responses are hidden from the projector."}</p>
       ) : (
         <div className="max-h-[340px] space-y-2 overflow-y-auto pr-1">
           {responses.map((response) => {
@@ -92,16 +114,7 @@ export default function OpenResponseList({
   );
 }
 
-/**
- * What the projector shows while an open question is running: how many
- * responses are in, and that they appear after the reveal.
- */
-export function OpenResponseCount({ count }: { count: number }) {
-  return (
-    <div className="open-response-list open-response-count-card w-full max-w-3xl rounded-2xl border p-6 text-center">
-      <p className="open-response-count-number text-5xl font-semibold tabular-nums">{count}</p>
-      <p className="open-response-count-label mt-2 text-lg">{count === 1 ? "response in" : "responses in"}</p>
-      <p className="open-response-empty mt-3 text-sm">Responses appear after the reveal.</p>
-    </div>
-  );
+/** The projector's live total and the responses explicitly shown by the presenter. */
+export function OpenResponseCount({ count, responses = [] }: { count: number; responses?: OpenResponseEntry[] }) {
+  return <OpenResponseList responses={responses} total={count} showStudentIds={false} live />;
 }

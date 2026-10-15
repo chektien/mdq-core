@@ -20,6 +20,7 @@ import {
   showLeaderboard,
   hideLeaderboard,
   setResponseHidden,
+  setAllResponsesHidden,
   setLiveResults,
   releaseSeat,
   setJoinLocked,
@@ -120,6 +121,7 @@ function revealStateFromRestore(data: NonNullable<SessionRestoreResponse["review
     distribution: data.distribution,
     isPoll: data.isPoll ?? false,
     openResponses: data.openResponses ?? [],
+    openResponseTotal: data.openResponseTotal,
   };
 }
 
@@ -1038,9 +1040,18 @@ function LiveView({
       setModerationNotice(e instanceof Error ? e.message : "That did not work. Please try again.");
     }
   }, [displayQuestion, sessionId]);
+  const setAllHidden = useCallback(async (hidden: boolean) => {
+    if (!displayQuestion) return;
+    setModerationNotice(null);
+    try {
+      await setAllResponsesHidden(sessionId, displayQuestion.questionIndex, hidden);
+    } catch (e) {
+      setModerationNotice(e instanceof Error ? e.message : "That did not work. Please try again.");
+    }
+  }, [displayQuestion, sessionId]);
   const moderationProps = isReviewing || !sock.connected
     ? {}
-    : { onToggleHidden: toggleResponseHidden, notice: moderationNotice };
+    : { onToggleHidden: toggleResponseHidden, onSetAllHidden: setAllHidden, hiddenByDefault: sock.answerCount?.openResponsesHiddenByDefault === true, notice: moderationNotice };
   const liveOpenResponses = displayQuestion?.questionType === "open_response"
     ? sock.answerCount?.openResponses ?? []
     : [];

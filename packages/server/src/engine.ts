@@ -34,7 +34,7 @@ export class EngineCommandError extends Error {}
  * `control`, and the same event with labels and public keys as `display`
  * (or `public` when phones get it too). Open-response text is the exception:
  * the instructor gets every response, the projector gets only the ones the
- * presenter has not hidden and only once the answers are revealed, and phones
+ * presenter has shown, including before reveal, and phones
  * never get anyone else's response.
  */
 export type Audience = "all" | "staff" | "control" | "display" | "public" | "participants" | `participant:${string}`;
@@ -80,6 +80,7 @@ export type Command =
   | { type: "answerSubmit"; studentId?: string; sessionToken?: string; payload: AnswerSubmitPayload }
   /** Hide or show one open response on the projector. `role` is who is asking; only `control` may. */
   | { type: "responseVisibility"; role: SocketRole; questionIndex: number; publicKey: string; hidden: boolean }
+  | { type: "responsesVisibility"; role: SocketRole; questionIndex: number; hidden: boolean }
   /** A session-only poll override. Public hiding keeps the presenter's private counts. */
   | { type: "liveResults"; role: SocketRole; questionIndex: number; visible: boolean }
   /** Free one participant's seat so the next join with that ID (or name) takes it over. `role` is who is asking; only `control` may. */
@@ -139,6 +140,9 @@ const clone = (session: Session, answering = false): Session => ({
   submissions: answering ? [...session.submissions] : session.submissions.map((s) => ({ ...s, selectedOptions: [...s.selectedOptions] })),
   questionTiming: session.questionTiming ? Object.fromEntries(Object.entries(session.questionTiming)
     .map(([index, timing]) => [index, { ...timing, restarts: timing.restarts.map((restart) => ({ ...restart })) }])) : undefined,
+  shownResponses: session.shownResponses
+    ? Object.fromEntries(Object.entries(session.shownResponses).map(([index, keys]) => [index, [...keys]]))
+    : undefined,
   hiddenResponses: session.hiddenResponses
     ? Object.fromEntries(Object.entries(session.hiddenResponses).map(([index, keys]) => [index, [...keys]]))
     : undefined,
@@ -260,18 +264,21 @@ export const responsesFor = (responses: OpenResponseEntry[], view: ResponseView)
   return responses.filter((r) => !r.hidden)
     .map(({ publicKey, label, responseText, submittedAt }) => ({ publicKey, label, responseText, submittedAt }));
 };
-/**
- * The answer count. It only carries the responses themselves to the
- * instructor: the projector and phones never get open-response text while a
- * question is open, only the count.
- */
-const countPayload = (session: Session, quiz: Quiz, view: ResponseView) => ({
-  questionIndex: session.currentQuestionIndex,
-  ...getSubmissionCount(session, session.currentQuestionIndex),
-  ...(session.submissions.length > 0 ? { hasAnswers: true as const } : {}),
-  openResponses: view === "control" && isOpenResponseQuestion(questionAt(session, quiz))
-    ? responsesFor(getOpenResponses(session, session.currentQuestionIndex), view) : undefined,
-});
+/** Control gets all responses; display gets only shown responses; phones get no text. */
+const countPayload = (session: Session, quiz: Quiz, view: ResponseView, now: number) => {
+  const responses = isOpenResponseQuestion(questionAt(session, quiz)) ? getOpenResponses(session, session.currentQuestionIndex) : undefined;
+  return {
+    questionIndex: session.currentQuestionIndex,
+    ...getSubmissionCount(session, session.currentQuestionIndex),
+    ...(session.submissions.length > 0 ? { hasAnswers: true as const } : {}),
+    openResponses: undefined,
+    ...(responses && view === "control" ? { openResponsesHiddenByDefault: session.openResponsesHiddenByDefault === true } : {}),
+    ...(responses && view !== "participant" ? {
+      openResponseTotal: responses.length,
+      openResponses: view === "control" || !publicResultsHidden(session, now) ? responsesFor(responses, view) : undefined,
+    } : {}),
+  };
+};
 const revealPayload = (session: Session, quiz: Quiz, view: ResponseView, now = Date.now()) => {
   const q = questionAt(session, quiz);
   if (view !== "control" && publicResultsHidden(session, now)) return null;
@@ -280,6 +287,7 @@ const revealPayload = (session: Session, quiz: Quiz, view: ResponseView, now = D
     correctOptions: q.correctOptions, explanation: q.explanation,
     distribution: getDistribution(session, session.currentQuestionIndex), isPoll: q.isPoll === true,
     ...(getQuestionType(q) === "poll" ? { voters: pollCounts(session, quiz, session.currentQuestionIndex).voters } : {}),
+    ...(isOpenResponseQuestion(q) && view !== "participant" ? { openResponseTotal: getOpenResponses(session, session.currentQuestionIndex).length } : {}),
     openResponses: isOpenResponseQuestion(q) && view !== "participant" ? responsesFor(getOpenResponses(session, session.currentQuestionIndex), view) : undefined,
   };
 };
@@ -432,13 +440,13 @@ export function apply(input: Session, quiz: Quiz, command: Command, now: number)
   const messages: EngineMessage[] = [];
   let seatTaken: EngineResult["seatTaken"];
   const emit = (event: string, payload: unknown, audience: Audience = "all") => messages.push(message(event, payload, audience));
-  // Open responses go out in full to control only; the projector gets the count, then the visible responses at reveal.
+  // Control sees every response; display sees only shown responses and the real total.
   const emitCount = () => {
-    if (publicResultsHidden(session, now)) { emit(SocketEvents.ANSWER_COUNT, countPayload(session, quiz, "control"), "control"); return; }
+    if (publicResultsHidden(session, now)) { emit(SocketEvents.ANSWER_COUNT, countPayload(session, quiz, "control", now), "control"); return; }
     if (isOpenResponseQuestion(questionAt(session, quiz))) {
-      emit(SocketEvents.ANSWER_COUNT, countPayload(session, quiz, "control"), "control");
-      emit(SocketEvents.ANSWER_COUNT, countPayload(session, quiz, "display"), "display");
-    } else emit(SocketEvents.ANSWER_COUNT, countPayload(session, quiz, "display"), "staff");
+      emit(SocketEvents.ANSWER_COUNT, countPayload(session, quiz, "control", now), "control");
+      emit(SocketEvents.ANSWER_COUNT, countPayload(session, quiz, "display", now), "display");
+    } else emit(SocketEvents.ANSWER_COUNT, countPayload(session, quiz, "display", now), "staff");
   };
   const emitReveal = () => {
     if (session.policy && !isQuestionReleased(session, session.currentQuestionIndex)) return;
@@ -518,7 +526,7 @@ export function apply(input: Session, quiz: Quiz, command: Command, now: number)
       session.deletedAt = now;
       session.participants.clear(); session.submissions = []; session.deckSnapshot = undefined;
       session.releasedQuestionIndexes?.clear(); session.revealedQuestionIndexes?.clear();
-      session.questionTiming = undefined; session.hiddenResponses = undefined;
+      session.questionTiming = undefined; session.hiddenResponses = undefined; session.shownResponses = undefined;
       session.liveResultsOverrides = undefined;
       session.questionStartedAt = undefined; session.questionDeadlineAt = undefined;
       emit(SocketEvents.SESSION_AVAILABILITY, availabilityPayload(session, now));
@@ -786,22 +794,27 @@ export function apply(input: Session, quiz: Quiz, command: Command, now: number)
       messages.push(...pollLiveMessages(session, quiz, questionIndex, now));
       break;
     }
-    case "responseVisibility": {
+    case "responseVisibility":
+    case "responsesVisibility": {
       if (command.role !== "control") throw new EngineCommandError("Only the presenter can hide or show responses.");
-      const { questionIndex, publicKey, hidden } = command;
+      const { questionIndex, hidden } = command;
       const question = quiz.questions[questionIndex];
-      if (!question || !isOpenResponseQuestion(question)) throw new EngineCommandError("That question has no open responses.");
-      if (!getOpenResponses(session, questionIndex).some((r) => r.publicKey === publicKey)) throw new EngineCommandError("That response was not found.");
+      if (!Number.isInteger(questionIndex) || !question || !isOpenResponseQuestion(question)) throw new EngineCommandError("That question has no open responses.");
+      if (typeof hidden !== "boolean") throw new EngineCommandError("Send hidden as true or false.");
+      const responses = getOpenResponses(session, questionIndex);
+      if (command.type === "responsesVisibility" && questionIndex !== session.currentQuestionIndex) throw new EngineCommandError("Only the current item's responses can be changed together.");
+      if (command.type === "responseVisibility" && !responses.some((r) => r.publicKey === command.publicKey)) throw new EngineCommandError("That response was not found.");
+      const affected = new Set(command.type === "responseVisibility" ? [command.publicKey] : responses.map((r) => r.publicKey));
+      const map = session.openResponsesHiddenByDefault === true ? "shownResponses" : "hiddenResponses";
       const key = String(questionIndex);
-      const others = (session.hiddenResponses?.[key] ?? []).filter((k) => k !== publicKey);
-      const keys = hidden ? [...others, publicKey] : others;
-      const next = { ...session.hiddenResponses };
+      const others = (session[map]?.[key] ?? []).filter((k) => !affected.has(k));
+      const include = map === "shownResponses" ? !hidden : hidden;
+      const keys = include ? [...others, ...affected] : others;
+      const next = { ...session[map] };
       if (keys.length) next[key] = keys; else delete next[key];
-      session.hiddenResponses = Object.keys(next).length ? next : undefined;
-      // Only the question on screen has an audience to update. The instructor sees the new flag at once,
-      // and the projector changes only while the answers are showing.
-      if (questionIndex === session.currentQuestionIndex && session.state !== "LOBBY" && session.state !== "ENDED") {
-        emit(SocketEvents.ANSWER_COUNT, countPayload(session, quiz, "control"), "control");
+      session[map] = Object.keys(next).length ? next : undefined;
+      if (questionIndex === session.currentQuestionIndex && ["QUESTION_OPEN", "QUESTION_CLOSED", "REVEAL"].includes(session.state)) {
+        emitCount();
         if (session.state === "REVEAL") {
           emit(SocketEvents.RESULTS_REVEAL, revealPayload(session, quiz, "control", now), "control");
           if (!publicResultsHidden(session, now)) emit(SocketEvents.RESULTS_REVEAL, revealPayload(session, quiz, "display", now), "display");
@@ -881,7 +894,7 @@ function snapshotMessages(session: Session, quiz: Quiz, now: number, audience: A
   const staff = view !== "participant";
   const payloadView: PayloadView = view === "control" ? "control" : "public";
   const emit = (event: string, payload: unknown, target: Audience = audience) => messages.push(message(event, payload, target));
-  const emitCount = () => { if (view === "control" || !publicResultsHidden(session, now)) emit(SocketEvents.ANSWER_COUNT, countPayload(session, quiz, view)); };
+  const emitCount = () => { if (view === "control" || !publicResultsHidden(session, now)) emit(SocketEvents.ANSWER_COUNT, countPayload(session, quiz, view, now)); };
   if (session.availability) emit(SocketEvents.SESSION_AVAILABILITY, availabilityPayload(session, now));
   if (sessionAvailabilityPhase(session, now) === "deleted") return messages;
   if (staff) emit(SocketEvents.SESSION_STATE, { ...(session.availability ? { availability: availabilityPayload(session, now) } : {}), state: session.state, questionIndex: session.currentQuestionIndex >= 0 ? session.currentQuestionIndex : undefined,

@@ -312,6 +312,12 @@ export interface ResponseVisibilityRequest {
   hidden: boolean;
 }
 
+/** Show or hide all existing responses to the current item. Future responses keep the session default. */
+export interface ResponsesVisibilityRequest {
+  questionIndex: number;
+  hidden: boolean;
+}
+
 /** A session-only presenter override for a poll's live results. */
 export interface LiveResultsRequest {
   questionIndex: number;
@@ -390,12 +396,16 @@ export interface AnswerRejectedPayload {
 }
 
 export interface AnswerCountPayload {
+  /** Control only: this session requires the presenter to show new responses. */
+  openResponsesHiddenByDefault?: boolean;
   /** Session-wide evidence, independent of the current question. */
   hasAnswers?: true;
   questionIndex: number;
   submitted: number;
   total: number;
   openResponses?: OpenResponseEntry[];
+  /** Real response count, including responses hidden from the projector. */
+  openResponseTotal?: number;
 }
 
 export interface QuestionClosePayload {
@@ -431,6 +441,8 @@ export interface ResultsRevealPayload {
   /** Accepted voters for polls, including multi-select polls. */
   voters?: number;
   openResponses?: OpenResponseEntry[];
+  /** Real response count, including responses hidden from the projector. */
+  openResponseTotal?: number;
 }
 
 export interface LeaderboardEntry {
@@ -518,6 +530,7 @@ export const API = {
   SESSION_LEADERBOARD_SHOW: "/api/session/:id/leaderboard-show",
   SESSION_LEADERBOARD_HIDE: "/api/session/:id/leaderboard-hide",
   SESSION_RESPONSE_VISIBILITY: "/api/session/:id/response-visibility",
+  SESSION_RESPONSES_VISIBILITY: "/api/session/:id/responses-visibility",
   SESSION_LIVE_RESULTS: "/api/session/:id/live-results",
   SESSION_RELEASE_SEAT: "/api/session/:id/release-seat",
   SESSION_JOIN_LOCK: "/api/session/:id/join-lock",
@@ -752,6 +765,10 @@ export interface Session {
    * Plain data, so it survives session serialisation.
    */
   hiddenResponses?: Record<string, string[]>;
+  /** Set only at creation. Absent/false preserves legacy default-visible moderation. */
+  openResponsesHiddenByDefault?: boolean;
+  /** Explicitly shown public keys per item for default-hidden sessions. */
+  shownResponses?: Record<string, string[]>;
   /** Per-poll presenter overrides, keyed by item index. Never edits the deck. */
   liveResultsOverrides?: Record<string, boolean>;
   /** Whether the question now closed was closed by its timer running out, not by the presenter. */

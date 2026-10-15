@@ -148,6 +148,7 @@ export interface RevealState {
   distribution: Record<string, number>;
   isPoll: boolean;
   openResponses: OpenResponseEntry[];
+  openResponseTotal?: number;
   /** Accepted voters, on polls only: the percentage base. */
   voters?: number;
 }
@@ -566,6 +567,7 @@ export function useSocket(
         distribution: data.distribution,
         isPoll: data.isPoll ?? false,
         openResponses: data.openResponses ?? [],
+        openResponseTotal: data.openResponseTotal,
         ...(Number.isSafeInteger(data.voters) && data.voters! >= 0 ? { voters: data.voters } : {}),
       });
       setSessionState("REVEAL");

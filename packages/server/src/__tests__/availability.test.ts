@@ -114,8 +114,13 @@ it("End during recovery starts its own seven days, is idempotent/final, and defe
 });
 it("unrecovered expiry purges without End, result scope or disclosure", () => {
   const session = answer(open(), 5).session;
+  session.hiddenResponses = { 0: ["smoke-hidden"] };
+  session.shownResponses = { 0: ["smoke-shown"] };
   const alarm = nextAvailabilityAlarm(session, 10_000)!;
   const deleted = apply(session, quiz, { type: "purgeAvailability", alarm }, alarm.dueAt);
+  expect(deleted.session.hiddenResponses).toBeUndefined();
+  expect(deleted.session.shownResponses).toBeUndefined();
+  expect(session.shownResponses).toEqual({ 0: ["smoke-shown"] });
   expect(deleted.session.resultScope).toBeUndefined();expect(deleted.session.state).toBe("QUESTION_OPEN");
   expect(deleted.session.participants.size).toBe(0);expect(deleted.session.submissions).toEqual([]);
   expect(deleted.messages.map(item => item.event)).toEqual([SocketEvents.SESSION_AVAILABILITY]);

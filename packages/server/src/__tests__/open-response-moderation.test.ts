@@ -1,7 +1,7 @@
 import { createLegacySession } from "./fixtures/legacy-session";
 import { Quiz, Session, SocketEvents, AnswerCountPayload, ResultsRevealPayload, MAX_OPEN_RESPONSE_LENGTH } from "@mdq/shared";
 import { apply, EngineCommandError, type Command, type EngineMessage } from "../engine";
-import { serializeSession, deserializeSession, getOpenResponses } from "../session";
+import { serializeSession, deserializeSession, getOpenResponses, createSession } from "../session";
 import { parseQuizMarkdown } from "../parser";
 
 const DECK = `# Moderation check
@@ -36,8 +36,9 @@ const IDS = ["ZQ-1001", "ZQ-2002", "ZQ-3003"];
 const TEXTS = ["Kind words from Alex", "Rude words from Sam", "Plain words from Robin"];
 
 /** A session with three participants who each answered the open question (index 1), left open. */
-function openSession(): { session: Session; keys: string[]; step: (command: Command, at?: number) => EngineMessage[] } {
+function openSession(defaultHidden?: boolean): { session: Session; keys: string[]; step: (command: Command, at?: number) => EngineMessage[] } {
   let session: Session = createLegacySession("moderation", "open");
+  if (defaultHidden !== undefined) session.openResponsesHiddenByDefault = defaultHidden;
   const step = (command: Command, at = 5000) => {
     const result = apply(session, quiz, command, at);
     session = result.session;
@@ -58,17 +59,129 @@ const to = (messages: EngineMessage[], audience: string, event: string) => messa
 const texts = (entries?: { responseText: string }[]) => (entries ?? []).map((e) => e.responseText).sort();
 
 describe("open response moderation", () => {
-  it("gives the projector the count only while the question is open", () => {
-    const { step } = openSession();
-    const messages = step({ type: "snapshot", view: "display" });
-    const count = to(messages, "display", SocketEvents.ANSWER_COUNT)[0].payload as AnswerCountPayload;
-    expect(count.submitted).toBe(3);
-    expect(count.openResponses).toBeUndefined();
-    for (const text of TEXTS) expect(JSON.stringify(messages)).not.toContain(text);
-    // A new answer reaches the projector as a count too.
-    const more = step({ type: "answerSubmit", studentId: IDS[0], payload: { questionIndex: 1, responseText: "A second thought" } });
-    expect(JSON.stringify(more.filter((m) => m.audience !== "control"))).not.toContain("A second thought");
-    expect(JSON.stringify(more.filter((m) => m.audience === "control"))).toContain("A second thought");
+  it("preserves default-visible sessions and sends visible text and the real total while open", () => {
+    for (const flag of [undefined, false]) {
+      const { step } = openSession(flag);
+      const messages = step({ type: "snapshot", view: "display" });
+      const count = to(messages, "display", SocketEvents.ANSWER_COUNT)[0].payload as AnswerCountPayload;
+      expect(count.submitted).toBe(3);
+      expect(count.openResponseTotal).toBe(3);
+      expect(texts(count.openResponses)).toEqual([...TEXTS].sort());
+      const more = step({ type: "answerSubmit", studentId: IDS[0], payload: { questionIndex: 1, responseText: "A second thought" } });
+      expect(JSON.stringify(to(more, "display", SocketEvents.ANSWER_COUNT))).toContain("A second thought");
+    }
+  });
+
+  it("creates default-hidden sessions and round-trips the flag without adopting it on old sessions", () => {
+    const fresh = createSession("smoke", "open");
+    expect(fresh.openResponsesHiddenByDefault).toBe(true);
+    expect(deserializeSession(serializeSession(fresh)).openResponsesHiddenByDefault).toBe(true);
+    const { session } = openSession();
+    const restored = deserializeSession(serializeSession(session));
+    expect(restored.openResponsesHiddenByDefault).toBeUndefined();
+    expect(getOpenResponses(restored, 1).every((r) => !r.hidden)).toBe(true);
+  });
+
+  it("starts hidden, shows and hides live in open and closed states, and retains the total at reveal", () => {
+    const { step, keys } = openSession(true);
+    const readCount = (messages: EngineMessage[]) => to(messages, "display", SocketEvents.ANSWER_COUNT)[0].payload as AnswerCountPayload;
+    const before = readCount(step({ type: "snapshot", view: "display" }));
+    expect(before.openResponses).toEqual([]);
+    expect(before.openResponseTotal).toBe(3);
+    const consoleCount = to(step({ type: "snapshot", view: "control" }), "control", SocketEvents.ANSWER_COUNT)[0].payload as AnswerCountPayload;
+    expect(consoleCount.openResponsesHiddenByDefault).toBe(true);
+    expect(consoleCount.openResponses!.every((r) => r.hidden)).toBe(true);
+    for (const state of ["QUESTION_OPEN", "QUESTION_CLOSED"]) {
+      if (state === "QUESTION_CLOSED") step({ type: "close" }, 6000);
+      const shown = readCount(step(hide(1, keys[0], false), 6100));
+      expect(shown.openResponseTotal).toBe(3);
+      expect(texts(shown.openResponses)).toEqual([TEXTS[0]]);
+      expect(Object.keys(shown.openResponses![0]).sort()).toEqual(["label", "publicKey", "responseText", "submittedAt"]);
+      const hidden = readCount(step(hide(1, keys[0]), 6200));
+      expect(hidden.openResponses).toEqual([]);
+      expect(hidden.openResponseTotal).toBe(3);
+    }
+    step(hide(1, keys[2], false), 6300);
+    const reveal = to(step({ type: "reveal" }, 6400), "display", SocketEvents.RESULTS_REVEAL)[0].payload as ResultsRevealPayload;
+    expect(reveal.openResponseTotal).toBe(3);
+    expect(texts(reveal.openResponses)).toEqual([TEXTS[2]]);
+    const allHidden = to(step(hide(1, keys[2]), 6500), "display", SocketEvents.RESULTS_REVEAL)[0].payload as ResultsRevealPayload;
+    expect(allHidden.openResponses).toEqual([]);
+    expect(allHidden.openResponseTotal).toBe(3);
+    const snapshot = to(step({ type: "snapshot", view: "display" }, 6600), "display", SocketEvents.RESULTS_REVEAL)[0].payload as ResultsRevealPayload;
+    expect(snapshot).toEqual(allHidden);
+  });
+
+  it("keeps shown and hidden choices on edits and starts a new participant hidden", () => {
+    const { step, keys } = openSession(true);
+    step(hide(1, keys[0], false));
+    const shownEdit = step({ type: "answerSubmit", studentId: IDS[0], payload: { questionIndex: 1, responseText: "Edited shown" } });
+    const display = to(shownEdit, "display", SocketEvents.ANSWER_COUNT)[0].payload as AnswerCountPayload;
+    expect(texts(display.openResponses)).toEqual(["Edited shown"]);
+    const hiddenEdit = step({ type: "answerSubmit", studentId: IDS[1], payload: { questionIndex: 1, responseText: "Edited hidden" } });
+    expect(JSON.stringify(to(hiddenEdit, "display", SocketEvents.ANSWER_COUNT))).not.toContain("Edited hidden");
+    step({ type: "join", socketId: "sock-new", newToken: "tok-new", payload: { studentId: "smoke-new" } });
+    const submitted = step({ type: "answerSubmit", studentId: "smoke-new", payload: { questionIndex: 1, responseText: "New hidden" } });
+    const after = to(submitted, "display", SocketEvents.ANSWER_COUNT)[0].payload as AnswerCountPayload;
+    expect(after.openResponseTotal).toBe(4);
+    expect(texts(after.openResponses)).toEqual(["Edited shown"]);
+    for (const messages of [shownEdit, hiddenEdit, submitted]) {
+      expect(messages.filter((m) => ["all", "public", "participants"].includes(m.audience)).some((m) => JSON.stringify(m).includes("Edited"))).toBe(false);
+    }
+  });
+
+  it("never sends shown responses to participants, on reveal or reconnect", () => {
+    const { step } = openSession(true);
+    const shown = step({ type: "responsesVisibility", role: "control", questionIndex: 1, hidden: false });
+    expect(shown.every((m) => ["control", "display"].includes(m.audience))).toBe(true);
+    step({ type: "close" }, 6000);
+    const revealed = step({ type: "reveal" }, 6100);
+    const phones = revealed.filter((m) => ["all", "public", "participants"].includes(m.audience));
+    expect(phones.some((m) => m.event === SocketEvents.RESULTS_REVEAL)).toBe(true);
+    const rejoined = step({ type: "snapshot", participantId: IDS[0], isReconnect: true }, 6200);
+    for (const messages of [phones, rejoined]) for (const text of TEXTS) expect(JSON.stringify(messages)).not.toContain(text);
+  });
+
+  it.each([true, false])("bulk changes only current responses for default-hidden=%s and persists choices without mutating input", (defaultHidden) => {
+    const { session, keys } = openSession(defaultHidden);
+    const bulk = (hidden: boolean): Extract<Command, { type: "responsesVisibility" }> => ({ type: "responsesVisibility", role: "control", questionIndex: 1, hidden });
+    const shown = apply(session, quiz, bulk(false), 5000);
+    expect(getOpenResponses(shown.session, 1).every((r) => !r.hidden)).toBe(true);
+    expect(texts((to(shown.messages, "display", SocketEvents.ANSWER_COUNT)[0].payload as AnswerCountPayload).openResponses)).toEqual([...TEXTS].sort());
+    expect(session.shownResponses).toBeUndefined();
+    expect(session.hiddenResponses).toBeUndefined();
+    const saved = deserializeSession(serializeSession(shown.session));
+    expect(saved.openResponsesHiddenByDefault).toBe(defaultHidden);
+    if (defaultHidden) expect(saved.shownResponses?.[1].sort()).toEqual([...keys].sort());
+    const hidden = apply(saved, quiz, bulk(true), 5100);
+    expect(getOpenResponses(hidden.session, 1).every((r) => r.hidden)).toBe(true);
+    const count = to(hidden.messages, "display", SocketEvents.ANSWER_COUNT)[0].payload as AnswerCountPayload;
+    expect(count.openResponses).toEqual([]);
+    expect(count.openResponseTotal).toBe(3);
+    expect(getOpenResponses(saved, 1).every((r) => !r.hidden)).toBe(true);
+    for (const role of ["display", "participant"] as const) expect(() => apply(saved, quiz, { ...bulk(false), role }, 5200)).toThrow(EngineCommandError);
+    expect(() => apply(saved, quiz, { ...bulk(false), questionIndex: 0 }, 5200)).toThrow(EngineCommandError);
+    expect(() => apply({ ...saved, currentQuestionIndex: 0 }, quiz, bulk(false), 5200)).toThrow("current item");
+    const rejoined = apply(saved, quiz, { type: "join", socketId: "new", newToken: "new", payload: { studentId: "smoke-new" } }, 5300).session;
+    const added = apply(rejoined, quiz, { type: "answerSubmit", studentId: "smoke-new", payload: { questionIndex: 1, responseText: "New response" } }, 5400).session;
+    expect(getOpenResponses(added, 1).find((r) => r.responseText === "New response")!.hidden).toBe(defaultHidden);
+  });
+
+  it("keeps shown text private while public results are hidden, including snapshots and bulk actions", () => {
+    const { session, keys } = openSession(true);
+    for (const boundary of [{ resultsDisclosed: false }, { policy: { schemaVersion: 1 as const, pacing: "self-paced" as const, ranking: "correctness" as const, effectiveTiming: "untimed" as const } }]) {
+      const privateSession = { ...session, ...boundary };
+      const shown = apply(privateSession, quiz, hide(1, keys[0], false), 5000);
+      const bulk = apply(shown.session, quiz, { type: "responsesVisibility", role: "control", questionIndex: 1, hidden: false }, 5100);
+      const snap = apply(bulk.session, quiz, { type: "snapshot", view: "display" }, 5200);
+      const revealed = apply({ ...bulk.session, state: "REVEAL", revealedQuestionIndexes: new Set([1]), releasedQuestionIndexes: new Set([1]) }, quiz, { type: "snapshot", view: "display" }, 5400);
+      for (const result of [shown, bulk, snap, revealed]) {
+        const publicMessages = result.messages.filter((m) => m.audience !== "control");
+        for (const text of TEXTS) expect(JSON.stringify(publicMessages)).not.toContain(text);
+      }
+      const participant = apply(bulk.session, quiz, { type: "snapshot", participantId: IDS[0], isReconnect: true }, 5500);
+      for (const text of TEXTS.slice(1)) expect(JSON.stringify(participant.messages)).not.toContain(text);
+    }
   });
 
   it("shows the instructor every response live, each with a hidden flag", () => {
@@ -80,8 +193,10 @@ describe("open response moderation", () => {
     const after = to(messages, "control", SocketEvents.ANSWER_COUNT)[0].payload as AnswerCountPayload;
     expect(texts(after.openResponses)).toEqual([...TEXTS].sort());
     expect(after.openResponses!.filter((r) => r.hidden).map((r) => r.publicKey)).toEqual([keys[1]]);
-    // Nothing goes to the projector or phones while the question is open.
-    expect(messages.filter((m) => m.audience !== "control")).toEqual([]);
+    const display = to(messages, "display", SocketEvents.ANSWER_COUNT)[0].payload as AnswerCountPayload;
+    expect(display.openResponseTotal).toBe(3);
+    expect(texts(display.openResponses)).toEqual([TEXTS[0], TEXTS[2]].sort());
+    expect(messages.filter((m) => !["control", "display"].includes(m.audience))).toEqual([]);
   });
 
   it("leaves a response hidden before the reveal out of the projector's reveal", () => {
