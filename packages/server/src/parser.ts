@@ -204,12 +204,19 @@ function stripOptionalQuotes(value: string): string {
   return trimmed;
 }
 
+/** The deck header: the lines above the first separator, found by the same rule as splitQuestionBlocks (an indented `---` counts). */
+function deckHeader(markdown: string): string {
+  const lines = markdown.split("\n");
+  const end = lines.findIndex((line) => /^---+\s*$/.test(line.trim()));
+  return end < 0 ? markdown : lines.slice(0, end).join("\n");
+}
+
 function extractDeckDarkMetadata(
   markdown: string,
   sourceFile: string,
   errors: QuizParseError[],
 ): DeckTheme | undefined {
-  const preamble = markdown.split(/^---+\s*$/m, 1)[0];
+  const preamble = deckHeader(markdown);
   const match = preamble.match(/^dark:[ \t]*(.*?)[ \t\r]*$/im);
   if (!match) return undefined;
 
@@ -229,7 +236,7 @@ function extractDeckSchemeMetadata(
   sourceFile: string,
   errors: QuizParseError[],
 ): DeckPalette | undefined {
-  const preamble = markdown.split(/^---+\s*$/m, 1)[0];
+  const preamble = deckHeader(markdown);
   const match = preamble.match(/^theme:[ \t]*(.*?)[ \t\r]*$/im);
   if (!match) return undefined;
 
@@ -251,7 +258,7 @@ function rejectDeckPaletteMetadata(
   sourceFile: string,
   errors: QuizParseError[],
 ): void {
-  const preamble = markdown.split(/^---+\s*$/m, 1)[0];
+  const preamble = deckHeader(markdown);
   for (const match of preamble.matchAll(/^palette:[^\n]*$/gim)) {
     const lineNumber = preamble.slice(0, match.index).split("\n").length;
     errors.push(new QuizParseError(

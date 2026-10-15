@@ -34,7 +34,8 @@ describe("deck appearance keys", () => {
   });
 
   it("reads appearance only above the first separator, including a headerless deck", () => {
-    for (const prefix of ["", "# Header\n"]) {
+    // An indented separator ends the header too, as it splits questions.
+    for (const prefix of ["", "# Header\n", "  ", "# Header\n  "]) {
       const result = parseQuizMarkdown(`${prefix}${body}\ntheme: gruvbox\ndark: off\npalette: ayu\n`, "body.md");
       expect(result.errors).toEqual([]);
       expect(result.quiz).toMatchObject({ theme: undefined, palette: undefined });
