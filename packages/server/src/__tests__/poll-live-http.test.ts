@@ -102,7 +102,7 @@ describe("live-results HTTP route", () => {
     expect(getSession(session.sessionId)!.liveResultsOverrides).toEqual({ "0": false });
     expect(JSON.stringify({ votes: session.submissions, timing: session.questionTiming, policy: session.policy })).toBe(before);
     const messages = emitted!.messages.filter(m => m.event === SocketEvents.POLL_LIVE);
-    expect(messages.find(m => m.audience === "control")?.payload).toEqual({ questionIndex: 0, voters: 3, counts: { A: 3, B: 3 } });
+    expect(messages.find(m => m.audience === "control")?.payload).toEqual({ questionIndex: 0, voters: 3, counts: { A: 3, B: 3 }, liveResults: false });
     const publicMessages = messages.filter(m => m.audience !== "control");
     expect(publicMessages.map(m => m.audience)).toEqual(["display", "participant:synthetic-one", "participant:synthetic-two", "participant:synthetic-three"]);
     for (const message of publicMessages) expect(message.payload).toEqual({ questionIndex: 0, hidden: true });
@@ -116,7 +116,7 @@ describe("live-results HTTP route", () => {
     expect(result).toMatchObject({ status: 200, body: { questionIndex: 0, visible: true } });
     expect(getSession(session.sessionId)!.liveResultsOverrides).toEqual({ "0": true });
     expect(emitted!.messages).toHaveLength(3);
-    expect(emitted!.messages.find(m => m.audience === "control")?.payload).toEqual({ questionIndex: 0, voters: 1, counts: { A: 1, B: 1 } });
+    expect(emitted!.messages.find(m => m.audience === "control")?.payload).toEqual({ questionIndex: 0, voters: 1, counts: { A: 1, B: 1 }, liveResults: true });
     for (const message of emitted!.messages.filter(m => m.audience !== "control")) {
       expect(message.payload).toEqual({ questionIndex: 0, voters: 1, counts: null, floor: 3 });
     }

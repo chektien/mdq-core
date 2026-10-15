@@ -204,8 +204,8 @@ const pollLivePayload = (session: Session, quiz: Quiz, index: number, now: numbe
     || session.participants.get(participantId)?.released || !pollVotes(session, index).has(participantId))) return null;
   if (view !== "control" && !enabled) return { questionIndex: index, hidden: true };
   const { voters, counts } = pollCounts(session, quiz, index);
-  return view !== "control" && voters < 3 ? { questionIndex: index, voters, counts: null, floor: 3 }
-    : { questionIndex: index, voters, counts };
+  if (view === "control") return { questionIndex: index, voters, counts, liveResults: enabled };
+  return voters < 3 ? { questionIndex: index, voters, counts: null, floor: 3 } : { questionIndex: index, voters, counts };
 };
 
 const pollLiveMessages = (session: Session, quiz: Quiz, index: number, now: number): EngineMessage[] => {

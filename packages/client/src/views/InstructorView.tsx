@@ -1024,6 +1024,7 @@ function LiveView({
       question={currentPoll}
       counts={livePollCounts}
       connected={sock.connected}
+      closed={state === "QUESTION_CLOSED"}
     />
   ) : null;
   const liveRevealActionLabel = getRevealActionLabel(q?.questionType ?? "multiple_choice");
@@ -1970,18 +1971,20 @@ function LiveView({
 }
 
 /** Presenter-only counts and controls stay in the body, outside the shared toolbar. */
-function PresenterPollResults({ sessionId, question, counts, connected }: {
+function PresenterPollResults({ sessionId, question, counts, connected, closed }: {
   sessionId: string;
   question: QuestionState;
   counts: Extract<PollLivePayload, { counts: Record<string, number> }> | null;
   connected: boolean;
+  closed: boolean;
 }) {
   // A fresh server question (navigation or reconnect) supplies the effective setting again.
   const [override, setOverride] = useState<{ question: QuestionState; visible: boolean } | null>(null);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const visible = override?.question === question ? override.visible : question.liveResults === true;
-  const hiddenByPresenter = !visible && (override?.question === question || question.liveResults === false);
+  // The server's control feed says whether the room sees the counts, so every open console agrees.
+  const visible = counts?.liveResults ?? (override?.question === question ? override.visible : question.liveResults === true);
+  const hiddenByPresenter = !visible && (counts?.liveResults === false || override?.question === question || question.liveResults === false);
   const toggle = async () => {
     setPending(true);
     setError(null);
@@ -2003,7 +2006,9 @@ function PresenterPollResults({ sessionId, question, counts, connected }: {
       <button type="button" className="session-options-button" disabled={pending || !connected} onClick={() => void toggle()}>
         {visible ? "Hide live results" : "Show live results"}
       </button>
-      {hiddenByPresenter && <p role="status" className="text-zinc-400 text-sm">Hidden from the room. Only you see these counts.</p>}
+      {hiddenByPresenter && <p role="status" className="text-zinc-400 text-sm">{closed
+        ? "Hidden from phones. The projector shows the closed results, as for any poll."
+        : "Hidden from the room. Only you see these counts."}</p>}
       {error && <p role="alert" className="open-response-notice text-sm">{error}</p>}
     </div>
   );

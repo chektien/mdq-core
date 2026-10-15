@@ -110,7 +110,8 @@ describe("live poll counts over real sockets", () => {
       expect(counted(phone).filter((p) => JSON.stringify(p) === JSON.stringify(final))).toHaveLength(1);
     }
     await until(() => counted(display).some((p) => JSON.stringify(p) === JSON.stringify(final)), "projector receives counts");
-    await until(() => counted(control).some((p) => JSON.stringify(p) === JSON.stringify(final)), "presenter receives counts");
+    // The presenter's copy also says whether the room sees the counts.
+    await until(() => counted(control).some((p) => JSON.stringify(p) === JSON.stringify({ ...final, liveResults: true })), "presenter receives counts");
     expect(live(unvoted)).toEqual([]);
     for (const recorder of [first, second, third, display, control]) {
       expect(JSON.stringify(live(recorder))).not.toMatch(/ZQ-|Name /);
@@ -127,7 +128,8 @@ describe("live poll counts over real sockets", () => {
       expect(counted(recorder)).toEqual([]);
     }
     await until(() => counted(control).length === 1, "private counts retained");
-    expect(counted(control)).toEqual([final]);
+    // Every console learns the room no longer sees the counts.
+    expect(counted(control)).toEqual([{ ...final, liveResults: false }]);
     expect(getSession(sessionId)!.liveResultsOverrides).toEqual({ "0": false });
     expect(JSON.stringify(getSession(sessionId)!.submissions)).toBe(submissions);
     expect(JSON.stringify(getSession(sessionId)!.questionTiming)).toBe(timing);

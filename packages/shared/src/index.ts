@@ -416,7 +416,8 @@ export interface PollLiveCounts {
 }
 /** Public counts are suppressed below three voters; control has no floor. */
 export type PollLivePayload =
-  | { questionIndex: number; voters: number; counts: Record<string, number> }
+  /** `liveResults` is only on the presenter's (control) payload: whether the room sees the counts, for every open console. */
+  | { questionIndex: number; voters: number; counts: Record<string, number>; liveResults?: boolean }
   | { questionIndex: number; voters: number; counts: null; floor: 3 }
   | { questionIndex: number; hidden: true };
 

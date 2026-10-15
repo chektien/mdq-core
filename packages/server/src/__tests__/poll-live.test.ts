@@ -90,7 +90,7 @@ it("routes aggregate counts only to control, display and accepted voters, with a
   for (const [position, id] of ["voter-one", "voter-two", "voter-three"].entries()) {
     const result = vote(session, quiz, id, 0, ["A", "B", "B"]);
     const voters = position + 1;
-    expect(payloadFor(result, "control")).toEqual({ questionIndex: 0, voters, counts: { A: voters, B: voters, C: 0 } });
+    expect(payloadFor(result, "control")).toEqual({ questionIndex: 0, voters, counts: { A: voters, B: voters, C: 0 }, liveResults: true });
     const publicPayload = voters < 3 ? { questionIndex: 0, voters, counts: null, floor: 3 }
       : { questionIndex: 0, voters, counts: { A: 3, B: 3, C: 0 } };
     expect(payloadFor(result, "display")).toEqual(publicPayload);
@@ -161,7 +161,7 @@ it("self-paced votes and browse/reconnect projections use each item's accepted v
   expect(payloadFor(second, "participant:voter-two")).toMatchObject({ questionIndex: 1 });
   const firstAgain = vote(second.session, quiz, "voter-three", 0, ["C"]);
   expect(live(firstAgain).map(m => m.audience)).toEqual(["control", "display", "participant:voter-one", "participant:voter-three"]);
-  expect(payloadFor(firstAgain, "control")).toEqual({ questionIndex: 0, voters: 2, counts: { A: 1, B: 0, C: 1 } });
+  expect(payloadFor(firstAgain, "control")).toEqual({ questionIndex: 0, voters: 2, counts: { A: 1, B: 0, C: 1 }, liveResults: true });
   session = firstAgain.session;
   for (const item of [participantStudyItemPayload(session, quiz, 0, "voter-one", 20), participantStudyPayload(session, quiz, "voter-one", 20).items[0]]) {
     expect(item?.pollLive).toEqual({ questionIndex: 0, voters: 2, counts: null, floor: 3 });
