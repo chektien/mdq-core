@@ -14,6 +14,7 @@ import type {
   AnswerCountPayload,
   ResultsRevealPayload,
   ResultsDistributionPayload,
+  PollLivePayload,
   LeaderboardUpdatePayload,
   SessionStatePayload,
   SessionParticipantsPayload,
@@ -188,6 +189,7 @@ export interface UseSocketReturn {
   // Reveal
   reveal: RevealState | null;
   distribution: ResultsDistributionPayload | null;
+  pollLive: Readonly<Record<number, PollLivePayload>>;
 
   // Leaderboard
   leaderboard: LeaderboardRow[];
@@ -202,6 +204,9 @@ export interface UseSocketReturn {
   reconnect: () => void;
   disconnect: (options?: { preserveSession?: boolean }) => void;
 }
+
+/** One empty value, so a hidden feed does not change identity on every render. */
+const NO_POLL_LIVE: Readonly<Record<number, PollLivePayload>> = Object.freeze({});
 
 export function useSocket(
   sessionId: string | null,
@@ -257,6 +262,7 @@ export function useSocket(
 
   const [reveal, setReveal] = useState<RevealState | null>(null);
   const [distribution, setDistribution] = useState<ResultsDistributionPayload | null>(null);
+  const [pollLive, setPollLive] = useState<Readonly<Record<number, PollLivePayload>>>({});
 
   const [leaderboard, setLeaderboard] = useState<LeaderboardRow[]>([]);
   const [totalQuestions, setTotalQuestions] = useState(0);
@@ -293,6 +299,7 @@ export function useSocket(
     setSessionState(null);
     setSocketAvailability(null);
     setPolicy(null); setEffectiveRanking(null);
+    setPollLive({});
     if (!sessionId) return;
 
     const socket = io({
@@ -354,6 +361,7 @@ export function useSocket(
       setDeckTitle(data.deckTitle?.trim() || null);
       setSessionState(data.sessionState);
       setAnsweredQuestions(data.answeredQuestions || []);
+      setPollLive({});
       answeredQuestionsRef.current = data.answeredQuestions || [];
       pendingAnswerRef.current.clear();
       ownAnswersRef.current = mergeOwnAnswers(new Map(), data.answers);
@@ -532,6 +540,11 @@ export function useSocket(
     // ── Results ───────────────────────────
     socket.on(SocketEvents.RESULTS_DISTRIBUTION, (data: ResultsDistributionPayload) => {
       setDistribution(data);
+    });
+
+    socket.on(SocketEvents.POLL_LIVE, (data: PollLivePayload) => {
+      if (!data || typeof data !== "object" || !Number.isInteger(data.questionIndex) || data.questionIndex < 0) return;
+      setPollLive(previous => ({ ...previous, [data.questionIndex]: data }));
     });
 
     socket.on(SocketEvents.RESULTS_REVEAL, (data: ResultsRevealPayload) => {
@@ -736,6 +749,7 @@ export function useSocket(
     submittedResponseText,
     reveal: role !== "instructor" && (availability?.phase === "expired" || availability?.phase === "deleted") ? null : reveal,
     distribution: role !== "instructor" && (availability?.phase === "expired" || availability?.phase === "deleted") ? null : distribution,
+    pollLive: role !== "instructor" && (availability?.phase === "expired" || availability?.phase === "deleted") ? NO_POLL_LIVE : pollLive,
     leaderboard: role !== "instructor" && (availability?.phase === "expired" || availability?.phase === "deleted") ? [] : leaderboard,
     totalQuestions,
     participants,
