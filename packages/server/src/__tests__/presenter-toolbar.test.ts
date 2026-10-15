@@ -40,10 +40,12 @@ describe("presenter toolbar", () => {
     expect(index).toMatch(/\.slide-toolbar-nav > \* \{\s*pointer-events: auto;/);
   });
 
-  it("grows titles into the available column, caps them at 30rem and wraps at words on two lines", () => {
+  it("grows titles into the available column, caps them at 30rem, shortens them at a word and cuts at most two lines between words", () => {
     expect(index).toMatch(/\.slide-nav-button\.slide-action-button-with-detail \{[^}]*flex: 1 1 0;\s*min-width: 0;\s*max-width: 30rem;/);
-    expect(index).toMatch(/\.slide-nav-button \.slide-button-detail \{[^}]*-webkit-line-clamp: 2;\s*white-space: normal;\s*word-break: normal;/);
-    expect(surface).toContain("const detail = action.detail?.trim();");
+    // Two lines cut between lines, never a clamp ellipsis inside a word; shortTitle supplies the ellipsis.
+    expect(index).toMatch(/\.slide-nav-button \.slide-button-detail \{[^}]*max-height: calc\(2 \* 1\.25em\);\s*line-height: 1\.25;\s*overflow: hidden;\s*white-space: normal;\s*word-break: normal;/);
+    expect(index).not.toMatch(/\.slide-nav-button \.slide-button-detail \{[^}]*line-clamp/);
+    expect(surface).toContain('const detail = variant === "nav" ? shortTitle(fullDetail) : fullDetail;');
     expect(surface).toContain('title={variant === "nav" ? fullLabel');
     expect(surface).toContain("aria-label={hasDetail ? fullLabel : undefined}");
   });

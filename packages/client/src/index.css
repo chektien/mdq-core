@@ -2911,9 +2911,12 @@ html[data-theme="light"] .image-expansion-close:focus-visible {
 }
 
 .slide-nav-button .slide-button-detail {
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
+  /* At most two lines, cut between lines (so between words) rather than by a
+     clamp ellipsis that can land inside a word; shortTitle adds the ellipsis. */
+  display: block;
+  max-height: calc(2 * 1.25em);
+  line-height: 1.25;
+  overflow: hidden;
   white-space: normal;
   word-break: normal;
   overflow-wrap: normal;

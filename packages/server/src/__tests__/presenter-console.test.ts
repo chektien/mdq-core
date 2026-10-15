@@ -297,6 +297,9 @@ describe("Prev/Next titles", () => {
     expect(shortTitle("A very long synthetic title that keeps going well beyond the two line limit of the button")).toBe("A very long synthetic title that keeps going well…");
     expect(shortTitle("A title, with punctuation - that keeps going past the limit of the button")).not.toMatch(/[\s,-]…$/);
     expect(shortTitle(undefined)).toBeUndefined();
+    // A long word after an early space: cut at the space, not inside the word.
+    expect(shortTitle("An overview of pneumonoultramicroscopicsilicovolcanoconiosis and its causes")).toBe("An overview of…");
+    expect(shortTitle("Supercalifragilisticexpialidociousandmoreandmoreletterswithoutspaces")).toMatch(/…$/);
   });
   it("keep the whole title in the tooltip and accessible name", () => {
     const source = fs.readFileSync(path.resolve(__dirname, "../../../client/src/components/LiveSurface.tsx"), "utf8");
