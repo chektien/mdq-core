@@ -2,7 +2,7 @@ import { availabilityPayload, nextAvailabilityAlarm, sessionAvailabilityPhase, v
 import { isSlideType } from "@mdq/shared";
 import express, { type Request, type Response } from "express";
 import cors from "cors";
-import { API, AccessInfo, CumulativeLeaderboardEntry, PublicCumulativeLeaderboardEntry, ParseDiagnostic, formatDiagnostic, DeckPalette, DeckTheme, JoinLockRequest, Quiz, ReleaseSeatRequest, ResponseVisibilityRequest, Session, SessionState, PARTICIPANT_RESULT_RETENTION_MS, usesStudentIds } from "@mdq/shared";
+import { API, AccessInfo, CumulativeLeaderboardEntry, PublicCumulativeLeaderboardEntry, ParseDiagnostic, formatDiagnostic, DeckPalette, DeckTheme, JoinLockRequest, LiveResultsRequest, Quiz, ReleaseSeatRequest, ResponseVisibilityRequest, Session, SessionState, PARTICIPANT_RESULT_RETENTION_MS, usesStudentIds } from "@mdq/shared";
 import {
   createSession,
   storeSession,
@@ -955,6 +955,29 @@ export function createApp(quizDirOrOpts?: string | AppOptions) {
         onMessages?.(session, req.params.id, result);
         logActivity(`instructor ${hidden ? "hid" : "showed"} a response session=${req.params.id} q=${questionIndex}`);
         return res.json({ questionIndex, publicKey, hidden });
+      } catch (e) {
+        if (e instanceof EngineCommandError) return res.status(400).json({ error: e.message });
+        throw e;
+      }
+    });
+  });
+
+  // ── Show or hide a poll's live results for the room ──
+  app.post(API.SESSION_LIVE_RESULTS, requireInstructorAuth, (req, res) => {
+    withSession(req, res, (session) => {
+      const quiz = getQuizForSession(session);
+      if (!quiz) return res.status(500).json({ error: "Quiz data not found" });
+      const { questionIndex, visible } = (req.body ?? {}) as Partial<LiveResultsRequest>;
+      if (!Number.isInteger(questionIndex) || typeof visible !== "boolean") {
+        return res.status(400).json({ error: "Send questionIndex and visible." });
+      }
+      try {
+        const result = apply(session, quiz, { type: "liveResults", role: "control", questionIndex: questionIndex as number, visible }, Date.now());
+        Object.assign(session, result.session);
+        storeSession(session);
+        onMessages?.(session, req.params.id, result);
+        logActivity(`instructor ${visible ? "showed" : "hid"} live results session=${req.params.id} q=${questionIndex}`);
+        return res.json({ questionIndex, visible });
       } catch (e) {
         if (e instanceof EngineCommandError) return res.status(400).json({ error: e.message });
         throw e;

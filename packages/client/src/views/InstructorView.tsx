@@ -20,6 +20,7 @@ import {
   showLeaderboard,
   hideLeaderboard,
   setResponseHidden,
+  setLiveResults,
   releaseSeat,
   setJoinLocked,
   resultsCsvUrl,
@@ -32,8 +33,9 @@ import {
   type SessionRestoreResponse,
 } from "../hooks/api";
 import { formatDiagnostic } from "@mdq/shared";
-import type { AccessInfo, DeckPalette, DeckTheme, FoldoutNote, OpenResponseEntry, SessionState } from "@mdq/shared";
+import type { AccessInfo, DeckPalette, DeckTheme, FoldoutNote, OpenResponseEntry, PollLivePayload, SessionState } from "@mdq/shared";
 import { applyClientPalette, applyClientTheme } from "../theme";
+import DistributionChart from "../components/DistributionChart";
 import Timer from "../components/Timer";
 import Leaderboard from "../components/Leaderboard";
 import { deckLabel, resultsHeading } from "../deckLabel";
@@ -99,6 +101,7 @@ function questionStateFromRestore(data: NonNullable<SessionRestoreResponse["revi
     options: data.options,
     allowsMultiple: data.allowsMultiple,
     isPoll: data.isPoll ?? false,
+    liveResults: data.liveResults,
     timeLimitSec: data.timeLimitSec,
     startedAt: data.startedAt,
     deadlineAt: data.deadlineAt,
@@ -1010,6 +1013,19 @@ function LiveView({
   const displayQuestionModeText = displayQuestion
     ? getQuestionModeText(displayQuestion.questionType, displayQuestion.allowsMultiple)
     : "";
+  const currentPoll = !isReviewing && displayQuestion?.questionType === "poll" && (state === "QUESTION_OPEN" || state === "QUESTION_CLOSED")
+    ? displayQuestion : null;
+  const pollLive = currentPoll ? sock.pollLive[currentPoll.questionIndex] : undefined;
+  const livePollCounts = pollLive && "counts" in pollLive && pollLive.counts !== null ? pollLive : null;
+  const pollLiveResults = currentPoll ? (
+    <PresenterPollResults
+      key={`${sessionId}-${currentPoll.questionIndex}`}
+      sessionId={sessionId}
+      question={currentPoll}
+      counts={livePollCounts}
+      connected={sock.connected}
+    />
+  ) : null;
   const liveRevealActionLabel = getRevealActionLabel(q?.questionType ?? "multiple_choice");
   // Hide or show one response on the projector; the server sends back the new state.
   const toggleResponseHidden = useCallback(async (response: OpenResponseEntry, hidden: boolean) => {
@@ -1408,7 +1424,7 @@ function LiveView({
             />
           ) : (
             (() => {
-              const dist = state === "QUESTION_CLOSED" && !isReviewing ? sock.distribution?.distribution : null;
+              const dist = state === "QUESTION_CLOSED" && !isReviewing && !livePollCounts ? sock.distribution?.distribution : null;
               const totalResponses = sock.answerCount?.submitted ?? 0;
               const maxCount = dist ? Math.max(1, ...Object.values(dist)) : 0;
               return (
@@ -1443,6 +1459,7 @@ function LiveView({
               );
             })()
           )}
+          {pollLiveResults}
         </ResponsiveQuizSurface>
       );
     }
@@ -1747,7 +1764,7 @@ function LiveView({
                     />
                   ) : (
                     (() => {
-                      const dist = state === "QUESTION_CLOSED" && !isReviewing ? sock.distribution?.distribution : null;
+                      const dist = state === "QUESTION_CLOSED" && !isReviewing && !livePollCounts ? sock.distribution?.distribution : null;
                       const totalResponses = sock.answerCount?.submitted ?? 0;
                       const maxCount = dist ? Math.max(1, ...Object.values(dist)) : 0;
                       return (
@@ -1782,6 +1799,7 @@ function LiveView({
                       );
                     })()
                   )}
+                  {pollLiveResults}
                 </ResponsiveQuizSurface>
               </LiveSurface>
             )}
@@ -1947,6 +1965,46 @@ function LiveView({
       )}
       {endSessionConfirmDialog}
       {participantsDialog}
+    </div>
+  );
+}
+
+/** Presenter-only counts and controls stay in the body, outside the shared toolbar. */
+function PresenterPollResults({ sessionId, question, counts, connected }: {
+  sessionId: string;
+  question: QuestionState;
+  counts: Extract<PollLivePayload, { counts: Record<string, number> }> | null;
+  connected: boolean;
+}) {
+  // A fresh server question (navigation or reconnect) supplies the effective setting again.
+  const [override, setOverride] = useState<{ question: QuestionState; visible: boolean } | null>(null);
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const visible = override?.question === question ? override.visible : question.liveResults === true;
+  const hiddenByPresenter = !visible && (override?.question === question || question.liveResults === false);
+  const toggle = async () => {
+    setPending(true);
+    setError(null);
+    try {
+      await setLiveResults(sessionId, question.questionIndex, !visible);
+      setOverride({ question, visible: !visible });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "That did not work. Please try again.");
+    } finally {
+      setPending(false);
+    }
+  };
+  return (
+    <div className="w-full max-w-4xl space-y-3">
+      {counts && <>
+        <p className="text-zinc-400 text-sm tabular-nums">{counts.voters} {counts.voters === 1 ? "vote" : "votes"}</p>
+        <DistributionChart distribution={counts.counts} labels={question.options.map(option => option.label)} totalResponses={counts.voters} />
+      </>}
+      <button type="button" className="session-options-button" disabled={pending || !connected} onClick={() => void toggle()}>
+        {visible ? "Hide live results" : "Show live results"}
+      </button>
+      {hiddenByPresenter && <p role="status" className="text-zinc-400 text-sm">Hidden from the room. Only you see these counts.</p>}
+      {error && <p role="alert" className="open-response-notice text-sm">{error}</p>}
     </div>
   );
 }

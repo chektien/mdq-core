@@ -8,7 +8,7 @@ import { Server } from "socket.io";
 import { io as ioClient, Socket as ClientSocket } from "socket.io-client";
 import { PollLivePayload, Quiz, SocketEvents, StudentJoinedPayload } from "@mdq/shared";
 import { createApp } from "../app";
-import { clearAllSessions } from "../session";
+import { clearAllSessions, getSession } from "../session";
 import { setupSocket, emitMessages } from "../socket";
 
 // Intentional public, synthetic fixture. No teaching-instance content.
@@ -117,5 +117,27 @@ describe("live poll counts over real sockets", () => {
     }
     const joined = first.events.find((e) => e.event === SocketEvents.STUDENT_JOINED)?.payload as StudentJoinedPayload;
     expect(joined.participantId).toBe("ZQ-1");
+    const before = getSession(sessionId)!;
+    const submissions = JSON.stringify(before.submissions);
+    const timing = JSON.stringify(before.questionTiming);
+    for (const recorder of [first, second, third, display, control]) recorder.events.length = 0;
+    await request(app).post(`/api/session/${sessionId}/live-results`).send({ questionIndex: 0, visible: false }).expect(200);
+    for (const recorder of [first, second, third, display]) {
+      await until(() => live(recorder).some(p => "hidden" in p), "public counts removed immediately");
+      expect(counted(recorder)).toEqual([]);
+    }
+    await until(() => counted(control).length === 1, "private counts retained");
+    expect(counted(control)).toEqual([final]);
+    expect(getSession(sessionId)!.liveResultsOverrides).toEqual({ "0": false });
+    expect(JSON.stringify(getSession(sessionId)!.submissions)).toBe(submissions);
+    expect(JSON.stringify(getSession(sessionId)!.questionTiming)).toBe(timing);
+    expect(getSession(sessionId)!.state).toBe("QUESTION_OPEN");
+    expect(live(unvoted)).toEqual([]);
+    await request(app).post(`/api/session/${sessionId}/live-results`).send({ questionIndex: 0, visible: true }).expect(200);
+    for (const recorder of [first, second, third, display]) {
+      await until(() => counted(recorder).length === 1, "public counts restored");
+      expect(counted(recorder)).toEqual([final]);
+    }
   });
+
 });

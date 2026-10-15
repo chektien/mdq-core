@@ -295,6 +295,20 @@ export async function setResponseHidden(sessionId: string, questionIndex: number
   }
 }
 
+/** Show or hide a poll's live results for the room. */
+export async function setLiveResults(sessionId: string, questionIndex: number, visible: boolean): Promise<void> {
+  const res = await fetchWithTimeout(apiPath(API.SESSION_LIVE_RESULTS, { id: sessionId }), {
+    method: "POST",
+    credentials: "same-origin",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ questionIndex, visible }),
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.error || "That did not work. Please try again.");
+  }
+}
+
 /** Free one participant's seat so the next join with their ID (or name) from any device takes it over. */
 export async function releaseSeat(sessionId: string, publicKey: string): Promise<void> {
   const res = await fetchWithTimeout(apiPath(API.SESSION_RELEASE_SEAT, { id: sessionId }), {

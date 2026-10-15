@@ -312,6 +312,12 @@ export interface ResponseVisibilityRequest {
   hidden: boolean;
 }
 
+/** A session-only presenter override for a poll's live results. */
+export interface LiveResultsRequest {
+  questionIndex: number;
+  visible: boolean;
+}
+
 /** What a device is told when its seat was freed and another device took it. */
 export const SEAT_TAKEN_MESSAGE = "You joined on another device. This screen is no longer in the session.";
 
@@ -421,6 +427,8 @@ export interface ResultsRevealPayload {
   explanation: string;
   distribution: Record<string, number>;
   isPoll?: boolean;
+  /** Accepted voters for polls, including multi-select polls. */
+  voters?: number;
   openResponses?: OpenResponseEntry[];
 }
 
@@ -509,6 +517,7 @@ export const API = {
   SESSION_LEADERBOARD_SHOW: "/api/session/:id/leaderboard-show",
   SESSION_LEADERBOARD_HIDE: "/api/session/:id/leaderboard-hide",
   SESSION_RESPONSE_VISIBILITY: "/api/session/:id/response-visibility",
+  SESSION_LIVE_RESULTS: "/api/session/:id/live-results",
   SESSION_RELEASE_SEAT: "/api/session/:id/release-seat",
   SESSION_JOIN_LOCK: "/api/session/:id/join-lock",
   SESSION_RESULTS_CSV: "/api/session/:id/results.csv",

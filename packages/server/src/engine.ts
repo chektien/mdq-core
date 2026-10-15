@@ -279,6 +279,7 @@ const revealPayload = (session: Session, quiz: Quiz, view: ResponseView, now = D
     questionIndex: session.currentQuestionIndex, questionType: getQuestionType(q),
     correctOptions: q.correctOptions, explanation: q.explanation,
     distribution: getDistribution(session, session.currentQuestionIndex), isPoll: q.isPoll === true,
+    ...(getQuestionType(q) === "poll" ? { voters: pollCounts(session, quiz, session.currentQuestionIndex).voters } : {}),
     openResponses: isOpenResponseQuestion(q) && view !== "participant" ? responsesFor(getOpenResponses(session, session.currentQuestionIndex), view) : undefined,
   };
 };

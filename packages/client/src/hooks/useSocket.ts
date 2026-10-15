@@ -78,6 +78,7 @@ export interface QuestionState {
   options: { label: string; text: string }[];
   allowsMultiple: boolean;
   isPoll: boolean;
+  liveResults?: boolean;
   timeLimitSec: number | null;
   deadlineAt?: number | null;
   firstOpenedAt?: number;
@@ -434,6 +435,7 @@ export function useSocket(
         options: data.options,
         allowsMultiple: data.allowsMultiple,
         isPoll: data.isPoll ?? false,
+        liveResults: data.liveResults,
         timeLimitSec: data.timeLimitSec,
         startedAt: data.startedAt,
         deadlineAt: data.deadlineAt,
@@ -443,7 +445,7 @@ export function useSocket(
       };
       // A snapshot that repeats the opening on screen keeps the same object, so
       // the student view does not clear an option chosen while offline.
-      const shownQuestion = isSameOpening(previousQuestion, nextQuestion) ? previousQuestion : nextQuestion;
+      const shownQuestion = isSameOpening(previousQuestion, nextQuestion) && previousQuestion.liveResults === nextQuestion.liveResults ? previousQuestion : nextQuestion;
       currentQuestionRef.current = shownQuestion;
       setCurrentQuestion(shownQuestion);
       setSessionState("QUESTION_OPEN");

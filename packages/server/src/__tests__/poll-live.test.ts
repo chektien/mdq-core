@@ -265,3 +265,27 @@ it("a released seat stops receiving live counts until it joins again, and its re
   expect(payloadFor(result, "participant:voter-one")).toBeUndefined();
   expect(live(snapshot(result.session, quiz, "voter-one"))).toEqual([]);
 });
+
+it("reveals multi-select poll percentages against accepted voters, not selections", () => {
+  const quiz = parse(poll());
+  let session = start(quiz);
+  session = vote(session, quiz, "voter-one", 0, ["A", "B"]).session;
+  session = vote(session, quiz, "voter-two", 0, ["A", "C"]).session;
+  session = run(session, quiz, { type: "close" }).session;
+  const revealed = run(session, quiz, { type: "reveal" });
+  const payloads = revealed.messages.filter(m => m.event === SocketEvents.RESULTS_REVEAL).map(m => m.payload);
+  expect(payloads.length).toBeGreaterThan(0);
+  for (const payload of payloads) expect(payload).toMatchObject({ voters: 2, distribution: { A: 2, B: 1, C: 1 } });
+  for (const audience of ["control", "display", "voter-one"]) {
+    const replay = snapshot(revealed.session, quiz, audience).messages.find(m => m.event === SocketEvents.RESULTS_REVEAL);
+    expect(replay?.payload).toMatchObject({ voters: 2 });
+  }
+});
+
+it.each(["multiple_choice", "open_response"])("does not add voters to a %s reveal", type => {
+  const quiz = parse(`## Synthetic question\ntype: ${type}\ntime-limit: none\nChoose.${type === "multiple_choice" ? "\nA. One\nB. Two\n> Correct Answer: A" : ""}`);
+  const closed = run(start(quiz), quiz, { type: "close" });
+  const reveals = run(closed.session, quiz, { type: "reveal" }).messages.filter(m => m.event === SocketEvents.RESULTS_REVEAL);
+  expect(reveals.length).toBeGreaterThan(0);
+  for (const reveal of reveals) expect(reveal.payload).not.toHaveProperty("voters");
+});
