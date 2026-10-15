@@ -447,7 +447,9 @@ export function useSocket(
       };
       // A snapshot that repeats the opening on screen keeps the same object, so
       // the student view does not clear an option chosen while offline.
-      const shownQuestion = isSameOpening(previousQuestion, nextQuestion) && previousQuestion.liveResults === nextQuestion.liveResults ? previousQuestion : nextQuestion;
+      const openedQuestion = isSameOpening(previousQuestion, nextQuestion) ? previousQuestion : nextQuestion;
+      // A repeated opening still brings the presenter's current live-results setting.
+      const shownQuestion = openedQuestion.liveResults === nextQuestion.liveResults ? openedQuestion : { ...openedQuestion, liveResults: nextQuestion.liveResults };
       currentQuestionRef.current = shownQuestion;
       setCurrentQuestion(shownQuestion);
       setSessionState("QUESTION_OPEN");
