@@ -59,16 +59,18 @@ const to = (messages: EngineMessage[], audience: string, event: string) => messa
 const texts = (entries?: { responseText: string }[]) => (entries ?? []).map((e) => e.responseText).sort();
 
 describe("open response moderation", () => {
-  it("preserves default-visible sessions and sends visible text and the real total while open", () => {
+  it("keeps a session from before default-hidden on its reveal-only boundary: no text on the projector while open", () => {
     for (const flag of [undefined, false]) {
       const { step } = openSession(flag);
       const messages = step({ type: "snapshot", view: "display" });
       const count = to(messages, "display", SocketEvents.ANSWER_COUNT)[0].payload as AnswerCountPayload;
       expect(count.submitted).toBe(3);
       expect(count.openResponseTotal).toBe(3);
-      expect(texts(count.openResponses)).toEqual([...TEXTS].sort());
+      expect(count.openResponses).toBeUndefined();
       const more = step({ type: "answerSubmit", studentId: IDS[0], payload: { questionIndex: 1, responseText: "A second thought" } });
-      expect(JSON.stringify(to(more, "display", SocketEvents.ANSWER_COUNT))).toContain("A second thought");
+      expect(JSON.stringify(to(more, "display", SocketEvents.ANSWER_COUNT))).not.toContain("A second thought");
+      // The presenter still sees every response.
+      expect(JSON.stringify(to(more, "control", SocketEvents.ANSWER_COUNT))).toContain("A second thought");
     }
   });
 
@@ -147,7 +149,8 @@ describe("open response moderation", () => {
     const bulk = (hidden: boolean): Extract<Command, { type: "responsesVisibility" }> => ({ type: "responsesVisibility", role: "control", questionIndex: 1, hidden });
     const shown = apply(session, quiz, bulk(false), 5000);
     expect(getOpenResponses(shown.session, 1).every((r) => !r.hidden)).toBe(true);
-    expect(texts((to(shown.messages, "display", SocketEvents.ANSWER_COUNT)[0].payload as AnswerCountPayload).openResponses)).toEqual([...TEXTS].sort());
+    // While open, only a default-hidden session puts the shown text on the projector.
+    expect(texts((to(shown.messages, "display", SocketEvents.ANSWER_COUNT)[0].payload as AnswerCountPayload).openResponses)).toEqual(defaultHidden ? [...TEXTS].sort() : []);
     expect(session.shownResponses).toBeUndefined();
     expect(session.hiddenResponses).toBeUndefined();
     const saved = deserializeSession(serializeSession(shown.session));
@@ -156,7 +159,8 @@ describe("open response moderation", () => {
     const hidden = apply(saved, quiz, bulk(true), 5100);
     expect(getOpenResponses(hidden.session, 1).every((r) => r.hidden)).toBe(true);
     const count = to(hidden.messages, "display", SocketEvents.ANSWER_COUNT)[0].payload as AnswerCountPayload;
-    expect(count.openResponses).toEqual([]);
+    // A default-hidden session sends an empty list; an older session sends no text while open at all.
+    expect(count.openResponses).toEqual(defaultHidden ? [] : undefined);
     expect(count.openResponseTotal).toBe(3);
     expect(getOpenResponses(saved, 1).every((r) => !r.hidden)).toBe(true);
     for (const role of ["display", "participant"] as const) expect(() => apply(saved, quiz, { ...bulk(false), role }, 5200)).toThrow(EngineCommandError);
@@ -184,7 +188,7 @@ describe("open response moderation", () => {
     }
   });
 
-  it("shows the instructor every response live, each with a hidden flag", () => {
+  it("shows the instructor every response live, each with a hidden flag; a pre-change session's projector gets no text while open", () => {
     const { step, keys } = openSession();
     const before = to(step({ type: "snapshot", view: "control" }), "control", SocketEvents.ANSWER_COUNT)[0].payload as AnswerCountPayload;
     expect(texts(before.openResponses)).toEqual([...TEXTS].sort());
@@ -195,7 +199,7 @@ describe("open response moderation", () => {
     expect(after.openResponses!.filter((r) => r.hidden).map((r) => r.publicKey)).toEqual([keys[1]]);
     const display = to(messages, "display", SocketEvents.ANSWER_COUNT)[0].payload as AnswerCountPayload;
     expect(display.openResponseTotal).toBe(3);
-    expect(texts(display.openResponses)).toEqual([TEXTS[0], TEXTS[2]].sort());
+    expect(display.openResponses).toBeUndefined();
     expect(messages.filter((m) => !["control", "display"].includes(m.audience))).toEqual([]);
   });
 

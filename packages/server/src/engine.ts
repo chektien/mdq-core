@@ -275,7 +275,10 @@ const countPayload = (session: Session, quiz: Quiz, view: ResponseView, now: num
     ...(responses && view === "control" ? { openResponsesHiddenByDefault: session.openResponsesHiddenByDefault === true } : {}),
     ...(responses && view !== "participant" ? {
       openResponseTotal: responses.length,
-      openResponses: view === "control" || !publicResultsHidden(session, now) ? responsesFor(responses, view) : undefined,
+      // Before the reveal the projector sees response text only in sessions where responses start hidden and
+      // the presenter chose them; sessions from before that keep their reveal-only boundary.
+      openResponses: view === "control" || (session.openResponsesHiddenByDefault === true && !publicResultsHidden(session, now))
+        ? responsesFor(responses, view) : undefined,
     } : {}),
   };
 };
