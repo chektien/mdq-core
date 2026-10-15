@@ -1,6 +1,6 @@
 import fs from "fs";
 import path from "path";
-import { closedLabel, formatRemaining, pluralize, positionLabel } from "../../../client/src/instructorText";
+import { answeredLabel, restartCountdownDetail, closedLabel, formatRemaining, pluralize, positionLabel } from "../../../client/src/instructorText";
 import { readShowStudentIds, saveShowStudentIds } from "../../../client/src/showStudentIds";
 
 const clientSrc = path.resolve(__dirname, "..", "..", "..", "client", "src");
@@ -14,6 +14,23 @@ const lastRule = (css: string, selector: string): string => {
 };
 
 describe("presenter wording", () => {
+  it("explains an empty room and keeps answered counts once people have joined", () => {
+    expect(answeredLabel(0, 0)).toBe("No one has joined yet");
+    expect(answeredLabel(0, 4)).toBe("0/4 answered");
+    expect(answeredLabel(3, 4)).toBe("3/4 answered");
+    expect(read("views/InstructorView.tsx").match(/answeredLabel\(sock.answerCount.submitted, sock.answerCount.total\)/g)).toHaveLength(2);
+  });
+
+  it("warns about restart speed ranking only on scored questions", () => {
+    expect(restartCountdownDetail({ questionType: "multiple_choice", isPoll: false }, true)).toBe("Ties will no longer use answer speed");
+    expect(restartCountdownDetail({ questionType: "multiple_choice", isPoll: false }, false)).toBeNull();
+    expect(restartCountdownDetail({ questionType: "multiple_choice", isPoll: true }, true)).toBeNull();
+    for (const questionType of ["poll", "open_response", "slide", "cover"] as const) {
+      expect(restartCountdownDetail({ questionType, isPoll: questionType === "poll" }, true)).toBeNull();
+    }
+    expect(read("views/InstructorView.tsx")).toContain("detail: restartCountdownDetail(q, speedRanking)");
+  });
+
   it("says what is left with the right plurals and no zero counts", () => {
     expect(pluralize(1, "slide")).toBe("1 slide");
     expect(pluralize(2, "slide")).toBe("2 slides");
@@ -151,7 +168,7 @@ describe("presenter toolbar", () => {
     expect(tsx).toContain('const waitingReason = !sock.connected ? "Reconnecting..." : null;');
     expect(tsx).toContain("reason: waitingReason");
     expect(tsx).toContain("offline={!sock.connected}");
-    expect(read("components/LiveSurface.tsx")).toContain("title={action.disabled && action.reason ? action.reason : undefined}");
+    expect(read("components/LiveSurface.tsx")).toContain('title={variant === "nav" ? fullLabel : action.disabled && action.reason ? action.reason : undefined}');
     expect(css).toContain(".session-code-card-meta-offline");
   });
 });

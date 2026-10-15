@@ -32,8 +32,10 @@ export default function OpenResponseList({
 
   return (
     <div className="open-response-list w-full max-w-3xl rounded-2xl border p-4">
-      <div className="mb-3 flex items-center justify-between gap-3">
-        <h3 className="open-response-title text-sm font-semibold uppercase tracking-[0.2em]">{title}</h3>
+      <div className="open-response-heading mb-3 flex items-center justify-between gap-3">
+        <h3 className="open-response-title text-sm font-semibold uppercase tracking-[0.2em]">
+          {title}<span className="open-response-inline-count"> · {responses.length}</span>
+        </h3>
         <span className="open-response-count text-xs tabular-nums">{responses.length}</span>
       </div>
       {notice && <p role="alert" className="open-response-notice mb-3 text-sm">{notice}</p>}

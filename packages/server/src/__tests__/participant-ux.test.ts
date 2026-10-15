@@ -9,7 +9,7 @@ import { clearAllSessions } from "../session";
 import { parseQuizMarkdown } from "../parser";
 import { deckLabel, formatQuizLabel, resultsHeading } from "../../../client/src/deckLabel";
 import { SESSION_MISSING_MESSAGE, extraLabelNote, joinRefusalMessage } from "../../../client/src/joinForm";
-import { getQuestionModeText } from "../../../client/src/questionMode";
+import { getPresenterQuestionModeText, getQuestionModeText } from "../../../client/src/questionMode";
 
 const clientSrc = path.resolve(__dirname, "..", "..", "..", "client", "src");
 const read = (rel: string): string => fs.readFileSync(path.join(clientSrc, rel), "utf-8");
@@ -179,6 +179,25 @@ describe("deck title on results", () => {
 
 describe("closing early and the wording around it", () => {
   const view = read("views/StudentView.tsx");
+
+  it("gives presenters compact mode/scoring labels without changing participant instructions", () => {
+    expect(getPresenterQuestionModeText("open_response", false)).toBe("Open response · not scored");
+    expect(getPresenterQuestionModeText("open_response", true)).toBe("Open response · not scored");
+    expect(getPresenterQuestionModeText("poll", false)).toBe("Poll · one choice · not scored");
+    expect(getPresenterQuestionModeText("poll", true)).toBe("Poll · several choices · not scored");
+    expect(getPresenterQuestionModeText("multiple_choice", false)).toBe("Question · one answer");
+    expect(getPresenterQuestionModeText("multiple_choice", true)).toBe("Question · several answers");
+    for (const type of ["slide", "cover"] as const) {
+      expect(getPresenterQuestionModeText(type, false)).toBe("Slide · no response needed");
+    }
+    expect(getQuestionModeText("poll", false)).toBe("Poll question. Select one option. This does not affect your score.");
+    expect(getQuestionModeText("multiple_choice", false)).toBe("Select only one answer");
+    expect(getQuestionModeText("multiple_choice", true)).toBe("You can select multiple answers");
+    expect(read("views/InstructorView.tsx")).toContain("getPresenterQuestionModeText(displayQuestion.questionType, displayQuestion.allowsMultiple)");
+    for (const source of [view, read("views/PresentationView.tsx")]) {
+      expect(source).not.toContain("getPresenterQuestionModeText");
+    }
+  });
 
   it("only says time is up when the timer ran out", () => {
     expect(view).toContain("Answers are closed. Waiting for the instructor.");

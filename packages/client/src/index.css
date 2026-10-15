@@ -2901,13 +2901,23 @@ html[data-theme="light"] .image-expansion-close:focus-visible {
 .slide-nav-button.slide-action-button-with-detail {
   /* Prev and Next both carry a title, so each may give ground to the other
      and to the controls on the right instead of running under them. */
-  flex: 0 1 auto;
-  min-width: min(20rem, 28cqi);
-  max-width: min(30rem, 34cqi);
+  flex: 1 1 0;
+  min-width: 0;
+  max-width: 30rem;
   align-items: flex-start;
   flex-direction: column;
   padding: 0.58rem 0.82rem;
   text-align: left;
+}
+
+.slide-nav-button .slide-button-detail {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  white-space: normal;
+  word-break: normal;
+  overflow-wrap: normal;
+  hyphens: none;
 }
 
 .slide-action-button:hover:not(:disabled) {
@@ -3780,6 +3790,10 @@ html[data-theme="light"] .slide-action-button-warning:disabled {
   width: auto;
   height: auto;
   max-height: 22dvh;
+}
+
+.question-media .slide-media-grid .slide-media-figure:first-child {
+  grid-column: auto;
 }
 
 .slide-media-figure {
@@ -5027,19 +5041,19 @@ html[data-theme="light"] .quiz-html a {
   padding-block: 0.26rem;
 }
 
-.quiz-surface-content-fit > :first-child:not(.quiz-html) {
+.quiz-surface-content-fit > :first-child:not(.quiz-html, .presenter-question-content, .presenter-question-mode) {
   transition:
     transform 140ms ease,
     margin 140ms ease;
 }
 
-.quiz-surface-content-fit[data-fit-density="compact"] > :first-child:not(.quiz-html) {
+.quiz-surface-content-fit[data-fit-density="compact"] > :first-child:not(.quiz-html, .presenter-question-content, .presenter-question-mode) {
   margin-block: -0.2rem;
   transform: scale(0.94);
 }
 
-.quiz-surface-content-fit[data-fit-density="tight"] > :first-child:not(.quiz-html),
-.quiz-surface-content-fit[data-fit-density="scaled"] > :first-child:not(.quiz-html) {
+.quiz-surface-content-fit[data-fit-density="tight"] > :first-child:not(.quiz-html, .presenter-question-content, .presenter-question-mode),
+.quiz-surface-content-fit[data-fit-density="scaled"] > :first-child:not(.quiz-html, .presenter-question-content, .presenter-question-mode) {
   margin-block: -0.45rem;
   transform: scale(0.84);
 }
@@ -7196,15 +7210,6 @@ html[data-theme="light"] .slide-video-figure .slide-video-action:not(button) {
     max-width: min(46rem, 62vw);
   }
 
-  /* The next item's title gives way to the controls; it is cut with an ellipsis.
-     Neither button keeps more than half of the column for itself, so two long
-     titles share it between them instead of the second one running under the
-     controls on the right. Where there is room, each keeps its usual width. */
-  .slide-nav-button.slide-action-button-with-detail {
-    min-width: min(11rem, 22cqi, calc(50% - 0.225rem));
-    max-width: 100%;
-  }
-
   .slide-toolbar-stack {
     grid-column: 1 / -1;
     grid-row: 2;
@@ -8037,16 +8042,12 @@ dialog.participants-overlay::backdrop {
 /* Wide screens keep the status label in the middle column. It keeps room
    there by taking it from the two titles, not from the controls. */
 @media (min-width: 1300px) {
-  .slide-toolbar {
-    grid-template-columns: minmax(0, max-content) minmax(0, 1fr) auto;
+  .slide-toolbar:has(.slide-toolbar-nav) {
+    grid-template-columns: minmax(0, 1fr) minmax(0, max-content) auto;
   }
 
-  .slide-toolbar:has(.slide-status-pill) {
-    grid-template-columns: minmax(0, max-content) minmax(11rem, 1fr) auto;
-  }
-
-  .slide-nav-button.slide-action-button-with-detail {
-    min-width: min(11rem, 22cqi);
+  .slide-toolbar:has(.slide-toolbar-nav):has(.slide-status-pill) {
+    grid-template-columns: minmax(0, 1fr) minmax(11rem, max-content) auto;
   }
 }
 
@@ -8467,3 +8468,99 @@ html:root[data-theme] .student-screen[data-deck-background="true"] .dist-row-she
 
 .instructor-qr-code-label, .instructor-qr-helper, .instructor-qr-presentation-link { font-size: .875rem; }
 .instructor-qr-url { font-size: max(1rem, 1em); }
+
+/* Console columns use the question stem's existing max-w-5xl (64rem).
+   The mode identifies response/scoring rules; keep its existing status colours
+   and radius, with ordinary tracking and the same left edge as the panels. */
+.slide-live-shell-controls .quiz-surface-content {
+  width: min(100%, var(--container-5xl, 64rem));
+}
+.slide-live-shell-controls .quiz-surface-content > :is(.presenter-question-content, .presenter-question-mode, .open-response-list, [class~="max-w-4xl"]) {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+}
+.presenter-question-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: inherit;
+}
+.presenter-question-content > .quiz-html {
+  width: 100%;
+  max-width: 100%;
+  font-size: var(--quiz-fit-question-size);
+}
+.quiz-surface-content-reveal .presenter-question-content > .quiz-html {
+  font-size: var(--quiz-fit-reveal-question-size);
+}
+.presenter-question-mode {
+  text-align: left;
+}
+.presenter-question-mode .selection-mode-chip {
+  letter-spacing: normal;
+}
+.open-response-inline-count {
+  display: none;
+}
+.slide-live-shell-controls .open-response-title {
+  letter-spacing: 0.06em;
+}
+.slide-live-shell-controls .open-response-inline-count {
+  display: inline;
+  font-variant-numeric: tabular-nums;
+}
+.slide-live-shell-controls .open-response-heading > .open-response-count {
+  display: none;
+}
+
+/* Intrinsic question thumbnails: the bitmap sets the frame width and the
+   caption wraps to it. Leave the content-slide position/group grids intact. */
+.question-media .slide-media-grid .slide-media-figure {
+  width: fit-content;
+  max-width: min(100%, var(--mdq-image-width, 100%));
+  height: auto;
+  justify-self: center;
+  align-self: start;
+  grid-template-rows: auto auto;
+  background: transparent;
+  border: 0;
+  padding: 0;
+  box-shadow: none;
+}
+.question-media .slide-media-grid .slide-media-expand-button {
+  width: fit-content;
+  max-width: 100%;
+  height: auto;
+  aspect-ratio: auto;
+  justify-self: center;
+  background: transparent;
+  box-shadow: none;
+}
+.question-media .slide-media-grid .slide-media-figure img {
+  display: block;
+  width: auto;
+  height: auto;
+  max-width: 100%;
+  max-height: 22dvh;
+}
+.question-media .slide-media-figure figcaption {
+  /* A long caption must not widen the intrinsic image frame. */
+  width: 0;
+  min-width: 100%;
+  overflow-wrap: anywhere;
+  color: var(--mdq-slide-ink-soft);
+}
+.question-media .slide-media-expand-button:is(:hover, :focus-visible) img {
+  box-shadow: none;
+  transform: none;
+}
+
+@media (min-width: 761px) {
+  /* Measured by LiveSurface, including compact/expanded cards and fixed cards
+     in short windows. Reserve a full card plus the existing 1rem gap, at all
+     console widths and on reveal as well as open/closed questions. */
+  .slide-live-shell-controls .slide-surface > .slide-safe:has(> .slide-join-panel) {
+    padding-bottom: max(clamp(2.8rem, 5cqi, 5.5rem), calc(var(--slide-join-clear, 0px) + 1rem));
+  }
+}

@@ -298,7 +298,9 @@ export default function LiveSurface({
     variant: "nav" | "action",
   ) => {
     const tone = action.tone || "neutral";
-    const hasDetail = !!action.detail;
+    const detail = action.detail?.trim();
+    const hasDetail = !!detail;
+    const fullLabel = hasDetail ? `${action.label}: ${detail}` : action.label;
     const className = [
       "slide-action-button",
       `slide-action-button-${tone}`,
@@ -326,13 +328,13 @@ export default function LiveSurface({
         className={className}
         onClick={action.onClick}
         disabled={action.disabled}
-        title={action.disabled && action.reason ? action.reason : undefined}
+        title={variant === "nav" ? fullLabel : action.disabled && action.reason ? action.reason : undefined}
         aria-pressed={action.pressed}
-        aria-label={hasDetail ? `${action.label}: ${action.detail}` : undefined}
+        aria-label={hasDetail ? fullLabel : undefined}
         aria-description={action.disabled && action.reason ? action.reason : undefined}
       >
         <span className="slide-button-label">{action.label}</span>
-        {hasDetail && <span className="slide-button-detail">{action.detail}</span>}
+        {hasDetail && <span className="slide-button-detail">{detail}</span>}
       </button>
     );
   };

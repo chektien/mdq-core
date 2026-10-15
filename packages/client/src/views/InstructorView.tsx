@@ -55,10 +55,10 @@ import SlideContent, { SlideContentBody, QuestionMedia } from "../components/Sli
 import PresenterContent, { type PresenterPublicContentInput } from "../components/PresenterContent";
 import SlideBackgroundLayer from "../components/SlideBackgroundLayer";
 import PresenterNotesPanel from "../components/PresenterNotesPanel";
-import { getQuestionModeText, getRevealActionLabel } from "../questionMode";
+import { getPresenterQuestionModeText, getRevealActionLabel } from "../questionMode";
 import { decidePresenterKey, documentHasOpenDialog, pickNavAction } from "../presenterKeys";
 import { readShowStudentIds, saveShowStudentIds } from "../showStudentIds";
-import { closedLabel as closedLabelFor, pluralize, positionLabel as positionLabelFor } from "../instructorText";
+import { answeredLabel, restartCountdownDetail, closedLabel as closedLabelFor, pluralize, positionLabel as positionLabelFor } from "../instructorText";
 
 type InstructorPhase = "setup" | "lobby" | "live" | "ended";
 const INSTRUCTOR_RESTORE_KEY = "mdquiz_instructor_session";
@@ -1011,7 +1011,7 @@ function LiveView({
   const noVotesClosed = state === "QUESTION_CLOSED" && !isReviewing && displayQuestion?.isPoll === true && (sock.answerCount?.submitted ?? 0) === 0;
   const noVotesRevealed = displayReveal?.isPoll === true && Object.values(displayReveal.distribution).every((count) => count === 0);
   const displayQuestionModeText = displayQuestion
-    ? getQuestionModeText(displayQuestion.questionType, displayQuestion.allowsMultiple)
+    ? getPresenterQuestionModeText(displayQuestion.questionType, displayQuestion.allowsMultiple)
     : "";
   const currentPoll = !isReviewing && displayQuestion?.questionType === "poll" && (state === "QUESTION_OPEN" || state === "QUESTION_CLOSED")
     ? displayQuestion : null;
@@ -1085,7 +1085,7 @@ function LiveView({
     if (displayReveal) return displayReveal.isPoll ? "Results open" : "Answer revealed";
     if (state === "QUESTION_CLOSED") return closedLabel;
     if (sock.answerCount && state === "QUESTION_OPEN") {
-      return `${sock.answerCount.submitted}/${sock.answerCount.total} answered`;
+      return answeredLabel(sock.answerCount.submitted, sock.answerCount.total);
     }
     return null;
   })();
@@ -1245,7 +1245,7 @@ function LiveView({
     if (canClose) {
       if (q && q.timeLimitSec !== null && sock.remainingSec !== null && sock.remainingSec > 0 && !sock.reveal && !isReviewing) actions.push({
         label: "Restart Countdown",
-        detail: speedRanking ? "Ties will no longer use answer speed" : null,
+        detail: restartCountdownDetail(q, speedRanking),
         reason: waitingReason,
         onClick: () => onAction(async () => { const result = await restartCountdown(sessionId); onSpeedInvalidated(); return result; }, "restart countdown"),
         disabled: controlsUnavailable,
@@ -1402,16 +1402,20 @@ function LiveView({
             <div className="text-amber-300 text-lg font-semibold">Review Mode</div>
           )}
 
-          <PresenterContent sessionId={sessionId} kind="question-stem" content={presenterPublicContent!} reviewing={isReviewing}>
-            <QuizHtml
-              className="quiz-html text-2xl lg:text-3xl text-white text-center leading-relaxed max-w-5xl"
-              html={displayQuestion.text}
-            />
-            <QuestionMedia media={displayQuestion.slideMedia} />
-          </PresenterContent>
+          <div className="presenter-question-mode">
+            <span className={`selection-mode-chip ${displayQuestion.questionType === "open_response" || displayQuestion.allowsMultiple ? "selection-mode-chip-multi" : "selection-mode-chip-single"}`}>
+              {displayQuestionModeText}
+            </span>
+          </div>
 
-          <div className={`selection-mode-chip ${displayQuestion.questionType === "open_response" || displayQuestion.allowsMultiple ? "selection-mode-chip-multi" : "selection-mode-chip-single"}`}>
-            {displayQuestionModeText}
+          <div className="presenter-question-content">
+            <PresenterContent sessionId={sessionId} kind="question-stem" content={presenterPublicContent!} reviewing={isReviewing}>
+              <QuizHtml
+                className="quiz-html text-2xl lg:text-3xl text-white text-center leading-relaxed max-w-5xl"
+                html={displayQuestion.text}
+              />
+              <QuestionMedia media={displayQuestion.slideMedia} />
+            </PresenterContent>
           </div>
 
           {noVotesClosed && <p className="no-votes-note">No votes yet</p>}
@@ -1468,13 +1472,15 @@ function LiveView({
     if (displayReveal && displayQuestion && (((state === "REVEAL") && !isReviewing) || isReviewing)) {
       return (
         <ResponsiveQuizSurface reveal fitKey={fitKey}>
-          <PresenterContent sessionId={sessionId} kind="question-stem" content={presenterPublicContent!} reveal reviewing={isReviewing}>
-            <QuizHtml
-              className={`quiz-html text-center leading-relaxed max-w-5xl ${isReviewing ? "text-2xl lg:text-3xl text-white" : "text-xl lg:text-2xl text-zinc-300"}`}
-              html={displayQuestion.text}
-            />
-            <QuestionMedia media={displayQuestion.slideMedia} />
-          </PresenterContent>
+          <div className="presenter-question-content">
+            <PresenterContent sessionId={sessionId} kind="question-stem" content={presenterPublicContent!} reveal reviewing={isReviewing}>
+              <QuizHtml
+                className={`quiz-html text-center leading-relaxed max-w-5xl ${isReviewing ? "text-2xl lg:text-3xl text-white" : "text-xl lg:text-2xl text-zinc-300"}`}
+                html={displayQuestion.text}
+              />
+              <QuestionMedia media={displayQuestion.slideMedia} />
+            </PresenterContent>
+          </div>
 
           {noVotesRevealed && <p className="no-votes-note">No votes yet</p>}
 
@@ -1647,7 +1653,7 @@ function LiveView({
           {/* Answered count */}
           {sock.answerCount && (state === "QUESTION_OPEN" || state === "QUESTION_CLOSED") && (
             <span className="text-zinc-400 font-mono tabular-nums">
-              {sock.answerCount.submitted}/{sock.answerCount.total} answered
+              {answeredLabel(sock.answerCount.submitted, sock.answerCount.total)}
             </span>
           )}
           <span className="text-zinc-500 tabular-nums">
@@ -1742,16 +1748,20 @@ function LiveView({
                   )}
 
                   {/* Question text */}
-                  <PresenterContent sessionId={sessionId} kind="question-stem" content={presenterPublicContent!} reviewing={isReviewing}>
-                    <QuizHtml
-                      className="quiz-html text-2xl lg:text-3xl text-white text-center leading-relaxed max-w-5xl"
-                      html={displayQuestion.text}
-                    />
-                    <QuestionMedia media={displayQuestion.slideMedia} />
-                  </PresenterContent>
+                  <div className="presenter-question-mode">
+                    <span className={`selection-mode-chip ${displayQuestion.questionType === "open_response" || displayQuestion.allowsMultiple ? "selection-mode-chip-multi" : "selection-mode-chip-single"}`}>
+                      {displayQuestionModeText}
+                    </span>
+                  </div>
 
-                  <div className={`selection-mode-chip ${displayQuestion.questionType === "open_response" || displayQuestion.allowsMultiple ? "selection-mode-chip-multi" : "selection-mode-chip-single"}`}>
-                    {displayQuestionModeText}
+                  <div className="presenter-question-content">
+                    <PresenterContent sessionId={sessionId} kind="question-stem" content={presenterPublicContent!} reviewing={isReviewing}>
+                      <QuizHtml
+                        className="quiz-html text-2xl lg:text-3xl text-white text-center leading-relaxed max-w-5xl"
+                        html={displayQuestion.text}
+                      />
+                      <QuestionMedia media={displayQuestion.slideMedia} />
+                    </PresenterContent>
                   </div>
 
                   {noVotesClosed && <p className="no-votes-note">No votes yet</p>}
@@ -1829,13 +1839,15 @@ function LiveView({
             actions={liveSurfaceActions}
           >
             <ResponsiveQuizSurface reveal fitKey={fitKey}>
-              <PresenterContent sessionId={sessionId} kind="question-stem" content={presenterPublicContent!} reveal reviewing={isReviewing}>
-                <QuizHtml
-                  className={`quiz-html text-center leading-relaxed max-w-5xl ${isReviewing ? "text-2xl lg:text-3xl text-white" : "text-xl lg:text-2xl text-zinc-300"}`}
-                  html={displayQuestion.text}
-                />
-                <QuestionMedia media={displayQuestion.slideMedia} />
-              </PresenterContent>
+              <div className="presenter-question-content">
+                <PresenterContent sessionId={sessionId} kind="question-stem" content={presenterPublicContent!} reveal reviewing={isReviewing}>
+                  <QuizHtml
+                    className={`quiz-html text-center leading-relaxed max-w-5xl ${isReviewing ? "text-2xl lg:text-3xl text-white" : "text-xl lg:text-2xl text-zinc-300"}`}
+                    html={displayQuestion.text}
+                  />
+                  <QuestionMedia media={displayQuestion.slideMedia} />
+                </PresenterContent>
+              </div>
 
               {noVotesRevealed && <p className="no-votes-note">No votes yet</p>}
 

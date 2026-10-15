@@ -1,4 +1,15 @@
 /** Small pieces of presenter-facing wording that more than one view uses. */
+import type { QuestionType } from "@mdq/shared";
+
+export function answeredLabel(submitted: number, total: number): string {
+  return total === 0 ? "No one has joined yet" : `${submitted}/${total} answered`;
+}
+
+export function restartCountdownDetail(question: { questionType: QuestionType; isPoll: boolean }, speedRanking: boolean): string | null {
+  return speedRanking && question.questionType === "multiple_choice" && !question.isPoll
+    ? "Ties will no longer use answer speed"
+    : null;
+}
 
 export function pluralize(count: number, singular: string, plural = `${singular}s`): string {
   return `${count} ${count === 1 ? singular : plural}`;
