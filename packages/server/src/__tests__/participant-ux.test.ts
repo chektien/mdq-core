@@ -9,7 +9,7 @@ import { clearAllSessions } from "../session";
 import { parseQuizMarkdown } from "../parser";
 import { deckLabel, formatQuizLabel, resultsHeading } from "../../../client/src/deckLabel";
 import { SESSION_MISSING_MESSAGE, extraLabelNote, joinRefusalMessage } from "../../../client/src/joinForm";
-import { getQuestionModeText } from "../../../client/src/questionMode";
+import { getPresenterQuestionModeText, getQuestionModeText } from "../../../client/src/questionMode";
 
 const clientSrc = path.resolve(__dirname, "..", "..", "..", "client", "src");
 const read = (rel: string): string => fs.readFileSync(path.join(clientSrc, rel), "utf-8");
@@ -180,6 +180,25 @@ describe("deck title on results", () => {
 describe("closing early and the wording around it", () => {
   const view = read("views/StudentView.tsx");
 
+  it("gives presenters compact mode/scoring labels without changing participant instructions", () => {
+    expect(getPresenterQuestionModeText("open_response", false)).toBe("Open response · not scored");
+    expect(getPresenterQuestionModeText("open_response", true)).toBe("Open response · not scored");
+    expect(getPresenterQuestionModeText("poll", false)).toBe("Poll · one choice · not scored");
+    expect(getPresenterQuestionModeText("poll", true)).toBe("Poll · several choices · not scored");
+    expect(getPresenterQuestionModeText("multiple_choice", false)).toBe("Question · one answer");
+    expect(getPresenterQuestionModeText("multiple_choice", true)).toBe("Question · several answers");
+    for (const type of ["slide", "cover"] as const) {
+      expect(getPresenterQuestionModeText(type, false)).toBe("Slide · no response needed");
+    }
+    expect(getQuestionModeText("poll", false)).toBe("Poll question. Select one option. This does not affect your score.");
+    expect(getQuestionModeText("multiple_choice", false)).toBe("Select only one answer");
+    expect(getQuestionModeText("multiple_choice", true)).toBe("You can select multiple answers");
+    expect(read("views/InstructorView.tsx")).toContain("getPresenterQuestionModeText(displayQuestion.questionType, displayQuestion.allowsMultiple)");
+    for (const source of [view, read("views/PresentationView.tsx")]) {
+      expect(source).not.toContain("getPresenterQuestionModeText");
+    }
+  });
+
   it("only says time is up when the timer ran out", () => {
     expect(view).toContain("Answers are closed. Waiting for the instructor.");
     expect(view).toContain("Time's up. Waiting for the instructor.");
@@ -194,7 +213,8 @@ describe("closing early and the wording around it", () => {
     expect(view).toContain("You cannot change your vote after you submit.");
     const text = getQuestionModeText("open_response", false);
     expect(text).not.toContain("Submit one written reply");
-    expect(text).toContain("update");
+    expect(text).toContain("You can update it while answers are open.");
+    expect(text).not.toContain("time is up");
   });
 
   it("offers to send an answer that was left unsent after reconnecting", () => {
@@ -209,8 +229,8 @@ describe("join form messages", () => {
     expect(joinRefusalMessage("Session not found")).toBe(SESSION_MISSING_MESSAGE);
   });
 
-  it("adds the next step when a Student ID is already in use, once", () => {
-    const clash = 'The Student ID "S0001" is already in this session on another device. Use that device, or check that you typed your own ID.';
+  it("adds the next step when a Participant ID is already in use, once", () => {
+    const clash = 'The Participant ID "S0001" is already in this session on another device. Use that device, or check that you typed your own ID.';
     const shown = joinRefusalMessage(clash);
     expect(shown.startsWith(clash)).toBe(true);
     expect(shown).toContain("If that device is not working, ask your instructor to let you join again.");
@@ -273,6 +293,10 @@ describe("screen reader and touch details", () => {
   it("labels the leaderboard numbers and caps the phone leaderboard's width", () => {
     const board = read("components/Leaderboard.tsx");
     expect(board).toContain("of ${totalQuestions} correct");
+    expect(board).toContain('{entry.rank}');
+    expect(board).toContain('aria-label={`Rank ${entry.rank}`}');
+    expect(board).toContain('isHighlighted && <span className="leaderboard-you">You</span>');
+    expect(board).not.toMatch(/animationDelay|rankLabel|"1st"|"2nd"|"3rd"/);
     expect(board).toContain(" s<span");
     const css = read("index.css");
     expect(css).toMatch(/\.leaderboard-board-compact \{\s*width: min\(100%, 32rem\);/);
@@ -300,8 +324,8 @@ describe("reduced motion", () => {
     expect(start).toBeGreaterThan(0);
   });
 
-  it("stops the timer pulse and the leaderboard slide-in", () => {
-    expect(block).toMatch(/\.timer-urgent,\s*\.leaderboard-row \{\s*animation: none;/);
+  it("stops the timer pulse and the whole leaderboard fade", () => {
+    expect(block).toMatch(/\.timer-urgent,\s*\.leaderboard-list \{\s*animation: none;/);
   });
 
   it("swaps the spinning loader for a fade", () => {
@@ -328,7 +352,7 @@ describe("reduced motion", () => {
 
   it("covers every animation and transition the stylesheet declares", () => {
     const animated = [...css.matchAll(/animation:\s*([a-z-]+)/g)].map((m) => m[1]).filter((n) => n !== "none");
-    expect(new Set(animated)).toEqual(new Set(["timer-pulse", "slide-in", "reduced-motion-fade", "mdq-status-fade"]));
+    expect(new Set(animated)).toEqual(new Set(["timer-pulse", "leaderboard-fade", "reduced-motion-fade", "mdq-status-fade"]));
   });
 });
 
@@ -341,7 +365,7 @@ describe("presenter review fixes", () => {
     expect(restore).toContain("questionTotal: data.questionTotal");
   });
 
-  it("says ID or name in the participants help when Student IDs are off", () => {
+  it("says ID or name in the participants help when Participant IDs are off", () => {
     expect(instructor).toContain('join with their {nameOnly ? "name" : idsAvailable ? "ID" : "ID or name"} from any device');
   });
 
@@ -373,6 +397,6 @@ describe("presenter review fixes", () => {
     expect(view).toContain("SEAT_TAKEN_MESSAGE");
     expect(socket).toContain("SocketEvents.SEAT_TAKEN");
     expect(socket).toContain('role === "student" && !seatTakenRef.current');
-    expect(socket).toContain("stored.sessionToken === joinedTokenRef.current");
+    expect(socket).toContain("clearStoredSession(sessionId, joinedTokenRef.current)");
   });
 });

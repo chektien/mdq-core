@@ -48,7 +48,7 @@ export const nameTakenMessage = (name: string): string =>
   `Someone here is already using the name "${name}". Add an initial or your surname, for example "${name} B."`;
 
 export const idTakenMessage = (id: string): string =>
-  `The Student ID "${id}" is already in this session on another device. Use that device, or check that you typed your own ID.`;
+  `The Participant ID "${id}" is already in this session on another device. Use that device, or check that you typed your own ID.`;
 
 /** The seat whose name is `name`, ignoring case, for a deck that uses names as IDs. */
 export function findSeatByName(session: Session, name: string): Participant | undefined {

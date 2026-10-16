@@ -82,7 +82,7 @@ If Tailscale is not installed or campus Wi-Fi blocks peer-to-peer:
 For each question:
 
 1. Click "Start" (or "Next Question") to open the question.
-2. The timer starts automatically (default 35s, or per-question `time-limit`).
+2. The timer starts automatically (default 35s, or per-question `time-limit`). A question with `time-limit: none` has no timer and waits for presenter close. Reconnect/reload must preserve the timed question's deadline; only **Restart Countdown** on an open, unrevealed timed question starts a new countdown, keeping submitted answers intact.
 3. Watch the submission count. The question auto-closes when time runs out, or you can close it early.
    - If a student disconnects mid-question, the denominator may drop because only currently connected participants are counted.
 4. Click "Reveal" to show the correct answer, explanation, and answer distribution chart.

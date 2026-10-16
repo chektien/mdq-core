@@ -1,3 +1,5 @@
+import { parseQuizMarkdown } from "../parser";
+import { createLegacySession } from "./fixtures/legacy-session";
 import {
   createSession,
   serializeSession,
@@ -19,7 +21,7 @@ describe("Session Engine", () => {
   let session: Session;
 
   beforeEach(() => {
-    session = createSession("week01", "open");
+    session = createLegacySession("week01", "open");
   });
 
   describe("createSession", () => {
@@ -66,6 +68,19 @@ describe("Session Engine", () => {
   });
 
   describe("session JSON round trips", () => {
+    it("restores a frozen retired-palette deck as classic without changing the saved record", () => {
+      const original = createSession("retired", "open");
+      const source = "# Retired\ndark: off\ntheme: classic\n\n---\n\n## Only\n\ntype: slide\n\nKept content.\n";
+      original.deckSnapshot = parseQuizMarkdown(source, "retired.md").quiz!;
+      Object.assign(original.deckSnapshot, { palette: "tokyo-night" });
+      const serialized = serializeSession(original);
+      const restored = deserializeSession(serialized);
+      expect(restored.deckSnapshot).toStrictEqual({ ...original.deckSnapshot, palette: "classic" });
+      expect(restored.deckSnapshot?.theme).toBe("light");
+      expect(original.deckSnapshot.palette).toBe("tokyo-night");
+      expect(serialized).toContain('"palette":"tokyo-night"');
+    });
+
     it.each(SESSION_STATES)("preserves a populated %s session", (state) => {
       const original = createSession("week01", "strict");
       addParticipant(original, "S001", "sock1", "Alice", undefined, "client-a");
@@ -92,7 +107,7 @@ describe("Session Engine", () => {
     });
 
     it("preserves absent optional fields and remains usable after restoration", () => {
-      const original = createSession("week01", "open");
+      const original = createLegacySession("week01", "open");
       delete original.revealedQuestionIndexes;
       const { participant } = addParticipant(original, "S001", "sock1");
       original.state = "QUESTION_OPEN";

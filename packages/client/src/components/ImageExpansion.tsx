@@ -3,6 +3,7 @@ import {
   type ReactNode,
   useCallback,
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
 } from "react";
@@ -28,29 +29,17 @@ function getImageName(image: ExpandedImage): string {
   return image.title || image.alt || "image";
 }
 
-function getViewportSize() {
-  return { width: window.innerWidth, height: window.innerHeight };
-}
-
-function getExpandedImageWidth(
-  naturalSize: { width: number; height: number },
-  viewportSize: { width: number; height: number },
-): number {
-  const framePaddingAllowance = 48;
-  const maxFrameWidth = Math.max(180, Math.min(viewportSize.width * 0.96, 1888) - framePaddingAllowance);
-  const heightReserve = Math.min(Math.max(viewportSize.height * 0.14, 112), 160);
-  const maxImageHeight = Math.max(180, viewportSize.height - heightReserve);
-  const widthByHeight = maxImageHeight * (naturalSize.width / naturalSize.height);
-  return Math.round(Math.min(maxFrameWidth, widthByHeight));
-}
-
 export function ImageExpansionOverlay({ image, onClose }: ImageExpansionOverlayProps) {
   const closeButtonRef = useRef<HTMLButtonElement | null>(null);
   const [naturalSize, setNaturalSize] = useState<{ width: number; height: number } | null>(null);
-  const [viewportSize, setViewportSize] = useState<{ width: number; height: number } | null>(null);
+  const overlayRef = useRef<HTMLDivElement | null>(null);
+  const frameRef = useRef<HTMLElement | null>(null);
+  const captionRef = useRef<HTMLElement | null>(null);
+  const [imageWidth, setImageWidth] = useState<number | null>(null);
 
   useEffect(() => {
     setNaturalSize(null);
+    setImageWidth(null);
   }, [image?.src]);
 
   useEffect(() => {
@@ -65,38 +54,67 @@ export function ImageExpansionOverlay({ image, onClose }: ImageExpansionOverlayP
 
     document.body.classList.add("image-expansion-lock");
     document.addEventListener("keydown", onKeyDown);
-    setViewportSize(getViewportSize());
     window.setTimeout(() => closeButtonRef.current?.focus(), 0);
-
-    const onResize = () => setViewportSize(getViewportSize());
-    window.addEventListener("resize", onResize);
 
     return () => {
       document.body.classList.remove("image-expansion-lock");
       document.removeEventListener("keydown", onKeyDown);
-      window.removeEventListener("resize", onResize);
     };
   }, [image, onClose]);
+
+  // Use the actual frame chrome and wrapped caption, not a guessed viewport
+  // allowance. Only the width is constrained, so the native image ratio also
+  // determines its element height (no object-fit letterboxing inside the img).
+  useLayoutEffect(() => {
+    const overlay = overlayRef.current;
+    const frame = frameRef.current;
+    if (!image || !naturalSize || !overlay || !frame) return undefined;
+    const measure = () => {
+      const overlayStyle = window.getComputedStyle(overlay);
+      const frameStyle = window.getComputedStyle(frame);
+      const px = (value: string) => parseFloat(value) || 0;
+      const horizontalChrome = px(overlayStyle.paddingLeft) + px(overlayStyle.paddingRight)
+        + px(frameStyle.paddingLeft) + px(frameStyle.paddingRight)
+        + px(frameStyle.borderLeftWidth) + px(frameStyle.borderRightWidth);
+      const verticalChrome = px(overlayStyle.paddingTop) + px(overlayStyle.paddingBottom)
+        + px(frameStyle.paddingTop) + px(frameStyle.paddingBottom)
+        + px(frameStyle.borderTopWidth) + px(frameStyle.borderBottomWidth);
+      const captionHeight = captionRef.current?.getBoundingClientRect().height || 0;
+      const availableWidth = Math.max(1, overlay.clientWidth - horizontalChrome);
+      const availableHeight = Math.max(1, overlay.clientHeight - verticalChrome
+        - captionHeight - (captionHeight ? px(frameStyle.rowGap) : 0));
+      const width = Math.floor(Math.min(availableWidth,
+        availableHeight * naturalSize.width / naturalSize.height));
+      setImageWidth((previous) => previous === width ? previous : width);
+    };
+    measure();
+    window.addEventListener("resize", measure);
+    const observer = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(measure);
+    observer?.observe(overlay);
+    if (captionRef.current) observer?.observe(captionRef.current);
+    return () => {
+      window.removeEventListener("resize", measure);
+      observer?.disconnect();
+    };
+  }, [image, naturalSize]);
 
   if (!image || typeof document === "undefined") return null;
 
   const imageName = getImageName(image);
   const caption = image.title || image.alt;
-  const imageStyle = naturalSize && viewportSize
-    ? ({
-        width: `${getExpandedImageWidth(naturalSize, viewportSize)}px`,
-      } satisfies CSSProperties)
+  const imageStyle = imageWidth !== null
+    ? ({ width: `${imageWidth}px` } satisfies CSSProperties)
     : undefined;
 
   return createPortal(
-    <div className="image-expansion-overlay" role="dialog" aria-modal="true" aria-label={`Expanded ${imageName}`}>
+    <div ref={overlayRef} className="image-expansion-overlay" role="dialog" aria-modal="true" aria-label={`Expanded ${imageName}`}>
       <button
         type="button"
         className="image-expansion-backdrop"
         aria-label="Close expanded image"
         onClick={onClose}
       />
-      <figure className="image-expansion-frame">
+      <figure ref={frameRef} className="image-expansion-frame">
         <button
           ref={closeButtonRef}
           type="button"
@@ -121,7 +139,7 @@ export function ImageExpansionOverlay({ image, onClose }: ImageExpansionOverlayP
             }}
           />
         </div>
-        {caption && <figcaption className="image-expansion-caption">{caption}</figcaption>}
+        {caption && <figcaption ref={captionRef} className="image-expansion-caption">{caption}</figcaption>}
       </figure>
     </div>,
     document.body,

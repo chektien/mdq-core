@@ -1,4 +1,4 @@
-import { Quiz, Session, SessionState, SocketEvents } from "@mdq/shared";
+import { Quiz, Session, SessionState, SocketEvents, type Participant } from "@mdq/shared";
 import { apply, questionPosition, type Audience, type Command } from "../engine";
 import { emitMessages } from "../socket";
 import { storeSession, clearAllSessions } from "../session";
@@ -22,6 +22,7 @@ const openPayload = (index: number) => ({
   attendeeNotes: undefined, slideMedia: undefined, slideMediaPosition: undefined, slideMediaOpacity: undefined,
   slideBackground: undefined, slideLiveEmbed: undefined, slideVideo: undefined, slideReferences: undefined,
   options: [{ label: "A", text: "One" }], allowsMultiple: false, isPoll: false, timeLimitSec: 20, startedAt: 1000,
+  deadlineAt: 21000, serverNow: 1000,
   questionNumber: index + 1, questionTotal: 2,
 });
 const count = (index: number) => ({ questionIndex: index, submitted: 0, total: 0, openResponses: undefined });
@@ -29,7 +30,7 @@ const reveal = (index: number) => ({ questionIndex: index, questionType: "multip
   explanation: "Correct", distribution: {}, isPoll: false, openResponses: undefined });
 const msg = (event: string, payload: unknown, audience: Audience = "all") => ({ audience, event, payload });
 const opened = (index: number) => [
-  msg(SocketEvents.QUESTION_OPEN, openPayload(index)),
+  msg(SocketEvents.QUESTION_OPEN, { ...openPayload(index), firstOpenedAt: 1000 }),
   msg(SocketEvents.SESSION_STATE, { state: "QUESTION_OPEN", questionIndex: index }),
   msg(SocketEvents.ANSWER_COUNT, count(index), "staff"),
 ];
@@ -61,13 +62,12 @@ const cases: Record<string, { state: SessionState; messages: ReturnType<typeof m
   "QUESTION_CLOSED:leaderboardShow": { state: "LEADERBOARD", messages: leaders },
   "QUESTION_CLOSED:end": { state: "ENDED", messages: ended },
   "REVEAL:next": { state: "QUESTION_OPEN", messages: opened(1) },
-  "REVEAL:start": { state: "QUESTION_OPEN", messages: opened(0) },
-  "REVEAL:open": { state: "QUESTION_OPEN", messages: opened(0) },
   "REVEAL:leaderboardShow": { state: "LEADERBOARD", messages: leaders },
   "REVEAL:end": { state: "ENDED", messages: ended },
   "LEADERBOARD:leaderboardHide": { state: "REVEAL", messages: revealed(0) },
   "LEADERBOARD:reveal": { state: "REVEAL", messages: revealed(0) },
   "LEADERBOARD:end": { state: "ENDED", messages: ended },
+  "ENDED:end": { state: "ENDED", messages: [] },
 };
 
 for (const state of states) for (const type of commands) {
@@ -169,6 +169,7 @@ for (const state of states) {
 it("previous navigation returns to a revealed quiz and a slide opens without a timer", () => {
   const input = base("QUESTION_OPEN");
   input.currentQuestionIndex = 1;
+  input.questionTiming = { "0": { startedAt: 1000, deadlineAt: 21000, restarts: [] } };
   const previous = apply(input, quiz, { type: "previous" }, 1000);
   expect(previous.session.state).toBe("REVEAL");
   expect(previous.messages).toEqual(revealed(0));
@@ -323,4 +324,54 @@ it("tells screens whether a question closed because the timer ran out", () => {
   const late = (session: Session) => apply(session, quiz, { type: "snapshot", view: "display" }, 30000).messages.find((m) => m.event === SocketEvents.QUESTION_CLOSE)!.payload;
   expect(late(closedEarly.session)).toEqual({ questionIndex: 0 });
   expect(late(timedOut.session)).toEqual({ questionIndex: 0, timedOut: true });
+});
+
+describe("answer structural sharing", () => {
+  const seat = (id: string) => ({ studentId: id, publicKey: `key-${id}`, label: id, sessionToken: `token-${id}`, socketId: `socket-${id}`, joinedAt: 1, connected: true });
+  it("does not copy historical option arrays or mutate seats when accepting a new answer", () => {
+    const input = base("QUESTION_OPEN");
+    input.participants.set("new", Object.freeze(seat("new")));
+    let historicalOptionReads = 0;
+    for (let i = 0; i < 100; i++) {
+      input.participants.set(`old-${i}`, Object.freeze(seat(`old-${i}`)));
+      input.submissions.push(Object.freeze({ studentId: `old-${i}`, questionIndex: 1,
+        get selectedOptions() { historicalOptionReads++; return Object.freeze(["A"]) as unknown as string[]; },
+        submittedAt: 1000, responseTimeMs: 0 }));
+    }
+    Object.freeze(input.submissions); Object.freeze(input);
+    const output = apply(input, quiz, { type: "answerSubmit", studentId: "new", payload: { questionIndex: 0, selectedOptions: ["A"] } }, 2000);
+    expect(output.messages[0].event).toBe(SocketEvents.ANSWER_ACCEPTED);
+    expect(historicalOptionReads).toBe(0);
+    expect(input.submissions).toHaveLength(100);
+    expect(output.session.submissions).toHaveLength(101);
+    expect(output.session.submissions[0]).toBe(input.submissions[0]);
+    expect(output.session.participants).toBe(input.participants);
+    // A later seat mutation must still protect both previous versions.
+    const disconnected = apply(output.session, quiz, { type: "disconnect", studentId: "new", socketId: "socket-new" }, 3000);
+    expect(disconnected.session.participants.get("new")!.connected).toBe(false);
+    expect(output.session.participants.get("new")!.connected).toBe(true);
+    expect(input.participants.get("new")!.connected).toBe(true);
+  });
+  it("replaces a written answer without changing a retained input snapshot", () => {
+    const written: Quiz = { ...quiz, questions: [{ ...question(0), questionType: "open_response", options: [], correctOptions: [] }] };
+    const input = base("QUESTION_OPEN"); input.participants.set("one", Object.freeze(seat("one")));
+    const first = apply(input, written, { type: "answerSubmit", studentId: "one", payload: { questionIndex: 0, responseText: "First" } }, 2000);
+    Object.freeze(first.session.submissions[0].selectedOptions); Object.freeze(first.session.submissions[0]); Object.freeze(first.session.submissions);
+    const second = apply(first.session, written, { type: "answerSubmit", studentId: "one", payload: { questionIndex: 0, responseText: "Second" } }, 3000);
+    expect(second.messages[0].event).toBe(SocketEvents.ANSWER_ACCEPTED);
+    expect(first.session.submissions[0].responseText).toBe("First");
+    expect(second.session.submissions[0].responseText).toBe("Second");
+    expect(second.session.submissions).toHaveLength(1);
+  });
+  it("copies legacy identities before adopting them even when the answer is rejected", () => {
+    const input = base("QUESTION_OPEN");
+    const old = Object.freeze({ studentId: "legacy", sessionToken: "legacy-token", socketId: "legacy-socket", joinedAt: 1, connected: true });
+    input.participants.set("legacy", old as Participant); Object.freeze(input.submissions); Object.freeze(input);
+    const output = apply(input, quiz, { type: "answerSubmit", studentId: "legacy", payload: { questionIndex: 1, selectedOptions: ["A"] } }, 2000);
+    expect(output.messages[0].event).toBe(SocketEvents.ANSWER_REJECTED);
+    expect(input.participants.get("legacy")).toBe(old);
+    expect(input.participants.get("legacy")!.publicKey).toBeUndefined();
+    expect(output.session.participants.get("legacy")!.publicKey).toBeTruthy();
+    expect(output.session.participants.get("legacy")!.label).toBeTruthy();
+  });
 });

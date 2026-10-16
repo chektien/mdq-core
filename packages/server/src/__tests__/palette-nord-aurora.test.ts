@@ -1,7 +1,9 @@
 import fs from "fs";
 import path from "path";
+import { parseQuizMarkdown } from "../parser";
+import { buildHtml } from "../print-mdq";
 
-// Contrast contract for the Tokyo Night palette: both blocks exist, the upstream is
+// Contrast contract for the Nord Aurora palette: both blocks exist, the upstream is
 // credited, text holds 4.5:1 on every surface it sits on, filled controls hold
 // their label at 4.5:1, and boundaries, focus and selected colours hold 3:1.
 
@@ -10,7 +12,7 @@ const index = fs.readFileSync(path.join(clientSrc, "index.css"), "utf-8");
 const theme = fs.readFileSync(path.join(clientSrc, "theme.css"), "utf-8");
 const printSource = fs.readFileSync(path.resolve(__dirname, "..", "print-mdq.ts"), "utf-8");
 
-const NAME = "tokyo-night";
+const NAME = "nord-aurora";
 const DARK = `html[data-palette="${NAME}"]:not([data-theme="light"])`;
 const LIGHT = `html[data-palette="${NAME}"][data-theme="light"]`;
 
@@ -60,7 +62,7 @@ const hex = (value: string | undefined, label: string): string => {
 const printBlock = (fn: string, next: string): string =>
   printSource.slice(printSource.indexOf(`function ${fn}`), printSource.indexOf(`function ${next}`));
 
-describe("Tokyo Night palette", () => {
+describe("Nord Aurora palette", () => {
   const dark: Tokens = { ...tokens(theme, 'html[data-theme="dark"]'), ...tokens(index, DARK) };
   const light: Tokens = { ...tokens(theme, 'html[data-theme="light"]'), ...tokens(index, LIGHT) };
   // The dark end-session dialog reads the palette's --mdq-dialog, with the Keep Session fill on it.
@@ -69,15 +71,15 @@ describe("Tokyo Night palette", () => {
   it("defines a dark block, which also applies when data-theme is absent, and a light block", () => {
     expect(index).toContain(`${DARK} {`);
     expect(index).toContain(`${LIGHT} {`);
-    expect(dark["--mdq-slide-bg"]).toBe("#1a1b26");
-    expect(light["--mdq-slide-bg"]).toBe("#e1e2e7");
+    expect(dark["--mdq-slide-bg"]).toBe("#2e3440");
+    expect(light["--mdq-slide-bg"]).toBe("#eceff4");
   });
 
   it("credits the upstream palette and names its adjusted shades", () => {
-    const start = index.indexOf(`deck palette: ${NAME})`);
+    const start = index.indexOf(`deck theme: ${NAME})`);
     const header = index.slice(start, index.indexOf(DARK, start));
-    expect(header).toContain("folke/tokyonight.nvim");
-    expect(header).toContain("Apache-2.0");
+    expect(header).toContain("nordtheme/nord");
+    expect(header).toContain("MIT");
     expect(header).toMatch(/#[0-9a-f]{6} to #[0-9a-f]{6}/);
   });
 
@@ -189,12 +191,12 @@ describe("Tokyo Night palette", () => {
           if (mode === "light") return hex(t[`--mdq-rank-${name}`] ?? t["--mdq-muted"], `rank ${name}`);
           return hex(declarations(ruleBody(index, `${selector} .leaderboard-row.rank-${name}`))["--leaderboard-rank-color"], name);
         };
-        const glass = c("--mdq-slide-glass");
-        const highlight = mode === "dark" ? over(`rgba(${channels(c("--mdq-accent")).join(", ")}, 0.24)`, c("--mdq-slide-glass-strong")) : over(`rgba(${channels(c("--mdq-accent")).join(", ")}, 0.07)`, c("--mdq-card-strong"));
+        const ground = c("--mdq-paper");
+        const highlight = over(`rgba(${channels(c("--mdq-accent")).join(", ")}, 0.06)`, ground);
         for (const name of ["first", "second", "third", "standard"]) {
           const color = rank(name);
           if (mode === "light" && name === "standard") continue;
-          expect([name, contrast(color, over(`rgba(${channels(color).join(", ")}, 0.16)`, glass)) >= 4.5]).toEqual([name, true]);
+          expect([name, contrast(color, ground) >= 4.5]).toEqual([name, true]);
           expect([name, "own row", contrast(color, highlight) >= 4.5]).toEqual([name, "own row", true]);
         }
       });
@@ -202,15 +204,15 @@ describe("Tokyo Night palette", () => {
   }
 
   it("has print tokens for both themes that mirror the live palette", () => {
-    const print = printBlock("renderTokyoNightTokens", "printPageBackground");
+    const print = printBlock("renderNordAuroraTokens", "printPageBackground");
     expect(print).not.toContain("TODO");
-    expect(print).toContain("--page-bg: #1a1b26;");
-    expect(print).toContain("--page-bg: #e1e2e7;");
+    expect(print).toContain("--page-bg: #2e3440;");
+    expect(print).toContain("--page-bg: #eceff4;");
     expect(print).toContain(`--accent: ${dark["--mdq-accent-text"]};`);
     expect(print).toContain(`--accent: ${light["--mdq-accent-text"]};`);
     expect(print).toContain(`--green: ${dark["--mdq-success-text"]};`);
     expect(print).toContain(`--green: ${light["--mdq-success-text"]};`);
-    expect(printSource).toContain(`case "${NAME}":\n      return theme === "dark" ? "#1a1b26" : "#e1e2e7";`);
+    expect(printSource).toContain(`case "${NAME}":\n      return theme === "dark" ? "#2e3440" : "#eceff4";`);
     const halves = {
       light: print.slice(print.indexOf('if (theme === "light")'), print.indexOf("\n  return `")),
       dark: print.slice(print.indexOf("\n  return `")),
@@ -230,5 +232,31 @@ describe("Tokyo Night palette", () => {
 });
 
 function declarations(body: string): Record<string, string> {
-  return Object.fromEntries([...body.matchAll(/(--[\w-]+|[a-z-]+)\s*:\s*([^;]+);/g)].map((m) => [m[1], m[2].trim()]));
+  return Object.fromEntries([...body.replace(/\/\*[\s\S]*?\*\//g, "").matchAll(/(--[\w-]+|[a-z-]+)\s*:\s*([^;]+);/g)].map((m) => [m[1], m[2].trim()]));
 }
+
+// Verify the real export path, rather than only the source token strings.
+it.each(["dark", "light"] as const)("exports a Nord Aurora %s deck with its upstream notice", (mode) => {
+  const markdown = `# Aurora sample\ndark: ${mode === "dark" ? "on" : "off"}\ntheme: nord-aurora\n\n---\n\n## Readable content\ntype: slide\n\nBody with **emphasis** and a [reference](https://www.nordtheme.com/).\n`;
+  const parsed = parseQuizMarkdown(markdown, "aurora.md");
+  expect(parsed.errors).toEqual([]);
+  expect(parsed.quiz?.palette).toBe("nord-aurora");
+  const html = buildHtml(parsed.quiz!, { inputFile: "/tmp/aurora.md", outputFile: "/tmp/aurora.pdf", imagesDir: "/tmp",
+    includeFoldouts: true, includePresenterNotes: false, includeAnswers: true, pageSize: "A4", theme: mode });
+  expect(html).toContain(`--page-bg: ${mode === "dark" ? "#2e3440" : "#eceff4"}`);
+  expect(html).toContain("Readable content");
+  const notices = fs.readFileSync(path.resolve(clientSrc, "../../../THIRD_PARTY_NOTICES.md"), "utf-8");
+  const license = notices.slice(notices.indexOf("MIT License (MIT)")).trim();
+  expect(html).toContain(license);
+  expect(index).toContain(license);
+});
+
+it.each(["dark", "light"] as const)("keeps correct-answer labels readable in actual %s print HTML", (mode) => {
+  const quiz = parseQuizMarkdown("# Aurora\ntheme: nord-aurora\n\n---\n\n## Check\nWhat stays portable?\n\nA. Markdown\nB. Nothing\n\n> Correct Answer: A\n", "check.md").quiz!;
+  const html = buildHtml(quiz, { inputFile: "/tmp/check.md", outputFile: "/tmp/check.pdf", imagesDir: "/tmp",
+    includeFoldouts: true, includePresenterNotes: false, includeAnswers: true, pageSize: "A4", theme: mode });
+  expect(html).toContain("option-correct");
+  const vars = declarations(html);
+  expect(html).toMatch(/\.option-correct \.option-label\s*\{[^}]*color: var\(--on-green, #fff\)/);
+  expect(contrast(vars["--on-green"], vars["--green"])).toBeGreaterThanOrEqual(4.5);
+});

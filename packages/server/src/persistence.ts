@@ -10,9 +10,10 @@ import {
   Submission,
   DATA_DIR,
 } from "@mdq/shared";
+import { effectiveRanking, getSessionScoredQuestionCount, releasedQuestionIndexes, resultMetadata, scoredCorrectAnswersForSession } from "./policy";
 import { computeLeaderboard } from "./session";
 import { buildResultsCsv, isSubmissionCorrect, toIso } from "./results-csv";
-import { buildScoredCorrectAnswersMap, getQuestionType, getScoredQuestionCount, isScoredQuestion } from "./scoring";
+import { getQuestionType, isScoredQuestion } from "./scoring";
 
 const sessionRevealTimestamps = new Map<string, Map<number, number>>();
 const DEFAULT_DATA_DIR = path.resolve(__dirname, "../../../", DATA_DIR);
@@ -116,11 +117,14 @@ export function saveSessionSnapshot(session: Session, baseDir?: string): void {
   ensureDir(dir);
 
   const snapshot: SessionSnapshot = {
+    ...(session.availability ? { availability: { ...session.availability } } : {}),
     sessionId: session.sessionId,
     sessionCode: session.sessionCode,
     week: session.week,
     mode: session.mode,
-    questionCount: session.currentQuestionIndex + 1,
+    questionCount: session.policy ? (session.resultScope?.releasedQuestionIndexes ?? [...(session.releasedQuestionIndexes ?? [])]).length : session.currentQuestionIndex + 1,
+    ...(session.policy ? { deckSnapshot: session.deckSnapshot, policy: session.policy, policyFrozen: session.policyFrozen, releasedQuestionIndexes: [...(session.releasedQuestionIndexes ?? [])], resultScope: session.resultScope } : {}),
+    ...(session.liveResultsOverrides ? { liveResultsOverrides: session.liveResultsOverrides } : {}),
     participantCount: session.participants.size,
     participants: [...session.participants.values()].map((p) => ({
       studentId: p.studentId,
@@ -128,7 +132,8 @@ export function saveSessionSnapshot(session: Session, baseDir?: string): void {
       joinedAt: p.joinedAt,
     })),
     createdAt: session.createdAt,
-    endedAt: Date.now(),
+    endedAt: session.resultScope?.endedAt ?? session.endedAt ?? Date.now(),
+    ...(session.questionTiming ? { questionTiming: session.questionTiming } : {}),
   };
 
   const filePath = path.join(dir, `${session.sessionId}.json`);
@@ -238,8 +243,8 @@ export function saveSessionSummaryMarkdown(
   ensureDir(dir);
 
   const participants = [...session.participants.values()].sort((a, b) => a.studentId.localeCompare(b.studentId));
-  const correctMap = buildScoredCorrectAnswersMap(quiz);
-  const scoredQuestionCount = getScoredQuestionCount(quiz);
+  const correctMap = scoredCorrectAnswersForSession(session, quiz);
+  const scoredQuestionCount = getSessionScoredQuestionCount(session, quiz);
 
   const submissionsByQuestion = new Map<number, Submission[]>();
   const submissionsByStudent = new Map<string, Submission[]>();
@@ -255,7 +260,7 @@ export function saveSessionSummaryMarkdown(
     submissionsByStudent.get(sub.studentId)!.push(sub);
   }
 
-  const leaderboard = computeLeaderboard(session, correctMap);
+  const leaderboard = computeLeaderboard(session, correctMap, effectiveRanking(session, quiz));
   const activeParticipants = participants.filter((p) => (submissionsByStudent.get(p.studentId)?.length || 0) > 0);
   const avgScore = leaderboard.length > 0
     ? leaderboard.reduce((sum, e) => sum + e.correctCount, 0) / leaderboard.length
@@ -289,6 +294,7 @@ export function saveSessionSummaryMarkdown(
 
   const anomalies: string[] = [];
   for (let i = 0; i < quiz.questions.length; i++) {
+    if (session.policy && !releasedQuestionIndexes(session, quiz).includes(i)) continue;
     const question = quiz.questions[i];
     if (isSlideType(getQuestionType(question))) continue;
     const subs = submissionsByQuestion.get(i) || [];
@@ -387,17 +393,20 @@ export function saveWeeklyResult(
   quiz: Quiz,
   baseDir?: string,
 ): void {
+  // A nondisclosing administrative stop must not publish or replace weekly rewards.
+  if (session.resultsDisclosed === false || session.resultScope?.disclosed === false) return;
   const dir = winnersDir(baseDir);
   ensureDir(dir);
 
-  const correctMap = buildScoredCorrectAnswersMap(quiz);
-  const entries = computeLeaderboard(session, correctMap);
+  const correctMap = scoredCorrectAnswersForSession(session, quiz);
+  const entries = session.policy && !correctMap.size ? [] : computeLeaderboard(session, correctMap, effectiveRanking(session, quiz));
 
   const result: WeeklyResult = {
     week: session.week,
     sessionId: session.sessionId,
-    totalQuestions: getScoredQuestionCount(quiz),
-    completedAt: Date.now(),
+    totalQuestions: getSessionScoredQuestionCount(session, quiz),
+    completedAt: session.resultScope?.endedAt ?? session.endedAt ?? Date.now(),
+    ...(session.policy ? { metadata: resultMetadata(session, quiz) } : {}),
     entries,
   };
 
@@ -490,6 +499,8 @@ export function computeCumulativeFromResults(
   >();
 
   for (const result of weeklyResults) {
+    // Stored instructor records are not permission to publish provisional or expired results.
+    if (result.metadata && result.metadata.finality !== "ended") continue;
     for (const entry of result.entries) {
       const existing = statsMap.get(entry.studentId);
       if (existing) {
@@ -548,7 +559,7 @@ export function persistSessionOnEnd(
   quiz: Quiz,
   baseDir?: string,
 ): void {
-  const endedAt = Date.now();
+  const endedAt = session.resultScope?.endedAt ?? session.endedAt ?? Date.now();
 
   try {
     saveSessionSnapshot(session, baseDir);
@@ -600,4 +611,17 @@ function readJsonSafe<T>(filePath: string): T | null {
   } catch {
     return null;
   }
+}
+
+/** Lifecycle purge removes this session's own artifacts, never a newer week's winner. */
+export function purgeSessionArtifacts(session: Session, baseDir?: string): void {
+  const ownPaths = [path.join(sessionsDir(baseDir), `${session.sessionId}.json`),
+    getSessionResultsCsvPath(session, baseDir), getSessionSummaryMarkdownPath(session, baseDir)];
+  const winnerPath = path.join(winnersDir(baseDir), `${sanitizeFileToken(session.week)}.json`);
+  if (fs.existsSync(winnerPath)) {
+    const saved = JSON.parse(fs.readFileSync(winnerPath, "utf-8")) as { sessionId?: string };
+    if (saved.sessionId === session.sessionId) ownPaths.push(winnerPath);
+  }
+  for (const ownPath of ownPaths) if (fs.existsSync(ownPath)) fs.unlinkSync(ownPath);
+  sessionRevealTimestamps.delete(session.sessionId);
 }

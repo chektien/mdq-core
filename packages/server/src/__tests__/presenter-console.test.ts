@@ -1,7 +1,8 @@
 import fs from "fs";
 import path from "path";
-import { closedLabel, formatRemaining, pluralize, positionLabel } from "../../../client/src/instructorText";
+import { answeredLabel, restartCountdownDetail, closedLabel, formatRemaining, pluralize, positionLabel } from "../../../client/src/instructorText";
 import { readShowStudentIds, saveShowStudentIds } from "../../../client/src/showStudentIds";
+import { shortTitle } from "../../../client/src/shortTitle";
 
 const clientSrc = path.resolve(__dirname, "..", "..", "..", "client", "src");
 const read = (rel: string): string => fs.readFileSync(path.join(clientSrc, rel), "utf-8");
@@ -14,6 +15,23 @@ const lastRule = (css: string, selector: string): string => {
 };
 
 describe("presenter wording", () => {
+  it("explains an empty room and keeps answered counts once people have joined", () => {
+    expect(answeredLabel(0, 0)).toBe("No one has joined yet");
+    expect(answeredLabel(0, 4)).toBe("0/4 answered");
+    expect(answeredLabel(3, 4)).toBe("3/4 answered");
+    expect(read("views/InstructorView.tsx").match(/answeredLabel\(sock.answerCount.submitted, sock.answerCount.total\)/g)).toHaveLength(2);
+  });
+
+  it("warns about restart speed ranking only on scored questions", () => {
+    expect(restartCountdownDetail({ questionType: "multiple_choice", isPoll: false }, true)).toBe("Ties will no longer use answer speed");
+    expect(restartCountdownDetail({ questionType: "multiple_choice", isPoll: false }, false)).toBeNull();
+    expect(restartCountdownDetail({ questionType: "multiple_choice", isPoll: true }, true)).toBeNull();
+    for (const questionType of ["poll", "open_response", "slide", "cover"] as const) {
+      expect(restartCountdownDetail({ questionType, isPoll: questionType === "poll" }, true)).toBeNull();
+    }
+    expect(read("views/InstructorView.tsx")).toContain("detail: restartCountdownDetail(q, speedRanking)");
+  });
+
   it("says what is left with the right plurals and no zero counts", () => {
     expect(pluralize(1, "slide")).toBe("1 slide");
     expect(pluralize(2, "slide")).toBe("2 slides");
@@ -49,7 +67,10 @@ describe("presenter wording", () => {
   it("asks nothing vague when ending a session", () => {
     const tsx = read("views/InstructorView.tsx");
     expect(tsx).not.toContain("Are you sure?");
-    expect(tsx).toContain("Everyone&apos;s screen will show the final results.");
+    expect(tsx).toContain("EndSessionConfirmation");
+    const confirmation = read("components/EndSessionConfirmation.tsx");
+    expect(confirmation).toContain("End session and show results?");
+    expect(confirmation).toContain("Answers will close and results will be available. This cannot be reopened.");
   });
 });
 
@@ -97,8 +118,8 @@ describe("Student IDs on the instructor's console", () => {
     // Every toggle sits behind idsAvailable: the lobby and the Participants dialog (switch rows) and the ended screen (a button).
     expect(tsx.match(/className="student-ids-toggle/g)?.length).toBe(1);
     expect(tsx.match(/\{idsAvailable && \(\s*<button\s+type="button"\s+className="student-ids-toggle/g)?.length).toBe(1);
-    expect(tsx.match(/<SettingSwitch\s+label="Show Student IDs"/g)?.length).toBe(2);
-    expect(tsx.match(/\{idsAvailable && \(\s*<SettingSwitch\s+label="Show Student IDs"/g)?.length).toBe(2);
+    expect(tsx.match(/<SettingSwitch\s+label="Show Participant IDs"/g)?.length).toBe(2);
+    expect(tsx.match(/\{idsAvailable && \(\s*<SettingSwitch\s+label="Show Participant IDs"/g)?.length).toBe(2);
     // With the toggle gone, idsVisible is false, and that reaches every list.
     expect(tsx).toContain("const idsVisible = idsAvailable && showStudentIds;");
     expect(tsx).toContain('nameOnly ? "name" : idsAvailable ? "ID" : "ID or name"');
@@ -148,7 +169,7 @@ describe("presenter toolbar", () => {
     expect(tsx).toContain('const waitingReason = !sock.connected ? "Reconnecting..." : null;');
     expect(tsx).toContain("reason: waitingReason");
     expect(tsx).toContain("offline={!sock.connected}");
-    expect(read("components/LiveSurface.tsx")).toContain("title={action.disabled && action.reason ? action.reason : undefined}");
+    expect(read("components/LiveSurface.tsx")).toContain('title={variant === "nav" ? fullLabel : action.disabled && action.reason ? action.reason : undefined}');
     expect(css).toContain(".session-code-card-meta-offline");
   });
 });
@@ -213,11 +234,11 @@ describe("Participants dialog", () => {
     expect(lastRule(read("index.css"), ".participants-close")).toMatch(/width: 2\.75rem;\s*height: 2\.75rem/);
   });
 
-  it("groups Lock joining and Show Student IDs under a labelled Session settings area, each with its description", () => {
+  it("groups Lock joining and Show Participant IDs under a labelled Session settings area, each with its description", () => {
     expect(dialog).toContain('aria-labelledby="session-settings-title"');
     expect(dialog).toContain("Session settings");
     expect(dialog).toContain("<JoinLockToggle");
-    expect(dialog).toContain('label="Show Student IDs"');
+    expect(dialog).toContain('label="Show Participant IDs"');
     expect(dialog).toContain("description={STUDENT_IDS_DESCRIPTION}");
     // The settings come after the participant list, which stays the main content.
     expect(dialog.indexOf("<ParticipantList")).toBeLessThan(dialog.indexOf("session-settings-title"));
@@ -234,16 +255,16 @@ describe("Participants dialog", () => {
 });
 
 describe("open join card", () => {
-  it("widens the address area, with the QR at least as large as before", () => {
+  it("fits the unbroken address, with the QR at least as large as before", () => {
     const css = read("index.css");
-    expect(css).toContain("--slide-expanded-join-width: clamp(11.5rem, 16cqi, 16rem)");
-    expect(css).toMatch(/\.slide-join-panel\.session-code-card-expanded,[\s\S]*?width: var\(--slide-expanded-join-width\)/);
-    expect(css).toMatch(/\.slide-join-panel\.session-code-card-expanded \.session-code-card-qr \{\s*width: min\(100%, 9rem\)/);
+    expect(read("components/LiveSurface.tsx")).toContain('safe.style.setProperty("--slide-expanded-join-width", `${Math.ceil(card.offsetWidth)}px`)');
+    expect(css).toMatch(/\.slide-join-panel\.session-code-card-expanded,[\s\S]*?width: max-content/);
+    expect(css).toMatch(/\.slide-join-panel\.session-code-card-expanded \.session-code-card-qr \{\s*width: 9rem;\s*max-width: 100%/);
   });
 
   it("reserves the widened floating card beside media and references, but adds no inset when it is in flow", () => {
     const css = read("index.css");
-    expect(css).toMatch(/\.slide-safe:has\(\.slide-join-panel\.session-code-card-expanded\) \{\s*--slide-join-reserve: var\(--slide-expanded-join-width\)/);
+    expect(css).toMatch(/\.slide-safe:has\(\.slide-join-panel\.session-code-card-expanded\) \{\s*--slide-join-reserve: var\(--slide-expanded-join-width, 0px\)/);
     for (const selector of [
       ".slide-safe:has(.slide-join-panel) .slide-content-grid-with-media .slide-media-grid",
       ".slide-safe:has(.slide-join-panel) .slide-content-grid-media-only .slide-media-groups",
@@ -269,3 +290,20 @@ describe("participant list", () => {
     expect(read("hooks/api.ts")).toContain("API.SESSION_RELEASE_SEAT");
   });
 });
+
+describe("Prev/Next titles", () => {
+  it("shorten at a word with no space before the ellipsis, keeping short titles whole", () => {
+    expect(shortTitle("Hear preferences with a poll")).toBe("Hear preferences with a poll");
+    expect(shortTitle("A very long synthetic title that keeps going well beyond the two line limit of the button")).toBe("A very long synthetic title that keeps going well…");
+    expect(shortTitle("A title, with punctuation - that keeps going past the limit of the button")).not.toMatch(/[\s,-]…$/);
+    expect(shortTitle(undefined)).toBeUndefined();
+    // A long word after an early space: cut at the space, not inside the word.
+    expect(shortTitle("An overview of pneumonoultramicroscopicsilicovolcanoconiosis and its causes")).toBe("An overview of…");
+    expect(shortTitle("Supercalifragilisticexpialidociousandmoreandmoreletterswithoutspaces")).toMatch(/…$/);
+  });
+  it("keep the whole title in the tooltip and accessible name", () => {
+    const source = fs.readFileSync(path.resolve(__dirname, "../../../client/src/components/LiveSurface.tsx"), "utf8");
+    expect(source).toMatch(/fullLabel = hasDetail \? `\$\{action\.label\}: \$\{fullDetail\}`/);
+  });
+});
+

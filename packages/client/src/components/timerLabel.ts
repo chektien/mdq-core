@@ -5,9 +5,12 @@ export function timerLabel(remainingSec: number): string {
     : `${remainingSec}`;
 }
 
-/** Keep the count inside the ring: the inner diameter is size - 20 (radius
-    minus half the 8px stroke), and a monospace digit is about 0.6em wide. */
+/** Reserve space inside the stroke for both the text's width and height.
+ * Budget 0.65em per monospace glyph (including font fallback/bold ink) and
+ * keep the text diagonal within 75% of the inner diameter. This leaves clear
+ * space around even a five-character label at the small phone diameter. */
 export function timerFontSize(size: number, label: string): number {
-  const fit = (0.8 * (size - 20)) / (label.length * 0.6);
-  return Math.min(label.length >= 4 ? size * 0.26 : size * 0.32, fit);
+  const innerDiameter = Math.max(0, size - 20);
+  const fit = (0.75 * innerDiameter) / Math.hypot(label.length * 0.65, 1);
+  return Math.min(size * 0.32, fit);
 }

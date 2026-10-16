@@ -35,18 +35,19 @@ describe("presenter toolbar", () => {
   });
 
   it("lets Prev and Next shrink so two titles never run under the controls", () => {
-    expect(index).toMatch(/\.slide-nav-button\.slide-action-button-with-detail \{[^}]*flex: 0 1 auto;/);
+    expect(index).toMatch(/\.slide-nav-button\.slide-action-button-with-detail \{[^}]*flex: 1 1 0;/);
     expect(index).toMatch(/\.slide-toolbar-nav \{\s*width: 100%;\s*pointer-events: none;/);
     expect(index).toMatch(/\.slide-toolbar-nav > \* \{\s*pointer-events: auto;/);
   });
 
-  it("caps each titled Prev and Next at half the column between 761px and 1299px", () => {
-    const block = index.match(/@media \(min-width: 761px\) and \(max-width: 1299px\) \{[\s\S]*?\n\}\n/);
-    expect(block).not.toBeNull();
-    // Each keeps at most half of the column, so two long titles cannot push the second under the controls.
-    expect(block?.[0]).toMatch(/\.slide-nav-button\.slide-action-button-with-detail \{\s*min-width: min\(11rem, 22cqi, calc\(50% - 0\.225rem\)\);/);
-    // Half of the column less half of the 0.45rem gap between the buttons.
-    expect(index).toMatch(/\.slide-toolbar-nav \{\s*display: flex;[^}]*gap: 0\.45rem;/);
+  it("grows titles into the available column, caps them at 30rem, shortens them at a word and cuts at most two lines between words", () => {
+    expect(index).toMatch(/\.slide-nav-button\.slide-action-button-with-detail \{[^}]*flex: 1 1 0;\s*min-width: 0;\s*max-width: 30rem;/);
+    // Two lines cut between lines, never a clamp ellipsis inside a word; shortTitle supplies the ellipsis.
+    expect(index).toMatch(/\.slide-nav-button \.slide-button-detail \{[^}]*max-height: calc\(2 \* 1\.25em\);\s*line-height: 1\.25;\s*overflow: hidden;[^}]*text-overflow: clip;\s*white-space: normal;\s*word-break: normal;\s*overflow-wrap: break-word;/);
+    expect(index).not.toMatch(/\.slide-nav-button \.slide-button-detail \{[^}]*line-clamp/);
+    expect(surface).toContain('const detail = variant === "nav" ? shortTitle(fullDetail) : fullDetail;');
+    expect(surface).toContain('title={variant === "nav" ? fullLabel');
+    expect(surface).toContain("aria-label={hasDetail ? fullLabel : undefined}");
   });
 
   it("measures the join card and hands its height to the stylesheet", () => {

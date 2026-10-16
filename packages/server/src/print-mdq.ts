@@ -20,7 +20,7 @@ interface PrintOptions {
   includeAnswers: boolean;
   pageSize: "A4" | "Letter";
   theme: PrintTheme;
-  /** Explicit --palette. When omitted, the deck palette (else classic) is used. */
+  /** Explicit --theme. When omitted, the deck palette (else classic) is used. */
   palette?: PrintPalette;
   title?: string;
   htmlOut?: string;
@@ -64,17 +64,17 @@ Options:
   --answers            Include correct-answer highlights and feedback.
   --no-answers         Hide correct answers and feedback. Default.
   --page-size <size>   A4 or Letter. Default: A4.
-  --theme <theme>      dark or light. Default: dark.
-  --palette <palette>  ${DECK_PALETTES.join(", ")}. Default: the deck's palette, else classic.
+  --dark <on|off>      Dark or light slides. Default: on.
+  --theme <scheme>     ${DECK_PALETTES.join(", ")}. Default: the deck's theme setting, else classic.
   --title <title>      Override the PDF cover title.
   --html <file>        Also write the generated print HTML for debugging.
   -h, --help           Show this help.
 
 Examples:
-  npm run print:pdf -- data/decks/week00.md --theme light --out exports/week00.pdf
-  npm run print:pdf -- data/decks/sample-session.md --theme dark --no-foldouts --page-size Letter
-  npm run print:pdf -- data/decks/sample-session.md --theme dark --answers --presenter-notes
-  npm run print:pdf -- data/decks/sample-session.md --theme light --palette gruvbox
+  npm run print:pdf -- data/decks/week00.md --dark off --out exports/week00.pdf
+  npm run print:pdf -- data/decks/sample-session.md --dark on --no-foldouts --page-size Letter
+  npm run print:pdf -- data/decks/sample-session.md --dark on --answers --presenter-notes
+  npm run print:pdf -- data/decks/sample-session.md --dark off --theme gruvbox
 `;
 }
 
@@ -86,7 +86,7 @@ function readValue(args: string[], index: number, flag: string): string {
   return value;
 }
 
-function parseArgs(argv: string[]): CliResult {
+export function parseArgs(argv: string[]): CliResult {
   let inputFile = "";
   let outputFile = "";
   let imagesDir = path.resolve("data/images");
@@ -160,21 +160,28 @@ function parseArgs(argv: string[]): CliResult {
       i++;
       continue;
     }
-    if (arg === "--theme") {
+    if (arg === "--dark") {
       const value = readValue(argv, i, arg);
       const normalized = value.toLowerCase();
-      if (normalized !== "dark" && normalized !== "light") {
-        throw new Error(`Unsupported theme "${value}". Use dark or light.`);
+      if (normalized !== "on" && normalized !== "off") {
+        throw new Error(`Unsupported dark "${value}". Use on or off.`);
       }
-      theme = normalized;
+      theme = normalized === "on" ? "dark" : "light";
       i++;
       continue;
     }
     if (arg === "--palette") {
+      throw new Error("--palette is not supported. Use --theme <scheme>.");
+    }
+    if (arg === "--theme") {
       const value = readValue(argv, i, arg);
+      const mode = value.trim().toLowerCase();
+      if (mode === "dark" || mode === "light") {
+        throw new Error(`Unsupported theme "${value}". Use --dark ${mode === "dark" ? "on" : "off"}.`);
+      }
       const normalized = parseDeckPalette(value);
       if (!normalized) {
-        throw new Error(`Unsupported palette "${value}". Use ${describeDeckPalettes()}.`);
+        throw new Error(`Unsupported theme "${value}". Use ${describeDeckPalettes()}.`);
       }
       palette = normalized;
       i++;
@@ -473,7 +480,7 @@ function renderItem(question: Question, index: number, total: number, options: P
     </article>`;
   }
   const hasBody = body.trim().length > 0;
-  const hasSlideMedia = isSlide && (question.slideMedia?.length ?? 0) > 0;
+  const hasSlideMedia = (question.slideMedia?.length ?? 0) > 0;
   const hasSlideVideo = isSlide && !!question.slideVideo;
   const bodySection = hasBody || (!hasSlideMedia && !hasSlideVideo)
     ? `<section class="body-copy">${hasBody ? body : "<p class=\"empty-copy\">No body text.</p>"}</section>`
@@ -485,7 +492,7 @@ function renderItem(question: Question, index: number, total: number, options: P
         <div class="item-kicker">
           <span>${String(index + 1).padStart(2, "0")} / ${String(total).padStart(2, "0")}</span>
           <span>${questionTypeLabel(question)}</span>
-          ${question.timeLimitSec > 0 ? `<span>${question.timeLimitSec}s</span>` : ""}
+          ${question.timeLimitSec !== null && question.timeLimitSec > 0 ? `<span>${question.timeLimitSec}s</span>` : ""}
           ${question.allowsMultiple ? "<span>Multi-select</span>" : ""}
         </div>
         <h2>${escapeHtml(heading)}</h2>
@@ -849,63 +856,165 @@ function renderAyuTokens(theme: PrintTheme): string {
     `;
 }
 
-// Tokyo Night mirrors the live slide palette in packages/client/src/index.css
-// (folke/tokyonight.nvim,
-// https://github.com/folke/tokyonight.nvim, Apache-2.0): dark is the night style, light is Day
-// with its accents darkened, for example blue #2e7de9 to #1355b1 and green
-// #587539 to #485f2e. Attendee notes use the blue, presenter notes the purple.
-function renderTokyoNightTokens(theme: PrintTheme): string {
+// Tomorrow / Tomorrow Night, Chris Kempson (MIT). Same readability shades as the live palette.
+function renderTomorrowTokens(theme: PrintTheme): string {
   if (theme === "light") {
     return `
-      --page-bg: #e1e2e7;
-      --ink: #1f356a;
-      --body: #2a4990;
-      --muted: #3f4c7e;
+      --page-bg: #ffffff;
+      --ink: #4d4d4c;
+      --body: #4d4d4c;
+      --muted: #666666;
       --line: rgba(55, 96, 191, 0.28);
       --soft-line: rgba(55, 96, 191, 0.14);
-      --paper: #e1e2e7;
-      --wash: #d0d5e3;
-      --option-bg: #e1e2e7;
-      --media-bg: #d0d5e3;
-      --accent: #1355b1;
-      --accent-soft: rgba(19, 85, 177, 0.1);
-      --teal: #1355b1;
-      --teal-line: rgba(19, 85, 177, 0.35);
-      --teal-soft: rgba(19, 85, 177, 0.09);
-      --amber: #6d3faf;
-      --amber-line: rgba(109, 63, 175, 0.38);
-      --amber-soft: rgba(109, 63, 175, 0.09);
-      --green: #485f2e;
-      --green-line: rgba(72, 95, 46, 0.45);
-      --green-soft: rgba(72, 95, 46, 0.12);
-      --reference: #3f4c7e;
-      --shadow: rgba(31, 53, 106, 0.04);
+      --paper: #ffffff;
+      --wash: #f5f5f5;
+      --option-bg: #ffffff;
+      --media-bg: #f5f5f5;
+      --accent: #38649e;
+      --accent-soft: rgba(56, 100, 158, 0.1);
+      --teal: #38649e;
+      --teal-line: rgba(56, 100, 158, 0.35);
+      --teal-soft: rgba(56, 100, 158, 0.09);
+      --amber: #794898;
+      --amber-line: rgba(121, 72, 152, 0.38);
+      --amber-soft: rgba(121, 72, 152, 0.09);
+      --green: #526600;
+      --green-line: rgba(82, 102, 0, 0.45);
+      --green-soft: rgba(82, 102, 0, 0.12);
+      --reference: #666666;
+      --shadow: rgba(77, 77, 76, 0.04);
     `;
   }
 
   return `
-      --page-bg: #1a1b26;
-      --ink: #d6ddf9;
-      --body: #c0caf5;
-      --muted: #a9b1d6;
-      --line: rgba(192, 202, 245, 0.32);
-      --soft-line: rgba(192, 202, 245, 0.16);
-      --paper: #16161e;
-      --wash: #292e42;
-      --option-bg: #16161e;
-      --media-bg: #16161e;
-      --accent: #7aa2f7;
-      --accent-soft: rgba(122, 162, 247, 0.16);
-      --teal: #7aa2f7;
-      --teal-line: rgba(122, 162, 247, 0.42);
-      --teal-soft: rgba(122, 162, 247, 0.12);
-      --amber: #bb9af7;
-      --amber-line: rgba(187, 154, 247, 0.42);
-      --amber-soft: rgba(187, 154, 247, 0.12);
-      --green: #9ece6a;
-      --green-line: rgba(158, 206, 106, 0.46);
-      --green-soft: rgba(158, 206, 106, 0.16);
-      --reference: #a9b1d6;
+      --page-bg: #1d1f21;
+      --ink: #ffffff;
+      --body: #c5c8c6;
+      --muted: #b0b2b0;
+      --line: rgba(197, 200, 198, 0.32);
+      --soft-line: rgba(197, 200, 198, 0.16);
+      --paper: #1d1f21;
+      --wash: #282a2e;
+      --option-bg: #1d1f21;
+      --media-bg: #1d1f21;
+      --accent: #81a2be;
+      --accent-soft: rgba(129, 162, 190, 0.16);
+      --teal: #81a2be;
+      --teal-line: rgba(129, 162, 190, 0.42);
+      --teal-soft: rgba(129, 162, 190, 0.12);
+      --amber: #b294bb;
+      --amber-line: rgba(178, 148, 187, 0.42);
+      --amber-soft: rgba(178, 148, 187, 0.12);
+      --green: #b5bd68;
+      --green-line: rgba(181, 189, 104, 0.46);
+      --green-soft: rgba(181, 189, 104, 0.16);
+      --reference: #b0b2b0;
+      --shadow: rgba(0, 0, 0, 0.18);
+    `;
+}
+
+// Nord Aurora mirrors the live Polar Night / Snow Storm adaptation with
+// Aurora accents. Adjusted text shades and the full upstream notice are kept.
+function renderNordAuroraTokens(theme: PrintTheme): string {
+  if (theme === "light") {
+    return `
+      /*! Nord palette (Nord Aurora adaptation)
+MIT License (MIT)
+
+Copyright (c) 2016-present Sven Greb <development@svengreb.de> (https://www.svengreb.de)
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+      */
+      --page-bg: #eceff4;
+      --ink: #2e3440;
+      --body: #3b4252;
+      --muted: #4c566a;
+      --line: rgba(59, 66, 82, 0.28);
+      --soft-line: rgba(59, 66, 82, 0.14);
+      --paper: #eceff4;
+      --wash: #e5e9f0;
+      --option-bg: #eceff4;
+      --media-bg: #d8dee9;
+      --accent: #604c5d;
+      --accent-soft: rgba(96, 76, 93, 0.1);
+      --teal: #604c5d;
+      --teal-line: rgba(96, 76, 93, 0.35);
+      --teal-soft: rgba(96, 76, 93, 0.09);
+      --amber: #71493c;
+      --amber-line: rgba(113, 73, 60, 0.38);
+      --amber-soft: rgba(113, 73, 60, 0.09);
+      --green: #46523c;
+      --on-green: #eceff4;
+      --green-line: rgba(70, 82, 60, 0.45);
+      --green-soft: rgba(70, 82, 60, 0.12);
+      --reference: #4c566a;
+      --shadow: rgba(46, 52, 64, 0.04);
+    `;
+  }
+
+  return `
+      /*! Nord palette (Nord Aurora adaptation)
+MIT License (MIT)
+
+Copyright (c) 2016-present Sven Greb <development@svengreb.de> (https://www.svengreb.de)
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+      */
+      --page-bg: #2e3440;
+      --ink: #e5e9f0;
+      --body: #e5e9f0;
+      --muted: #d8dee9;
+      --line: rgba(229, 233, 240, 0.32);
+      --soft-line: rgba(229, 233, 240, 0.16);
+      --paper: #3b4252;
+      --wash: #3b4252;
+      --option-bg: #3b4252;
+      --media-bg: #2e3440;
+      --accent: #d1bacd;
+      --accent-soft: rgba(209, 186, 205, 0.16);
+      --teal: #d1bacd;
+      --teal-line: rgba(209, 186, 205, 0.42);
+      --teal-soft: rgba(209, 186, 205, 0.12);
+      --amber: #ead0c6;
+      --amber-line: rgba(234, 208, 198, 0.42);
+      --amber-soft: rgba(234, 208, 198, 0.12);
+      --green: #c5d6b7;
+      --on-green: #2e3440;
+      --green-line: rgba(197, 214, 183, 0.46);
+      --green-soft: rgba(197, 214, 183, 0.16);
+      --reference: #d8dee9;
       --shadow: rgba(0, 0, 0, 0.18);
     `;
 }
@@ -927,8 +1036,11 @@ function printPageBackground(theme: PrintTheme, palette: PrintPalette): string {
     case "ayu":
       return theme === "dark" ? "#10141c" : "#fcfcfc";
 
-    case "tokyo-night":
-      return theme === "dark" ? "#1a1b26" : "#e1e2e7";
+    case "tomorrow":
+      return theme === "dark" ? "#1d1f21" : "#ffffff";
+
+    case "nord-aurora":
+      return theme === "dark" ? "#2e3440" : "#eceff4";
 
     case "classic":
       break;
@@ -953,8 +1065,11 @@ function renderThemeTokens(theme: PrintTheme, palette: PrintPalette): string {
     case "ayu":
       return renderAyuTokens(theme);
 
-    case "tokyo-night":
-      return renderTokyoNightTokens(theme);
+    case "tomorrow":
+      return renderTomorrowTokens(theme);
+
+    case "nord-aurora":
+      return renderNordAuroraTokens(theme);
 
     case "classic":
       break;
@@ -1552,7 +1667,7 @@ function renderStyles(
 
     .option-correct .option-label {
       background: var(--green);
-      color: #fff;
+      color: var(--on-green, #fff);
     }
 
     .option-text > :first-child {

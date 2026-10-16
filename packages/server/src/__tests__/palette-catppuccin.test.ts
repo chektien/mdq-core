@@ -96,7 +96,7 @@ describe(`${NAME} palette`, () => {
   });
 
   it("uses no !important in its rules", () => {
-    const start = css.indexOf(`/* ── Catppuccin palette (deck palette: ${NAME}) ── */`);
+    const start = css.indexOf(`/* ── Catppuccin palette (deck theme: ${NAME}) ── */`);
     const end = css.indexOf("/* ── ", start + 10);
     expect(start).toBeGreaterThan(0);
     expect(css.slice(start, end)).not.toContain("!important");
@@ -236,30 +236,30 @@ describe(`${NAME} palette`, () => {
     expect(t["--mdq-accent"]).toBeDefined();
   });
 
-  it("keeps the leaderboard rank colours at 4.5:1 on their row tint", () => {
+  it("keeps the leaderboard rank colours at 4.5:1 on their flat paper row", () => {
     const rowText = (color: string, glass: string, alpha: number): void => {
       expectRatio(`rank ${color} on ${glass}`, solid(color), over(`rgba(${solid(color).join(",")},${alpha})`, glass), 4.5);
     };
     const dark = declarations(ruleBody(css, DARK));
     for (const rank of ["first", "second", "third", "standard"]) {
       const color = declarations(ruleBody(css, `${DARK} .leaderboard-row.rank-${rank}`))["--leaderboard-rank-color"];
-      rowText(color, dark["--mdq-slide-glass"], 0.16);
+      rowText(color, dark["--mdq-paper"], 0);
     }
-    // The viewer's own row washes the accent over the glass at 24 percent.
+    // The viewer's own row mixes six percent accent into solid paper.
     const third = declarations(ruleBody(css, `${DARK} .leaderboard-row.leaderboard-row-highlight.rank-third`))["--leaderboard-rank-color"];
     for (const rank of ["first", "second", "third", "standard"]) {
       const color = rank === "third" ? third : declarations(ruleBody(css, `${DARK} .leaderboard-row.rank-${rank}`))["--leaderboard-rank-color"];
-      const wash = over(`rgba(${solid(dark["--mdq-slide-accent"]).join(",")},0.24)`, dark["--mdq-slide-glass-strong"]);
+      const wash = over(`rgba(${solid(dark["--mdq-slide-accent"]).join(",")},0.06)`, dark["--mdq-paper"]);
       expectRatio(`highlighted ${rank}`, solid(color), wash, 4.5);
     }
     const light = declarations(ruleBody(css, LIGHT));
     for (const token of ["--mdq-rank-first", "--mdq-rank-second", "--mdq-rank-third"]) {
-      rowText(light[token], light["--mdq-slide-glass"], 0.16);
-      const wash = over(`rgba(${solid(light["--mdq-slide-accent"]).join(",")},0.24)`, light["--mdq-slide-glass-strong"]);
+      rowText(light[token], light["--mdq-paper"], 0);
+      const wash = over(`rgba(${solid(light["--mdq-slide-accent"]).join(",")},0.06)`, light["--mdq-paper"]);
       expectRatio(`highlighted ${token}`, solid(light[token]), wash, 4.5);
     }
     const standard = declarations(ruleBody(css, `${LIGHT} .leaderboard-row.rank-standard`))["--leaderboard-rank-color"];
-    rowText(standard, light["--mdq-slide-glass"], 0.16);
+    rowText(standard, light["--mdq-paper"], 0);
   });
 
   describe("print tokens", () => {

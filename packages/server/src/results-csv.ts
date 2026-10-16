@@ -1,8 +1,9 @@
 // Pure results CSV builder. Keep this module free of Node fs/path imports so it
 // can be bundled for runtimes that have no filesystem.
 import { isSlideType, Session, Quiz, Submission } from "@mdq/shared";
+import { effectiveRanking, releasedQuestionIndexes, resultMetadata, scoredCorrectAnswersForSession } from "./policy";
 import { computeLeaderboard, isExactOptionMatch } from "./session";
-import { buildScoredCorrectAnswersMap, isScoredQuestion } from "./scoring";
+import { isScoredQuestion } from "./scoring";
 
 export interface BuildResultsCsvOptions {
   /** Reveal time (epoch ms) per question index. Missing entries leave the cell empty. */
@@ -46,16 +47,17 @@ export function csvEscape(value: string | number | boolean): string {
  * Build the per-student results CSV text (with trailing newline) for a session.
  */
 export function buildResultsCsv(session: Session, quiz: Quiz, options: BuildResultsCsvOptions = {}): string {
+  quiz = session.deckSnapshot ?? quiz;
   const revealTimestamps = options.revealTimestamps ?? new Map<number, number>();
   const now = options.now ?? Date.now();
 
-  const correctMap = buildScoredCorrectAnswersMap(quiz);
-  const leaderboard = computeLeaderboard(session, correctMap);
+  const correctMap = scoredCorrectAnswersForSession(session, quiz);
+  const leaderboard = computeLeaderboard(session, correctMap, effectiveRanking(session, quiz));
   const boardMap = new Map(leaderboard.map((entry) => [entry.studentId, entry]));
 
   // Keep item indexes in column names, but content-only items have no results.
   const resultIndexes = quiz.questions.flatMap((question, index) =>
-    isSlideType(question.questionType) ? [] : [index]);
+    isSlideType(question.questionType) || (session.policy && !releasedQuestionIndexes(session, quiz).includes(index)) ? [] : [index]);
   const resultIndexSet = new Set(resultIndexes);
 
   const submissionsByStudent = new Map<string, Map<number, Submission>>();
@@ -83,6 +85,8 @@ export function buildResultsCsv(session: Session, quiz: Quiz, options: BuildResu
     "attendance",
   ];
 
+  const metadata = resultMetadata(session, quiz);
+  if (metadata) headers.push("results_schema_version", "pacing", "effective_timing", "ranking", "effective_ranking", "released_item_indexes", "scored_item_indexes", "finality", "result_version", "session_ended_at_iso");
   for (const i of resultIndexes) {
     headers.push(`q${i + 1}_revealed_at_iso`);
     headers.push(`q${i + 1}_selected`);
@@ -114,6 +118,8 @@ export function buildResultsCsv(session: Session, quiz: Quiz, options: BuildResu
       "present",
     ];
 
+    if (metadata) row.push(metadata.schemaVersion, metadata.policy.pacing, metadata.policy.effectiveTiming, metadata.policy.ranking, metadata.effectiveRanking,
+      metadata.releasedQuestionIndexes.join("|"), metadata.scoredQuestionIndexes.join("|"), metadata.finality, metadata.resultVersion ?? "", toIso(metadata.endedAt));
     for (const i of resultIndexes) {
       const sub = subs.get(i);
       const revealedAtIso = toIso(revealTimestamps.get(i));

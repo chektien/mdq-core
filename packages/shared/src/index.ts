@@ -50,6 +50,7 @@ export const SocketEvents = {
   SESSION_PARTICIPANTS: "session:participants",
   ANSWER_COUNT: "answer:count",
   RESULTS_DISTRIBUTION: "results:distribution",
+  POLL_LIVE: "poll:live",
 
   // Server -> All
   QUESTION_OPEN: "question:open",
@@ -58,13 +59,14 @@ export const SocketEvents = {
   RESULTS_REVEAL: "results:reveal",
   LEADERBOARD_UPDATE: "leaderboard:update",
   SESSION_STATE: "session:state",
+  SESSION_AVAILABILITY: "session:availability",
 } as const;
 
 // ── Socket.IO Payload Types ─────────────────
 
 export interface StudentJoinPayload {
   /**
-   * The Student ID. A deck that turns Student IDs off (`student-id: false`)
+   * The Participant ID. A deck that turns Participant IDs off (`participant-id: false`)
    * takes the name as the ID, so a first join carries only `displayName`; a
    * rejoin may send the `participantId` it was given here instead.
    */
@@ -88,6 +90,7 @@ export interface StudentJoinedPayload {
   participantId: string;
   sessionToken: string;
   sessionState: SessionState;
+  availability?: SessionAvailabilityPayload;
   currentQuestion?: number;
   answeredQuestions?: number[]; // question indices already answered
   /**
@@ -97,7 +100,7 @@ export interface StudentJoinedPayload {
   answers?: StudentAnswer[];
   /**
    * The random key public payloads use for this participant instead of the
-   * Student ID. A phone matches it against leaderboard and response rows to
+   * Participant ID. A phone matches it against leaderboard and response rows to
    * find its own.
    */
   publicKey: string;
@@ -167,7 +170,8 @@ export const DECK_PALETTES = [
   "catppuccin",
   "seoul256",
   "ayu",
-  "tokyo-night",
+  "tomorrow",
+  "nord-aurora",
 ] as const;
 /** Slide color palette, chosen independently of the light/dark theme. */
 export type DeckPalette = (typeof DECK_PALETTES)[number];
@@ -177,10 +181,13 @@ export function isDeckPalette(value: unknown): value is DeckPalette {
   return typeof value === "string" && (DECK_PALETTES as readonly string[]).includes(value);
 }
 
-/** The palette named by `value` (case-insensitive, trimmed), or undefined when it is not a supported one. */
+/** Resolve a palette name, including retired names mapped to the standard look. */
 export function parseDeckPalette(value: unknown): DeckPalette | undefined {
   if (typeof value !== "string") return undefined;
   const normalized = value.trim().toLowerCase();
+  // Keep existing decks/configuration readable without retaining the retired
+  // theme's colours or offering it as a supported choice.
+  if (normalized === "tokyo-night") return "classic";
   return isDeckPalette(normalized) ? normalized : undefined;
 }
 
@@ -305,6 +312,18 @@ export interface ResponseVisibilityRequest {
   hidden: boolean;
 }
 
+/** Show or hide all existing responses to the current item. Future responses keep the session default. */
+export interface ResponsesVisibilityRequest {
+  questionIndex: number;
+  hidden: boolean;
+}
+
+/** A session-only presenter override for a poll's live results. */
+export interface LiveResultsRequest {
+  questionIndex: number;
+  visible: boolean;
+}
+
 /** What a device is told when its seat was freed and another device took it. */
 export const SEAT_TAKEN_MESSAGE = "You joined on another device. This screen is no longer in the session.";
 
@@ -340,8 +359,17 @@ export interface QuestionOpenPayload {
   options: { label: string; text: string }[];
   allowsMultiple: boolean;
   isPoll?: boolean;
-  timeLimitSec: number;
+  /** Effective session setting. Absent means live results are off. */
+  liveResults?: boolean;
+  /** null means the presenter closes this question; content items retain 0. */
+  timeLimitSec: number | null;
   startedAt: number; // unix ms
+  /** Authoritative deadline; null explicitly means no countdown. */
+  deadlineAt?: number | null;
+  /** Absent on restored legacy sessions whose first opening is unknown. */
+  firstOpenedAt?: number;
+  /** Server clock at payload creation, including observational replays. */
+  serverNow?: number;
   /** Position among the deck's questions, counting questions only (slides are skipped). Absent on a slide. */
   questionNumber?: number;
   /** How many questions the deck has, not counting slides. */
@@ -368,12 +396,16 @@ export interface AnswerRejectedPayload {
 }
 
 export interface AnswerCountPayload {
+  /** Control only: this session requires the presenter to show new responses. */
+  openResponsesHiddenByDefault?: boolean;
   /** Session-wide evidence, independent of the current question. */
   hasAnswers?: true;
   questionIndex: number;
   submitted: number;
   total: number;
   openResponses?: OpenResponseEntry[];
+  /** Real response count, including responses hidden from the projector. */
+  openResponseTotal?: number;
 }
 
 export interface QuestionClosePayload {
@@ -387,6 +419,18 @@ export interface ResultsDistributionPayload {
   distribution: Record<string, number>;
 }
 
+/** Aggregate voters, with each option counted at most once per voter. */
+export interface PollLiveCounts {
+  voters: number;
+  counts: Record<string, number> | null;
+}
+/** Public counts are suppressed below three voters; control has no floor. */
+export type PollLivePayload =
+  /** `liveResults` is only on the presenter's (control) payload: whether the room sees the counts, for every open console. */
+  | { questionIndex: number; voters: number; counts: Record<string, number>; liveResults?: boolean }
+  | { questionIndex: number; voters: number; counts: null; floor: 3 }
+  | { questionIndex: number; hidden: true };
+
 export interface ResultsRevealPayload {
   questionIndex: number;
   questionType?: QuestionType;
@@ -394,7 +438,11 @@ export interface ResultsRevealPayload {
   explanation: string;
   distribution: Record<string, number>;
   isPoll?: boolean;
+  /** Accepted voters for polls, including multi-select polls. */
+  voters?: number;
   openResponses?: OpenResponseEntry[];
+  /** Real response count, including responses hidden from the projector. */
+  openResponseTotal?: number;
 }
 
 export interface LeaderboardEntry {
@@ -417,7 +465,7 @@ export interface LeaderboardRow {
   studentId?: string;
   displayName?: string;
   correctCount: number;
-  totalTimeMs: number;
+  totalTimeMs?: number;
 }
 
 export interface LeaderboardUpdatePayload {
@@ -426,6 +474,9 @@ export interface LeaderboardUpdatePayload {
 }
 
 export interface SessionStatePayload {
+  policy?: SessionPolicy;
+  effectiveRanking?: "correctness" | "speed" | "legacy";
+  availability?: SessionAvailabilityPayload;
   /** Present once the session has any submissions, including after it ends. */
   hasAnswers?: true;
   state: SessionState;
@@ -462,16 +513,25 @@ export const API = {
   QUIZZES_RELOAD: "/api/quizzes/reload",
   QUIZ: "/api/quiz/:week",
   SESSION_CREATE: "/api/session",
+  SESSION_POLICY: "/api/session/:id/policy",
+  SESSION_AVAILABILITY: "/api/session/:id/availability",
+  SESSION_ITEMS: "/api/session/:id/items",
+  SESSION_ITEM: "/api/session/:id/items/:index",
   SESSION_START: "/api/session/:id/start",
   SESSION_PREV: "/api/session/:id/prev",
   SESSION_NEXT: "/api/session/:id/next",
   SESSION_CLOSE: "/api/session/:id/close",
+  SESSION_RESTART_COUNTDOWN: "/api/session/:id/restart-countdown",
   SESSION_REVEAL: "/api/session/:id/reveal",
   SESSION_END: "/api/session/:id/end",
+  SESSION_END_ADVISORY: "/api/session/:id/end-advisory",
+  SESSION_OWN_RESULTS: "/api/session/:id/own-results",
   SESSION_LEADERBOARD: "/api/session/:id/leaderboard",
   SESSION_LEADERBOARD_SHOW: "/api/session/:id/leaderboard-show",
   SESSION_LEADERBOARD_HIDE: "/api/session/:id/leaderboard-hide",
   SESSION_RESPONSE_VISIBILITY: "/api/session/:id/response-visibility",
+  SESSION_RESPONSES_VISIBILITY: "/api/session/:id/responses-visibility",
+  SESSION_LIVE_RESULTS: "/api/session/:id/live-results",
   SESSION_RELEASE_SEAT: "/api/session/:id/release-seat",
   SESSION_JOIN_LOCK: "/api/session/:id/join-lock",
   SESSION_RESULTS_CSV: "/api/session/:id/results.csv",
@@ -512,8 +572,10 @@ export interface Question {
   correctOptions: string[];
   allowsMultiple: boolean;
   isPoll?: boolean;
+  /** Poll-only authored setting; defaults to false. */
+  liveResults?: boolean;
   explanation: string;
-  timeLimitSec: number;
+  timeLimitSec: number | null;
 }
 
 /**
@@ -543,16 +605,16 @@ export function formatDiagnostic(diagnostic: ParseDiagnostic): string {
 export interface Quiz {
   week: string;
   title: string;
-  /** Optional per-deck color theme. The runtime theme remains the fallback. */
+  /** Optional per-deck mode from `dark: on|off`. The runtime theme remains the fallback. */
   theme?: DeckTheme;
-  /** Optional per-deck slide palette. The runtime palette remains the fallback. */
+  /** Optional per-deck colour scheme from `theme: <scheme>`. The runtime palette remains the fallback. */
   palette?: DeckPalette;
   /** Optional per-deck override. `false` disables globally enabled presenter notes. */
   presenterNotes?: boolean;
   /** Optional per-deck override for the panel's initial expanded state. */
   presenterNotesDefaultOpen?: boolean;
   /**
-   * Whether the join form asks for a Student ID (`student-id:` in the deck
+   * Whether the join form asks for a Participant ID (`student-id:` in the deck
    * header). Absent means on; `false` asks for a name only and uses it as the ID.
    */
   studentId?: boolean;
@@ -569,6 +631,39 @@ export interface Quiz {
 }
 
 export type SessionMode = "strict" | "open";
+
+/** Independent of the legacy participant identity/session mode. */
+export type SessionPolicy = {
+  schemaVersion: 1;
+  pacing: "presenter-paced" | "self-paced";
+  ranking: "correctness" | "speed";
+  effectiveTiming: "authored" | "untimed";
+} | {
+  schemaVersion: 2;
+  pacing: "presenter-paced" | "self-paced";
+  ranking: "automatic";
+  effectiveTiming: "authored" | "untimed";
+};
+export interface SessionResultScope {
+  schemaVersion: 1;
+  /** Fixed at first finalization. Absent on older schema-1 records, where it is 1. */
+  resultVersion?: number;
+  releasedQuestionIndexes: number[];
+  scoredQuestionIndexes: number[];
+  endedAt: number;
+  disclosed: boolean;
+}
+export interface SessionResultMetadata {
+  schemaVersion: 1;
+  resultVersion?: number;
+  endedAt?: number;
+  policy: SessionPolicy;
+  effectiveRanking: "correctness" | "speed";
+  releasedQuestionIndexes: number[];
+  scoredQuestionIndexes: number[];
+  finality: "provisional" | "ended" | "undisclosed";
+}
+
 
 export interface Participant {
   studentId: string;
@@ -597,7 +692,62 @@ export interface Submission {
   responseTimeMs: number;
 }
 
+/** Per-item timing, preserved across navigation and observational messages. */
+export interface QuestionTiming {
+  /** Unknown for legacy records: never infer a historical first opening. */
+  firstOpenedAt?: number;
+  startedAt: number;
+  deadlineAt: number | null;
+  restarts: { restartedAt: number; previousStartedAt: number; previousDeadlineAt: number | null }[];
+  /** Explicit restart invalidates fair time-based comparisons; legacy ranking is unchanged. */
+  timingFairnessInvalidated?: true;
+}
+
+/** Independent of presentation position and deliberate result finality. Missing means legacy. */
+export interface SessionAvailability {
+  schemaVersion: 1;
+  availableUntil: number;
+  generation: number;
+}
+export type SessionAvailabilityPhase = "active" | "expired" | "ended" | "deleted";
+/** Public lifecycle metadata contains no seat, content or result evidence. */
+export interface SessionAvailabilityPayload {
+  schemaVersion: 1;
+  phase: SessionAvailabilityPhase;
+  serverNow: number;
+  availableUntil?: number;
+  recoverBefore?: number;
+  deleteAt?: number;
+  resultRetainedUntil?: number;
+}
+export interface SessionAvailabilityAlarm {
+  sessionId: string;
+  generation: number;
+  availableUntil: number;
+  phase: "expire" | "purge";
+  dueAt: number;
+  endedAt?: number;
+}
+export const DEFAULT_SESSION_AVAILABILITY_MS = 4 * 60 * 60 * 1000;
+export const SESSION_RECOVERY_MS = 7 * 24 * 60 * 60 * 1000;
+export const MAX_SESSION_AVAILABILITY_MS = SESSION_RECOVERY_MS;
+
 export interface Session {
+  /** Adapter-owned retention durations. Never accepted from participant commands.
+   * Omitted values preserve the standalone engine defaults. */
+  retention?: { recoveryMs: number; resultsMs: number };
+  availability?: SessionAvailability;
+  /** Terminal tombstone, never a presentation state or result disclosure. */
+  deletedAt?: number;
+  /** Legacy End audit only; new policy sessions use resultScope. */
+  endedAt?: number;
+  resultsDisclosed?: boolean;
+  /** New sessions pin authored content at first Start; effective timing stays a separate policy. */
+  deckSnapshot?: Quiz;
+  policy?: SessionPolicy;
+  policyFrozen?: boolean;
+  releasedQuestionIndexes?: Set<number>;
+  resultScope?: SessionResultScope;
   sessionId: string;
   sessionCode: string;
   week: string;
@@ -605,6 +755,9 @@ export interface Session {
   state: SessionState;
   currentQuestionIndex: number;
   questionStartedAt?: number;
+  /** Compatibility alias for the current item's deadline. */
+  questionDeadlineAt?: number | null;
+  questionTiming?: Record<string, QuestionTiming>;
   revealedQuestionIndexes?: Set<number>;
   /**
    * Open responses the presenter has hidden from the projector: for each
@@ -612,6 +765,12 @@ export interface Session {
    * Plain data, so it survives session serialisation.
    */
   hiddenResponses?: Record<string, string[]>;
+  /** Set only at creation. Absent/false preserves legacy default-visible moderation. */
+  openResponsesHiddenByDefault?: boolean;
+  /** Explicitly shown public keys per item for default-hidden sessions. */
+  shownResponses?: Record<string, string[]>;
+  /** Per-poll presenter overrides, keyed by item index. Never edits the deck. */
+  liveResultsOverrides?: Record<string, boolean>;
   /** Whether the question now closed was closed by its timer running out, not by the presenter. */
   closedByTimer?: boolean;
   /**
@@ -628,6 +787,13 @@ export interface Session {
 
 /** Snapshot of a session written to data/sessions/<id>.json on session end */
 export interface SessionSnapshot {
+  liveResultsOverrides?: Record<string, boolean>;
+  availability?: SessionAvailability;
+  deckSnapshot?: Quiz;
+  policy?: SessionPolicy;
+  policyFrozen?: boolean;
+  releasedQuestionIndexes?: number[];
+  resultScope?: SessionResultScope;
   sessionId: string;
   sessionCode: string;
   week: string;
@@ -637,10 +803,13 @@ export interface SessionSnapshot {
   participants: { studentId: string; displayName?: string; joinedAt: number }[];
   createdAt: number;
   endedAt: number;
+  /** Timing audit history, including explicit restart fairness invalidation. */
+  questionTiming?: Record<string, QuestionTiming>;
 }
 
 /** Per-week leaderboard results written to data/winners/weekNN.json */
 export interface WeeklyResult {
+  metadata?: SessionResultMetadata;
   week: string;
   sessionId: string;
   totalQuestions: number;
@@ -658,7 +827,7 @@ export interface CumulativeLeaderboardEntry {
   weeksParticipated: number;
 }
 
-/** A saved-results row with the Student ID and typed name replaced by a label. */
+/** A saved-results row with the Participant ID and typed name replaced by a label. */
 export interface PublicCumulativeLeaderboardEntry {
   rank: number;
   label: string;
@@ -696,3 +865,53 @@ export * from "./deck-style";
 export * from "./identity";
 export * from "./videoProviders";
 export * from "./videoLinks";
+
+export interface ParticipantStudyItemPayload extends QuestionOpenPayload {
+  /** Only present for a live poll this seat has voted on. */
+  pollLive?: PollLivePayload;
+}
+
+/** Seat-authenticated released content, own answers and eligible live aggregates. */
+export interface ParticipantStudyPayload {
+  availability?: SessionAvailabilityPayload;
+  policy: SessionPolicy | null;
+  items: ParticipantStudyItemPayload[];
+  currentQuestionIndex: number;
+  state: SessionState;
+  answers: StudentAnswer[];
+  answeredQuestions: number[];
+  answerableQuestionIndexes: number[];
+}
+
+/** Advisory only. An in-flight answer may change counts before End is committed. */
+export interface EndSessionAdvisory {
+  unfinishedParticipantCount: number;
+  unshownQuestionCount: number;
+}
+export interface ParticipantQuestionResult {
+  question: QuestionOpenPayload;
+  answer: StudentAnswer | null;
+  /** Only scored questions carry correctness or an answer key. */
+  correct?: boolean;
+  correctOptions?: string[];
+  explanation?: string;
+  /** Final aggregate only for a live poll this participant voted on. */
+  pollLive?: PollLiveCounts;
+}
+/** Deliberately separate from instructor results. Never carries another participant's text or identity. */
+export interface ParticipantResultsPayload {
+  schemaVersion: 1;
+  /** Legacy records have version 0 and no invented final timestamp. */
+  resultVersion: number;
+  endedAt: number | null;
+  deckTitle: string;
+  policy: SessionPolicy | null;
+  publicKey: string;
+  summary: { answeredCount: number; availableQuestionCount: number; scoredQuestionCount?: number };
+  questions: ParticipantQuestionResult[];
+  /** Omitted entirely when no scored question was released. */
+  leaderboard?: { publicKey: string; label: string; rank: number; score: number }[];
+}
+export const PARTICIPANT_RESULT_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
+
+export * from "./deck-style-header";

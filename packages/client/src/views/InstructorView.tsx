@@ -1,5 +1,9 @@
+import SessionAvailabilitySettings from "../components/SessionAvailabilitySettings";
+import AvailabilityChoiceControl, { AVAILABILITY_PRESETS, availabilityRequest, deadlineProblem, type AvailabilityChoice } from "../components/AvailabilityChoice";
 import { isSlideType } from "@mdq/shared";
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import EndSessionConfirmation from "../components/EndSessionConfirmation";
+import { useEndSessionAdvisory } from "../hooks/useEndSessionAdvisory";
 import { useSocket } from "../hooks/useSocket";
 import { resolveSlideBackground, type QuestionState, type RevealState } from "../hooks/useSocket";
 import {
@@ -10,11 +14,14 @@ import {
   prevQuestion,
   nextQuestion,
   closeQuestion,
+  restartCountdown,
   revealAnswer,
   endSession,
   showLeaderboard,
   hideLeaderboard,
   setResponseHidden,
+  setAllResponsesHidden,
+  setLiveResults,
   releaseSeat,
   setJoinLocked,
   resultsCsvUrl,
@@ -27,8 +34,9 @@ import {
   type SessionRestoreResponse,
 } from "../hooks/api";
 import { formatDiagnostic } from "@mdq/shared";
-import type { AccessInfo, DeckPalette, DeckTheme, FoldoutNote, OpenResponseEntry, QuestionType, SessionState } from "@mdq/shared";
+import type { AccessInfo, DeckPalette, DeckTheme, FoldoutNote, OpenResponseEntry, PollLivePayload, SessionState } from "@mdq/shared";
 import { applyClientPalette, applyClientTheme } from "../theme";
+import DistributionChart from "../components/DistributionChart";
 import Timer from "../components/Timer";
 import Leaderboard from "../components/Leaderboard";
 import { deckLabel, resultsHeading } from "../deckLabel";
@@ -44,13 +52,14 @@ import QuizHtml from "../components/QuizHtml";
 import LiveSurface, { type LiveSurfaceAction } from "../components/LiveSurface";
 import ResponsiveQuizSurface from "../components/ResponsiveQuizSurface";
 import { quizFitKey } from "../quizFit";
-import SlideContent, { SlideContentBody } from "../components/SlideContent";
+import SlideContent, { SlideContentBody, QuestionMedia } from "../components/SlideContent";
+import PresenterContent, { type PresenterPublicContentInput } from "../components/PresenterContent";
 import SlideBackgroundLayer from "../components/SlideBackgroundLayer";
 import PresenterNotesPanel from "../components/PresenterNotesPanel";
-import { getQuestionModeText, getRevealActionLabel } from "../questionMode";
+import { getPresenterQuestionModeText, getRevealActionLabel } from "../questionMode";
 import { decidePresenterKey, documentHasOpenDialog, pickNavAction } from "../presenterKeys";
 import { readShowStudentIds, saveShowStudentIds } from "../showStudentIds";
-import { closedLabel as closedLabelFor, formatRemaining, pluralize, positionLabel as positionLabelFor } from "../instructorText";
+import { answeredLabel, restartCountdownDetail, closedLabel as closedLabelFor, pluralize, positionLabel as positionLabelFor } from "../instructorText";
 
 type InstructorPhase = "setup" | "lobby" | "live" | "ended";
 const INSTRUCTOR_RESTORE_KEY = "mdquiz_instructor_session";
@@ -93,8 +102,11 @@ function questionStateFromRestore(data: NonNullable<SessionRestoreResponse["revi
     options: data.options,
     allowsMultiple: data.allowsMultiple,
     isPoll: data.isPoll ?? false,
+    liveResults: data.liveResults,
     timeLimitSec: data.timeLimitSec,
     startedAt: data.startedAt,
+    deadlineAt: data.deadlineAt,
+    firstOpenedAt: data.firstOpenedAt,
     questionNumber: data.questionNumber,
     questionTotal: data.questionTotal,
   };
@@ -109,6 +121,7 @@ function revealStateFromRestore(data: NonNullable<SessionRestoreResponse["review
     distribution: data.distribution,
     isPoll: data.isPoll ?? false,
     openResponses: data.openResponses ?? [],
+    openResponseTotal: data.openResponseTotal,
   };
 }
 
@@ -158,8 +171,24 @@ export default function InstructorView({
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   // Session state
+  const [ranking, setRanking] = useState<"correctness" | "speed">("correctness");
+  const [pacing, setPacing] = useState<"presenter-paced" | "self-paced">("presenter-paced");
   const [sessionInfo, setSessionInfo] = useState<CreateSessionResponse | null>(null);
   const [accessInfo, setAccessInfo] = useState<AccessInfo | null>(null);
+  const [initialAvailability, setInitialAvailability] = useState<AvailabilityChoice>(() => {
+    try {
+      const key = localStorage.getItem("mdquiz_availability_preset");
+      if (AVAILABILITY_PRESETS.some(p => p.key === key)) return { kind: "preset", key: key! };
+    } catch { /* Optional preference. */ }
+    return { kind: "preset", key: "4h" };
+  });
+  const [setupNow, setSetupNow] = useState(Date.now);
+  const [showLobbyOptions, setShowLobbyOptions] = useState(false);
+  const lobbyOptionsOpener = useRef<HTMLButtonElement>(null);
+  const mountLobbyOptions = useCallback((dialog: HTMLDialogElement | null) => {
+    if (dialog) return mountParticipantsDialog(dialog, lobbyOptionsOpener.current);
+  }, []);
+  useEffect(() => { const timer = setInterval(() => setSetupNow(Date.now()), 30_000); return () => clearInterval(timer); }, []);
   const [phase, setPhase] = useState<InstructorPhase>("setup");
   // After session end the live opener no longer exists. Focus the new screen
   // once on attachment rather than leaving focus on the removed dialog/body.
@@ -170,7 +199,7 @@ export default function InstructorView({
   const [questionHeadings, setQuestionHeadings] = useState<string[]>([]);
   const [questionSummaries, setQuestionSummaries] = useState<QuestionSummary[]>([]);
   const [quizLabel, setQuizLabel] = useState("");
-  // Whether the deck uses Student IDs. With `student-id: false` the name is the ID, so the console has no IDs to show.
+  // Whether the deck uses Participant IDs. With `participant-id: false` the name is the ID, so the console has no IDs to show.
   const [deckUsesStudentIds, setDeckUsesStudentIds] = useState(true);
   const [sessionTheme, setSessionTheme] = useState<DeckTheme | undefined>();
   const [sessionPalette, setSessionPalette] = useState<DeckPalette | undefined>();
@@ -281,6 +310,7 @@ export default function InstructorView({
     try {
       const snapshot = await fetchSessionStateForRestore(stored.sessionId);
       const restoredInfo: CreateSessionResponse = {
+        policy: snapshot.policy ?? undefined,
         sessionId: snapshot.sessionId,
         sessionCode: snapshot.sessionCode,
         joinUrl: `/join/${snapshot.sessionCode}`,
@@ -291,6 +321,8 @@ export default function InstructorView({
       };
 
       setSessionInfo(restoredInfo);
+      setPacing(snapshot.policy?.pacing ?? "presenter-paced");
+      setRanking(snapshot.effectiveRanking === "speed" ? "speed" : "correctness");
       setSelectedWeek(snapshot.week);
       setTotalQuestionsInQuiz(snapshot.questionCount);
       setQuestionHeadings(snapshot.questionHeadings || []);
@@ -396,9 +428,18 @@ export default function InstructorView({
     setLoading(true);
     setErrorMsg(null);
     try {
-      const info = await createSession(selectedWeek);
+      const problem = deadlineProblem(initialAvailability, Date.now());
+      if (problem) throw new Error(problem);
+      const info = await createSession(selectedWeek, "open", { pacing, ...availabilityRequest(initialAvailability) });
+      try {
+        if (initialAvailability.kind === "preset") localStorage.setItem("mdquiz_availability_preset", initialAvailability.key);
+        else localStorage.removeItem("mdquiz_availability_preset");
+        localStorage.removeItem("mdquiz_available_until_preference");
+      } catch { /* Optional preference. */ }
       setRestoredRevealCache({});
       setSessionInfo(info);
+      setPacing(info.policy?.pacing ?? pacing);
+      setRanking("correctness");
       const deck = decks.find((q) => q.week === selectedWeek);
       if (deck) setTotalQuestionsInQuiz(deck.questionCount);
       setQuestionHeadings(info.questionHeadings || []);
@@ -422,7 +463,7 @@ export default function InstructorView({
     } finally {
       setLoading(false);
     }
-  }, [selectedWeek, decks]);
+  }, [selectedWeek, decks, initialAvailability, pacing]);
 
   const handleReloadDecks = useCallback(async () => {
     setLoading(true);
@@ -441,7 +482,7 @@ export default function InstructorView({
   }, [selectedWeek]);
 
   const handleAction = useCallback(
-    async (action: () => Promise<unknown>, label: string) => {
+    async (action: () => Promise<unknown>, label: string, onSuccess?: () => void) => {
       if (actionInFlightRef.current) return;
       actionInFlightRef.current = true;
       setRestoreNotice((current) => (
@@ -451,6 +492,7 @@ export default function InstructorView({
       setErrorMsg(null);
       try {
         await action();
+        onSuccess?.();
       } catch (e) {
         const message = e instanceof Error ? e.message : `Failed to ${label}`;
         setErrorMsg(`${message} Reconnecting to sync the current session state.`);
@@ -593,9 +635,16 @@ export default function InstructorView({
             >
               {loading ? "Reloading..." : "Reload Decks"}
             </button>
+            <fieldset className="availability-choice" disabled={loading}>
+              <legend>Session pacing</legend>
+              <label className="availability-option"><input type="radio" name="setup-pacing" checked={pacing === "presenter-paced"} onChange={() => setPacing("presenter-paced")} />Presenter-paced</label>
+              <label className="availability-option"><input type="radio" name="setup-pacing" checked={pacing === "self-paced"} onChange={() => setPacing("self-paced")} />Self-paced</label>
+              <p className="availability-preview">{pacing === "self-paced" ? "Participants explore released items without countdowns. Results stay hidden until you end the session." : "Participants follow you. Question timers apply, with speed breaking ties only when all scored questions shown have timers."}</p>
+            </fieldset>
+            <AvailabilityChoiceControl choice={initialAvailability} onChange={setInitialAvailability} now={setupNow} disabled={loading} />
             <button
               onClick={handleCreateSession}
-              disabled={loading || !selectedWeek}
+              disabled={loading || !selectedWeek || !!deadlineProblem(initialAvailability, setupNow)}
               className="w-full bg-indigo-600 hover:bg-indigo-500 disabled:bg-zinc-700 disabled:text-zinc-500 text-white font-semibold py-4 rounded-xl transition-colors text-lg"
             >
               {loading ? "Creating..." : "Create Session"}
@@ -616,7 +665,7 @@ export default function InstructorView({
         >
           &larr; Back to Setup
         </button>
-        <h1 className="instructor-phase-title text-2xl font-bold text-white">Waiting for Students</h1>
+        <h1 className="instructor-phase-title text-2xl font-bold text-white">Waiting for participants</h1>
 
         {/* Join details beside the room status on landscape screens, stacked otherwise */}
         <div className="instructor-lobby-body">
@@ -646,7 +695,7 @@ export default function InstructorView({
               <span className="instructor-participant-count-value text-5xl font-bold text-white tabular-nums">
                 {sock.participants?.count ?? 0}
               </span>
-              <span className="instructor-participant-count-label text-zinc-400 text-lg ml-2">students joined</span>
+              <span className="instructor-participant-count-label text-zinc-400 text-lg ml-2">participants joined</span>
             </div>
 
             {/* Participant list */}
@@ -660,22 +709,6 @@ export default function InstructorView({
                 />
               </div>
             )}
-            <div className="session-settings session-settings-lobby" role="group" aria-label="Session settings">
-              <JoinLockToggle
-                locked={sock.participants?.joinLocked === true}
-                onChange={handleJoinLock}
-                disabled={!sock.connected}
-              />
-              {idsAvailable && (
-                <SettingSwitch
-                  label="Show Student IDs"
-                  description={STUDENT_IDS_DESCRIPTION}
-                  checked={showStudentIds}
-                  onToggle={toggleShowStudentIds}
-                />
-              )}
-            </div>
-
             {errorMsg && (
               <div className="bg-red-900/50 border border-red-700 text-red-200 px-4 py-3 rounded-xl">
                 {errorMsg}
@@ -690,11 +723,24 @@ export default function InstructorView({
 
             <button
               onClick={() => handleAction(() => startSession(sid), "start")}
-              disabled={loading || !sock.connected}
+              disabled={loading || !sock.connected || sock.availability?.phase === "expired" || sock.availability?.phase === "deleted"}
               className="instructor-start-button bg-emerald-600 hover:bg-emerald-500 disabled:bg-zinc-700 text-white font-semibold py-4 px-12 rounded-xl transition-colors text-xl"
             >
               {loading ? "Starting..." : sock.connected ? "Start Session" : "Reconnecting..."}
             </button>
+            <button ref={lobbyOptionsOpener} type="button" className="session-options-button" onClick={() => setShowLobbyOptions(true)}>Session options</button>
+            {showLobbyOptions && <dialog ref={mountLobbyOptions} className="end-session-overlay participants-overlay fixed inset-0 z-[10000] flex items-center justify-center bg-[#07060b]/80 px-5 backdrop-blur-sm" aria-labelledby="lobby-options-title" onCancel={() => setShowLobbyOptions(false)} onClick={event => { if (event.target === event.currentTarget) setShowLobbyOptions(false); }}>
+              <div className="participants-card w-full max-w-lg rounded-2xl bg-[var(--mdq-dialog)] p-6 text-white">
+                <div className="participants-header"><h2 id="lobby-options-title" className="text-2xl font-semibold">Session options</h2><button type="button" className="participants-close" aria-label="Close session options" onClick={() => setShowLobbyOptions(false)} autoFocus>×</button></div>
+                <p className="participants-help">Pacing is {(sock.policy?.pacing ?? pacing) === "self-paced" ? "self-paced" : "presenter-paced"}. To change it, create a new session from setup.</p>
+                <p className="participants-help">{(sock.policy ?? sessionInfo?.policy)?.schemaVersion === 1 ? "This session keeps its original ranking policy." : "Ranking is automatic. Correct answers rank first. Speed breaks ties only for timed, presenter-paced questions; otherwise ties share a rank."}</p>
+                <SessionAvailabilitySettings sessionId={sid} observed={sock.availability} />
+                <div className="session-settings" role="group" aria-label="Joining options"><JoinLockToggle locked={sock.participants?.joinLocked === true} onChange={handleJoinLock} disabled={!sock.connected} />
+                {idsAvailable && (
+                  <SettingSwitch label="Show Participant IDs" description={STUDENT_IDS_DESCRIPTION} checked={showStudentIds} onToggle={toggleShowStudentIds} />
+                )}</div>
+              </div>
+            </dialog>}
             {!sock.connected && (
               <button
                 type="button"
@@ -733,7 +779,7 @@ export default function InstructorView({
             aria-pressed={showStudentIds}
             onClick={toggleShowStudentIds}
           >
-            Show Student IDs
+            Show Participant IDs
           </button>
         )}
         <div className="flex flex-wrap items-center justify-center gap-3">
@@ -760,6 +806,9 @@ export default function InstructorView({
   // ── Live Phase (QUESTION_OPEN, QUESTION_CLOSED, REVEAL, LEADERBOARD) ──
   return (
     <LiveView
+      selfPaced={(sock.policy?.pacing ?? pacing) === "self-paced"}
+      speedRanking={(sock.effectiveRanking ?? ranking) === "speed"}
+      onSpeedInvalidated={() => setRanking("correctness")}
       sock={sock}
       hasAnswers={hasAnswers}
       sessionId={sid}
@@ -792,6 +841,9 @@ export default function InstructorView({
 // ── Live sub-view ──────────────────────────
 
 function LiveView({
+  selfPaced,
+  speedRanking,
+  onSpeedInvalidated,
   sock,
   hasAnswers,
   sessionId,
@@ -799,7 +851,6 @@ function LiveView({
   accessInfo,
   totalQuestionsInQuiz,
   questionHeadings,
-  questionSummaries,
   quizLabel,
   restoredQuestionCache,
   restoredRevealCache,
@@ -818,6 +869,9 @@ function LiveView({
   onPresenterNotesToggle,
   onAction,
 }: {
+  selfPaced: boolean;
+  speedRanking: boolean;
+  onSpeedInvalidated: () => void;
   sock: ReturnType<typeof useSocket>;
   hasAnswers: boolean;
   sessionId: string;
@@ -832,11 +886,11 @@ function LiveView({
   loading: boolean;
   errorMsg: string | null;
   restoreNotice: string | null;
-  /** False when the deck hides Student IDs altogether. */
+  /** False when the deck hides Participant IDs altogether. */
   idsAvailable: boolean;
-  /** True when the deck has no Student IDs and the name is the ID. */
+  /** True when the deck has no Participant IDs and the name is the ID. */
   nameOnly: boolean;
-  /** Whether Student IDs show beside names on this console. */
+  /** Whether Participant IDs show beside names on this console. */
   showStudentIds: boolean;
   onToggleShowStudentIds: () => void;
   onReleaseSeat: (publicKey: string) => Promise<void>;
@@ -845,7 +899,7 @@ function LiveView({
   presenterNotesByIndex: Record<number, FoldoutNote[]>;
   presenterNotesOpen: boolean;
   onPresenterNotesToggle: (open: boolean) => void;
-  onAction: (action: () => Promise<unknown>, label: string) => void;
+  onAction: (action: () => Promise<unknown>, label: string, onSuccess?: () => void) => Promise<void>;
 }) {
   const state = sock.sessionState as SessionState;
   const q = sock.currentQuestion as QuestionState | null;
@@ -853,6 +907,8 @@ function LiveView({
 
   const [reviewQuestionIndex, setReviewQuestionIndex] = useState<number | null>(null);
   const [showEndConfirm, setShowEndConfirm] = useState(false);
+  const endAdvisory = useEndSessionAdvisory(sessionId, showEndConfirm);
+  const endOpenerRef = useRef<HTMLElement | null>(null);
   const [showParticipants, setShowParticipants] = useState(false);
   const participantsOpenerRef = useRef<HTMLElement | null>(null);
   // React runs this ref's cleanup before detaching the node, including when
@@ -914,6 +970,21 @@ function LiveView({
     return questionHeadings[questionIndex] || null;
   }, [questionHeadings]);
   const displayHeading = getQuestionHeading(displayQuestion?.questionIndex) || displayQuestion?.topic || null;
+  // Build only the public body/heading input. Never hand a renderer the socket
+  // question, reveal/answer state, presenter-note payload or controller actions.
+  const presenterPublicContent = useMemo<PresenterPublicContentInput | null>(() => displayQuestion ? {
+    title: displayHeading || displayQuestion.topic,
+    textHtml: displayQuestion.text,
+    questionType: displayQuestion.questionType,
+    slideKey: displayQuestion.questionIndex,
+    attendeeNotes: displayQuestion.attendeeNotes,
+    slideMedia: displayQuestion.slideMedia,
+    slideMediaPosition: displayQuestion.slideMediaPosition,
+    slideMediaOpacity: displayQuestion.slideMediaOpacity,
+    slideLiveEmbed: displayQuestion.slideLiveEmbed,
+    slideVideo: displayQuestion.slideVideo,
+    slideReferences: displayQuestion.slideReferences,
+  } : null, [displayQuestion, displayHeading]);
   const nextQuestionHeading = isReviewing
     ? null
     : getQuestionHeading(liveQuestionIndex >= 0 ? liveQuestionIndex + 1 : 0);
@@ -924,10 +995,10 @@ function LiveView({
 
   // Determine which controls to show
   const liveIsSlide = isSlideType(q?.questionType);
-  const canClose = state === "QUESTION_OPEN" && !liveIsSlide;
-  const canReveal = state === "QUESTION_CLOSED" && !liveIsSlide;
+  const canClose = !selfPaced && state === "QUESTION_OPEN" && !liveIsSlide;
+  const canReveal = !selfPaced && state === "QUESTION_CLOSED" && !liveIsSlide;
   const canNext =
-    (state === "REVEAL" || (state === "QUESTION_OPEN" && liveIsSlide)) &&
+    (state === "REVEAL" || (state === "QUESTION_OPEN" && (liveIsSlide || selfPaced))) &&
     q &&
     q.questionIndex < totalQuestionsInQuiz - 1;
   const canPrev = !isReviewing && state !== "LOBBY" && state !== "ENDED" && liveQuestionIndex > 0;
@@ -935,15 +1006,29 @@ function LiveView({
   const hasRevealedScoredQuestion = Object.values(revealCache).some(
     (reveal) => reveal.questionType === "multiple_choice" && !reveal.isPoll,
   );
-  const canShowLeaderboard = state === "REVEAL" && !liveIsSlide && hasRevealedScoredQuestion;
+  const canShowLeaderboard = !selfPaced && state === "REVEAL" && !liveIsSlide && hasRevealedScoredQuestion;
   const isFinalQuestion = liveQuestionIndex >= totalQuestionsInQuiz - 1;
   // "Time's up" only when the timer ran out; closing early just closes the answers.
   const closedLabel = closedLabelFor(sock.timedOut);
   const noVotesClosed = state === "QUESTION_CLOSED" && !isReviewing && displayQuestion?.isPoll === true && (sock.answerCount?.submitted ?? 0) === 0;
   const noVotesRevealed = displayReveal?.isPoll === true && Object.values(displayReveal.distribution).every((count) => count === 0);
   const displayQuestionModeText = displayQuestion
-    ? getQuestionModeText(displayQuestion.questionType, displayQuestion.allowsMultiple)
+    ? getPresenterQuestionModeText(displayQuestion.questionType, displayQuestion.allowsMultiple)
     : "";
+  const currentPoll = !isReviewing && displayQuestion?.questionType === "poll" && (state === "QUESTION_OPEN" || state === "QUESTION_CLOSED")
+    ? displayQuestion : null;
+  const pollLive = currentPoll ? sock.pollLive[currentPoll.questionIndex] : undefined;
+  const livePollCounts = pollLive && "counts" in pollLive && pollLive.counts !== null ? pollLive : null;
+  const pollLiveResults = currentPoll ? (
+    <PresenterPollResults
+      key={`${sessionId}-${currentPoll.questionIndex}`}
+      sessionId={sessionId}
+      question={currentPoll}
+      counts={livePollCounts}
+      connected={sock.connected}
+      closed={state === "QUESTION_CLOSED"}
+    />
+  ) : null;
   const liveRevealActionLabel = getRevealActionLabel(q?.questionType ?? "multiple_choice");
   // Hide or show one response on the projector; the server sends back the new state.
   const toggleResponseHidden = useCallback(async (response: OpenResponseEntry, hidden: boolean) => {
@@ -955,9 +1040,18 @@ function LiveView({
       setModerationNotice(e instanceof Error ? e.message : "That did not work. Please try again.");
     }
   }, [displayQuestion, sessionId]);
+  const setAllHidden = useCallback(async (hidden: boolean) => {
+    if (!displayQuestion) return;
+    setModerationNotice(null);
+    try {
+      await setAllResponsesHidden(sessionId, displayQuestion.questionIndex, hidden);
+    } catch (e) {
+      setModerationNotice(e instanceof Error ? e.message : "That did not work. Please try again.");
+    }
+  }, [displayQuestion, sessionId]);
   const moderationProps = isReviewing || !sock.connected
     ? {}
-    : { onToggleHidden: toggleResponseHidden, notice: moderationNotice };
+    : { onToggleHidden: toggleResponseHidden, onSetAllHidden: setAllHidden, hiddenByDefault: sock.answerCount?.openResponsesHiddenByDefault === true, notice: moderationNotice };
   const liveOpenResponses = displayQuestion?.questionType === "open_response"
     ? sock.answerCount?.openResponses ?? []
     : [];
@@ -1002,51 +1096,24 @@ function LiveView({
     if (displayReveal) return displayReveal.isPoll ? "Results open" : "Answer revealed";
     if (state === "QUESTION_CLOSED") return closedLabel;
     if (sock.answerCount && state === "QUESTION_OPEN") {
-      return `${sock.answerCount.submitted}/${sock.answerCount.total} answered`;
+      return answeredLabel(sock.answerCount.submitted, sock.answerCount.total);
     }
     return null;
   })();
   const currentReviewListIndex = isReviewing && reviewQuestionIndex !== null
     ? availableReviewIndices.findIndex((v) => v === reviewQuestionIndex)
     : -1;
-  const itemSummaries = questionSummaries.length > 0
-    ? questionSummaries
-    : questionHeadings.map((heading) => ({
-      heading,
-      questionType: "multiple_choice" as QuestionType,
-    }));
-  const activeItemStillPending = state === "QUESTION_OPEN" || state === "QUESTION_CLOSED";
-  const remainingStartIndex = liveQuestionIndex >= 0
-    ? liveQuestionIndex + (activeItemStillPending ? 0 : 1)
-    : 0;
-  const remainingItems = itemSummaries.slice(Math.max(0, Math.min(remainingStartIndex, itemSummaries.length)));
-  const remainingSlideCount = remainingItems.filter((item) => isSlideType(item.questionType)).length;
-  const remainingQuizQuestionCount = Math.max(remainingItems.length - remainingSlideCount, 0);
-  const remainingSummary = formatRemaining(remainingQuizQuestionCount, remainingSlideCount);
   const controlsUnavailable = loading || !sock.connected;
   // Why a control is waiting, so a tap that cannot work says so instead of doing nothing.
   const waitingReason = !sock.connected ? "Reconnecting..." : null;
 
-  useEffect(() => {
-    if (!showEndConfirm) return;
-
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        setShowEndConfirm(false);
-      }
-    };
-
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [showEndConfirm]);
-
-  const requestEndSession = useCallback(() => {
+  const requestEndSession = useCallback((event?: { currentTarget: HTMLElement }) => {
+    endOpenerRef.current = event?.currentTarget ?? document.activeElement as HTMLElement | null;
     setShowEndConfirm(true);
   }, []);
 
-  const confirmEndSession = useCallback(() => {
-    setShowEndConfirm(false);
-    onAction(() => endSession(sessionId), "end");
+  const confirmEndSession = useCallback(async () => {
+    await onAction(() => endSession(sessionId), "end", () => setShowEndConfirm(false));
   }, [onAction, sessionId]);
 
   const liveSurfaceNavActions: LiveSurfaceAction[] = (() => {
@@ -1187,6 +1254,13 @@ function LiveView({
 
     const actions: LiveSurfaceAction[] = [...reconnect];
     if (canClose) {
+      if (q && q.timeLimitSec !== null && sock.remainingSec !== null && sock.remainingSec > 0 && !sock.reveal && !isReviewing) actions.push({
+        label: "Restart Countdown",
+        detail: restartCountdownDetail(q, speedRanking),
+        reason: waitingReason,
+        onClick: () => onAction(async () => { const result = await restartCountdown(sessionId); onSpeedInvalidated(); return result; }, "restart countdown"),
+        disabled: controlsUnavailable,
+      });
       actions.push({
         label: "Close Question",
         onClick: () => onAction(() => closeQuestion(sessionId), "close"),
@@ -1226,63 +1300,8 @@ function LiveView({
   })();
 
   const endSessionConfirmDialog = showEndConfirm ? (
-    <div
-      className="end-session-overlay fixed inset-0 z-[10000] flex items-center justify-center bg-[#07060b]/80 px-5 backdrop-blur-sm"
-      role="presentation"
-      onMouseDown={(event) => {
-        if (event.target === event.currentTarget) {
-          setShowEndConfirm(false);
-        }
-      }}
-    >
-      <div
-        className="end-session-card w-full max-w-lg rounded-2xl border border-[color-mix(in_srgb,var(--mdq-danger-line)_40%,transparent)] bg-[var(--mdq-dialog)] p-6 text-white shadow-2xl shadow-black/50"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="end-session-title"
-      >
-        <p className="end-session-eyebrow text-xs font-semibold uppercase tracking-[0.22em] text-red-200/80">End live session</p>
-        <h2 id="end-session-title" className="mt-3 text-2xl font-semibold">End this session?</h2>
-        <p className="end-session-desc mt-3 text-sm leading-6 text-zinc-300">
-          Everyone&apos;s screen will show the final results.
-          {remainingSummary && ` Still to come: ${remainingSummary}.`}
-        </p>
-        {remainingSummary && (
-          <div className="mt-5 flex gap-3">
-            {remainingQuizQuestionCount > 0 && (
-              <div className="end-session-stat flex-1 rounded-xl border border-white/10 bg-white/[0.045] px-4 py-3">
-                <p className="end-session-stat-value text-3xl font-semibold tabular-nums text-white">{remainingQuizQuestionCount}</p>
-                <p className="end-session-stat-label mt-1 text-xs uppercase tracking-[0.18em] text-zinc-400">{remainingQuizQuestionCount === 1 ? "Quiz question left" : "Quiz questions left"}</p>
-              </div>
-            )}
-            {remainingSlideCount > 0 && (
-              <div className="end-session-stat flex-1 rounded-xl border border-white/10 bg-white/[0.045] px-4 py-3">
-                <p className="end-session-stat-value text-3xl font-semibold tabular-nums text-white">{remainingSlideCount}</p>
-                <p className="end-session-stat-label mt-1 text-xs uppercase tracking-[0.18em] text-zinc-400">{remainingSlideCount === 1 ? "Slide left" : "Slides left"}</p>
-              </div>
-            )}
-          </div>
-        )}
-        <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-end">
-          <button
-            type="button"
-            className="end-session-keep rounded-xl border border-white/12 bg-white/[0.04] px-5 py-3 text-sm font-semibold text-zinc-100 transition-colors hover:bg-white/[0.08]"
-            onClick={() => setShowEndConfirm(false)}
-            autoFocus
-          >
-            Keep Session
-          </button>
-          <button
-            type="button"
-            className="end-session-end rounded-xl border border-red-300/35 bg-red-600 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-red-950/25 transition-colors hover:bg-red-500 disabled:cursor-not-allowed disabled:border-zinc-700 disabled:bg-zinc-700 disabled:text-zinc-400 disabled:shadow-none"
-            onClick={confirmEndSession}
-            disabled={controlsUnavailable}
-          >
-            End Session
-          </button>
-        </div>
-      </div>
-    </div>
+    <EndSessionConfirmation advisory={endAdvisory} busy={loading} endDisabled={controlsUnavailable} error={errorMsg} opener={endOpenerRef.current}
+      onKeepOpen={() => setShowEndConfirm(false)} onEnd={confirmEndSession} />
   ) : null;
 
   const participantsDialog = showParticipants ? (
@@ -1330,6 +1349,8 @@ function LiveView({
           )}
         </div>
         <div className="session-settings" role="group" aria-labelledby="session-settings-title">
+          <p className="participants-help">Ranking is by correct answers. {speedRanking ? "Speed breaks ties." : "Ties share a rank."}</p>
+          <SessionAvailabilitySettings sessionId={sessionId} observed={sock.availability} />
           <h3 id="session-settings-title" className="session-settings-title">Session settings</h3>
           <JoinLockToggle
             locked={sock.participants?.joinLocked === true}
@@ -1338,7 +1359,7 @@ function LiveView({
           />
           {idsAvailable && (
             <SettingSwitch
-              label="Show Student IDs"
+              label="Show Participant IDs"
               description={STUDENT_IDS_DESCRIPTION}
               checked={showStudentIds}
               onToggle={onToggleShowStudentIds}
@@ -1358,25 +1379,27 @@ function LiveView({
     if (displayQuestion && (((state === "QUESTION_OPEN" || state === "QUESTION_CLOSED") && !isReviewing) || (isReviewing && !displayReveal))) {
       if (isSlideType(displayQuestion.questionType)) {
         return (
-          <SlideContentBody
-            slideType={displayQuestion.questionType}
-            title={displayHeading || displayQuestion.topic}
-            html={displayQuestion.text}
-            attendeeNotes={displayQuestion.attendeeNotes}
-            slideMedia={displayQuestion.slideMedia}
-            slideMediaPosition={displayQuestion.slideMediaPosition}
-            slideMediaOpacity={displayQuestion.slideMediaOpacity}
-            slideLiveEmbed={displayQuestion.slideLiveEmbed}
-            slideVideo={displayQuestion.slideVideo}
-            slideKey={displayQuestion.questionIndex}
-            slideReferences={displayQuestion.slideReferences}
-          />
+          <PresenterContent sessionId={sessionId} kind="slide" content={presenterPublicContent!} reviewing={isReviewing}>
+            <SlideContentBody
+              slideType={displayQuestion.questionType}
+              title={displayHeading || displayQuestion.topic}
+              html={displayQuestion.text}
+              attendeeNotes={displayQuestion.attendeeNotes}
+              slideMedia={displayQuestion.slideMedia}
+              slideMediaPosition={displayQuestion.slideMediaPosition}
+              slideMediaOpacity={displayQuestion.slideMediaOpacity}
+              slideLiveEmbed={displayQuestion.slideLiveEmbed}
+              slideVideo={displayQuestion.slideVideo}
+              slideKey={displayQuestion.questionIndex}
+              slideReferences={displayQuestion.slideReferences}
+            />
+          </PresenterContent>
         );
       }
 
       return (
         <ResponsiveQuizSurface fitKey={fitKey}>
-          {state === "QUESTION_OPEN" && !isReviewing && (
+          {state === "QUESTION_OPEN" && !isReviewing && !selfPaced && (
             <Timer
               remainingSec={sock.remainingSec}
               totalSec={displayQuestion.timeLimitSec}
@@ -1390,13 +1413,20 @@ function LiveView({
             <div className="text-amber-300 text-lg font-semibold">Review Mode</div>
           )}
 
-          <QuizHtml
-            className="quiz-html text-2xl lg:text-3xl text-white text-center leading-relaxed max-w-5xl"
-            html={displayQuestion.text}
-          />
+          <div className="presenter-question-mode">
+            <span className={`selection-mode-chip ${displayQuestion.questionType === "open_response" || displayQuestion.allowsMultiple ? "selection-mode-chip-multi" : "selection-mode-chip-single"}`}>
+              {displayQuestionModeText}
+            </span>
+          </div>
 
-          <div className={`selection-mode-chip ${displayQuestion.questionType === "open_response" || displayQuestion.allowsMultiple ? "selection-mode-chip-multi" : "selection-mode-chip-single"}`}>
-            {displayQuestionModeText}
+          <div className="presenter-question-content">
+            <PresenterContent sessionId={sessionId} kind="question-stem" content={presenterPublicContent!} reviewing={isReviewing}>
+              <QuizHtml
+                className="quiz-html text-2xl lg:text-3xl text-white text-center leading-relaxed max-w-5xl"
+                html={displayQuestion.text}
+              />
+              <QuestionMedia media={displayQuestion.slideMedia} />
+            </PresenterContent>
           </div>
 
           {noVotesClosed && <p className="no-votes-note">No votes yet</p>}
@@ -1410,7 +1440,7 @@ function LiveView({
             />
           ) : (
             (() => {
-              const dist = state === "QUESTION_CLOSED" && !isReviewing ? sock.distribution?.distribution : null;
+              const dist = state === "QUESTION_CLOSED" && !isReviewing && !livePollCounts ? sock.distribution?.distribution : null;
               const totalResponses = sock.answerCount?.submitted ?? 0;
               const maxCount = dist ? Math.max(1, ...Object.values(dist)) : 0;
               return (
@@ -1445,6 +1475,7 @@ function LiveView({
               );
             })()
           )}
+          {pollLiveResults}
         </ResponsiveQuizSurface>
       );
     }
@@ -1452,10 +1483,15 @@ function LiveView({
     if (displayReveal && displayQuestion && (((state === "REVEAL") && !isReviewing) || isReviewing)) {
       return (
         <ResponsiveQuizSurface reveal fitKey={fitKey}>
-          <QuizHtml
-            className={`quiz-html text-center leading-relaxed max-w-5xl ${isReviewing ? "text-2xl lg:text-3xl text-white" : "text-xl lg:text-2xl text-zinc-300"}`}
-            html={displayQuestion.text}
-          />
+          <div className="presenter-question-content">
+            <PresenterContent sessionId={sessionId} kind="question-stem" content={presenterPublicContent!} reveal reviewing={isReviewing}>
+              <QuizHtml
+                className={`quiz-html text-center leading-relaxed max-w-5xl ${isReviewing ? "text-2xl lg:text-3xl text-white" : "text-xl lg:text-2xl text-zinc-300"}`}
+                html={displayQuestion.text}
+              />
+              <QuestionMedia media={displayQuestion.slideMedia} />
+            </PresenterContent>
+          </div>
 
           {noVotesRevealed && <p className="no-votes-note">No votes yet</p>}
 
@@ -1547,6 +1583,18 @@ function LiveView({
     return null;
   })();
 
+  if (sock.availability?.phase === "expired" || sock.availability?.phase === "deleted") {
+    return <main className="min-h-dvh p-6 space-y-6">
+      <h1 className="text-2xl font-semibold text-white">{sock.availability.phase === "expired" ? "Availability ended" : "Session data deleted"}</h1>
+      <p className="text-zinc-400">Answers are closed.</p>
+      {sock.availability.phase === "expired" && <button type="button" className="session-options-button" onClick={() => setShowParticipants(true)}>Extend & reopen</button>}
+      {participantsDialog}
+      {sock.availability.phase === "expired" && <button type="button" className="bg-indigo-600 hover:bg-indigo-500 disabled:bg-zinc-700 text-white font-semibold py-3 px-4 rounded-xl" onClick={requestEndSession} disabled={controlsUnavailable}>End session and show results</button>}
+      {errorMsg && <p role="alert" className="text-red-200">{errorMsg}</p>}
+      {endSessionConfirmDialog}
+    </main>;
+  }
+
   if (isLiveSurfaceDisplay) {
     return (
       <div className="slide-live-shell slide-live-shell-controls">
@@ -1616,7 +1664,7 @@ function LiveView({
           {/* Answered count */}
           {sock.answerCount && (state === "QUESTION_OPEN" || state === "QUESTION_CLOSED") && (
             <span className="text-zinc-400 font-mono tabular-nums">
-              {sock.answerCount.submitted}/{sock.answerCount.total} answered
+              {answeredLabel(sock.answerCount.submitted, sock.answerCount.total)}
             </span>
           )}
           <span className="text-zinc-500 tabular-nums">
@@ -1696,7 +1744,7 @@ function LiveView({
               >
                 <ResponsiveQuizSurface fitKey={fitKey}>
                   {/* Timer */}
-                  {state === "QUESTION_OPEN" && !isReviewing && (
+                  {state === "QUESTION_OPEN" && !isReviewing && !selfPaced && (
                     <Timer
                       remainingSec={sock.remainingSec}
                       totalSec={displayQuestion.timeLimitSec}
@@ -1711,13 +1759,20 @@ function LiveView({
                   )}
 
                   {/* Question text */}
-                  <QuizHtml
-                    className="quiz-html text-2xl lg:text-3xl text-white text-center leading-relaxed max-w-5xl"
-                    html={displayQuestion.text}
-                  />
+                  <div className="presenter-question-mode">
+                    <span className={`selection-mode-chip ${displayQuestion.questionType === "open_response" || displayQuestion.allowsMultiple ? "selection-mode-chip-multi" : "selection-mode-chip-single"}`}>
+                      {displayQuestionModeText}
+                    </span>
+                  </div>
 
-                  <div className={`selection-mode-chip ${displayQuestion.questionType === "open_response" || displayQuestion.allowsMultiple ? "selection-mode-chip-multi" : "selection-mode-chip-single"}`}>
-                    {displayQuestionModeText}
+                  <div className="presenter-question-content">
+                    <PresenterContent sessionId={sessionId} kind="question-stem" content={presenterPublicContent!} reviewing={isReviewing}>
+                      <QuizHtml
+                        className="quiz-html text-2xl lg:text-3xl text-white text-center leading-relaxed max-w-5xl"
+                        html={displayQuestion.text}
+                      />
+                      <QuestionMedia media={displayQuestion.slideMedia} />
+                    </PresenterContent>
                   </div>
 
                   {noVotesClosed && <p className="no-votes-note">No votes yet</p>}
@@ -1731,7 +1786,7 @@ function LiveView({
                     />
                   ) : (
                     (() => {
-                      const dist = state === "QUESTION_CLOSED" && !isReviewing ? sock.distribution?.distribution : null;
+                      const dist = state === "QUESTION_CLOSED" && !isReviewing && !livePollCounts ? sock.distribution?.distribution : null;
                       const totalResponses = sock.answerCount?.submitted ?? 0;
                       const maxCount = dist ? Math.max(1, ...Object.values(dist)) : 0;
                       return (
@@ -1766,6 +1821,7 @@ function LiveView({
                       );
                     })()
                   )}
+                  {pollLiveResults}
                 </ResponsiveQuizSurface>
               </LiveSurface>
             )}
@@ -1794,10 +1850,15 @@ function LiveView({
             actions={liveSurfaceActions}
           >
             <ResponsiveQuizSurface reveal fitKey={fitKey}>
-              <QuizHtml
-                className={`quiz-html text-center leading-relaxed max-w-5xl ${isReviewing ? "text-2xl lg:text-3xl text-white" : "text-xl lg:text-2xl text-zinc-300"}`}
-                html={displayQuestion.text}
-              />
+              <div className="presenter-question-content">
+                <PresenterContent sessionId={sessionId} kind="question-stem" content={presenterPublicContent!} reveal reviewing={isReviewing}>
+                  <QuizHtml
+                    className={`quiz-html text-center leading-relaxed max-w-5xl ${isReviewing ? "text-2xl lg:text-3xl text-white" : "text-xl lg:text-2xl text-zinc-300"}`}
+                    html={displayQuestion.text}
+                  />
+                  <QuestionMedia media={displayQuestion.slideMedia} />
+                </PresenterContent>
+              </div>
 
               {noVotesRevealed && <p className="no-votes-note">No votes yet</p>}
 
@@ -1928,6 +1989,50 @@ function LiveView({
       )}
       {endSessionConfirmDialog}
       {participantsDialog}
+    </div>
+  );
+}
+
+/** Presenter-only counts and controls stay in the body, outside the shared toolbar. */
+function PresenterPollResults({ sessionId, question, counts, connected, closed }: {
+  sessionId: string;
+  question: QuestionState;
+  counts: Extract<PollLivePayload, { counts: Record<string, number> }> | null;
+  connected: boolean;
+  closed: boolean;
+}) {
+  // A fresh server question (navigation or reconnect) supplies the effective setting again.
+  const [override, setOverride] = useState<{ question: QuestionState; visible: boolean } | null>(null);
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  // The server's control feed says whether the room sees the counts, so every open console agrees.
+  const visible = counts?.liveResults ?? (override?.question === question ? override.visible : question.liveResults === true);
+  const hiddenByPresenter = !visible && (counts?.liveResults === false || override?.question === question || question.liveResults === false);
+  const toggle = async () => {
+    setPending(true);
+    setError(null);
+    try {
+      await setLiveResults(sessionId, question.questionIndex, !visible);
+      setOverride({ question, visible: !visible });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "That did not work. Please try again.");
+    } finally {
+      setPending(false);
+    }
+  };
+  return (
+    <div className="w-full max-w-4xl space-y-3">
+      {counts && <>
+        <p className="text-zinc-400 text-sm tabular-nums">{counts.voters} {counts.voters === 1 ? "vote" : "votes"}</p>
+        <DistributionChart distribution={counts.counts} labels={question.options.map(option => option.label)} totalResponses={counts.voters} />
+      </>}
+      <button type="button" className="session-options-button" disabled={pending || !connected} onClick={() => void toggle()}>
+        {visible ? "Hide live results" : "Show live results"}
+      </button>
+      {hiddenByPresenter && <p role="status" className="text-zinc-400 text-sm">{closed
+        ? "Hidden from phones. The projector shows the closed results, as for any poll."
+        : "Hidden from the room. Only you see these counts."}</p>}
+      {error && <p role="alert" className="open-response-notice text-sm">{error}</p>}
     </div>
   );
 }

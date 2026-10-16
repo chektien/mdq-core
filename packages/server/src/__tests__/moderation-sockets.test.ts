@@ -110,11 +110,16 @@ describe("open response moderation over real sockets", () => {
     phones.forEach(({ recorder }, i) => recorder.socket.emit(SocketEvents.ANSWER_SUBMIT, { questionIndex: 0, responseText: TEXTS[i] }));
     await until(() => (last<AnswerCountPayload>(control, SocketEvents.ANSWER_COUNT)?.openResponses ?? []).length === 3, "instructor sees all three");
 
-    // The instructor sees every response live; the projector only a count.
+    // New responses are hidden: the instructor sees all text, the projector knows the total.
     const live = last<AnswerCountPayload>(control, SocketEvents.ANSWER_COUNT);
     expect(live.openResponses!.map((r) => r.responseText).sort()).toEqual([...TEXTS].sort());
     await until(() => last<AnswerCountPayload>(display, SocketEvents.ANSWER_COUNT)?.submitted === 3, "projector count");
-    expect(last<AnswerCountPayload>(display, SocketEvents.ANSWER_COUNT).openResponses).toBeUndefined();
+    expect(last<AnswerCountPayload>(display, SocketEvents.ANSWER_COUNT).openResponses).toEqual([]);
+    expect(last<AnswerCountPayload>(display, SocketEvents.ANSWER_COUNT).openResponseTotal).toBe(3);
+    expect(live.openResponses!.every((response) => response.hidden)).toBe(true);
+    // Bulk show is routed live to display only; then hide Sam before reveal.
+    await request(app).post(`/api/session/${sessionId}/responses-visibility`).send({ questionIndex: 0, hidden: false }).expect(200);
+    await until(() => last<AnswerCountPayload>(display, SocketEvents.ANSWER_COUNT)?.openResponses?.length === 3, "bulk show while open");
 
     // Hide Sam's response before the reveal.
     const sam = live.openResponses!.find((r) => r.responseText === TEXTS[1])!;
@@ -122,6 +127,7 @@ describe("open response moderation over real sockets", () => {
     await until(() => last<AnswerCountPayload>(control, SocketEvents.ANSWER_COUNT).openResponses!.some((r) => r.hidden), "instructor sees the flag");
     expect(display.events.filter((e) => e.event === SocketEvents.RESULTS_REVEAL)).toHaveLength(0);
 
+    await until(() => last<AnswerCountPayload>(display, SocketEvents.ANSWER_COUNT)?.openResponses?.length === 2, "hide while open");
     await post(sessionId, "close");
     await post(sessionId, "reveal");
     await until(() => revealsOf(display).length === 1 && revealsOf(control).length === 1, "reveal delivered");
@@ -149,11 +155,16 @@ describe("open response moderation over real sockets", () => {
 
     // Frames sent to the projector never hold a Student ID or the text of a response that was hidden at that moment.
     for (const frame of [...display.events, ...late.events]) for (const id of IDS) expect(frame.text).not.toContain(id);
-    for (const frame of display.events.filter((e) => e.event === SocketEvents.ANSWER_COUNT)) for (const text of TEXTS) expect(frame.text).not.toContain(text);
+    for (const reveal of revealsOf(display)) expect(reveal.openResponseTotal).toBe(3);
     const projectorReveals = revealsOf(display);
     expect(JSON.stringify(projectorReveals[0])).not.toContain(TEXTS[1]);
     expect(JSON.stringify(projectorReveals[1])).not.toContain(TEXTS[0]);
     expect(JSON.stringify(projectorReveals[1])).not.toContain(TEXTS[1]);
+
+    await request(app).post(`/api/session/${sessionId}/responses-visibility`).send({ questionIndex: 0, hidden: true }).expect(200);
+    await until(() => revealsOf(display).length === 4, "bulk hide at reveal");
+    expect(revealsOf(display)[3].openResponses).toEqual([]);
+    expect(revealsOf(display)[3].openResponseTotal).toBe(3);
 
     // Phones never get anyone's response text, hidden or not, and are told nothing of the change.
     for (const { recorder } of phones) {
@@ -184,6 +195,9 @@ describe("open response moderation over real sockets", () => {
     await request(app).post(`/api/session/${sessionId}/response-visibility`).send({ questionIndex: 0, publicKey: key }).expect(400);
     await request(app).post("/api/session/nope/response-visibility").send({ questionIndex: 0, publicKey: key, hidden: true }).expect(404);
     await setVisibility(sessionId, 0, key, true).expect(200);
+    await request(app).post(`/api/session/${sessionId}/responses-visibility`).send({ questionIndex: 0 }).expect(400);
+    await request(app).post(`/api/session/${sessionId}/responses-visibility`).send({ questionIndex: 4, hidden: true }).expect(400);
+    await request(app).post(`/api/session/${sessionId}/responses-visibility`).send({ questionIndex: 0, hidden: true }).expect(200);
     // A phone cannot ask the server to hide anything: it has no such event.
     expect(phone.recorder.events.every((e) => !e.text.includes("hidden"))).toBe(true);
   });
@@ -229,6 +243,7 @@ describe("open response moderation over real sockets", () => {
       const { sessionId } = (await agent.post("/api/session").send({ week: "moderation" }).expect(201)).body;
       await request(protectedApp).get(`/api/session/${sessionId}/results.csv`).expect(401);
       await request(protectedApp).post(`/api/session/${sessionId}/response-visibility`).send({ questionIndex: 0, publicKey: "k", hidden: true }).expect(401);
+      await request(protectedApp).post(`/api/session/${sessionId}/responses-visibility`).send({ questionIndex: 0, hidden: true }).expect(401);
       await agent.get(`/api/session/${sessionId}/results.csv`).expect(200);
     });
   });

@@ -1,3 +1,5 @@
+import { sessionAvailabilityPhase } from "./availability";
+import { isSelfPaced } from "./policy";
 import { isSlideType } from "@mdq/shared";
 import { Server as HttpServer } from "http";
 import { Server, Socket } from "socket.io";
@@ -89,7 +91,11 @@ export function setupSocket(httpServer: HttpServer, quizzes: Map<string, Quiz>):
       logActivity(`reject socket=${socket.id} session=${sessionId} reason=session-not-found`);
       socket.disconnect(); return;
     }
-    const quiz = quizStore.get(session.week);
+    if (sessionAvailabilityPhase(session, Date.now()) === "deleted") {
+      socket.emit(SocketEvents.STUDENT_REJECTED, { reason: "Session data has been deleted" });
+      socket.disconnect(); return;
+    }
+    const quiz = session.deckSnapshot ?? quizStore.get(session.week);
     if (quiz) {
       const repaired = apply(session, quiz, { type: "repairClosedSlide" }, Date.now());
       if (repaired.session.state !== session.state) {
@@ -142,8 +148,9 @@ export function setupSocket(httpServer: HttpServer, quizzes: Map<string, Quiz>):
       const result = apply(session, quiz, { type: "answerSubmit", studentId, sessionToken, payload }, Date.now());
       Object.assign(session, result.session);
       // The answer's own outcome goes to the socket that asked, not to whichever socket holds the seat now.
+      // Live poll counts addressed to other voters go to those voters, through the usual routing.
       for (const item of result.messages) {
-        if (item.audience.startsWith("participant:")) socket.emit(item.event, item.payload);
+        if (item.audience.startsWith("participant:") && item.event !== SocketEvents.POLL_LIVE) socket.emit(item.event, item.payload);
         else emitMessages(io, sessionId, [item]);
       }
     });
@@ -156,20 +163,27 @@ export function setupSocket(httpServer: HttpServer, quizzes: Map<string, Quiz>):
 }
 
 /** Schedule the existing ticks and automatic close using the engine deadline. */
-export function startQuestionTimer(io: Server, session: Session, sessionId: string, timeLimitSec: number, nextDeadline?: number | null): void {
+export function startQuestionTimer(io: Server, session: Session, sessionId: string, timeLimitSec: number | null, nextDeadline?: number | null): void {
   clearSessionTimers(sessionId);
-  const quiz = quizStore.get(session.week);
+  if (isSelfPaced(session) || nextDeadline === null) return;
+  const quiz = session.deckSnapshot ?? quizStore.get(session.week);
   if (!quiz) return;
+  // An adapter may still pass timing from a reloaded or removed source. New sessions
+  // use only the frozen item; preserve caller-supplied timer overrides for legacy sessions.
+  if (session.deckSnapshot) timeLimitSec = session.deckSnapshot.questions[session.currentQuestionIndex]?.timeLimitSec ?? null;
+  if (timeLimitSec === null) return;
   const timedIndex = session.currentQuestionIndex;
   const timedStart = session.questionStartedAt;
-  const due = nextDeadline ?? Date.now() + timeLimitSec * 1000;
-  const isCurrent = () => session.state === "QUESTION_OPEN" && session.currentQuestionIndex === timedIndex
-    && session.questionStartedAt === timedStart && !isSlideType(getQuestionType(quiz.questions[timedIndex]));
-  let remaining = timeLimitSec;
+  const restartCount = session.questionTiming?.[String(timedIndex)]?.restarts.length ?? 0;
+  const due = nextDeadline ?? session.questionDeadlineAt ?? ((timedStart ?? Date.now()) + timeLimitSec * 1000);
+  const isCurrent = () => sessionAvailabilityPhase(session, Date.now()) === "active" && session.state === "QUESTION_OPEN" && session.currentQuestionIndex === timedIndex
+    && session.questionStartedAt === timedStart
+    && (session.questionTiming?.[String(timedIndex)]?.restarts.length ?? 0) === restartCount
+    && !isSlideType(getQuestionType(quiz.questions[timedIndex]));
   const tick = setInterval(() => {
     if (tickTimers.get(sessionId) !== tick || !isCurrent()) { if (tickTimers.get(sessionId) === tick) clearSessionTimers(sessionId); return; }
-    remaining--;
-    if (remaining >= 0) emitMessages(io, sessionId, apply(session, quiz, { type: "tick", remainingSec: remaining }, Date.now()).messages);
+    const remaining = Math.max(0, Math.ceil((due - Date.now()) / 1000));
+    emitMessages(io, sessionId, apply(session, quiz, { type: "tick", remainingSec: remaining }, Date.now()).messages);
   }, TICK_INTERVAL_MS);
   tickTimers.set(sessionId, tick);
   const timer = setTimeout(() => {
@@ -178,7 +192,7 @@ export function startQuestionTimer(io: Server, session: Session, sessionId: stri
     // A caller-supplied time limit has no engine deadline, so the adapter closes the item it has confirmed is current.
     const result = nextDeadline == null
       ? apply(session, quiz, { type: "close" }, Date.now())
-      : apply(session, quiz, { type: "timeout", deadline: due }, Math.max(Date.now(), due));
+      : apply(session, quiz, { type: "timeout", deadline: due, questionIndex: timedIndex, startedAt: timedStart, restartCount }, Math.max(Date.now(), due));
     Object.assign(session, result.session);
     emitMessages(io, sessionId, result.messages);
   }, Math.max(0, due - Date.now()));
@@ -187,6 +201,7 @@ export function startQuestionTimer(io: Server, session: Session, sessionId: stri
 
 /** Compatibility entry points used by existing in-process callers. */
 export function broadcastQuestionOpen(io: Server, session: Session, sessionId: string, quiz: Quiz): void {
+  quiz = session.deckSnapshot ?? quiz;
   clearSessionTimers(sessionId);
   const result = apply(session, quiz, { type: "broadcastOpen" }, Date.now());
   Object.assign(session, result.session);

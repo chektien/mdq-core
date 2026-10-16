@@ -90,10 +90,10 @@ function shortHash(text: string): string {
  * question under the same index gives a new key, and the fit starts afresh.
  */
 export function quizFitKey(
-  question: { questionIndex: number; text?: string; options?: Array<{ label: string; text: string }> } | null | undefined,
+  question: { questionIndex: number; text?: string; options?: Array<{ label: string; text: string }>; slideMedia?: Array<{ src: string; alt: string; title?: string }> } | null | undefined,
   state: string | null | undefined,
   reviewing = false,
 ): string {
-  const content = question ? `${question.text ?? ""}\u0000${(question.options ?? []).map((option) => `${option.label}\u0001${option.text}`).join("\u0000")}` : "";
+  const content = question ? `${question.text ?? ""}\u0000${(question.options ?? []).map((option) => `${option.label}\u0001${option.text}`).join("\u0000")}\u0000${(question.slideMedia ?? []).map(item => `${item.src}\u0001${item.alt}\u0001${item.title ?? ""}`).join("\u0000")}` : "";
   return `${question?.questionIndex ?? ""}:${state ?? ""}:${reviewing ? "review" : "live"}:${shortHash(content)}`;
 }
