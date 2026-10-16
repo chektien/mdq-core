@@ -527,19 +527,6 @@ html[data-theme="light"] .selection-mode-chip-multi {
   background: var(--mdq-secondary-soft);
 }
 
-/* The rank wash is lighter on the light ground, where the muted id and score
-   label are the lightest text on the row and hold 4.5:1 on it. */
-html[data-theme="light"] .leaderboard-row {
-  --leaderboard-wash: 11%;
-  box-shadow: 0 14px 28px rgba(79, 57, 34, 0.08);
-}
-
-html[data-theme="light"] .leaderboard-row-highlight {
-  background: var(--mdq-accent-wash) !important;
-  border-color: color-mix(in srgb, var(--mdq-accent) 30%, transparent) !important;
-  box-shadow: 0 18px 34px rgba(122, 71, 43, 0.14);
-}
-
 html[data-theme="light"] .leaderboard-name,
 html[data-theme="light"] .leaderboard-score {
   color: var(--mdq-ink) !important;
@@ -550,11 +537,6 @@ html[data-theme="light"] .leaderboard-score small,
 html[data-theme="light"] .leaderboard-overflow,
 html[data-theme="light"] .leaderboard-empty {
   color: var(--mdq-muted) !important;
-}
-
-html[data-theme="light"] .leaderboard-row-highlight .leaderboard-id,
-html[data-theme="light"] .leaderboard-row-highlight .leaderboard-score small {
-  color: var(--mdq-accent-ink) !important;
 }
 
 html[data-theme="light"] .leaderboard-row.rank-first {

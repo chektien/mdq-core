@@ -1,6 +1,16 @@
 import { isSlideType } from "@mdq/shared";
 import type { QuestionType } from "@mdq/shared";
 
+/** Compact console wording; participant/projector instructions stay separate. */
+export function getPresenterQuestionModeText(questionType: QuestionType, allowsMultiple: boolean): string {
+  if (questionType === "open_response") return "Open response · not scored";
+  if (questionType === "poll") {
+    return `Poll · ${allowsMultiple ? "several choices" : "one choice"} · not scored`;
+  }
+  if (isSlideType(questionType)) return "Slide · no response needed";
+  return `Question · ${allowsMultiple ? "several answers" : "one answer"}`;
+}
+
 export function getQuestionModeText(questionType: QuestionType, allowsMultiple: boolean): string {
   if (questionType === "poll") {
     return allowsMultiple
@@ -9,7 +19,7 @@ export function getQuestionModeText(questionType: QuestionType, allowsMultiple: 
   }
 
   if (questionType === "open_response") {
-    return "Open response. Write a reply. You can update it until time is up. This does not affect your score.";
+    return "Open response. Write a reply. You can update it while answers are open. This does not affect your score.";
   }
 
   if (isSlideType(questionType)) {

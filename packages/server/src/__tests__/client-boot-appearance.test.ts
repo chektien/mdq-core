@@ -14,11 +14,11 @@ describe("client boot appearance", () => {
   });
 
   it("keeps every supported palette served on <html> and ignores the rest", () => {
-    for (const palette of ["classic", "gruvbox", "rose-pine", "catppuccin", "seoul256", "ayu", "tokyo-night"]) {
+    for (const palette of ["classic", "gruvbox", "rose-pine", "catppuccin", "seoul256", "ayu", "tomorrow"]) {
       expect(readServedAppearance({ palette })).toEqual({ theme: undefined, palette });
       expect(resolveClientPalette(palette)).toBe(palette);
     }
-    for (const palette of ["rosepine", "Tokyo-Night", "mocha", "", undefined, 3]) {
+    for (const palette of ["rosepine", "mocha", "", undefined, 3]) {
       expect(resolveClientPalette(palette)).toBe("classic");
       expect(resolveClientPalette(palette, "ayu")).toBe("ayu");
     }
@@ -26,6 +26,16 @@ describe("client boot appearance", () => {
     expect(resolveBootAppearance({}, { palette: "catppuccin" })).toEqual({ theme: "dark", palette: "catppuccin" });
     expect(resolveBootAppearance({ palette: "seoul256" }, { palette: "ayu" })).toEqual({ theme: "dark", palette: "seoul256" });
     expect(resolveBootAppearance({}, { palette: "unknown" })).toEqual({ theme: "dark", palette: "classic" });
+  });
+
+  it("uses Classic for retired client data even with another runtime fallback", () => {
+    for (const palette of ["tokyo-night", "Tokyo-Night", " TOKYO-NIGHT "]) {
+      expect(resolveClientPalette(palette, "gruvbox")).toBe("classic");
+      const served = readServedAppearance({ theme: "light", palette });
+      expect(served).toEqual({ theme: "light", palette: "classic" });
+      expect(resolveBootAppearance(served, { theme: "dark", palette: "gruvbox" })).toEqual({ theme: "light", palette: "classic" });
+    }
+    expect(resolveClientPalette("tokyo night", "ayu")).toBe("ayu");
   });
 
   it("prefers served attributes over the runtime config", () => {

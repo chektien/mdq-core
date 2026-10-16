@@ -1,10 +1,11 @@
+import { createLegacySession } from "./fixtures/legacy-session";
 import * as fs from "fs";
 import * as os from "os";
 import * as path from "path";
 import { Quiz, Question } from "@mdq/shared";
 import { buildResultsCsv, csvEscape } from "../results-csv";
 import { getSessionResultsCsvPath, markQuestionRevealed, saveResultsCsv, saveSessionSummaryMarkdown } from "../persistence";
-import { addParticipant, createSession, recordSubmission, transitionState } from "../session";
+import { addParticipant, recordSubmission, transitionState } from "../session";
 
 function makeQuestion(index: number, overrides: Partial<Question> = {}): Question {
   return {
@@ -35,7 +36,7 @@ function makeFixture() {
       makeQuestion(2, { questionType: "open_response", options: [], correctOptions: [] }),
     ],
   };
-  const session = createSession("week01", "open");
+  const session = createLegacySession("week01", "open");
   addParticipant(session, "S0001", "sock1", "Alex Tan");
   addParticipant(session, "S0002", "sock2", 'Sam "Sammy", Lee');
   addParticipant(session, "S0003", "sock3", "Jo\nKim");

@@ -1,3 +1,4 @@
+import { createLegacySession } from "./fixtures/legacy-session";
 import * as fs from "fs";
 import * as os from "os";
 import * as path from "path";
@@ -11,7 +12,6 @@ import { setupSocket, clearSessionTimers, broadcastQuestionOpen } from "../socke
 import {
   clearAllSessions,
   storeSession,
-  createSession,
   transitionState,
 } from "../session";
 import { clearInstructorSessionsForTests } from "../instructor-auth";
@@ -356,7 +356,7 @@ describe("presenter notes: audience socket surface never receives them", () => {
   }
 
   it("QUESTION_OPEN payload has attendee notes but no presenter notes", async () => {
-    const session = createSession("talk", "open");
+    const session = createLegacySession("talk", "open");
     storeSession(session);
 
     const client: ClientSocket = ioClient(baseUrl, {

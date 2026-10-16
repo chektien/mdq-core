@@ -1,5 +1,7 @@
 import { API } from "@mdq/shared";
 import type {
+  SessionPolicy,
+  SessionAvailabilityPayload,
   ParseDiagnostic,
   AccessInfo,
   DeckPalette,
@@ -69,11 +71,14 @@ export interface DeckSummary {
 export type QuizSummary = DeckSummary;
 
 export interface QuestionSummary {
+  timeLimitSec?: number | null;
   heading: string;
   questionType: QuestionType;
 }
 
 export interface CreateSessionResponse {
+  policy?: SessionPolicy;
+  availability?: SessionAvailabilityPayload;
   sessionId: string;
   sessionCode: string;
   joinUrl: string;
@@ -86,6 +91,10 @@ export interface CreateSessionResponse {
 }
 
 export interface SessionRestoreResponse {
+  availability?: SessionAvailabilityPayload;
+  policy?: SessionPolicy | null;
+  policyFrozen?: boolean;
+  effectiveRanking?: "correctness" | "speed" | "legacy";
   sessionId: string;
   sessionCode: string;
   week: string;
@@ -105,6 +114,7 @@ export interface SessionRestoreResponse {
 }
 
 export interface PresentationSessionResponse {
+  availability?: SessionAvailabilityPayload;
   sessionId: string;
   sessionCode: string;
   week: string;
@@ -203,12 +213,12 @@ export async function reloadDecks(): Promise<ReloadDecksResponse> {
 
 export const reloadQuizzes = reloadDecks;
 
-export async function createSession(week: string, mode: string = "open"): Promise<CreateSessionResponse> {
+export async function createSession(week: string, mode: string = "open", options?: number | { pacing: SessionPolicy["pacing"]; availableUntil?: number; availableForMs?: number }): Promise<CreateSessionResponse> {
   const res = await fetchWithTimeout(apiPath(API.SESSION_CREATE), {
     method: "POST",
     credentials: "same-origin",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ week, mode }),
+    body: JSON.stringify({ week, mode, ...(typeof options === "number" ? { availableUntil: options } : options ?? {}) }),
   });
   if (!res.ok) {
     const data = await res.json().catch(() => ({}));
@@ -231,6 +241,18 @@ async function sessionAction(sessionId: string, action: string): Promise<Record<
   return res.json();
 }
 
+export async function configureSessionPolicy(sessionId: string, pacing: SessionPolicy["pacing"], ranking?: "correctness" | "speed") {
+  const response = await fetchWithTimeout(apiPath(API.SESSION_POLICY, { id: sessionId }), {
+    method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ pacing, ...(ranking !== undefined ? { ranking } : {}) }),
+  });
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    throw new Error(data.error || "Session pacing could not be saved");
+  }
+  return response.json();
+}
+
 export async function startSession(sessionId: string) {
   return sessionAction(sessionId, "START");
 }
@@ -245,6 +267,10 @@ export async function nextQuestion(sessionId: string) {
 
 export async function closeQuestion(sessionId: string) {
   return sessionAction(sessionId, "CLOSE");
+}
+
+export async function restartCountdown(sessionId: string) {
+  return sessionAction(sessionId, "RESTART_COUNTDOWN");
 }
 
 export async function revealAnswer(sessionId: string) {
@@ -262,6 +288,34 @@ export async function setResponseHidden(sessionId: string, questionIndex: number
     credentials: "same-origin",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ questionIndex, publicKey, hidden }),
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.error || "That did not work. Please try again.");
+  }
+}
+
+/** Show or hide all responses already submitted to the current item. */
+export async function setAllResponsesHidden(sessionId: string, questionIndex: number, hidden: boolean): Promise<void> {
+  const res = await fetchWithTimeout(apiPath(API.SESSION_RESPONSES_VISIBILITY, { id: sessionId }), {
+    method: "POST",
+    credentials: "same-origin",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ questionIndex, hidden }),
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.error || "That did not work. Please try again.");
+  }
+}
+
+/** Show or hide a poll's live results for the room. */
+export async function setLiveResults(sessionId: string, questionIndex: number, visible: boolean): Promise<void> {
+  const res = await fetchWithTimeout(apiPath(API.SESSION_LIVE_RESULTS, { id: sessionId }), {
+    method: "POST",
+    credentials: "same-origin",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ questionIndex, visible }),
   });
   if (!res.ok) {
     const data = await res.json().catch(() => ({}));
@@ -366,4 +420,16 @@ export async function fetchPresentationSession(sessionId: string): Promise<Prese
     throw new Error(data.error || "Failed to load projector session");
   }
   return res.json();
+}
+
+export async function configureSessionAvailability(sessionId: string, choice: number | { availableUntil: number } | { extendForMs: number }): Promise<SessionAvailabilityPayload> {
+  const response = await fetchWithTimeout(apiPath(API.SESSION_AVAILABILITY, { id: sessionId }), {
+    method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(typeof choice === "number" ? { availableUntil: choice } : choice),
+  });
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    throw new Error(data.error || "Availability could not be updated");
+  }
+  return response.json();
 }

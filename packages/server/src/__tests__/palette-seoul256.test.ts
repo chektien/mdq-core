@@ -74,7 +74,7 @@ describe("seoul256 palette", () => {
   });
 
   it("credits the upstream palette and names its adjusted shades", () => {
-    const start = index.indexOf(`deck palette: ${NAME})`);
+    const start = index.indexOf(`deck theme: ${NAME})`);
     const header = index.slice(start, index.indexOf(DARK, start));
     expect(header).toContain("junegunn/seoul256.vim");
     expect(header).toContain("MIT");

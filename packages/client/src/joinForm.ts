@@ -18,21 +18,21 @@ export interface JoinFieldSpec {
 export type JoinFieldName = "code" | "studentId" | "displayName";
 
 export interface JoinFormSpec {
-  /** Asks for a Student ID and a name: `id`; or for a name only, which is also the ID: `name`. */
+  /** Asks for a Participant ID and a name: `id`; or for a name only, which is also the ID: `name`. */
   mode: "id" | "name";
   studentId?: JoinFieldSpec;
   displayName: JoinFieldSpec;
-  /** A hidden ID made on this device stands in for the Student ID. */
+  /** A hidden ID made on this device stands in for the Participant ID. */
   generatedId: boolean;
 }
 
 /**
  * The fields a join form shows.
  *
- * - A deck that uses Student IDs (the default) asks for the ID (required) and a name (optional).
+ * - A deck that uses Participant IDs (the default) asks for the ID (required) and a name (optional).
  * - `autoGenerateStudentIds` hides the ID field, makes the name required and sends an ID
  *   generated on this device, exactly as before.
- * - A deck with `student-id: false` asks for a name only, and the name is the ID. That wins
+ * - A deck with `participant-id: false` asks for a name only, and the name is the ID. That wins
  *   over `autoGenerateStudentIds`: no ID is generated, because the name already is one.
  */
 export function joinFormSpec(studentIds: boolean, autoGenerateStudentIds: boolean): JoinFormSpec {
@@ -59,7 +59,7 @@ export function joinFormSpec(studentIds: boolean, autoGenerateStudentIds: boolea
     studentId: {
       id: "join-student-id",
       name: "studentId",
-      label: "Student ID",
+      label: "Participant ID",
       required: true,
       placeholder: "e.g. 2301234",
       maxLength: MAX_STUDENT_ID_LENGTH,
@@ -86,15 +86,15 @@ export function checkJoinValues(spec: JoinFormSpec, values: JoinValues): JoinPro
   const name = normalizeDisplayName(values.displayName);
   if (spec.studentId) {
     const id = values.studentId.trim();
-    if (!id) return { field: "studentId", message: "Enter your Student ID to join." };
-    if (id.length > MAX_STUDENT_ID_LENGTH) return { field: "studentId", message: `Student ID can be at most ${MAX_STUDENT_ID_LENGTH} characters.` };
+    if (!id) return { field: "studentId", message: "Enter your Participant ID to join." };
+    if (id.length > MAX_STUDENT_ID_LENGTH) return { field: "studentId", message: `Participant ID can be at most ${MAX_STUDENT_ID_LENGTH} characters.` };
   }
   if (spec.displayName.required && !name) return { field: "displayName", message: "Enter your name to join." };
   if (name.length > MAX_DISPLAY_NAME_LENGTH) return { field: "displayName", message: `Name can be at most ${MAX_DISPLAY_NAME_LENGTH} characters.` };
   return null;
 }
 
-/** What to send as the identity: the Student ID (never in name mode) and the cleaned-up name. */
+/** What to send as the identity: the Participant ID (never in name mode) and the cleaned-up name. */
 export function joinIdentity(spec: JoinFormSpec, values: JoinValues, generatedId: () => string): { studentId?: string; displayName?: string; seatKey: string } {
   const displayName = normalizeDisplayName(values.displayName) || undefined;
   if (spec.mode === "name") return { displayName, seatKey: displayName ?? "" };
@@ -104,7 +104,7 @@ export function joinIdentity(spec: JoinFormSpec, values: JoinValues, generatedId
 
 /** Which field a server message is about, so it can be marked and focused. */
 export function errorField(spec: JoinFormSpec, reason: string): JoinFieldName | null {
-  if (spec.studentId && /student id/i.test(reason)) return "studentId";
+  if (spec.studentId && /(?:participant|student) id/i.test(reason)) return "studentId";
   if (/name/i.test(reason)) return "displayName";
   if (/session|code/i.test(reason)) return "code";
   return null;

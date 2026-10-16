@@ -45,11 +45,11 @@ describe("client slide palette contract", () => {
     const instructor = read("views/InstructorView.tsx");
     const student = read("views/StudentView.tsx");
     const presentation = read("views/PresentationView.tsx");
-    const socket = read("hooks/useSocket.ts");
+    const storage = read("participantSessionStorage.ts");
 
     it("normalizes and applies only supported palettes, defaulting to classic", () => {
       expect(appearance).toContain('DEFAULT_CLIENT_PALETTE: DeckPalette = "classic"');
-      expect(appearance).toContain("isDeckPalette(palette)");
+      expect(appearance).toContain("parseDeckPalette(palette)");
       expect(theme).toContain("document.documentElement.dataset.palette = resolved");
     });
 
@@ -67,8 +67,8 @@ describe("client slide palette contract", () => {
     });
 
     it("retains the deck palette across student socket reconnection", () => {
-      expect(socket).toContain("sessionPalette?: DeckPalette");
-      expect(socket).toContain("sessionPalette: existing.sessionPalette");
+      expect(storage).toContain("sessionPalette?: DeckPalette");
+      expect(storage).toContain("sessionPalette: existing?.sessionPalette");
       expect(student).toContain("sessionPalette: resolvedPalette");
       expect(student).toContain("resolveClientPalette(stored.sessionPalette, defaultPalette)");
     });
@@ -112,7 +112,7 @@ describe("client slide palette contract", () => {
       expect(css).not.toMatch(/data-palette="classic"/);
       expect(themeCss).not.toMatch(/data-palette/);
       for (const [, selector] of paletteRules) {
-        expect(selector).toMatch(/data-palette="(gruvbox|rose-pine|catppuccin|seoul256|ayu|tokyo-night)"/);
+        expect(selector).toMatch(/data-palette="(gruvbox|rose-pine|catppuccin|seoul256|ayu|tomorrow|nord-aurora)"/);
       }
     });
 

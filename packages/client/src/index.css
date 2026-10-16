@@ -1,5 +1,29 @@
 @import "tailwindcss";
 
+/*! Nord palette (Nord Aurora adaptation)
+MIT License (MIT)
+
+Copyright (c) 2016-present Sven Greb <development@svengreb.de> (https://www.svengreb.de)
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+*/
+
 @theme {
   --font-sans: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "IBM Plex Mono", ui-monospace, monospace;
@@ -481,7 +505,7 @@ html[data-theme="light"] .slide-surface::after {
   touch-action: pan-y pinch-zoom;
 }
 
-/* ── Slide palettes (deck `palette:` key) ──────────
+/* ── Slide palettes (deck `theme:` key) ──────────
    `classic` adds no rules: it is the look defined above. `gruvbox` follows
    the morhetz/gruvbox palette (MIT/X11, https://github.com/morhetz/gruvbox).
    The light variant puts Gruvbox's faded accents on a neutral concrete grey
@@ -773,7 +797,302 @@ html[data-palette="gruvbox"][data-theme="light"] .leaderboard-row.rank-standard 
   --leaderboard-rank-color: var(--mdq-muted);
 }
 
-/* ── Rosé Pine palette (deck palette: rose-pine) ── */
+/* ── Nord Aurora palette (deck theme: nord-aurora) ── */
+/* MDQ adaptation of nordtheme/nord (MIT, https://www.nordtheme.com/).
+   Polar Night #2e3440/#3b4252 and Snow Storm #eceff4/#e5e9f0 are the
+   surfaces. Aurora, rather than Frost blue, supplies the primary accents.
+   For AA text on the surfaces and tinted states, dark purple #b48ead to
+   #d1bacd, orange #d08770 to #ead0c6, green #a3be8c to #c5d6b7, red
+   #bf616a to #e7c4c8 (danger text #f0dadd) and Frost blue #81a1c1 to #b2c5d9 (info text #d0dde9) are lightened.
+   Light text darkens purple to #604c5d, orange to #71493c, yellow #ebcb8b
+   to #574b33, green to #46523c and red to #753b41. Neutral outlines use
+   #66758c (light) or #8c98ab (dark). This is not an official Nord variant.
+   Existing MDQ font, spacing, radius and semantic control layout remain.
+   The gentle surface gradient and status washes inherit MDQ's depth and
+   status cues; no new decorative gradient, glow or motion is introduced. */
+html[data-palette="nord-aurora"]:not([data-theme="light"]) {
+  --mdq-slide-bg: #2e3440;
+  --mdq-slide-bg-soft: #3b4252;
+  --mdq-slide-frame: rgba(229, 233, 240, 0.16);
+  --mdq-slide-heading: #ebcb8b;
+  --mdq-slide-ink: #e5e9f0;
+  --mdq-slide-ink-soft: #d8dee9;
+  --mdq-slide-eyebrow: #d8dee9;
+  --mdq-slide-rule: rgba(229, 233, 240, 0.16);
+  --mdq-slide-accent: #d1bacd;
+  --mdq-slide-accent-strong: #d1bacd;
+  --mdq-slide-accent-warm: #ead0c6;
+  --mdq-slide-accent-cool: #c5d6b7;
+  --mdq-slide-blue: #c5d6b7;
+  --mdq-slide-scene: #b2c5d9;
+  --mdq-slide-maroon: #ead0c6;
+  --mdq-slide-glass: #2e3440;
+  --mdq-slide-glass-strong: #2e3440;
+  --mdq-slide-glass-line: rgba(229, 233, 240, 0.16);
+  --mdq-note-attendee: #d1bacd;
+  --mdq-note-attendee-tint: rgba(209, 186, 205, 0.12);
+  --mdq-note-presenter: #ead0c6;
+  --mdq-note-presenter-tint: rgba(234, 208, 198, 0.12);
+  --mdq-panel-radius: 0.2rem;
+  --mdq-paper: #2e3440;
+  --mdq-paper-strong: #3b4252;
+  --mdq-card: rgba(59, 66, 82, 0.92);
+  --mdq-card-strong: #3b4252;
+  --mdq-dialog: #2e3440;
+  --mdq-line: rgba(229, 233, 240, 0.14);
+  --mdq-line-strong: rgba(229, 233, 240, 0.28);
+  --mdq-control-border: #8c98ab;
+  --mdq-ink: #e5e9f0;
+  --mdq-ink-strong: #eceff4;
+  --mdq-ink-soft: #e5e9f0;
+  --mdq-muted: #d8dee9;
+  --mdq-soft: #c0c8d4;
+  --mdq-accent: #d1bacd;
+  --mdq-accent-hover: #d1bacd;
+  --mdq-accent-text: #d1bacd;
+  --mdq-on-accent: #2e3440;
+  --mdq-accent-soft: rgba(209, 186, 205, 0.14);
+  --mdq-accent-soft-strong: rgba(209, 186, 205, 0.22);
+  --mdq-accent-ink: #eceff4;
+  --mdq-secondary: #c5d6b7;
+  --mdq-secondary-text: #c5d6b7;
+  --mdq-on-secondary: #2e3440;
+  --mdq-secondary-soft: rgba(197, 214, 183, 0.14);
+  --mdq-success: #c5d6b7;
+  --mdq-success-text: #c5d6b7;
+  --mdq-on-success: #2e3440;
+  --mdq-success-soft: rgba(197, 214, 183, 0.14);
+  --mdq-success-ink: #eceff4;
+  --mdq-success-line: #c5d6b7;
+  --mdq-warning: #ebcb8b;
+  --mdq-warning-text: #ebcb8b;
+  --mdq-on-warning: #2e3440;
+  --mdq-warning-soft: rgba(235, 203, 139, 0.14);
+  --mdq-warning-ink: #eceff4;
+  --mdq-danger: #e7c4c8;
+  --mdq-danger-text: #f0dadd;
+  --mdq-on-danger: #2e3440;
+  --mdq-danger-soft: rgba(231, 196, 200, 0.16);
+  --mdq-danger-ink: #eceff4;
+  --mdq-danger-line: #e7c4c8;
+  --mdq-info: #b2c5d9;
+  --mdq-info-text: #d0dde9;
+  --mdq-on-info: #2e3440;
+  --mdq-info-soft: rgba(178, 197, 217, 0.16);
+  --mdq-info-ink: #e5e9f0;
+  --mdq-info-line: #b2c5d9;
+  --mdq-bar: #d1bacd;
+  --mdq-on-bar: #2e3440;
+  --mdq-bar-muted: #c0c8d4;
+  --mdq-on-bar-muted: #2e3440;
+  --mdq-bar-wash: rgba(209, 186, 205, 0.26);
+  --mdq-timer-ok: #c5d6b7;
+  --mdq-timer-warn: #ebcb8b;
+  --mdq-timer-urgent: #e7c4c8;
+  --mdq-timer-track: #8c98ab;
+  background: #2e3440;
+}
+
+html[data-palette="nord-aurora"]:not([data-theme="light"]) body {
+  background: #2e3440;
+}
+
+html[data-palette="nord-aurora"]:not([data-theme="light"]) .slide-surface {
+  background: linear-gradient(180deg, #3b4252 0%, #2e3440 100%);
+}
+
+/* Bold text: theme.css colours .quiz-html strong per theme, which out-ranks
+   the slide rule, so name the Nord Aurora foreground explicitly. */
+html[data-palette="nord-aurora"]:not([data-theme="light"]) .slide-surface .quiz-html strong {
+  color: #eceff4;
+}
+
+/* Nord Aurora link on the white join QR panel (theme.css). */
+html[data-palette="nord-aurora"][data-theme="dark"] .instructor-qr-panel,
+html[data-palette="nord-aurora"][data-theme="light"] .instructor-qr-panel {
+  --mdq-qr-link: #46523c;
+}
+
+html[data-palette="nord-aurora"][data-theme="light"] {
+  --mdq-slide-bg: #eceff4;
+  --mdq-slide-bg-soft: #e5e9f0;
+  --mdq-slide-frame: rgba(59, 66, 82, 0.18);
+  --mdq-slide-heading: #2e3440;
+  --mdq-slide-ink: #3b4252;
+  --mdq-slide-ink-soft: #4c566a;
+  --mdq-slide-eyebrow: #4c566a;
+  --mdq-slide-rule: rgba(59, 66, 82, 0.18);
+  --mdq-slide-accent: #604c5d;
+  --mdq-slide-accent-strong: #604c5d;
+  --mdq-slide-accent-warm: #71493c;
+  --mdq-slide-accent-cool: #46523c;
+  --mdq-slide-blue: #46523c;
+  --mdq-slide-scene: #574b33;
+  --mdq-slide-maroon: #71493c;
+  --mdq-slide-glass: #d8dee9;
+  --mdq-slide-glass-strong: #d8dee9;
+  --mdq-slide-glass-line: rgba(59, 66, 82, 0.18);
+  --mdq-note-attendee: #604c5d;
+  --mdq-note-attendee-tint: rgba(96, 76, 93, 0.09);
+  --mdq-note-presenter: #71493c;
+  --mdq-note-presenter-tint: rgba(113, 73, 60, 0.09);
+  --mdq-panel-radius: 0.2rem;
+  --mdq-paper: #eceff4;
+  --mdq-paper-strong: #eceff4;
+  --mdq-card: rgba(236, 239, 244, 0.92);
+  --mdq-card-strong: #eceff4;
+  --mdq-dialog: #eceff4;
+  --mdq-field: #eceff4;
+  --mdq-line: rgba(59, 66, 82, 0.14);
+  --mdq-line-strong: rgba(59, 66, 82, 0.26);
+  --mdq-control-border: #66758c;
+  --mdq-ink: #3b4252;
+  --mdq-ink-strong: #2e3440;
+  --mdq-ink-soft: #3b4252;
+  --mdq-muted: #4c566a;
+  --mdq-soft: #4c566a;
+  --mdq-accent: #604c5d;
+  --mdq-accent-hover: #503f4d;
+  --mdq-accent-text: #604c5d;
+  --mdq-on-accent: #eceff4;
+  --mdq-accent-soft: rgba(96, 76, 93, 0.1);
+  --mdq-accent-soft-strong: rgba(96, 76, 93, 0.16);
+  --mdq-accent-ink: #503f4d;
+  --mdq-accent-wash: linear-gradient(135deg, #eceff4, #e5dfe7);
+  --mdq-secondary: #46523c;
+  --mdq-secondary-text: #46523c;
+  --mdq-on-secondary: #eceff4;
+  --mdq-secondary-soft: rgba(70, 82, 60, 0.1);
+  --mdq-success: #46523c;
+  --mdq-success-text: #46523c;
+  --mdq-on-success: #eceff4;
+  --mdq-success-soft: rgba(70, 82, 60, 0.12);
+  --mdq-success-ink: #384230;
+  --mdq-success-line: #46523c;
+  --mdq-success-wash: linear-gradient(135deg, #eceff4, #e0e7db);
+  --mdq-warning: #574b33;
+  --mdq-warning-text: #574b33;
+  --mdq-on-warning: #eceff4;
+  --mdq-warning-soft: rgba(87, 75, 51, 0.14);
+  --mdq-warning-ink: #453b28;
+  --mdq-danger: #753b41;
+  --mdq-danger-text: #753b41;
+  --mdq-on-danger: #eceff4;
+  --mdq-danger-soft: rgba(117, 59, 65, 0.1);
+  --mdq-danger-ink: #5e2f34;
+  --mdq-danger-line: #753b41;
+  --mdq-danger-wash: linear-gradient(135deg, #eceff4, #e9dde0);
+  --mdq-info: #46523c;
+  --mdq-info-text: #46523c;
+  --mdq-on-info: #eceff4;
+  --mdq-info-soft: rgba(70, 82, 60, 0.1);
+  --mdq-info-ink: #384230;
+  --mdq-info-line: #46523c;
+  --mdq-bar: #604c5d;
+  --mdq-on-bar: #eceff4;
+  --mdq-bar-muted: #4c566a;
+  --mdq-on-bar-muted: #eceff4;
+  --mdq-bar-wash: rgba(96, 76, 93, 0.16);
+  --mdq-timer-ok: #46523c;
+  --mdq-timer-warn: #574b33;
+  --mdq-timer-urgent: #753b41;
+  --mdq-timer-track: #66758c;
+  --mdq-rank-first: #574b33;
+  --mdq-rank-second: #3b4252;
+  --mdq-rank-third: #503f4d;
+  --mdq-page-glow-top: transparent;
+  --mdq-page-glow-cool: transparent;
+  --mdq-page-glow-warm: transparent;
+  background: #eceff4;
+}
+
+html[data-palette="nord-aurora"][data-theme="light"] .slide-surface {
+  background: linear-gradient(180deg, #eceff4 0%, #e5e9f0 100%);
+}
+
+html[data-palette="nord-aurora"][data-theme="light"] .slide-surface .quiz-html strong {
+  color: #2e3440;
+}
+
+/* The Nord Aurora light green and yellow text tokens sit just under 4.5:1 on
+   their own tinted pill over the lower slide gradient, so the pills use the
+   deeper ink shade. */
+html[data-palette="nord-aurora"][data-theme="light"] .slide-status-pill-success {
+  color: var(--mdq-success-ink);
+}
+
+html[data-palette="nord-aurora"][data-theme="light"] .slide-status-pill-warning {
+  color: var(--mdq-warning-ink);
+}
+
+
+/* The dark selection-mode card and chips carry classic purple and green in
+   their base rules; the light theme already reads the tokens. */
+html[data-palette="nord-aurora"]:not([data-theme="light"]) .selection-mode-card-single {
+  border-color: rgba(209, 186, 205, 0.34);
+  background: linear-gradient(135deg, #3b4252, #3b4252);
+}
+
+html[data-palette="nord-aurora"]:not([data-theme="light"]) .selection-mode-card-single::after {
+  background: rgba(209, 186, 205, 0.22);
+}
+
+html[data-palette="nord-aurora"]:not([data-theme="light"]) .selection-mode-card-multi {
+  border-color: rgba(197, 214, 183, 0.32);
+  background: linear-gradient(135deg, #3b4252, #3b4252);
+}
+
+html[data-palette="nord-aurora"]:not([data-theme="light"]) .selection-mode-card-multi::after {
+  background: rgba(197, 214, 183, 0.2);
+}
+
+html[data-palette="nord-aurora"]:not([data-theme="light"]) .selection-mode-label {
+  color: #eceff4;
+}
+
+html[data-palette="nord-aurora"]:not([data-theme="light"]) .selection-mode-text {
+  color: #d8dee9;
+}
+
+html[data-palette="nord-aurora"]:not([data-theme="light"]) .selection-mode-chip-single {
+  color: #d1bacd;
+  border-color: rgba(209, 186, 205, 0.4);
+  background: #2e3440;
+}
+
+html[data-palette="nord-aurora"]:not([data-theme="light"]) .selection-mode-chip-multi {
+  color: #c5d6b7;
+  border-color: rgba(197, 214, 183, 0.4);
+  background: #2e3440;
+}
+
+html[data-palette="nord-aurora"]:not([data-theme="light"]) .leaderboard-row.rank-first {
+  --leaderboard-rank-color: #ebcb8b;
+}
+
+html[data-palette="nord-aurora"]:not([data-theme="light"]) .leaderboard-row.rank-second {
+  --leaderboard-rank-color: #d8dee9;
+}
+
+html[data-palette="nord-aurora"]:not([data-theme="light"]) .leaderboard-row.rank-third {
+  --leaderboard-rank-color: #ead0c6;
+}
+
+/* Below the podium the row keeps a neutral tint, so fourth place does not
+   pick up the orange accent that third place uses. */
+html[data-palette="nord-aurora"]:not([data-theme="light"]) .leaderboard-row.rank-standard {
+  --leaderboard-rank-color: #d8dee9;
+}
+
+html[data-palette="nord-aurora"][data-theme="light"] .leaderboard-row.rank-standard {
+  --leaderboard-rank-color: var(--mdq-muted);
+}
+
+html[data-palette="nord-aurora"]:not([data-theme="light"]) .leaderboard-row.leaderboard-row-highlight.rank-third {
+  --leaderboard-rank-color: #ead0c6;
+}
+
+/* ── Rosé Pine palette (deck theme: rose-pine) ── */
 /* The -ink tokens and rank colours are darker (light) or lighter (dark)
    shades of the named accents, so they are not listed one by one. */
 /* Rosé Pine follows the rose-pine/rose-pine-palette colours (MIT,
@@ -784,10 +1103,8 @@ html[data-palette="gruvbox"][data-theme="light"] .leaderboard-row.rank-standard 
    toward the foreground (#779eb7) so it holds 4.5:1 as text on the dark
    surfaces, and by 50 percent (#89a9c2) for success text, which also sits on
    the tinted reveal panel. Dark headings are rose #ebbcba, Dawn headings are
-   pine because every lightness-lowered rose is a saturated red. Leaderboard
-   rows wash their rank colour at 8 to 10 percent so the secondary text
-   holds 4.5:1 on them. Secondary text sits on
-   tinted cards, pills and leaderboard rows, so it is moved further from the
+   pine because every lightness-lowered rose is a saturated red. Secondary text sits on
+   tinted cards, pills and the flat leaderboard, so it is moved further from the
    page: dark subtle #908caa to #a4a0bc (25 percent toward text), Dawn subtle
    #797593 to #5f5b7a (both still #908caa and #797593 for outlines and the
    timer track). Where another Dawn colour misses 4.5:1 on the cream surfaces
@@ -1064,23 +1381,12 @@ html[data-palette="rose-pine"]:not([data-theme="light"]) .leaderboard-row.rank-t
   --leaderboard-rank-color: #ebbcba;
 }
 
-/* Below the podium the row keeps a neutral tint, so fourth place does not
-   pick up the accent that the podium places use. */
-/* Rank washes are lighter than the default 16 and 24 percent, so the muted id
-   and score label (#a4a0bc) hold 4.5:1 on every row, including the viewer's
-   own. Fourth place and below keep the text colour for their rank on a still
-   lighter wash. */
-html[data-palette="rose-pine"]:not([data-theme="light"]) .leaderboard-row {
-  --leaderboard-wash: 10%;
-  --leaderboard-highlight-wash: 10%;
-}
+/* Below the podium the rank uses neutral ink so the top three stand out. */
 html[data-palette="rose-pine"]:not([data-theme="light"]) .leaderboard-row.rank-standard {
   --leaderboard-rank-color: #e0def4;
-  --leaderboard-wash: 8%;
 }
 
-/* The viewer's own row adds an accent wash. Third place keeps its own
-   colour there, which holds 4.5:1 on that wash. */
+/* The viewer's third-place rank keeps its palette colour. */
 html[data-palette="rose-pine"]:not([data-theme="light"]) .leaderboard-row.leaderboard-row-highlight.rank-third {
   --leaderboard-rank-color: #ebbcba;
 }
@@ -1089,7 +1395,7 @@ html[data-palette="rose-pine"][data-theme="light"] .leaderboard-row.rank-standar
   --leaderboard-rank-color: #5d5a73;
 }
 
-/* ── Catppuccin palette (deck palette: catppuccin) ── */
+/* ── Catppuccin palette (deck theme: catppuccin) ── */
 /* The -ink tokens and rank colours are darker (light) or lighter (dark)
    shades of the named accents, so they are not listed one by one. */
 /* Catppuccin follows the catppuccin/palette colours (MIT,
@@ -1373,14 +1679,12 @@ html[data-palette="catppuccin"]:not([data-theme="light"]) .leaderboard-row.rank-
   --leaderboard-rank-color: #fab387;
 }
 
-/* Below the podium the row keeps a neutral tint, so fourth place does not
-   pick up the accent that the podium places use. */
+/* Below the podium the rank uses neutral ink so the top three stand out. */
 html[data-palette="catppuccin"]:not([data-theme="light"]) .leaderboard-row.rank-standard {
   --leaderboard-rank-color: #a6adc8;
 }
 
-/* The viewer's own row adds an accent wash. Third place keeps its own
-   colour there, which holds 4.5:1 on that wash. */
+/* The viewer's third-place rank keeps its palette colour. */
 html[data-palette="catppuccin"]:not([data-theme="light"]) .leaderboard-row.leaderboard-row-highlight.rank-third {
   --leaderboard-rank-color: #fab387;
 }
@@ -1389,7 +1693,7 @@ html[data-palette="catppuccin"][data-theme="light"] .leaderboard-row.rank-standa
   --leaderboard-rank-color: #525465;
 }
 
-/* ── seoul256 palette (deck palette: seoul256) ── */
+/* ── seoul256 palette (deck theme: seoul256) ── */
 /* The -ink tokens and rank colours are darker (light) or lighter (dark)
    shades of the named accents, so they are not listed one by one. */
 /* seoul256 follows Junegunn Choi's seoul256.vim colour scheme (MIT, as stated
@@ -1416,7 +1720,7 @@ html[data-palette="catppuccin"][data-theme="light"] .leaderboard-row.rank-standa
    label 255, accent text is 89 (#9b1d72) and danger is 88 (#9b1300).
    Leaderboard ranks are darkened from gold #9a7200 to #654b00 and from
    #be7572 to #7c3c39, and muted text from 238 (#565656) to #525252 so
-   leaderboard ids hold 4.5:1 on the tinted rows. The dark poll bar wash is
+   leaderboard ids hold 4.5:1 on their grounds. The dark poll bar wash is
    18 percent of the accent so option text holds 4.5:1 on it. Dark is the
    default theme, so the dark variant also applies when data-theme is absent. */
 html[data-palette="seoul256"]:not([data-theme="light"]) {
@@ -1670,12 +1974,7 @@ html[data-palette="seoul256"]:not([data-theme="light"]) .leaderboard-row.rank-st
   --leaderboard-rank-color: #d1d0d1;
 }
 
-/* The viewer's own row adds an accent wash, lightened to 18 percent so the
-   third-place peach holds 4.5:1 on it, and third place keeps the palette
-   colour there instead of the classic orange. */
-html[data-palette="seoul256"]:not([data-theme="light"]) .leaderboard-row {
-  --leaderboard-highlight-wash: 18%;
-}
+/* The viewer's third-place rank keeps the palette peach. */
 html[data-palette="seoul256"]:not([data-theme="light"]) .leaderboard-row.leaderboard-row-highlight.rank-third {
   --leaderboard-rank-color: #ffbd98;
 }
@@ -1684,7 +1983,7 @@ html[data-palette="seoul256"][data-theme="light"] .leaderboard-row.rank-standard
   --leaderboard-rank-color: var(--mdq-muted);
 }
 
-/* ── Ayu palette (deck palette: ayu) ── */
+/* ── Ayu palette (deck theme: ayu) ── */
 /* The -ink tokens and rank colours are darker (light) or lighter (dark)
    shades of the named accents, so they are not listed one by one. */
 /* Ayu follows the ayu-colors themes by the Ayu theme authors (MIT,
@@ -1961,8 +2260,7 @@ html[data-palette="ayu"]:not([data-theme="light"]) .leaderboard-row.rank-standar
   --leaderboard-rank-color: #b1afaa;
 }
 
-/* The viewer's own row adds an accent wash; third place keeps the palette
-   colour there instead of the classic orange. */
+/* The viewer's third-place rank keeps the palette colour. */
 html[data-palette="ayu"]:not([data-theme="light"]) .leaderboard-row.leaderboard-row-highlight.rank-third {
   --leaderboard-rank-color: #ff8f40;
 }
@@ -1971,303 +2269,282 @@ html[data-palette="ayu"][data-theme="light"] .leaderboard-row.rank-standard {
   --leaderboard-rank-color: var(--mdq-muted);
 }
 
-/* ── Tokyo Night palette (deck palette: tokyo-night) ── */
-/* The -ink tokens and rank colours are darker (light) or lighter (dark)
-   shades of the named accents, so they are not listed one by one. */
-/* Tokyo Night follows folke's tokyonight.nvim colours (Apache-2.0,
-   https://github.com/folke/tokyonight.nvim, extras/lua/tokyonight_night.lua
-   and tokyonight_day.lua at cdc07ac). Dark is the night style: background
-   #1a1b26, dark #16161e, highlight #292e42, foreground #c0caf5 with fg_dark
-   #a9b1d6, blue #7aa2f7 as the accent, magenta #bb9af7, green #9ece6a, yellow
-   #e0af68, orange #ff9e64, red #f7768e, cyan #7dcfff, and #737aa2 (dark5) for
-   borders and the timer track. Adjusted in dark: small danger text red
-   #f7768e to #ff899d, strong text #c0caf5 mixed 35% toward white (#d6ddf9),
-   soft text #737aa2 mixed toward #a9b1d6 (#8e96bc), and the join QR link is
-   the day blue #2e7de9 darkened to #186fe6 because that panel is white.
-   Light is the day style: background #e1e2e7, bg_dark #d0d5e3, foreground
-   #3760bf, with the brighter #ececef and #f2f2f4 being the background mixed
-   35% and 55% toward white for the slide gradient and cards. Day accents fail
-   4.5:1 on that background, so they are darkened, keeping the hue: text
-   #3760bf to #2a4990 (headings #1f356a), fg_dark #6172b0 to #3f4c7e (muted)
-   and #4e5f9d (soft), blue #2e7de9 to #1355b1 as text and #1769da as a
-   fill, purple #7847bd to #6d3faf, magenta #9854f1 to #7013ea, green #587539
-   to #485f2e, yellow #8c6c3e to #6d5430, red #c64343 to #a03131, cyan
-   #006a83 to #005e75, orange #b15c00 to #894700, and #68709a is #6172b0
-   darkened for borders and the timer track. Leaderboard ranks are darkened
-   from #8c6c3e to #5f492a, #6172b0 to #3d4a7a and #b15c00 to #763e00. Dark is
-   the default theme, so the dark variant also applies when data-theme is
-   absent. */
-html[data-palette="tokyo-night"]:not([data-theme="light"]) {
-  --mdq-slide-bg: #1a1b26;
-  --mdq-slide-bg-soft: #16161e;
-  --mdq-slide-frame: rgba(192, 202, 245, 0.16);
-  --mdq-slide-heading: #7aa2f7;
-  --mdq-slide-ink: #c0caf5;
-  --mdq-slide-ink-soft: #a9b1d6;
-  --mdq-slide-eyebrow: #a9b1d6;
-  --mdq-slide-rule: rgba(192, 202, 245, 0.16);
-  --mdq-slide-accent: #7aa2f7;
-  --mdq-slide-accent-strong: #7aa2f7;
-  --mdq-slide-accent-warm: #ff9e64;
-  --mdq-slide-accent-cool: #7dcfff;
-  --mdq-slide-blue: #7aa2f7;
-  --mdq-slide-scene: #9ece6a;
-  --mdq-slide-maroon: #bb9af7;
-  --mdq-slide-glass: #16161e;
-  --mdq-slide-glass-strong: #16161e;
-  --mdq-slide-glass-line: rgba(192, 202, 245, 0.16);
-  --mdq-note-attendee: #7aa2f7;
-  --mdq-note-attendee-tint: rgba(122, 162, 247, 0.12);
-  --mdq-note-presenter: #bb9af7;
-  --mdq-note-presenter-tint: rgba(187, 154, 247, 0.12);
+/* Tomorrow (deck theme: tomorrow)
+   Chris Kempson, https://github.com/chriskempson/tomorrow-theme, MIT.
+   Tomorrow light is flat pure white; dark uses Tomorrow Night.
+   Readability shades: blue #4271ae to #38649e, green #718c00 to #526600,
+   aqua #3e999f to #247278, purple #8959a8 to #794898, orange #f5871f
+   to #935000, yellow #eab700 to #7a5e00, red #c82829 to #b32223.
+   Muted light ink #8e908c to #666666; dark red fill #cc6666 to #d16b6b, danger text to #e08787.
+   Highlighted third-place ink #de935f to #e4a77c; light silver #666666 to #585858.
+   These retain the palette hues while meeting text/control contrast. */
+html[data-palette="tomorrow"]:not([data-theme="light"]) {
+  --mdq-slide-bg: #1d1f21;
+  --mdq-slide-bg-soft: #1d1f21;
+  --mdq-slide-frame: rgba(197, 200, 198, 0.16);
+  --mdq-slide-heading: #81a2be;
+  --mdq-slide-ink: #c5c8c6;
+  --mdq-slide-ink-soft: #b0b2b0;
+  --mdq-slide-eyebrow: #b0b2b0;
+  --mdq-slide-rule: rgba(197, 200, 198, 0.16);
+  --mdq-slide-accent: #81a2be;
+  --mdq-slide-accent-strong: #81a2be;
+  --mdq-slide-accent-warm: #de935f;
+  --mdq-slide-accent-cool: #8abeb7;
+  --mdq-slide-blue: #81a2be;
+  --mdq-slide-scene: #b5bd68;
+  --mdq-slide-maroon: #b294bb;
+  --mdq-slide-glass: #1d1f21;
+  --mdq-slide-glass-strong: #1d1f21;
+  --mdq-slide-glass-line: rgba(197, 200, 198, 0.16);
+  --mdq-note-attendee: #81a2be;
+  --mdq-note-attendee-tint: rgba(129, 162, 190, 0.12);
+  --mdq-note-presenter: #b294bb;
+  --mdq-note-presenter-tint: rgba(178, 148, 187, 0.12);
   --mdq-panel-radius: 0.2rem;
-  --mdq-paper: #1a1b26;
-  --mdq-paper-strong: #16161e;
-  --mdq-card: rgba(41, 46, 66, 0.92);
-  --mdq-card-strong: #292e42;
-  --mdq-dialog: #16161e;
-  --mdq-line: rgba(192, 202, 245, 0.14);
-  --mdq-line-strong: rgba(192, 202, 245, 0.28);
-  --mdq-control-border: #737aa2;
-  --mdq-ink: #c0caf5;
-  --mdq-ink-strong: #d6ddf9;
-  --mdq-ink-soft: #c0caf5;
-  --mdq-muted: #a9b1d6;
-  --mdq-soft: #8e96bc;
-  --mdq-accent: #7aa2f7;
-  --mdq-accent-hover: #8db0ff;
-  --mdq-accent-text: #7aa2f7;
-  --mdq-on-accent: #16161e;
-  --mdq-accent-soft: rgba(122, 162, 247, 0.1);
-  --mdq-accent-soft-strong: rgba(122, 162, 247, 0.18);
-  --mdq-accent-ink: #c0caf5;
-  --mdq-secondary: #bb9af7;
-  --mdq-secondary-text: #bb9af7;
-  --mdq-on-secondary: #16161e;
-  --mdq-secondary-soft: rgba(187, 154, 247, 0.1);
-  --mdq-success: #9ece6a;
-  --mdq-success-text: #9ece6a;
-  --mdq-on-success: #16161e;
-  --mdq-success-soft: rgba(158, 206, 106, 0.1);
-  --mdq-success-ink: #c0caf5;
-  --mdq-success-line: #9ece6a;
-  --mdq-warning: #e0af68;
-  --mdq-warning-text: #e0af68;
-  --mdq-on-warning: #16161e;
-  --mdq-warning-soft: rgba(224, 175, 104, 0.1);
-  --mdq-warning-ink: #c0caf5;
-  --mdq-danger: #f7768e;
-  --mdq-danger-text: #ff899d;
-  --mdq-on-danger: #16161e;
-  --mdq-danger-soft: rgba(247, 118, 142, 0.1);
-  --mdq-danger-ink: #c0caf5;
-  --mdq-danger-line: #f7768e;
-  --mdq-info: #7dcfff;
-  --mdq-info-text: #7dcfff;
-  --mdq-on-info: #16161e;
-  --mdq-info-soft: rgba(125, 207, 255, 0.1);
-  --mdq-info-ink: #c0caf5;
-  --mdq-info-line: #7dcfff;
-  --mdq-bar: #7aa2f7;
-  --mdq-on-bar: #16161e;
-  --mdq-bar-muted: #787fa6;
-  --mdq-on-bar-muted: #16161e;
-  --mdq-bar-wash: rgba(122, 162, 247, 0.26);
-  --mdq-timer-ok: #9ece6a;
-  --mdq-timer-warn: #e0af68;
-  --mdq-timer-urgent: #f7768e;
-  --mdq-timer-track: #737aa2;
-  background: #1a1b26;
+  --mdq-paper: #1d1f21;
+  --mdq-paper-strong: #1d1f21;
+  --mdq-card: rgba(40, 42, 46, 0.92);
+  --mdq-card-strong: #282a2e;
+  --mdq-dialog: #1d1f21;
+  --mdq-line: rgba(197, 200, 198, 0.14);
+  --mdq-line-strong: rgba(197, 200, 198, 0.28);
+  --mdq-control-border: #858785;
+  --mdq-ink: #c5c8c6;
+  --mdq-ink-strong: #ffffff;
+  --mdq-ink-soft: #c5c8c6;
+  --mdq-muted: #b0b2b0;
+  --mdq-soft: #a4a6a4;
+  --mdq-accent: #81a2be;
+  --mdq-accent-hover: #91b2ce;
+  --mdq-accent-text: #81a2be;
+  --mdq-on-accent: #1d1f21;
+  --mdq-accent-soft: rgba(129, 162, 190, 0.1);
+  --mdq-accent-soft-strong: rgba(129, 162, 190, 0.18);
+  --mdq-accent-ink: #c5c8c6;
+  --mdq-secondary: #b294bb;
+  --mdq-secondary-text: #b294bb;
+  --mdq-on-secondary: #1d1f21;
+  --mdq-secondary-soft: rgba(178, 148, 187, 0.1);
+  --mdq-success: #b5bd68;
+  --mdq-success-text: #b5bd68;
+  --mdq-on-success: #1d1f21;
+  --mdq-success-soft: rgba(181, 189, 104, 0.1);
+  --mdq-success-ink: #c5c8c6;
+  --mdq-success-line: #b5bd68;
+  --mdq-warning: #f0c674;
+  --mdq-warning-text: #f0c674;
+  --mdq-on-warning: #1d1f21;
+  --mdq-warning-soft: rgba(240, 198, 116, 0.1);
+  --mdq-warning-ink: #c5c8c6;
+  --mdq-danger: #d16b6b;
+  --mdq-danger-text: #e08787;
+  --mdq-on-danger: #1d1f21;
+  --mdq-danger-soft: rgba(209, 107, 107, 0.1);
+  --mdq-danger-ink: #c5c8c6;
+  --mdq-danger-line: #d16b6b;
+  --mdq-info: #8abeb7;
+  --mdq-info-text: #8abeb7;
+  --mdq-on-info: #1d1f21;
+  --mdq-info-soft: rgba(138, 190, 183, 0.1);
+  --mdq-info-ink: #c5c8c6;
+  --mdq-info-line: #8abeb7;
+  --mdq-bar: #81a2be;
+  --mdq-on-bar: #1d1f21;
+  --mdq-bar-muted: #969896;
+  --mdq-on-bar-muted: #1d1f21;
+  --mdq-bar-wash: rgba(129, 162, 190, 0.26);
+  --mdq-timer-ok: #b5bd68;
+  --mdq-timer-warn: #f0c674;
+  --mdq-timer-urgent: #d16b6b;
+  --mdq-timer-track: #858785;
+  background: #1d1f21;
 }
 
-html[data-palette="tokyo-night"]:not([data-theme="light"]) body {
-  background: #1a1b26;
+html[data-palette="tomorrow"]:not([data-theme="light"]) body {
+  background: #1d1f21;
 }
 
-html[data-palette="tokyo-night"]:not([data-theme="light"]) .slide-surface {
-  background: linear-gradient(180deg, #1a1b26 0%, #16161e 100%);
+html[data-palette="tomorrow"]:not([data-theme="light"]) .slide-surface {
+  background: var(--mdq-slide-bg);
 }
 
-html[data-palette="tokyo-night"]:not([data-theme="light"]) .slide-surface .quiz-html strong {
-  color: #d6ddf9;
+html[data-palette="tomorrow"]:not([data-theme="light"]) .slide-surface .quiz-html strong {
+  color: #ffffff;
 }
 
-html[data-palette="tokyo-night"][data-theme="light"] {
-  --mdq-slide-bg: #e1e2e7;
-  --mdq-slide-bg-soft: #ececef;
+html[data-palette="tomorrow"][data-theme="light"] {
+  --mdq-slide-bg: #ffffff;
+  --mdq-slide-bg-soft: #ffffff;
   --mdq-slide-frame: rgba(55, 96, 191, 0.18);
-  --mdq-slide-heading: #1f356a;
-  --mdq-slide-ink: #2a4990;
-  --mdq-slide-ink-soft: #404e81;
-  --mdq-slide-eyebrow: #404e81;
+  --mdq-slide-heading: #4d4d4c;
+  --mdq-slide-ink: #4d4d4c;
+  --mdq-slide-ink-soft: #666666;
+  --mdq-slide-eyebrow: #666666;
   --mdq-slide-rule: rgba(55, 96, 191, 0.18);
-  --mdq-slide-accent: #1355b1;
-  --mdq-slide-accent-strong: #1355b1;
-  --mdq-slide-accent-warm: #894700;
-  --mdq-slide-accent-cool: #005e75;
-  --mdq-slide-blue: #1355b1;
-  --mdq-slide-scene: #485f2e;
-  --mdq-slide-maroon: #6d3faf;
-  --mdq-slide-glass: #d0d5e3;
-  --mdq-slide-glass-strong: #d0d5e3;
+  --mdq-slide-accent: #38649e;
+  --mdq-slide-accent-strong: #38649e;
+  --mdq-slide-accent-warm: #935000;
+  --mdq-slide-accent-cool: #247278;
+  --mdq-slide-blue: #38649e;
+  --mdq-slide-scene: #526600;
+  --mdq-slide-maroon: #794898;
+  --mdq-slide-glass: #f5f5f5;
+  --mdq-slide-glass-strong: #f5f5f5;
   --mdq-slide-glass-line: rgba(55, 96, 191, 0.18);
-  --mdq-note-attendee: #1355b1;
-  --mdq-note-attendee-tint: rgba(19, 85, 177, 0.09);
-  --mdq-note-presenter: #6d3faf;
-  --mdq-note-presenter-tint: rgba(109, 63, 175, 0.09);
+  --mdq-note-attendee: #38649e;
+  --mdq-note-attendee-tint: rgba(56, 100, 158, 0.09);
+  --mdq-note-presenter: #794898;
+  --mdq-note-presenter-tint: rgba(121, 72, 152, 0.09);
   --mdq-panel-radius: 0.2rem;
-  --mdq-paper: #e1e2e7;
-  --mdq-paper-strong: #ececef;
-  --mdq-card: rgba(242, 242, 244, 0.92);
-  --mdq-card-strong: #f2f2f4;
-  --mdq-dialog: #f2f2f4;
-  --mdq-field: #f2f2f4;
+  --mdq-paper: #ffffff;
+  --mdq-paper-strong: #ffffff;
+  --mdq-card: rgba(255, 255, 255, 0.92);
+  --mdq-card-strong: #ffffff;
+  --mdq-dialog: #ffffff;
+  --mdq-field: #ffffff;
   --mdq-line: rgba(55, 96, 191, 0.14);
   --mdq-line-strong: rgba(55, 96, 191, 0.26);
-  --mdq-control-border: #68709a;
-  --mdq-ink: #2a4990;
-  --mdq-ink-strong: #1f356a;
-  --mdq-ink-soft: #2a4990;
-  --mdq-muted: #3f4c7e;
-  --mdq-soft: #4e5f9d;
-  --mdq-accent: #1769da;
-  --mdq-accent-hover: #1769da;
-  --mdq-accent-text: #1355b1;
-  --mdq-on-accent: #f2f2f4;
-  --mdq-accent-soft: rgba(23, 105, 218, 0.08);
-  --mdq-accent-soft-strong: rgba(23, 105, 218, 0.14);
-  --mdq-accent-ink: #0d3a79;
-  --mdq-accent-wash: linear-gradient(135deg, #e7ebf3, #dae3f1);
-  --mdq-secondary: #7013ea;
-  --mdq-secondary-text: #7013ea;
-  --mdq-on-secondary: #f2f2f4;
-  --mdq-secondary-soft: rgba(112, 19, 234, 0.08);
-  --mdq-success: #485f2e;
-  --mdq-success-text: #485f2e;
-  --mdq-on-success: #f2f2f4;
-  --mdq-success-soft: rgba(72, 95, 46, 0.08);
-  --mdq-success-ink: #314120;
-  --mdq-success-line: #485f2e;
-  --mdq-success-wash: linear-gradient(135deg, #e9ebea, #dfe2de);
-  --mdq-warning: #6d5430;
-  --mdq-warning-text: #6d5430;
-  --mdq-on-warning: #f2f2f4;
-  --mdq-warning-soft: rgba(109, 84, 48, 0.08);
-  --mdq-warning-ink: #4a3921;
-  --mdq-danger: #a03131;
-  --mdq-danger-text: #a03131;
-  --mdq-on-danger: #f2f2f4;
-  --mdq-danger-soft: rgba(160, 49, 49, 0.08);
-  --mdq-danger-ink: #6e2121;
-  --mdq-danger-line: #a03131;
-  --mdq-danger-wash: linear-gradient(135deg, #eee8ea, #e9dddf);
-  --mdq-info: #005e75;
-  --mdq-info-text: #005e75;
-  --mdq-on-info: #f2f2f4;
-  --mdq-info-soft: rgba(0, 94, 117, 0.08);
-  --mdq-info-ink: #004252;
-  --mdq-info-line: #005e75;
-  --mdq-bar: #1769da;
-  --mdq-on-bar: #f2f2f4;
-  --mdq-bar-muted: #4b5b96;
-  --mdq-on-bar-muted: #f2f2f4;
-  --mdq-bar-wash: rgba(23, 105, 218, 0.16);
-  --mdq-timer-ok: #485f2e;
-  --mdq-timer-warn: #6d5430;
-  --mdq-timer-urgent: #a03131;
-  --mdq-timer-track: #68709a;
-  --mdq-rank-first: #5f492a;
-  --mdq-rank-second: #3d4a7a;
-  --mdq-rank-third: #763e00;
+  --mdq-control-border: #757575;
+  --mdq-ink: #4d4d4c;
+  --mdq-ink-strong: #4d4d4c;
+  --mdq-ink-soft: #4d4d4c;
+  --mdq-muted: #666666;
+  --mdq-soft: #6b6b6b;
+  --mdq-accent: #38649e;
+  --mdq-accent-hover: #38649e;
+  --mdq-accent-text: #38649e;
+  --mdq-on-accent: #ffffff;
+  --mdq-accent-soft: rgba(56, 100, 158, 0.08);
+  --mdq-accent-soft-strong: rgba(56, 100, 158, 0.14);
+  --mdq-accent-ink: #304a6a;
+  --mdq-accent-wash: linear-gradient(135deg, #ffffff, #f5f5f5);
+  --mdq-secondary: #794898;
+  --mdq-secondary-text: #794898;
+  --mdq-on-secondary: #ffffff;
+  --mdq-secondary-soft: rgba(121, 72, 152, 0.08);
+  --mdq-success: #526600;
+  --mdq-success-text: #526600;
+  --mdq-on-success: #ffffff;
+  --mdq-success-soft: rgba(82, 102, 0, 0.08);
+  --mdq-success-ink: #3f4d00;
+  --mdq-success-line: #526600;
+  --mdq-success-wash: linear-gradient(135deg, #ffffff, #f5f5f5);
+  --mdq-warning: #7a5e00;
+  --mdq-warning-text: #7a5e00;
+  --mdq-on-warning: #ffffff;
+  --mdq-warning-soft: rgba(122, 94, 0, 0.08);
+  --mdq-warning-ink: #574300;
+  --mdq-danger: #b32223;
+  --mdq-danger-text: #b32223;
+  --mdq-on-danger: #ffffff;
+  --mdq-danger-soft: rgba(179, 34, 35, 0.08);
+  --mdq-danger-ink: #82191a;
+  --mdq-danger-line: #b32223;
+  --mdq-danger-wash: linear-gradient(135deg, #ffffff, #f5f5f5);
+  --mdq-info: #247278;
+  --mdq-info-text: #247278;
+  --mdq-on-info: #ffffff;
+  --mdq-info-soft: rgba(36, 114, 120, 0.08);
+  --mdq-info-ink: #1a5358;
+  --mdq-info-line: #247278;
+  --mdq-bar: #38649e;
+  --mdq-on-bar: #ffffff;
+  --mdq-bar-muted: #6b6b6b;
+  --mdq-on-bar-muted: #ffffff;
+  --mdq-bar-wash: rgba(56, 100, 158, 0.16);
+  --mdq-timer-ok: #526600;
+  --mdq-timer-warn: #7a5e00;
+  --mdq-timer-urgent: #b32223;
+  --mdq-timer-track: #757575;
+  --mdq-rank-first: #7a5e00;
+  --mdq-rank-second: #585858;
+  --mdq-rank-third: #935000;
   --mdq-page-glow-top: transparent;
   --mdq-page-glow-cool: transparent;
   --mdq-page-glow-warm: transparent;
-  background: #e1e2e7;
+  background: #ffffff;
 }
 
-html[data-palette="tokyo-night"][data-theme="light"] .slide-surface {
-  background: linear-gradient(180deg, #ececef 0%, #e1e2e7 100%);
+html[data-palette="tomorrow"][data-theme="light"] .slide-surface {
+  background: var(--mdq-slide-bg);
 }
 
-html[data-palette="tokyo-night"][data-theme="light"] .slide-surface .quiz-html strong {
-  color: #1f356a;
+html[data-palette="tomorrow"][data-theme="light"] .slide-surface .quiz-html strong {
+  color: #4d4d4c;
 }
 
-/* tokyo-night link on the white join QR panel (theme.css). */
-html[data-palette="tokyo-night"][data-theme="dark"] .instructor-qr-panel,
-html[data-palette="tokyo-night"][data-theme="light"] .instructor-qr-panel {
-  --mdq-qr-link: #186fe6;
+/* Tomorrow link on the white join QR panel (theme.css). */
+html[data-palette="tomorrow"][data-theme="dark"] .instructor-qr-panel,
+html[data-palette="tomorrow"][data-theme="light"] .instructor-qr-panel {
+  --mdq-qr-link: #38649e;
 }
 
 /* The dark selection-mode card and chips carry classic purple and green in
    their base rules; the light theme already reads the tokens. */
-html[data-palette="tokyo-night"]:not([data-theme="light"]) .selection-mode-card-single {
-  border-color: rgba(122, 162, 247, 0.34);
-  background: linear-gradient(135deg, #292e42, #16161e);
+html[data-palette="tomorrow"]:not([data-theme="light"]) .selection-mode-card-single {
+  border-color: rgba(129, 162, 190, 0.34);
+  background: linear-gradient(135deg, #282a2e, #1d1f21);
 }
-html[data-palette="tokyo-night"]:not([data-theme="light"]) .selection-mode-card-single::after {
-  background: rgba(122, 162, 247, 0.22);
+html[data-palette="tomorrow"]:not([data-theme="light"]) .selection-mode-card-single::after {
+  background: rgba(129, 162, 190, 0.22);
 }
-html[data-palette="tokyo-night"]:not([data-theme="light"]) .selection-mode-card-multi {
-  border-color: rgba(187, 154, 247, 0.32);
-  background: linear-gradient(135deg, #292e42, #16161e);
+html[data-palette="tomorrow"]:not([data-theme="light"]) .selection-mode-card-multi {
+  border-color: rgba(178, 148, 187, 0.32);
+  background: linear-gradient(135deg, #282a2e, #1d1f21);
 }
-html[data-palette="tokyo-night"]:not([data-theme="light"]) .selection-mode-card-multi::after {
-  background: rgba(187, 154, 247, 0.2);
+html[data-palette="tomorrow"]:not([data-theme="light"]) .selection-mode-card-multi::after {
+  background: rgba(178, 148, 187, 0.2);
 }
-html[data-palette="tokyo-night"]:not([data-theme="light"]) .selection-mode-label {
-  color: #d6ddf9;
+html[data-palette="tomorrow"]:not([data-theme="light"]) .selection-mode-label {
+  color: #ffffff;
 }
-html[data-palette="tokyo-night"]:not([data-theme="light"]) .selection-mode-text {
-  color: #a9b1d6;
+html[data-palette="tomorrow"]:not([data-theme="light"]) .selection-mode-text {
+  color: #b0b2b0;
 }
-html[data-palette="tokyo-night"]:not([data-theme="light"]) .selection-mode-chip-single {
-  color: #7aa2f7;
-  border-color: rgba(122, 162, 247, 0.4);
-  background: #16161e;
+html[data-palette="tomorrow"]:not([data-theme="light"]) .selection-mode-chip-single {
+  color: #81a2be;
+  border-color: rgba(129, 162, 190, 0.4);
+  background: #1d1f21;
 }
-html[data-palette="tokyo-night"]:not([data-theme="light"]) .selection-mode-chip-multi {
-  color: #bb9af7;
-  border-color: rgba(187, 154, 247, 0.4);
-  background: #16161e;
+html[data-palette="tomorrow"]:not([data-theme="light"]) .selection-mode-chip-multi {
+  color: #b294bb;
+  border-color: rgba(178, 148, 187, 0.4);
+  background: #1d1f21;
 }
 
-html[data-palette="tokyo-night"]:not([data-theme="light"]) .leaderboard-row.rank-first {
-  --leaderboard-rank-color: #e0af68;
+html[data-palette="tomorrow"]:not([data-theme="light"]) .leaderboard-row.rank-first {
+  --leaderboard-rank-color: #f0c674;
 }
-html[data-palette="tokyo-night"]:not([data-theme="light"]) .leaderboard-row.rank-second {
-  --leaderboard-rank-color: #a9b1d6;
+html[data-palette="tomorrow"]:not([data-theme="light"]) .leaderboard-row.rank-second {
+  --leaderboard-rank-color: #b0b2b0;
 }
-html[data-palette="tokyo-night"]:not([data-theme="light"]) .leaderboard-row.rank-third {
-  --leaderboard-rank-color: #ff9e64;
+html[data-palette="tomorrow"]:not([data-theme="light"]) .leaderboard-row.rank-third {
+  --leaderboard-rank-color: #e4a77c;
 }
 
 /* Below the podium the row keeps a neutral tint, so fourth place does not
    pick up the accent that third place uses. */
-html[data-palette="tokyo-night"]:not([data-theme="light"]) .leaderboard-row.rank-standard {
-  --leaderboard-rank-color: #a9b1d6;
+html[data-palette="tomorrow"]:not([data-theme="light"]) .leaderboard-row.rank-standard {
+  --leaderboard-rank-color: #b0b2b0;
 }
 
-/* The viewer's own row adds an accent wash; third place keeps the palette
-   colour there instead of the classic orange. */
-html[data-palette="tokyo-night"]:not([data-theme="light"]) .leaderboard-row.leaderboard-row-highlight.rank-third {
-  --leaderboard-rank-color: #ff9e64;
+/* The viewer's third-place rank keeps the palette colour. */
+html[data-palette="tomorrow"]:not([data-theme="light"]) .leaderboard-row.leaderboard-row-highlight.rank-third {
+  --leaderboard-rank-color: #e4a77c;
 }
 
-html[data-palette="tokyo-night"][data-theme="light"] .leaderboard-row.rank-standard {
+html[data-palette="tomorrow"][data-theme="light"] .leaderboard-row.rank-standard {
   --leaderboard-rank-color: var(--mdq-muted);
 }
 
-/* The viewer's own row adds an accent wash, so a dark theme lightens the
-   third-place orange to hold 4.5:1 on it. */
+/* Retain classic's lighter third-place orange on the accent-tinted own row. */
 html:not([data-theme="light"]) .leaderboard-row.leaderboard-row-highlight.rank-third {
   --leaderboard-rank-color: #ffa552;
 }
 
-/* The classic dark rank colour below the podium is the soft eyebrow grey, which
-   falls under 4.5:1 on the purple wash of the viewer's own row, so that row
-   uses the muted ink. Every dark palette sets its own colour for this row in a
-   more specific rule. */
+/* The classic viewer's rank below the podium uses muted ink. Each dark
+   palette keeps its own rank colour through a more specific rule. */
 html:not([data-theme="light"]) .leaderboard-row-highlight.rank-standard {
   --leaderboard-rank-color: var(--mdq-muted);
 }
@@ -2599,13 +2876,29 @@ html[data-theme="light"] .image-expansion-close:focus-visible {
 .slide-nav-button.slide-action-button-with-detail {
   /* Prev and Next both carry a title, so each may give ground to the other
      and to the controls on the right instead of running under them. */
-  flex: 0 1 auto;
-  min-width: min(20rem, 28cqi);
-  max-width: min(30rem, 34cqi);
+  flex: 1 1 0;
+  min-width: 0;
+  max-width: 30rem;
   align-items: flex-start;
   flex-direction: column;
   padding: 0.58rem 0.82rem;
   text-align: left;
+}
+
+.slide-nav-button .slide-button-detail {
+  /* At most two lines, cut between lines (so between words) rather than by a
+     clamp ellipsis that can land inside a word; shortTitle adds the ellipsis. */
+  display: block;
+  max-height: calc(2 * 1.25em);
+  line-height: 1.25;
+  overflow: hidden;
+  /* No ellipsis inside a word: a word wider than a narrow button breaks onto
+     the next line instead of being cut. */
+  text-overflow: clip;
+  white-space: normal;
+  word-break: normal;
+  overflow-wrap: break-word;
+  hyphens: none;
 }
 
 .slide-action-button:hover:not(:disabled) {
@@ -2682,7 +2975,7 @@ html[data-theme="light"] .slide-action-button-warning:disabled {
   background: color-mix(in srgb, var(--mdq-slide-ink) 7%, transparent);
   color: var(--mdq-slide-ink-soft);
   padding: 0.34rem 0.56rem;
-  font-size: 0.64rem;
+  font-size: 0.875rem;
   font-weight: 700;
   letter-spacing: 0.1em;
   line-height: 1;
@@ -3444,6 +3737,46 @@ html[data-theme="light"] .slide-action-button-warning:disabled {
   grid-column: 1 / -1;
 }
 
+/* Questions keep images compact above the answer controls. Reuse the deck's
+   image spacing/corners and native canvas; no new colour or decorative slab. */
+.question-media {
+  width: 100%;
+  max-width: var(--mdq-content-width, 80rem);
+  margin: 0 auto 1rem;
+}
+
+.question-media .slide-media-grid {
+  width: 100%;
+  height: auto;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr));
+  grid-auto-rows: auto;
+  /* Content-slide grids reserve two rows. Question images use only the rows
+     they actually fill, so two side-by-side images leave no empty band. */
+  grid-template-rows: none;
+}
+
+.question-media .slide-media-figure:first-child {
+  grid-column: auto;
+}
+
+.question-media .slide-media-expand-button {
+  height: auto;
+  /* A question's image is a compact intrinsic-height item, not the 16:9
+     content-slide canvas. Otherwise a wide tablet creates an empty tall
+     band above the bitmap and pushes it below the answer controls. */
+  aspect-ratio: auto;
+}
+
+.question-media .slide-media-grid .slide-media-figure img {
+  width: auto;
+  height: auto;
+  max-height: 22dvh;
+}
+
+.question-media .slide-media-grid .slide-media-figure:first-child {
+  grid-column: auto;
+}
+
 .slide-media-figure {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
@@ -4055,13 +4388,17 @@ html[data-theme="light"] .mdq-orbit-callout {
   margin-top: auto;
   color: var(--mdq-slide-ink-soft);
   font-size: var(--mdq-small-size, calc(clamp(0.62rem, 0.78cqi, 0.82rem) * var(--mdq-small-scale, 1)));
-  line-height: 1.28;
+  /* Long reference lists wrap. Leave the link underlines room between lines,
+     and balance the lines so a wrapped list does not end in a short orphan. */
+  line-height: 1.5;
   text-align: right;
+  text-wrap: balance;
 }
 
+/* Separate references sit further apart than the wrapped lines of one. */
 .slide-references ol {
   display: grid;
-  gap: 0.18rem;
+  gap: 0.4em;
   margin: 0;
   padding: 0;
   list-style: none;
@@ -4076,6 +4413,7 @@ html[data-theme="light"] .mdq-orbit-callout {
   color: inherit;
   text-decoration: underline;
   text-decoration-color: color-mix(in srgb, var(--mdq-slide-ink-soft) 44%, transparent);
+  text-decoration-thickness: max(1px, 0.06em);
   text-underline-offset: 0.18em;
 }
 
@@ -4581,6 +4919,9 @@ html[data-theme="light"] .quiz-html a {
   justify-content: center;
   gap: clamp(1rem, 2cqi, 1.8rem);
   text-align: center;
+  /* Shrinking this flex item hides its real height from the density fitter
+     and lets the timer/options paint over the toolbar and join card. */
+  flex-shrink: 0;
 }
 
 .quiz-surface-content-fit {
@@ -4681,19 +5022,19 @@ html[data-theme="light"] .quiz-html a {
   padding-block: 0.26rem;
 }
 
-.quiz-surface-content-fit > :first-child:not(.quiz-html) {
+.quiz-surface-content-fit > :first-child:not(.quiz-html, .presenter-question-content, .presenter-question-mode) {
   transition:
     transform 140ms ease,
     margin 140ms ease;
 }
 
-.quiz-surface-content-fit[data-fit-density="compact"] > :first-child:not(.quiz-html) {
+.quiz-surface-content-fit[data-fit-density="compact"] > :first-child:not(.quiz-html, .presenter-question-content, .presenter-question-mode) {
   margin-block: -0.2rem;
   transform: scale(0.94);
 }
 
-.quiz-surface-content-fit[data-fit-density="tight"] > :first-child:not(.quiz-html),
-.quiz-surface-content-fit[data-fit-density="scaled"] > :first-child:not(.quiz-html) {
+.quiz-surface-content-fit[data-fit-density="tight"] > :first-child:not(.quiz-html, .presenter-question-content, .presenter-question-mode),
+.quiz-surface-content-fit[data-fit-density="scaled"] > :first-child:not(.quiz-html, .presenter-question-content, .presenter-question-mode) {
   margin-block: -0.45rem;
   transform: scale(0.84);
 }
@@ -4787,7 +5128,7 @@ html[data-theme="light"] .quiz-html a {
   .slide-action-button,
   .slide-fullscreen-button {
     padding: 0.58rem 0.62rem;
-    font-size: 0.66rem;
+    font-size: 0.875rem;
   }
 
   .slide-next-up {
@@ -4969,7 +5310,7 @@ html[data-theme="light"] .quiz-html a {
 
   .slide-surface-student .slide-counter {
     margin-top: 0.15rem;
-    font-size: 0.64rem;
+    font-size: 0.875rem;
   }
 }
 
@@ -5128,7 +5469,7 @@ html[data-theme="light"] .quiz-html a {
   .slide-references {
     margin-top: 0.12rem;
     font-size: var(--mdq-small-size, calc(0.62rem * var(--mdq-small-scale, 1)));
-    line-height: 1.16;
+    line-height: 1.45;
   }
 
   .slide-notes {
@@ -5501,7 +5842,6 @@ body.image-expansion-lock {
 }
 
 .image-expansion-overlay {
-  --image-expansion-max-height: calc(100dvh - clamp(7rem, 14dvh, 10rem));
   position: fixed;
   inset: 0;
   z-index: 10000;
@@ -5525,8 +5865,11 @@ body.image-expansion-lock {
 .image-expansion-frame {
   position: relative;
   display: flex;
-  width: min(96vw, 118rem);
-  max-height: calc(100dvh - 2rem);
+  width: max-content;
+  max-width: 100%;
+  min-width: 4.25rem;
+  max-height: 100%;
+  flex: 0 0 auto;
   flex-direction: column;
   align-items: center;
   justify-content: center;
@@ -5545,8 +5888,10 @@ body.image-expansion-lock {
 
 .image-expansion-media {
   display: flex;
-  width: 100%;
+  width: max-content;
+  max-width: 100%;
   min-height: 0;
+  flex: 0 0 auto;
   align-items: center;
   justify-content: center;
 }
@@ -5556,7 +5901,6 @@ body.image-expansion-lock {
   width: auto;
   max-width: 100%;
   height: auto;
-  max-height: var(--image-expansion-max-height);
   object-fit: contain;
   border-radius: calc(var(--mdq-panel-radius) - 0.2rem);
   background: rgba(12, 12, 12, 0.44);
@@ -5564,7 +5908,14 @@ body.image-expansion-lock {
 }
 
 .image-expansion-caption {
-  max-width: min(92vw, 78rem);
+  /* Captions wrap within the image-sized frame instead of widening it. Long
+     captions scroll independently so the full image remains in the viewport. */
+  width: 0;
+  min-width: 100%;
+  max-height: min(24dvh, 8rem);
+  flex: 0 0 auto;
+  overflow-y: auto;
+  overflow-wrap: anywhere;
   color: var(--mdq-media-caption-ink);
   font-size: clamp(0.72rem, 1vw, 0.94rem);
   font-weight: 650;
@@ -5578,8 +5929,8 @@ body.image-expansion-lock {
   top: clamp(0.52rem, 1.2vw, 0.86rem);
   right: clamp(0.52rem, 1.2vw, 0.86rem);
   display: inline-grid;
-  width: 2.4rem;
-  height: 2.4rem;
+  width: 2.75rem;
+  height: 2.75rem;
   place-items: center;
   border: 1px solid rgba(238, 238, 235, 0.18);
   border-radius: 999px;
@@ -5632,7 +5983,6 @@ body.image-expansion-lock {
 
 @media (max-width: 640px) {
   .image-expansion-overlay {
-    --image-expansion-max-height: calc(100dvh - 8.25rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
     align-items: center;
     padding:
       calc(0.75rem + env(safe-area-inset-top, 0px))
@@ -5641,25 +5991,10 @@ body.image-expansion-lock {
   }
 
   .image-expansion-frame {
-    width: 100%;
-    max-height: calc(100dvh - 1.5rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
+    max-height: 100%;
     justify-content: flex-start;
     gap: 0.6rem;
     padding: 0.75rem;
-  }
-
-  .image-expansion-media {
-    flex: 1 1 auto;
-    min-height: min(46dvh, 18rem);
-  }
-
-  .image-expansion-image {
-    max-height: min(var(--image-expansion-max-height), 62dvh);
-  }
-
-  .image-expansion-caption {
-    width: 100%;
-    max-width: 100%;
   }
 }
 
@@ -5760,9 +6095,9 @@ body.image-expansion-lock {
 }
 
 /* ── Leaderboard surface ─────────────────── */
-@keyframes slide-in {
-  from { opacity: 0; transform: translateY(16px); }
-  to { opacity: 1; transform: translateY(0); }
+@keyframes leaderboard-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
 .leaderboard-board {
@@ -5772,27 +6107,31 @@ body.image-expansion-lock {
 
 .leaderboard-list {
   display: grid;
-  gap: 0.55rem;
   padding: 0;
   margin: 0;
   list-style: none;
+  overflow: hidden;
+  border: 1px solid var(--mdq-line);
+  border-radius: var(--mdq-panel-radius);
+  background: var(--mdq-paper);
+  animation: leaderboard-fade 160ms ease-out both;
 }
 
+/* One solid paper ground keeps the palette inks readable independently of
+   the slide behind it. Shared rules separate rows without rank washes. */
 .leaderboard-row {
   display: grid;
   grid-template-columns: minmax(3.8rem, auto) minmax(0, 1fr) auto;
   align-items: center;
   gap: clamp(0.75rem, 1.5vw, 1.1rem);
-  min-height: 4.25rem;
-  border: 1px solid var(--mdq-slide-glass-line);
-  border-radius: var(--mdq-panel-radius);
-  background:
-    linear-gradient(90deg, color-mix(in srgb, var(--leaderboard-rank-color, var(--mdq-slide-accent)) var(--leaderboard-wash, 16%), transparent), transparent 34%),
-    var(--mdq-slide-glass);
-  padding: clamp(0.72rem, 1.2vw, 0.95rem) clamp(0.82rem, 1.8vw, 1.25rem);
-  color: var(--mdq-slide-ink);
-  animation: slide-in 0.3s ease-out both;
-  backdrop-filter: blur(18px);
+  min-height: 3.5rem;
+  background: var(--mdq-paper);
+  padding: 0.5rem clamp(0.82rem, 1.8vw, 1.25rem);
+  color: var(--mdq-ink);
+}
+
+.leaderboard-row + .leaderboard-row {
+  border-top: 1px solid var(--mdq-line);
 }
 
 .leaderboard-row.rank-first {
@@ -5808,17 +6147,16 @@ body.image-expansion-lock {
 }
 
 .leaderboard-row-highlight {
-  border-color: color-mix(in srgb, var(--mdq-slide-accent) 44%, var(--mdq-slide-glass-line));
-  background:
-    linear-gradient(90deg, color-mix(in srgb, var(--mdq-slide-accent) var(--leaderboard-highlight-wash, 24%), transparent), transparent 42%),
-    var(--mdq-slide-glass-strong);
+  /* Six percent identifies the viewer without weakening small-text contrast. */
+  background: color-mix(in srgb, var(--mdq-accent) 6%, var(--mdq-paper));
 }
 
 .leaderboard-rank {
   min-width: 3.15rem;
   color: var(--leaderboard-rank-color, var(--mdq-slide-eyebrow));
   font-size: clamp(0.92rem, 1.5vw, 1.15rem);
-  font-weight: 900;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
   letter-spacing: 0.02em;
   text-align: center;
 }
@@ -5830,11 +6168,26 @@ body.image-expansion-lock {
   text-align: left;
 }
 
+.leaderboard-name-line {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+.leaderboard-you {
+  flex: none;
+  color: var(--mdq-accent-ink);
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
 .leaderboard-name {
+  min-width: 0;
   overflow: hidden;
-  color: var(--mdq-slide-heading);
+  color: var(--mdq-ink);
   font-size: clamp(1rem, 1.55vw, 1.28rem);
-  font-weight: 760;
+  font-weight: 600;
   line-height: 1.12;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -5844,8 +6197,8 @@ body.image-expansion-lock {
 .leaderboard-score small,
 .leaderboard-overflow,
 .leaderboard-empty {
-  color: var(--mdq-slide-ink-soft);
-  font-size: clamp(0.72rem, 1vw, 0.86rem);
+  color: var(--mdq-muted);
+  font-size: clamp(0.875rem, 1vw, 0.9rem);
   font-weight: 700;
 }
 
@@ -5853,9 +6206,9 @@ body.image-expansion-lock {
   display: grid;
   justify-items: end;
   gap: 0.1rem;
-  color: var(--mdq-slide-heading);
+  color: var(--mdq-ink);
   font-size: clamp(1rem, 1.45vw, 1.18rem);
-  font-weight: 860;
+  font-weight: 600;
   line-height: 1.1;
   text-align: right;
   white-space: nowrap;
@@ -5873,9 +6226,9 @@ body.image-expansion-lock {
 
 .leaderboard-empty {
   margin: 0;
-  border: 1px solid var(--mdq-slide-glass-line);
+  border: 1px solid var(--mdq-line);
   border-radius: var(--mdq-panel-radius);
-  background: var(--mdq-slide-glass);
+  background: var(--mdq-paper);
   padding: 1rem;
   text-align: center;
 }
@@ -6440,10 +6793,9 @@ html[data-theme="light"] .slide-video-figure .slide-video-action:not(button) {
   min-height: 100%;
 }
 
-/* Tablet instructor views have enough width to keep projector composition,
-   but not enough height once notes are docked. Put the compact join control
-   into normal flow before slide content and make the preview itself scroll,
-   so it never floats over evidence or disappears behind the notes panel. */
+/* Short instructor previews scroll inside their allocated surface, above
+   the private notes. The join card stays in its own bottom corner on tablets;
+   it must not introduce a stray row between the toolbar and slide title. */
 @media (max-width: 1180px) {
   .slide-live-shell-controls:has(.presenter-notes-panel)
     .slide-live-main
@@ -6453,12 +6805,25 @@ html[data-theme="light"] .slide-video-figure .slide-video-action:not(button) {
     overscroll-behavior: contain;
   }
 
+}
+
+@media (max-width: 760px) {
   .slide-live-shell-controls:has(.presenter-notes-panel) .slide-join-panel {
     position: static;
     align-self: flex-end;
     width: max-content;
     max-width: 100%;
     margin: 0;
+  }
+}
+
+@media (min-width: 761px) and (max-width: 1180px) {
+  .slide-live-shell-controls:has(.presenter-notes-panel) .slide-safe {
+    padding-bottom: max(2.8rem, calc(var(--slide-join-clear, 0px) + 0.6rem));
+  }
+
+  .slide-live-shell-controls:has(.presenter-notes-panel) .slide-join-panel {
+    bottom: 0.6rem;
   }
 }
 
@@ -6595,7 +6960,7 @@ html[data-theme="light"] .slide-video-figure .slide-video-action:not(button) {
   width: 100%;
 }
 
-@media (max-width: 760px), (max-height: 820px) {
+@media (max-width: 760px), (max-height: 700px) {
   .instructor-phase-shell {
     justify-content: flex-start;
     gap: clamp(0.8rem, 2dvh, 1.25rem);
@@ -6645,29 +7010,29 @@ html[data-theme="light"] .slide-video-figure .slide-video-action:not(button) {
 
   .instructor-qr-code-label {
     margin-bottom: 0.1rem;
-    font-size: 0.64rem;
+    font-size: 0.875rem;
     letter-spacing: 0.16em;
   }
 
   .instructor-qr-code {
-    font-size: clamp(1.8rem, 4.8dvh, 2.4rem);
+    font-size: clamp(2.4rem, 9vw, 3rem);
     line-height: 1;
     letter-spacing: 0.14em;
   }
 
   .instructor-qr-url {
-    font-size: clamp(0.78rem, 1.9dvh, 1rem);
+    font-size: 1rem;
     line-height: 1.2;
   }
 
   .instructor-qr-helper {
-    font-size: 0.66rem;
+    font-size: 0.875rem;
   }
 
   .instructor-qr-presentation-link {
     margin-top: 0.35rem;
     padding: 0.4rem 0.72rem;
-    font-size: 0.62rem;
+    font-size: 0.875rem;
     letter-spacing: 0.12em;
   }
 
@@ -6844,15 +7209,6 @@ html[data-theme="light"] .slide-video-figure .slide-video-action:not(button) {
     max-width: min(46rem, 62vw);
   }
 
-  /* The next item's title gives way to the controls; it is cut with an ellipsis.
-     Neither button keeps more than half of the column for itself, so two long
-     titles share it between them instead of the second one running under the
-     controls on the right. Where there is room, each keeps its usual width. */
-  .slide-nav-button.slide-action-button-with-detail {
-    min-width: min(11rem, 22cqi, calc(50% - 0.225rem));
-    max-width: 100%;
-  }
-
   .slide-toolbar-stack {
     grid-column: 1 / -1;
     grid-row: 2;
@@ -6918,15 +7274,40 @@ html[data-theme="light"] .slide-video-figure .slide-video-action:not(button) {
   align-items: center;
 }
 
-/* The open join card is wide enough for the join address to wrap to two lines, and the QR is a little
-   larger than it was. On a phone the card is a row (QR beside the text) and keeps its own layout. */
-@media (min-width: 761px) {
-  .slide-safe {
-    --slide-expanded-join-width: clamp(11.5rem, 16cqi, 16rem);
+/* Fit the open card to its unbroken join address, with a fixed scannable QR.
+   Only a viewport-constrained card wraps the address. LiveSurface measures its
+   real width for the adjacent content reserve; it does not determine the width. */
+@media (max-width: 760px) {
+  .slide-join-panel.session-code-card-expanded {
+    width: max-content;
+    max-width: 100%;
+    grid-template-columns: minmax(0, 1fr);
   }
 
+  .slide-join-panel.session-code-card-expanded .session-code-card-qr-button {
+    width: 4.8rem;
+    justify-self: center;
+  }
+
+  .quiz-surface .slide-join-panel.session-code-card-expanded {
+    grid-template-columns: minmax(0, 1fr) 4.4rem;
+  }
+
+  .quiz-surface .slide-join-panel.session-code-card-expanded .session-code-card-qr-button {
+    grid-column: 2;
+    grid-row: 1;
+    width: 4.4rem;
+  }
+
+  .quiz-surface .slide-join-panel.session-code-card-expanded .session-code-card-qr {
+    grid-column: auto;
+    grid-row: auto;
+  }
+}
+
+@media (min-width: 761px) {
   .slide-safe:has(.slide-join-panel.session-code-card-expanded) {
-    --slide-join-reserve: var(--slide-expanded-join-width);
+    --slide-join-reserve: var(--slide-expanded-join-width, 0px);
   }
 
   /* Video/still compositions keep their nested grids full-width. Reserve
@@ -6937,12 +7318,13 @@ html[data-theme="light"] .slide-video-figure .slide-video-action:not(button) {
 
   .slide-join-panel.session-code-card-expanded,
   .slide-live-shell-controls:has(.presenter-notes-panel) .slide-join-panel.session-code-card-expanded {
-    width: var(--slide-expanded-join-width);
-    max-width: 100%;
+    width: max-content;
+    max-width: calc(100% - 2 * clamp(1.2rem, 3.2cqi, 3.5rem));
   }
 
   .slide-join-panel.session-code-card-expanded .session-code-card-qr {
-    width: min(100%, 9rem);
+    width: 9rem;
+    max-width: 100%;
     justify-self: center;
   }
 }
@@ -6977,7 +7359,7 @@ html[data-theme="light"] .slide-video-figure .slide-video-action:not(button) {
     grid-template-columns: minmax(0, 1fr) auto 5.25rem;
     align-items: center;
     column-gap: 0.75rem;
-    width: min(26rem, 100%);
+    width: max-content;
   }
 
   .quiz-surface .slide-join-panel.session-code-card-expanded .session-code-card-toggle {
@@ -7569,7 +7951,7 @@ dialog.participants-overlay::backdrop {
 /* ── Reduced motion ───────────────────────
    People who ask their device for less motion get none of the movement here:
    the loading spinner fades instead of turning, the last-seconds timer pulse
-   and the leaderboard slide-in stop, the resumed label leaves without fading,
+   and the leaderboard list fade stop, the resumed label leaves without fading,
    and bars and buttons change at once. */
 @keyframes reduced-motion-fade {
   0%, 100% { opacity: 1; }
@@ -7582,7 +7964,7 @@ dialog.participants-overlay::backdrop {
   }
 
   .timer-urgent,
-  .leaderboard-row {
+  .leaderboard-list {
     animation: none;
   }
 
@@ -7659,16 +8041,12 @@ dialog.participants-overlay::backdrop {
 /* Wide screens keep the status label in the middle column. It keeps room
    there by taking it from the two titles, not from the controls. */
 @media (min-width: 1300px) {
-  .slide-toolbar {
-    grid-template-columns: minmax(0, max-content) minmax(0, 1fr) auto;
+  .slide-toolbar:has(.slide-toolbar-nav) {
+    grid-template-columns: minmax(0, 1fr) minmax(0, max-content) auto;
   }
 
-  .slide-toolbar:has(.slide-status-pill) {
-    grid-template-columns: minmax(0, max-content) minmax(11rem, 1fr) auto;
-  }
-
-  .slide-nav-button.slide-action-button-with-detail {
-    min-width: min(11rem, 22cqi);
+  .slide-toolbar:has(.slide-toolbar-nav):has(.slide-status-pill) {
+    grid-template-columns: minmax(0, 1fr) minmax(11rem, max-content) auto;
   }
 }
 
@@ -7705,8 +8083,7 @@ html:root[data-palette="rose-pine"][data-theme="light"]:has(.slide-surface:not(.
 html:root[data-palette="ayu"][data-theme="light"]:has(.slide-surface:not(.slide-surface-student)),
 html:root[data-palette="catppuccin"][data-theme="light"]:has(.slide-surface:not(.slide-surface-student)),
 html:root[data-palette="catppuccin"]:not([data-theme="light"]):has(.slide-surface:not(.slide-surface-student)),
-html:root[data-palette="seoul256"]:not([data-theme="light"]):has(.slide-surface:not(.slide-surface-student)),
-html:root[data-palette="tokyo-night"]:not([data-theme="light"]):has(.slide-surface:not(.slide-surface-student)) {
+html:root[data-palette="seoul256"]:not([data-theme="light"]):has(.slide-surface:not(.slide-surface-student)) {
   background: var(--mdq-slide-bg-soft);
 }
 
@@ -7956,14 +8333,48 @@ html:root[data-theme] .student-screen[data-deck-background="true"] .dist-row-she
 .slide-cover-block .slide-cover-meta :is(p, li) + :is(p, li) { margin-top: 0.3em; }
 .slide-cover-block .slide-cover-meta li::before { display: none; }
 .slide-cover-block .slide-cover-meta li::marker { content: ""; }
+/* Cover images below the title: one row whose height is a real share of the
+   slide and scales with --cover-fit, so the fit loop shrinks text and images
+   together and the title always stays on the slide. Each card fits its own
+   image, keeps its aspect ratio, never enlarges a small image, and shares the
+   row's width with its neighbours; a caption sits under its image. */
 .slide-cover-media {
+  --cover-media-height: calc(clamp(7rem, 40dvh, 34rem) * var(--cover-fit));
   display: flex;
   justify-content: center;
-  gap: 1em;
-  margin-top: 1em;
+  align-items: center;
+  gap: calc(clamp(0.75rem, 2.4cqi, 2.5rem) * var(--cover-fit));
+  margin-top: calc(1.6rem * var(--cover-fit));
 }
-.slide-cover-media .slide-media-figure { flex: 0 1 20%; min-width: 0; }
-.slide-cover-media img { max-height: 12dvh; object-fit: contain; }
+/* Four or more images wrap, three to a row, rather than squeezing into one. */
+.slide-cover-media:has(> :nth-child(4)) { flex-wrap: wrap; }
+.slide-cover-media .slide-media-figure {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: min(100%, var(--mdq-image-width, 100%));
+  padding: calc(clamp(0.42rem, 0.7cqi, 0.72rem) * var(--cover-fit));
+}
+.slide-cover-media:has(> :nth-child(4)) .slide-media-figure { flex: 0 1 30%; }
+/* Fill the card's image row so a theme's fixed-height card can limit its image
+   with max-height: 100%; an auto-height button leaves that percentage unresolved
+   and the image overflows the card. Plain covers are unchanged: an auto-height
+   card's row sizes to its content. */
+.slide-cover-media .slide-media-expand-button {
+  width: auto;
+  height: 100%;
+  max-width: 100%;
+  aspect-ratio: auto;
+}
+.slide-cover-media img {
+  width: auto;
+  height: auto;
+  max-width: 100%;
+  max-height: var(--cover-media-height);
+  object-fit: contain;
+}
+.slide-cover-media .slide-media-figure:has(figcaption) img {
+  max-height: calc(var(--cover-media-height) - 2.4em);
+}
 .slide-cover-background {
   position: absolute;
   inset: 0;
@@ -7989,4 +8400,171 @@ html:root[data-theme] .student-screen[data-deck-background="true"] .dist-row-she
 @media print {
   .slide-surface:has(.slide-cover-stage) > .slide-safe { height: 100vh; padding: 5%; }
   .slide-cover-stage { break-inside: avoid; }
+}
+
+/* Released-item navigation stays in page flow, away from Submit/the keyboard.
+   Existing deck tokens/radii; 44px targets and rem-based reflow for large text. */
+.participant-study {
+  container: participant-study / inline-size;
+  padding: 0.5rem 0.75rem;
+}
+.participant-study-layout {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-areas: "previous context next" "progress progress progress";
+  align-items: center;
+  gap: 0.25rem 0.5rem;
+}
+.participant-study-button {
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0.25rem 0.625rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  line-height: 1.25rem;
+  color: var(--mdq-ink);
+}
+.participant-study-previous { grid-area: previous; white-space: nowrap; }
+.participant-study-next { grid-area: next; white-space: nowrap; }
+.participant-study-button[aria-disabled="true"] { opacity: 0.4; cursor: default; }
+.participant-study-context { grid-area: context; min-width: 0; text-align: center; font-size: 0.875rem; line-height: 1.25rem; }
+.participant-study-following { margin: 0; }
+.participant-study-back { width: 100%; border-color: var(--mdq-accent); }
+.participant-study-position { display: block; font-size: 0.75rem; font-weight: 400; }
+.participant-study-progress { grid-area: progress; margin: 0; }
+.participant-study-error { grid-column: 1 / -1; }
+.participant-study :is(button, .participant-study-following):focus-visible {
+  outline: 2px solid var(--mdq-accent);
+  outline-offset: 2px;
+}
+@container participant-study (max-width: 17rem) {
+  .participant-study-layout { grid-template-areas: "previous . next" "context context context" "progress progress progress"; }
+}
+@container participant-study (min-width: 42rem) {
+  .participant-study-layout {
+    grid-template-columns: auto minmax(0, 1fr) minmax(0, 1.5fr) auto;
+    grid-template-areas: "previous context progress next";
+  }
+}
+
+/* Setup and private session options use the deck's own controls and palette. */
+.availability-choice { width: 100%; border: 0; margin: 0; padding: 0; text-align: left; }
+.availability-choice legend { font-size: 1rem; font-weight: 600; margin-bottom: .5rem; }
+.availability-option { display: flex; align-items: center; gap: .75rem; min-height: 2.75rem; font-size: 1rem; padding: .4rem 0; cursor: pointer; }
+.availability-option:has(input:disabled) { color: var(--mdq-muted); cursor: default; }
+.availability-option input { flex: 0 0 auto; }
+.availability-day-time { display: grid; grid-template-columns: 1fr 1fr; gap: .75rem; margin: .75rem 0; }
+.availability-field, .availability-day-time label { display: flex; flex-direction: column; gap: .4rem; font-size: 1rem; min-width: 0; }
+.availability-day-time input, .availability-day-time select { width: 100%; min-height: 2.75rem; font-size: 1rem; background: var(--mdq-dialog); color: var(--mdq-ink); border: 1px solid var(--mdq-line-strong); border-radius: .65rem; padding: .6rem; }
+.availability-preview { font-size: .875rem; line-height: 1.5; color: var(--mdq-muted); margin: .5rem 0; }
+.session-options-button { min-height: 2.75rem; padding: .6rem 1rem; border: 1px solid var(--mdq-line-strong); border-radius: .65rem; color: var(--mdq-ink); font-size: 1rem; }
+.availability-actions { display: flex; gap: .75rem; justify-content: flex-end; margin-top: .75rem; }
+.instructor-start-button { min-height: 3rem; }
+@media (max-width: 500px) {
+  .availability-day-time { grid-template-columns: 1fr; }
+  .availability-actions { flex-direction: column; }
+}
+
+.instructor-qr-code-label, .instructor-qr-helper, .instructor-qr-presentation-link { font-size: .875rem; }
+.instructor-qr-url { font-size: max(1rem, 1em); }
+
+/* Console columns use the question stem's existing max-w-5xl (64rem).
+   The mode identifies response/scoring rules; keep its existing status colours
+   and radius, with ordinary tracking and the same left edge as the panels. */
+.slide-live-shell-controls .quiz-surface-content {
+  width: min(100%, var(--container-5xl, 64rem));
+}
+.slide-live-shell-controls .quiz-surface-content > :is(.presenter-question-content, .presenter-question-mode, .open-response-list, [class~="max-w-4xl"]) {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+}
+.presenter-question-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: inherit;
+}
+.presenter-question-content > .quiz-html {
+  width: 100%;
+  max-width: 100%;
+  font-size: var(--quiz-fit-question-size);
+}
+.quiz-surface-content-reveal .presenter-question-content > .quiz-html {
+  font-size: var(--quiz-fit-reveal-question-size);
+}
+.presenter-question-mode {
+  text-align: left;
+}
+.presenter-question-mode .selection-mode-chip {
+  letter-spacing: normal;
+}
+.open-response-inline-count {
+  display: none;
+}
+.slide-live-shell-controls .open-response-title {
+  letter-spacing: 0.06em;
+}
+.slide-live-shell-controls .open-response-inline-count {
+  display: inline;
+  font-variant-numeric: tabular-nums;
+}
+.slide-live-shell-controls .open-response-heading > .open-response-count {
+  display: none;
+}
+
+/* Intrinsic question thumbnails: the bitmap sets the frame width and the
+   caption wraps to it. Leave the content-slide position/group grids intact. */
+.question-media .slide-media-grid .slide-media-figure {
+  width: fit-content;
+  max-width: min(100%, var(--mdq-image-width, 100%));
+  height: auto;
+  justify-self: center;
+  align-self: start;
+  grid-template-rows: auto auto;
+  background: transparent;
+  border: 0;
+  padding: 0;
+  box-shadow: none;
+}
+.question-media .slide-media-grid .slide-media-expand-button {
+  width: fit-content;
+  max-width: 100%;
+  height: auto;
+  aspect-ratio: auto;
+  justify-self: center;
+  background: transparent;
+  box-shadow: none;
+}
+.question-media .slide-media-grid .slide-media-figure img {
+  display: block;
+  width: auto;
+  height: auto;
+  max-width: 100%;
+  max-height: 22dvh;
+}
+.question-media .slide-media-figure figcaption {
+  /* A long caption must not widen the intrinsic image frame. */
+  width: 0;
+  min-width: 100%;
+  overflow-wrap: anywhere;
+  color: var(--mdq-slide-ink-soft);
+}
+.question-media .slide-media-expand-button:is(:hover, :focus-visible) img {
+  box-shadow: none;
+  transform: none;
+}
+/* The hugging frame clips what reaches past it, so the focus ring sits inside the image. */
+.question-media .slide-media-expand-button:focus-visible {
+  outline-offset: -3px;
+}
+
+@media (min-width: 761px) {
+  /* Measured by LiveSurface, including compact/expanded cards and fixed cards
+     in short windows. Reserve a full card plus the existing 1rem gap, at all
+     console widths and on reveal as well as open/closed questions. */
+  /* Not a full-screen live embed: its surface keeps its deliberate zero padding. */
+  .slide-live-shell-controls .slide-surface:not(.slide-surface-live-embed) > .slide-safe:has(> .slide-join-panel) {
+    padding-bottom: max(clamp(2.8rem, 5cqi, 5.5rem), calc(var(--slide-join-clear, 0px) + 1rem));
+  }
 }

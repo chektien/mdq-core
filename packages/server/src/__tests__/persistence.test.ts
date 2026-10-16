@@ -1,3 +1,4 @@
+import { createLegacySession } from "./fixtures/legacy-session";
 import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
@@ -17,7 +18,6 @@ import {
   getSessionSummaryMarkdownPath,
 } from "../persistence";
 import {
-  createSession,
   addParticipant,
   recordSubmission,
   transitionState,
@@ -55,7 +55,7 @@ function makeQuiz(week = "week01", questionCount = 2): Quiz {
 
 /** Setup a session with participants and submissions for testing */
 function setupSessionWithData(): { session: Session; quiz: Quiz } {
-  const session = createSession("week01", "open");
+  const session = createLegacySession("week01", "open");
   const quiz = makeQuiz("week01", 2);
 
   // Add participants
@@ -133,7 +133,7 @@ describe("Persistence", () => {
 
   describe("saveResultsCsv", () => {
     it("resolves default artifact paths to repo-level data/submissions", () => {
-      const session = createSession("week01", "open");
+      const session = createLegacySession("week01", "open");
       const cwdSpy = jest.spyOn(process, "cwd").mockReturnValue(path.resolve(__dirname, "../.."));
 
       try {
@@ -150,7 +150,7 @@ describe("Persistence", () => {
     });
 
     it("writes per-student CSV with one row per studentId", () => {
-      const session = createSession("week01", "open");
+      const session = createLegacySession("week01", "open");
       const quiz = makeQuiz("week01", 2);
 
       const firstJoin = addParticipant(session, "s001", "sock1", "Alice");
@@ -190,7 +190,7 @@ describe("Persistence", () => {
     });
 
     it("persists reveal timestamp and answer timestamp columns", () => {
-      const session = createSession("week01", "open");
+      const session = createLegacySession("week01", "open");
       const quiz = makeQuiz("week01", 1);
 
       addParticipant(session, "s001", "sock1", "Alice");
@@ -238,7 +238,7 @@ describe("Persistence", () => {
     });
 
     it("returns skipped when reveal question index is out of range", () => {
-      const session = createSession("week01", "open");
+      const session = createLegacySession("week01", "open");
       const quiz = makeQuiz("week01", 1);
       session.currentQuestionIndex = 3;
 
@@ -250,7 +250,7 @@ describe("Persistence", () => {
     });
 
     it("leaves correctness blank for open_response questions and excludes them from scoring", () => {
-      const session = createSession("week-open", "open");
+      const session = createLegacySession("week-open", "open");
       const quiz: Quiz = {
         week: "week-open",
         title: "Week Open",
@@ -377,7 +377,7 @@ describe("Persistence", () => {
       saveWeeklyResult(session, quiz, tempDir);
 
       // Add a second week
-      const session2 = createSession("week02", "open");
+      const session2 = createLegacySession("week02", "open");
       const quiz2 = makeQuiz("week02", 1);
       addParticipant(session2, "s001", "sock1", "Alice");
       transitionState(session2, "QUESTION_OPEN");
@@ -477,7 +477,7 @@ describe("Persistence", () => {
     });
 
     it("handles session with no participants", () => {
-      const session = createSession("week01", "open");
+      const session = createLegacySession("week01", "open");
       const quiz = makeQuiz("week01", 1);
       // No participants, no submissions
       expect(() => persistSessionOnEnd(session, quiz, tempDir)).not.toThrow();
@@ -539,7 +539,7 @@ describe("Persistence", () => {
     });
 
     it("excludes poll questions from score summaries and CSV correctness fields", () => {
-      const session = createSession("week01", "open");
+      const session = createLegacySession("week01", "open");
       const quiz: Quiz = {
         week: "week01",
         title: "Week Quiz",
@@ -636,7 +636,7 @@ describe("Ranking and Tie-Breaking", () => {
     });
 
     it("uses deterministic tie-break by studentId when scores and times match", () => {
-      const session = createSession("week01", "open");
+      const session = createLegacySession("week01", "open");
       const quiz = makeQuiz("week01", 1);
 
       // Add participants with alphabetically ordered IDs

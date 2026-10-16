@@ -17,8 +17,7 @@ import {
   parseDeckPalette,
   dashedSettingKey,
   normalizeDeckSettingKeys,
-  DECK_STYLE_KEYS,
-  resolveDeckStyleSetting,
+  readDeckStyleHeader,
   type ParseDiagnostic,
   type DeckStyle,
   type DeckStyleSettings,
@@ -78,8 +77,9 @@ export function parseQuizMarkdown(source: string, sourceFile: string): ParseResu
   const diagnostics: ParseDiagnostic[] = [];
 
   const title = extractDeckTitle(markdown);
-  const theme = extractDeckThemeMetadata(markdown, sourceFile, errors);
-  const palette = extractDeckPaletteMetadata(markdown, sourceFile, errors);
+  const theme = extractDeckDarkMetadata(markdown, sourceFile, errors);
+  const palette = extractDeckSchemeMetadata(markdown, sourceFile, errors);
+  rejectDeckPaletteMetadata(markdown, sourceFile, errors);
   const presenterNotes = extractDeckBooleanMetadata(markdown, "presenter_notes", sourceFile, errors);
   const presenterNotesDefaultOpen = extractDeckBooleanMetadata(
     markdown,
@@ -87,7 +87,11 @@ export function parseQuizMarkdown(source: string, sourceFile: string): ParseResu
     sourceFile,
     errors,
   );
-  const studentId = extractDeckBooleanMetadata(markdown, "student_id", sourceFile, errors);
+  // Read both aliases, including invalid values, so diagnostics stay truthful.
+  // A valid canonical value wins regardless of line order; protocol fields stay unchanged.
+  const participantId = extractDeckBooleanMetadata(markdown, "participant_id", sourceFile, errors);
+  const legacyStudentId = extractDeckBooleanMetadata(markdown, "student_id", sourceFile, errors);
+  const studentId = participantId ?? legacyStudentId;
   const deckStyle = extractDeckStyleMetadata(markdown, diagnostics, sourceFile);
 
   // Extract deck key from filename (e.g., "week01.md" -> "week01", "featured-demo.md" -> "featured-demo")
@@ -200,57 +204,72 @@ function stripOptionalQuotes(value: string): string {
   return trimmed;
 }
 
-function extractDeckThemeMetadata(
+/** The deck header: the lines above the first separator, found by the same rule as splitQuestionBlocks (an indented `---` counts). */
+function deckHeader(markdown: string): string {
+  const lines = markdown.split("\n");
+  const end = lines.findIndex((line) => /^---+\s*$/.test(line.trim()));
+  return end < 0 ? markdown : lines.slice(0, end).join("\n");
+}
+
+function extractDeckDarkMetadata(
   markdown: string,
   sourceFile: string,
   errors: QuizParseError[],
 ): DeckTheme | undefined {
-  const preamble = markdown.split(/^---+\s*$/m, 1)[0] || markdown;
-  const match = preamble.match(/^theme:\s*(.*?)\s*$/im);
+  const preamble = deckHeader(markdown);
+  const match = preamble.match(/^dark:[ \t]*(.*?)[ \t\r]*$/im);
   if (!match) return undefined;
 
   const value = stripOptionalQuotes(match[1]).toLowerCase();
-  if (value === "dark" || value === "light") return value;
+  if (value === "on") return "dark";
+  if (value === "off") return "light";
 
   const lineNumber = preamble.slice(0, match.index).split("\n").length;
-  errors.push(
-    new QuizParseError(
-      sourceFile,
-      -1,
-      `Invalid theme: ${match[1].trim()} (expected dark or light)`,
-      lineNumber,
-    ),
-  );
+  errors.push(new QuizParseError(
+    sourceFile, -1, `Invalid dark: ${match[1].trim()} (expected on or off)`, lineNumber,
+  ));
   return undefined;
 }
 
-function extractDeckPaletteMetadata(
+function extractDeckSchemeMetadata(
   markdown: string,
   sourceFile: string,
   errors: QuizParseError[],
 ): DeckPalette | undefined {
-  const preamble = markdown.split(/^---+\s*$/m, 1)[0] || markdown;
-  const match = preamble.match(/^palette:\s*(.*?)\s*$/im);
+  const preamble = deckHeader(markdown);
+  const match = preamble.match(/^theme:[ \t]*(.*?)[ \t\r]*$/im);
   if (!match) return undefined;
 
-  const palette = parseDeckPalette(stripOptionalQuotes(match[1]));
+  const value = stripOptionalQuotes(match[1]);
+  const palette = parseDeckPalette(value);
   if (palette) return palette;
 
+  const mode = value.toLowerCase();
+  const detail = mode === "dark" || mode === "light"
+    ? `Invalid theme: ${match[1].trim()} (write dark: ${mode === "dark" ? "on" : "off"})`
+    : `Invalid theme: ${match[1].trim()} (expected ${describeDeckPalettes()})`;
   const lineNumber = preamble.slice(0, match.index).split("\n").length;
-  errors.push(
-    new QuizParseError(
-      sourceFile,
-      -1,
-      `Invalid palette: ${match[1].trim()} (expected ${describeDeckPalettes()})`,
-      lineNumber,
-    ),
-  );
+  errors.push(new QuizParseError(sourceFile, -1, detail, lineNumber));
   return undefined;
+}
+
+function rejectDeckPaletteMetadata(
+  markdown: string,
+  sourceFile: string,
+  errors: QuizParseError[],
+): void {
+  const preamble = deckHeader(markdown);
+  for (const match of preamble.matchAll(/^palette:[^\n]*$/gim)) {
+    const lineNumber = preamble.slice(0, match.index).split("\n").length;
+    errors.push(new QuizParseError(
+      sourceFile, -1, "palette: is not a deck setting (write theme: <scheme>)", lineNumber,
+    ));
+  }
 }
 
 function extractDeckBooleanMetadata(
   markdown: string,
-  key: "presenter_notes" | "presenter_notes_default_open" | "student_id",
+  key: "presenter_notes" | "presenter_notes_default_open" | "participant_id" | "student_id",
   sourceFile: string,
   errors: QuizParseError[],
 ): boolean | undefined {
@@ -286,23 +305,12 @@ function extractDeckStyleMetadata(
   diagnostics: ParseDiagnostic[],
   sourceFile: string,
 ): { settings: DeckStyleSettings; style: DeckStyle } | undefined {
-  const preamble = markdown.split(/^---+\s*$/m, 1)[0] || markdown;
-  const settings: DeckStyleSettings = {};
-  const style: DeckStyle = {};
-  for (const key of DECK_STYLE_KEYS) {
-    const match = preamble.match(new RegExp(`^${key.replace(/-/g, "_")}:[ \\t]*(.*?)\\s*$`, "im"));
-    if (!match) continue;
-    const result = resolveDeckStyleSetting(key, match[1]);
-    if (result.ok) {
-      settings[key] = result.value;
-      Object.assign(style, result.style);
-      continue;
-    }
-    const lineNumber = preamble.slice(0, match.index).split("\n").length;
-    diagnostics.push({ severity: "warning", sourceFile, questionIndex: -1, lineNumber, message: result.message });
+  const parsed = readDeckStyleHeader(markdown);
+  for (const warning of parsed.warnings) {
+    diagnostics.push({ severity: "warning", sourceFile, questionIndex: -1, lineNumber: warning.line, message: warning.message });
   }
   diagnostics.sort((a, b) => (a.lineNumber ?? 0) - (b.lineNumber ?? 0));
-  return Object.keys(settings).length > 0 ? { settings, style } : undefined;
+  return Object.keys(parsed.settings).length ? { settings: parsed.settings, style: parsed.style } : undefined;
 }
 
 /**
@@ -330,15 +338,16 @@ function parseQuestionBlock(
   const subtopic = colonIdx >= 0 ? topicRaw.substring(colonIdx + 1).trim() : undefined;
 
   // 2. Extract time_limit (optional, after H2, before question text)
-  let timeLimitSec = DEFAULT_TIME_LIMIT_SEC;
-  const timeLimitMatch = block.match(/^time_limit:\s*(\d+)\s*$/m);
+  let timeLimitSec: number | null = DEFAULT_TIME_LIMIT_SEC;
+  const timeLimitMatch = block.match(/^time_limit:\s*([^\n]*)$/m);
   if (timeLimitMatch) {
-    timeLimitSec = parseInt(timeLimitMatch[1], 10);
-    if (timeLimitSec <= 0) {
+    const value = timeLimitMatch[1].trim().toLowerCase();
+    timeLimitSec = value === "none" ? null : Number(value);
+    if (timeLimitSec !== null && (!/^\d+$/.test(value) || !Number.isSafeInteger(timeLimitSec) || timeLimitSec <= 0)) {
       throw new QuizParseError(
         sourceFile,
         index,
-        `Invalid time-limit: ${timeLimitMatch[1]} (must be positive)`,
+        `Invalid time-limit: ${timeLimitMatch[1]} (must be positive seconds or none)`,
         findLineNumber(lines, blockStartLine, (line) => /^time_limit:\s*/i.test(line)),
       );
     }
@@ -361,6 +370,16 @@ function parseQuestionBlock(
   const isOpenResponse = normalizedQuestionType === "open_response";
   const isCover = normalizedQuestionType === "cover";
   const isSlide = normalizedQuestionType === "slide" || isCover;
+
+  const liveResultsMatch = block.match(/^live_results:[^\S\n]*([^\n]*)$/im);
+  let liveResults = false;
+  if (liveResultsMatch) {
+    const lineNumber = findLineNumber(lines, blockStartLine, (line) => /^live_results:/i.test(line));
+    if (!isPoll) throw new QuizParseError(sourceFile, index, "live-results only applies to polls", lineNumber);
+    const value = liveResultsMatch[1].trim().toLowerCase();
+    if (value !== "on" && value !== "off") throw new QuizParseError(sourceFile, index, "Invalid live-results (must be on or off)", lineNumber);
+    liveResults = value === "on";
+  }
 
   if (isSlide && timeLimitMatch) {
     throw new QuizParseError(
@@ -516,7 +535,8 @@ function parseQuestionBlock(
 
   let textLines = lines.slice(h2LineIdx + 1, contentEndLineIdx);
   // Remove time_limit line from text
-  textLines = textLines.filter((l) => !/^time_limit:\s*\d+/i.test(l.trim()));
+  textLines = textLines.filter((l) => !/^time_limit:/i.test(l.trim()));
+  textLines = textLines.filter((l) => !/^live_results:/i.test(l.trim()));
   textLines = textLines.filter((l) => !/^(?:type|question_type):\s*[a-z_-]+$/i.test(l.trim()));
   textLines = textLines.filter((l) => !/^multi_select:\s*(true|false|yes|no|1|0)$/i.test(l.trim()));
   const liveEmbedExtraction = isSlide
@@ -564,9 +584,19 @@ function parseQuestionBlock(
     ...note,
     id: `note-${idx + 1}`,
   }));
-  const mediaExtraction = isSlide
-    ? extractSlideMedia(textLines)
-    : { contentLines: textLines, media: [] as SlideMedia[] };
+  // Images belong to every item, not just content slides. Scan the question's
+  // whole non-quoted body so an image after its options is not silently lost.
+  // Options and quoted metadata/notes are separate audiences, never media.
+  // Keep fence lines and line positions intact while excluding those regions.
+  const promptMedia = extractSlideMedia(textLines);
+  const mediaExtraction = isSlide ? promptMedia : {
+    contentLines: promptMedia.contentLines,
+    // Lex the original body before excluding option lines. Replacing quoted
+    // lines with blanks destroys Markdown lazy-blockquote audience context.
+    media: extractSlideMedia(lines.slice(h2LineIdx + 1), new Set(
+      optionLines.map(option => option.lineIndex - h2LineIdx - 1),
+    )).media,
+  };
   textLines = mediaExtraction.contentLines;
   const { slideMediaPosition, slideMediaOpacity } = resolveMediaPosition(
     mediaExtraction.media,
@@ -574,7 +604,9 @@ function parseQuestionBlock(
     index,
     blockStartLine,
   );
-  const textMd = textLines.join("\n").trim();
+  // Strip only blank edge lines: trim() would turn initial indented code
+  // into active Markdown (and can reveal a literal image example).
+  const textMd = textLines.join("\n").replace(/^(?:[ \t]*\r?\n)+|(?:\r?\n[ \t]*)+$/g, "");
 
   // 7. Render markdown to HTML
   const textHtml = renderMarkdown(textMd);
@@ -606,6 +638,7 @@ function parseQuestionBlock(
     correctOptions,
     allowsMultiple,
     isPoll,
+    ...(isPoll ? { liveResults } : {}),
     explanation,
     timeLimitSec: isSlide ? 0 : timeLimitSec,
   };
@@ -621,7 +654,7 @@ function findQuestionPromptLineNumber(lines: string[], blockStartLine: number, f
     const trimmed = lines[i].trim();
     if (!trimmed) continue;
     if (/^##\s+/.test(trimmed)) continue;
-    if (/^(time_limit|type|question_type|multi_select):/i.test(trimmed)) continue;
+    if (/^(time_limit|type|question_type|multi_select|live_results):/i.test(trimmed)) continue;
     if (/^>/.test(trimmed)) continue;
     return blockStartLine + i;
   }
@@ -719,7 +752,7 @@ function getFencedCodeLineIndices(lines: string[]): Set<number> {
 
 /** Detect the start of a list item: leading whitespace then `-`, `*`, `+`, or
  * an ordered marker like `1.` or `12.` followed by a space. */
-const LIST_MARKER_REGEX = /^\s*(?:[-*+]|\d+\.)\s+/;
+const LIST_MARKER_REGEX = /^\s*(?:[-*+]|\d+[.)])\s+/;
 
 /** Escape image markdown so marked renders the source literally instead of as
  * an <img> tag. `\![alt\](src)` is a valid CommonMark escape pair that
@@ -926,10 +959,39 @@ function extractSlideBackground(lines: string[]): { contentLines: string[]; back
   };
 }
 
-function extractSlideMedia(lines: string[]): { contentLines: string[]; media: SlideMedia[] } {
+/** Literal block context comes from the same Markdown lexer as rendering,
+ * including indented code and list continuations across blank lines. */
+function literalMediaLines(lines: string[]): Map<number, "code" | "literal"> {
+  // marked expands leading tabs before creating raw block tokens. Use its
+  // normalised text for offset matching; line numbers stay unchanged.
+  const text = lines.join("\n").replace(/\r/g, "")
+    .replace(/^( *)(\t+)/gm, (_match, spaces: string, tabs: string) => spaces + "    ".repeat(tabs.length));
+  const result = new Map<number, "code" | "literal">();
+  let cursor = 0;
+  for (const token of marked.lexer(text)) {
+    if (!token.raw) continue;
+    const from = text.indexOf(token.raw, cursor);
+    if (from < 0) continue;
+    cursor = from + token.raw.length;
+    if (!["code", "list", "blockquote"].includes(token.type)) continue;
+    const first = text.slice(0, from).split("\n").length - 1;
+    const last = text.slice(0, cursor - 1).split("\n").length - 1;
+    for (let line = first; line <= last; line++) {
+      // MDQ historically lifts an unindented image line immediately after a
+      // bullet into item media. Only markers/indented list continuations are
+      // literal list examples; keep the image helper and existing decks working.
+      if (token.type === "list" && !/^(?:\s+\S|\s*(?:[-*+]|\d+[.)])\s+)/.test(lines[line] ?? "")) continue;
+      result.set(line, token.type === "code" ? "code" : "literal");
+    }
+  }
+  return result;
+}
+
+function extractSlideMedia(lines: string[], excludedLines: ReadonlySet<number> = new Set()): { contentLines: string[]; media: SlideMedia[] } {
   const contentLines: string[] = [];
   const media: SlideMedia[] = [];
   const fencedLines = getFencedCodeLineIndices(lines);
+  const literalLines = literalMediaLines(lines);
   let inListItem = false;
   let currentGroup: string | undefined;
 
@@ -937,8 +999,8 @@ function extractSlideMedia(lines: string[]): { contentLines: string[]; media: Sl
     const line = lines[lineIdx];
 
     // Lines inside a fenced code block are literal — pass them through unchanged.
-    if (fencedLines.has(lineIdx)) {
-      contentLines.push(line);
+    if (excludedLines.has(lineIdx) || fencedLines.has(lineIdx) || literalLines.has(lineIdx)) {
+      contentLines.push(!fencedLines.has(lineIdx) && literalLines.get(lineIdx) === "literal" ? escapeImageMarkdownInLine(line) : line);
       continue;
     }
 
@@ -981,6 +1043,9 @@ function extractSlideMedia(lines: string[]): { contentLines: string[]; media: Sl
     while ((match = MARKDOWN_IMAGE_REGEX.exec(line)) !== null) {
       // Skip if the match starts inside an inline code span — that's literal text.
       if (indexInRanges(match.index, codeSpans)) continue;
+      let escapes = 0;
+      for (let index = match.index - 1; index >= 0 && line[index] === "\\"; index--) escapes++;
+      if (escapes % 2 === 1) continue;
 
       const alt = match[1]?.trim() || "Slide image";
       const src = resolveMarkdownImageHref(match[2] || "");

@@ -12,7 +12,7 @@ describe("client light-theme contract", () => {
     const instructor = read("views/InstructorView.tsx");
     const student = read("views/StudentView.tsx");
     const presentation = read("views/PresentationView.tsx");
-    const socket = read("hooks/useSocket.ts");
+    const storage = read("participantSessionStorage.ts");
 
     it("normalizes and applies only supported themes", () => {
       expect(appearance).toContain('theme === "light" || theme === "dark"');
@@ -26,8 +26,8 @@ describe("client light-theme contract", () => {
     });
 
     it("retains the deck theme across student socket reconnection", () => {
-      expect(socket).toContain("sessionTheme?: DeckTheme");
-      expect(socket).toContain("sessionTheme: existing.sessionTheme");
+      expect(storage).toContain("sessionTheme?: DeckTheme");
+      expect(storage).toContain("sessionTheme: existing?.sessionTheme");
     });
   });
 
@@ -54,18 +54,14 @@ describe("client light-theme contract", () => {
     });
   });
 
-  describe("InstructorView end-session dialog markup", () => {
-    const tsx = read("views/InstructorView.tsx");
+  describe("shared end-session dialog markup", () => {
+    const tsx = read("components/EndSessionConfirmation.tsx");
 
     it("carries the semantic class names", () => {
       for (const cls of [
         "end-session-overlay",
         "end-session-card",
-        "end-session-eyebrow",
         "end-session-desc",
-        "end-session-stat",
-        "end-session-stat-value",
-        "end-session-stat-label",
         "end-session-keep",
         "end-session-end",
       ]) {

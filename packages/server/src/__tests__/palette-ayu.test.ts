@@ -74,7 +74,7 @@ describe("Ayu palette", () => {
   });
 
   it("credits the upstream palette and names its adjusted shades", () => {
-    const start = index.indexOf(`deck palette: ${NAME})`);
+    const start = index.indexOf(`deck theme: ${NAME})`);
     const header = index.slice(start, index.indexOf(DARK, start));
     expect(header).toContain("ayu-theme/ayu-colors");
     expect(header).toContain("MIT");
@@ -202,7 +202,7 @@ describe("Ayu palette", () => {
   }
 
   it("has print tokens for both themes that mirror the live palette", () => {
-    const print = printBlock("renderAyuTokens", "renderTokyoNightTokens");
+    const print = printBlock("renderAyuTokens", "renderTomorrowTokens");
     expect(print).not.toContain("TODO");
     expect(print).toContain("--page-bg: #10141c;");
     expect(print).toContain("--page-bg: #fcfcfc;");
