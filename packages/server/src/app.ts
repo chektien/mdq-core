@@ -902,10 +902,21 @@ export function createApp(quizDirOrOpts?: string | AppOptions) {
           // A session ended from the lobby has no results, so it must not replace saved ones.
           const endedUnstarted = action.type === "end" && current.state === "LOBBY";
           const alreadyEnded = current.state === "ENDED";
-          const command: Command = action.type === "restartCountdown" ? { type: "restartCountdown", role: "control" }
+          let command: Command = action.type === "restartCountdown" ? { type: "restartCountdown", role: "control" }
             : action.type === "end" ? { type: "end", discloseResults: req.body?.discloseResults !== false }
             : { type: action.type } as Command;
+          if (action.type === "close") {
+            const { questionIndex, startedAt } = req.body ?? {};
+            if ((questionIndex !== undefined && (!Number.isInteger(questionIndex) || questionIndex < 0))
+              || (startedAt !== undefined && (typeof startedAt !== "number" || !Number.isFinite(startedAt) || startedAt < 0))) {
+              return res.status(400).json({ error: "Send a valid questionIndex and startedAt." });
+            }
+            command = { type: "close", questionIndex, startedAt };
+          }
           const result = apply(current, quiz, command, Date.now());
+          if (action.type === "close" && result.messages.length === 0) {
+            return res.json({ state: current.state, questionIndex: current.currentQuestionIndex });
+          }
           const session = current;
           Object.assign(session, result.session);
           const lockedOnLeaderboard = action.type === "leaderboardHide" && session.state === "LEADERBOARD"

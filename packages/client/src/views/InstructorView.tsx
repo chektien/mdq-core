@@ -1263,7 +1263,7 @@ function LiveView({
       });
       actions.push({
         label: "Close Question",
-        onClick: () => onAction(() => closeQuestion(sessionId), "close"),
+        onClick: () => onAction(() => closeQuestion(sessionId, sock.currentQuestion ? { questionIndex: sock.currentQuestion.questionIndex, startedAt: sock.currentQuestion.startedAt } : undefined), "close"),
         disabled: controlsUnavailable,
         reason: waitingReason,
         tone: "warning",

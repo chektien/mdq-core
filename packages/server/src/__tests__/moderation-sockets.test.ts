@@ -8,7 +8,8 @@ import { Server } from "socket.io";
 import { io as ioClient, Socket as ClientSocket } from "socket.io-client";
 import { Quiz, SocketEvents, AnswerCountPayload, ResultsRevealPayload, StudentJoinedPayload } from "@mdq/shared";
 import { createApp, resultsFileName } from "../app";
-import { clearAllSessions } from "../session";
+import { clearAllSessions, getSession } from "../session";
+import { BLOCKED_LANGUAGE_MESSAGE } from "../text-filter";
 import { setupSocket, emitMessages } from "../socket";
 import { clearInstructorSessionsForTests } from "../instructor-auth";
 
@@ -94,6 +95,26 @@ describe("open response moderation over real sockets", () => {
   const setVisibility = (sessionId: string, questionIndex: number, publicKey: string, hidden: boolean) =>
     request(app).post(`/api/session/${sessionId}/response-visibility`).send({ questionIndex, publicKey, hidden });
   const visibleTexts = (reveal: ResultsRevealPayload) => (reveal.openResponses ?? []).map((r) => r.responseText).sort();
+
+  it("rejects blocked text only to its sender, stores nothing, and accepts a clean retry", async () => {
+    const { sessionId } = (await request(app).post("/api/session").send({ week: "moderation" }).expect(201)).body;
+    const control = connect(sessionId, "instructor");
+    const display = connect(sessionId, "presentation");
+    await until(() => control.socket.connected && display.socket.connected, "staff connect");
+    const { recorder } = await joinAs(sessionId, { studentId: IDS[0], displayName: "Alex Tan" });
+    await post(sessionId, "start");
+    recorder.socket.emit(SocketEvents.ANSWER_SUBMIT, { questionIndex: 0, responseText: "f.u.c.k" });
+    await until(() => recorder.events.some(event => event.event === SocketEvents.ANSWER_REJECTED), "rejection");
+    expect(last<{ reason: string }>(recorder, SocketEvents.ANSWER_REJECTED).reason).toBe(BLOCKED_LANGUAGE_MESSAGE);
+    expect(getSession(sessionId)!.submissions).toEqual([]);
+    expect(JSON.stringify([...control.events, ...display.events])).not.toContain("f.u.c.k");
+    recorder.socket.emit(SocketEvents.ANSWER_SUBMIT, { questionIndex: 0, responseText: "A revised thought." });
+    await until(() => recorder.events.some(event => event.event === SocketEvents.ANSWER_ACCEPTED), "clean retry");
+    expect(getSession(sessionId)!.submissions.map(submission => submission.responseText)).toEqual(["A revised thought."]);
+    const csv = await request(app).get(`/api/session/${sessionId}/results.csv`).expect(200);
+    expect(csv.text).not.toContain("f.u.c.k");
+    expect(csv.text).toContain("A revised thought.");
+  });
 
   it("never sends a hidden response to the projector or a phone, and moves the projector at once", async () => {
     const created = await request(app).post("/api/session").send({ week: "moderation" }).expect(201);
