@@ -35,7 +35,7 @@ it("rejects before storage or any staff emission, preserves an accepted answer, 
   const step = (command: Command) => { const result = apply(session, quiz, command, 1000); session = result.session; return result; };
   step({ type: "start" });
   step({ type: "join", payload: { studentId: "TEST" }, socketId: "socket", newToken: "token" });
-  const answer = (responseText: string): Command => ({ type: "answerSubmit", studentId: "TEST", payload: { questionIndex: 0, responseText, selectedOptions: [] } });
+  const answer = (responseText: string): Command => ({ type: "answerSubmit", studentId: "TEST", sessionToken: "token", payload: { questionIndex: 0, responseText, selectedOptions: [] } });
   const refused = step(answer("f-u-c-k"));
   expect(session.submissions).toEqual([]);
   expect(refused.messages).toEqual([{ audience: "participant:TEST", event: SocketEvents.ANSWER_REJECTED, payload: { questionIndex: 0, reason: BLOCKED_LANGUAGE_MESSAGE } }]);
