@@ -8,6 +8,7 @@ import { useSocket } from "../hooks/useSocket";
 import { resolveSlideBackground, type QuestionState, type RevealState } from "../hooks/useSocket";
 import {
   fetchDecks,
+  DeckValidationError,
   reloadDecks,
   createSession,
   startSession,
@@ -33,8 +34,9 @@ import {
   type CreateSessionResponse,
   type SessionRestoreResponse,
 } from "../hooks/api";
+import DeckValidationNotice from "../components/DeckValidationNotice";
 import { formatDiagnostic } from "@mdq/shared";
-import type { AccessInfo, DeckPalette, DeckTheme, FoldoutNote, OpenResponseEntry, PollLivePayload, SessionState } from "@mdq/shared";
+import type { AccessInfo, DeckValidationReport, DeckPalette, DeckTheme, FoldoutNote, OpenResponseEntry, PollLivePayload, SessionState } from "@mdq/shared";
 import { applyClientPalette, applyClientTheme } from "../theme";
 import DistributionChart from "../components/DistributionChart";
 import Timer from "../components/Timer";
@@ -169,6 +171,8 @@ export default function InstructorView({
   const [deckFilter, setDeckFilter] = useState("");
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [deckValidation, setDeckValidation] = useState<DeckValidationReport | null>(null);
+  const [reloadNotice, setReloadNotice] = useState<string | null>(null);
 
   // Session state
   const [ranking, setRanking] = useState<"correctness" | "speed">("correctness");
@@ -272,7 +276,10 @@ export default function InstructorView({
         setDecks(loadedDecks);
         if (loadedDecks.length > 0) setSelectedWeek(loadedDecks[0].week);
       })
-      .catch((e) => setErrorMsg(e.message));
+      .catch((e) => {
+        if (e instanceof DeckValidationError) setDeckValidation(e.validation);
+        else setErrorMsg(e.message);
+      });
   }, []);
 
   // Load presenter notes for the selected deck (instructor-only endpoint).
@@ -459,7 +466,8 @@ export default function InstructorView({
         // Non-critical
       }
     } catch (e) {
-      setErrorMsg(e instanceof Error ? e.message : "Failed to create session");
+      if (e instanceof DeckValidationError) setDeckValidation(e.validation);
+      else setErrorMsg(e instanceof Error ? e.message : "Failed to create session");
     } finally {
       setLoading(false);
     }
@@ -468,18 +476,24 @@ export default function InstructorView({
   const handleReloadDecks = useCallback(async () => {
     setLoading(true);
     setErrorMsg(null);
+    setReloadNotice(null);
     try {
       const result = await reloadDecks();
       setDecks(result.quizzes);
-      if (!result.quizzes.find((q) => q.week === selectedWeek) && result.quizzes.length > 0) {
-        setSelectedWeek(result.quizzes[0].week);
-      }
+      setDeckValidation(null);
+      setSelectedWeek((current) => result.quizzes.some((q) => q.week === current)
+        ? current : result.quizzes[0]?.week ?? "");
+      setReloadNotice(`${pluralize(result.loaded, "deck")} reloaded. No server restart needed.`);
     } catch (e) {
-      setErrorMsg(e instanceof Error ? e.message : "Failed to reload decks");
+      if (e instanceof DeckValidationError) {
+        setDeckValidation(e.validation);
+        setDecks([]);
+        setSelectedWeek("");
+      } else setErrorMsg(e instanceof Error ? e.message : "Failed to reload decks");
     } finally {
       setLoading(false);
     }
-  }, [selectedWeek]);
+  }, []);
 
   const handleAction = useCallback(
     async (action: () => Promise<unknown>, label: string, onSuccess?: () => void) => {
@@ -554,6 +568,9 @@ export default function InstructorView({
           </div>
         )}
 
+        {deckValidation && <DeckValidationNotice report={deckValidation} />}
+        {reloadNotice && <p role="status" className="text-emerald-100 text-center">{reloadNotice}</p>}
+
         {restoreNotice && (
           <div className={`${pendingRestore ? "bg-amber-900/40 border-amber-700 text-amber-100" : "bg-emerald-900/40 border-emerald-700 text-emerald-100"} border px-4 py-3 rounded-xl max-w-2xl w-full text-center text-sm`}>
             <p>{restoreNotice}</p>
@@ -571,7 +588,7 @@ export default function InstructorView({
         )}
 
         {decks.length === 0 ? (
-          <p className="text-zinc-400">No decks found. Add markdown deck files to the data/decks directory.</p>
+          !deckValidation && <p className="text-zinc-400">No decks found. Add markdown deck files to the data/decks directory, then choose Reload Decks.</p>
         ) : (
           <div className="w-full max-w-2xl space-y-6">
             <div className="space-y-3">
@@ -628,13 +645,6 @@ export default function InstructorView({
                 )}
               </div>
             </div>
-            <button
-              onClick={handleReloadDecks}
-              disabled={loading}
-              className="w-full bg-zinc-800 hover:bg-zinc-700 disabled:bg-zinc-700 disabled:text-zinc-500 border border-zinc-700 text-zinc-200 font-medium py-3 rounded-xl transition-colors"
-            >
-              {loading ? "Reloading..." : "Reload Decks"}
-            </button>
             <fieldset className="availability-choice" disabled={loading}>
               <legend>Session pacing</legend>
               <label className="availability-option"><input type="radio" name="setup-pacing" checked={pacing === "presenter-paced"} onChange={() => setPacing("presenter-paced")} />Presenter-paced</label>
@@ -644,13 +654,20 @@ export default function InstructorView({
             <AvailabilityChoiceControl choice={initialAvailability} onChange={setInitialAvailability} now={setupNow} disabled={loading} />
             <button
               onClick={handleCreateSession}
-              disabled={loading || !selectedWeek || !!deadlineProblem(initialAvailability, setupNow)}
+              disabled={loading || !selectedWeek || !!deadlineProblem(initialAvailability, setupNow) || Boolean(deckValidation)}
               className="w-full bg-indigo-600 hover:bg-indigo-500 disabled:bg-zinc-700 disabled:text-zinc-500 text-white font-semibold py-4 rounded-xl transition-colors text-lg"
             >
               {loading ? "Creating..." : "Create Session"}
             </button>
           </div>
         )}
+        <button
+          onClick={handleReloadDecks}
+          disabled={loading}
+          className="w-full max-w-2xl bg-zinc-800 hover:bg-zinc-700 disabled:bg-zinc-700 disabled:text-zinc-500 border border-zinc-700 text-zinc-200 font-medium py-3 rounded-xl transition-colors"
+        >
+          {loading ? "Reloading..." : "Reload Decks"}
+        </button>
       </div>
     );
   }

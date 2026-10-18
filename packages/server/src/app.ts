@@ -16,6 +16,7 @@ import {
 } from "./session";
 import { parseQuizMarkdown } from "./parser";
 import { publicResultsHidden, releasedQuestionIndexes, getSessionScoredQuestionCount, effectiveRanking, sessionPolicy } from "./policy";
+import { buildDeckValidationResponse } from "./deck-validation";
 import { apply, participantResultsPayload, endSessionAdvisory, participantStudyPayload, participantStudyItemPayload, publicQuestionPayload, leaderboardRows, questionPosition, responsesFor, timingFor, EngineCommandError, type Command, type EngineResult } from "./engine";
 import {
   persistSessionOnEnd,
@@ -285,48 +286,8 @@ export function createApp(quizDirOrOpts?: string | AppOptions) {
       }));
   }
 
-  function describeQuizValidationDetail(detail: string): string {
-    if (detail.startsWith("No answer options found")) {
-      return "This question has no answer choices, so MDQ cannot run it safely as a quiz question.";
-    }
-    if (detail.startsWith("Missing correct answer line")) {
-      return "This question does not say which answer is correct.";
-    }
-    if (detail.includes("must not define correct answers")) {
-      return "This open-ended or poll question still has a marked correct answer.";
-    }
-    if (detail.includes("must not define answer options")) {
-      return "This open-ended question still has multiple-choice answer options.";
-    }
-    if (/must not use multi[-_]select/.test(detail)) {
-      return "This open-ended question is using a multiple-choice setting that does not apply here.";
-    }
-    if (detail.startsWith("Unsupported type") || detail.startsWith("Unsupported question_type")) {
-      return "This question uses a question type that MDQ does not support.";
-    }
-    if (detail.startsWith("Correct answer")) {
-      return "This question points to an answer choice that does not exist.";
-    }
-    return "This quiz question has a formatting problem that needs to be fixed before class.";
-  }
-
-  function buildQuizValidationMessage(errors: ReturnType<typeof parseQuizMarkdown>["errors"]): string {
-    const [firstError, ...rest] = errors;
-    if (!firstError) {
-      return "We couldn't load the quiz because a quiz file needs fixing.";
-    }
-
-    const location = `${firstError.sourceFile}:${firstError.lineNumber ?? 1}`;
-    const extraCount = rest.length;
-    const extraSuffix = extraCount > 0
-      ? ` There ${extraCount === 1 ? "is 1 more issue" : `are ${extraCount} more issues`} after that.`
-      : "";
-
-    return `We couldn't load the deck because ${location} needs attention. ${describeQuizValidationDetail(firstError.detail)} Fix the markdown file and reload decks before starting a session.${extraSuffix}`;
-  }
-
-  function getQuizValidationMessage(): string | null {
-    return quizValidationErrors.length > 0 ? buildQuizValidationMessage(quizValidationErrors) : null;
+  function getQuizValidationResponse() {
+    return quizValidationErrors.length > 0 ? buildDeckValidationResponse(quizValidationErrors) : null;
   }
 
   function loadQuizzesFromDir(dirPath: string): number {
@@ -585,9 +546,9 @@ export function createApp(quizDirOrOpts?: string | AppOptions) {
 
   // ── Deck endpoints ────────────────────────
   const listDecksHandler = (_req: Request, res: Response) => {
-    const validationMessage = getQuizValidationMessage();
-    if (validationMessage) {
-      return res.status(409).json({ error: validationMessage });
+    const validation = getQuizValidationResponse();
+    if (validation) {
+      return res.status(409).json(validation);
     }
     const list = [...quizzes.values()].sort(compareDecksForList).map((quiz) => summarizeQuizForList(quiz, theme, palette, quizDiagnostics.get(quiz.week)));
     return res.json(list);
@@ -599,9 +560,9 @@ export function createApp(quizDirOrOpts?: string | AppOptions) {
     }
     try {
       const loaded = loadQuizzesFromDir(quizDir);
-      const validationMessage = getQuizValidationMessage();
-      if (validationMessage) {
-        return res.status(409).json({ error: validationMessage });
+      const validation = getQuizValidationResponse();
+      if (validation) {
+        return res.status(409).json(validation);
       }
       const list = [...quizzes.values()].sort(compareDecksForList).map((quiz) => summarizeQuizForList(quiz, theme, palette, quizDiagnostics.get(quiz.week)));
       return res.json({ loaded, quizzes: list });
@@ -667,9 +628,9 @@ export function createApp(quizDirOrOpts?: string | AppOptions) {
 
   // ── Session lifecycle ─────────────────────
   app.post(API.SESSION_CREATE, requireInstructorAuth, (req, res) => {
-    const validationMessage = getQuizValidationMessage();
-    if (validationMessage) {
-      return res.status(409).json({ error: validationMessage });
+    const validation = getQuizValidationResponse();
+    if (validation) {
+      return res.status(409).json(validation);
     }
     const { week, mode = "open" } = req.body;
     if (!week) {
