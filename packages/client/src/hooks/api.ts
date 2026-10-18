@@ -227,12 +227,13 @@ export async function createSession(week: string, mode: string = "open", options
   return res.json();
 }
 
-async function sessionAction(sessionId: string, action: string): Promise<Record<string, unknown>> {
+async function sessionAction(sessionId: string, action: string, body?: object): Promise<Record<string, unknown>> {
   const pathTemplate = (API as Record<string, string>)[`SESSION_${action.toUpperCase()}`];
   if (!pathTemplate) throw new Error(`Unknown action: ${action}`);
   const res = await fetchWithTimeout(apiPath(pathTemplate, { id: sessionId }), {
     method: "POST",
     credentials: "same-origin",
+    ...(body ? { headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) } : {}),
   });
   if (!res.ok) {
     const data = await res.json().catch(() => ({}));
@@ -265,8 +266,8 @@ export async function nextQuestion(sessionId: string) {
   return sessionAction(sessionId, "NEXT");
 }
 
-export async function closeQuestion(sessionId: string) {
-  return sessionAction(sessionId, "CLOSE");
+export async function closeQuestion(sessionId: string, opening?: { questionIndex: number; startedAt: number }) {
+  return sessionAction(sessionId, "CLOSE", opening);
 }
 
 export async function restartCountdown(sessionId: string) {

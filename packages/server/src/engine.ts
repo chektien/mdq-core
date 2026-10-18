@@ -1,6 +1,7 @@
 import { availabilityAlarmMatches, availabilityPayload, nextAvailabilityAlarm, sessionAvailabilityPhase, validateAvailabilityDeadline } from "./availability";
 import { defaultSessionPolicy, effectiveRanking, getSessionScoredQuestionCount, isQuestionReleased, isSelfPaced, publicResultsHidden, releasedQuestionIndexes, scoredCorrectAnswersForSession } from "./policy";
 import { isSlideType } from "@mdq/shared";
+import { containsBlockedLanguage, BLOCKED_LANGUAGE_MESSAGE } from "./text-filter";
 import {
   Quiz, Session, SessionState, SocketEvents, QuestionOpenPayload, QuestionClosePayload, FoldoutNote,
   StudentJoinPayload, AnswerSubmitPayload, Participant, STATE_TRANSITIONS, StudentAnswer,
@@ -68,9 +69,11 @@ export type Command =
   | { type: "configureAvailability"; role: SocketRole; availableUntil?: number; extendForMs?: number }
   | { type: "expireAvailability" | "purgeAvailability"; alarm: import("@mdq/shared").SessionAvailabilityAlarm }
   | { type: "configurePolicy"; role: SocketRole; pacing: "presenter-paced" | "self-paced"; ranking?: "correctness" | "speed" }
-  | { type: "start" | "next" | "previous" | "open" | "close" | "reveal" | "leaderboardShow" | "leaderboardHide" | "broadcastOpen" | "broadcastReveal" | "broadcastLeaderboard" | "participants" | "repairClosedSlide" }
+  | { type: "start" | "next" | "previous" | "open" | "reveal" | "leaderboardShow" | "leaderboardHide" | "broadcastOpen" | "broadcastReveal" | "broadcastLeaderboard" | "participants" | "repairClosedSlide" }
   | { type: "timeout"; deadline?: number; questionIndex?: number; startedAt?: number; restartCount?: number }
   | { type: "restartCountdown"; role: SocketRole }
+  /** Identify the opening so delayed close requests cannot close another item. */
+  | { type: "close"; questionIndex?: number; startedAt?: number }
   | { type: "join"; payload: StudentJoinPayload; socketId: string; newToken: string; newPublicKey?: string }
   /**
    * `sessionToken` is the token the answering connection joined with. When it is given and is no longer
@@ -638,6 +641,15 @@ export function apply(input: Session, quiz: Quiz, command: Command, now: number)
     case "timeout":
       if (command.type === "timeout" && availabilityPhase !== "active") break;
       if (isSelfPaced(session)) { if (command.type === "timeout") break; throw new EngineCommandError("Self-paced answers stay open until End."); }
+      if (command.type === "close") {
+        if ((command.questionIndex !== undefined && command.questionIndex !== session.currentQuestionIndex)
+          || (command.startedAt !== undefined && command.startedAt !== session.questionStartedAt)) {
+          throw new EngineCommandError("The question has changed. Refresh its state before closing it.");
+        }
+        // A second presenter, retry or timer/manual race must not emit a second close
+        // or overwrite the original timedOut flag. Only the same current item is a no-op.
+        if (session.currentQuestionIndex >= 0 && ["QUESTION_CLOSED", "REVEAL", "LEADERBOARD"].includes(session.state)) break;
+      }
       if (command.type === "close" && isSlideType(getQuestionType(questionAt(session, quiz)))) throw new EngineCommandError("Slides do not close; advance to the next item.");
       if (command.type === "timeout") {
         const due = deadline(session, quiz);
@@ -764,6 +776,7 @@ export function apply(input: Session, quiz: Quiz, command: Command, now: number)
         if (options.length) { reject("Open response questions accept text responses only."); break; }
         if (!responseText) { reject("Response text cannot be blank."); break; }
         if ([...responseText].length > MAX_OPEN_RESPONSE_LENGTH) { reject(`Please use up to ${MAX_OPEN_RESPONSE_LENGTH} characters.`); break; }
+        if (containsBlockedLanguage(responseText)) { reject(BLOCKED_LANGUAGE_MESSAGE); break; }
       } else {
         if (options.some((label) => !q.options.some((option) => option.label === label))) { reject("An option is not part of this question."); break; }
         if (!q.allowsMultiple && options.length > 1) { reject("This question accepts one answer only."); break; }
