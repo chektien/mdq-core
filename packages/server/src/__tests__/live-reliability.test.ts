@@ -65,7 +65,7 @@ describe("close retries preserve the original question outcome", () => {
 it("keeps answers and scores across disconnect, persistence and reconnect", () => {
   const run = runner(); run.step({ type: "start" });
   run.step({ type: "join", payload: { studentId: "TEST1" }, socketId: "first", newToken: "token" });
-  run.step({ type: "answerSubmit", studentId: "TEST1", payload: { questionIndex: 0, selectedOptions: ["A"] } }, 2000);
+  run.step({ type: "answerSubmit", studentId: "TEST1", sessionToken: "token", payload: { questionIndex: 0, selectedOptions: ["A"] } }, 2000);
   const disconnected = run.step({ type: "disconnect", studentId: "TEST1", socketId: "first" }, 3000);
   const counter = disconnected.messages.find(message => message.event === SocketEvents.ANSWER_COUNT)?.payload;
   expect(counter).toMatchObject({ submitted: 1 });
