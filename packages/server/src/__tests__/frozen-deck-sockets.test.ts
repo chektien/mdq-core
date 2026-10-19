@@ -4,7 +4,6 @@ import path from "path";
 import { createServer } from "http";
 import { AddressInfo } from "net";
 import request from "supertest";
-import { Server } from "socket.io";
 import { io as ioClient, Socket } from "socket.io-client";
 import { QuestionOpenPayload, Quiz, SocketEvents, StudentJoinedPayload } from "@mdq/shared";
 import { createApp } from "../app";
@@ -44,7 +43,6 @@ it.each(["replace", "remove"] as const)("frozen socket reconnect, content, answe
   const previousKey = process.env.INSTRUCTOR_KEY;
   delete process.env.INSTRUCTOR_PASSWORD; delete process.env.INSTRUCTOR_KEY;
   clearAllSessions();
-  let ioServer: Server;
   const app = createApp({ quizDir: directory, dataDir: path.join(directory, "runtime"), onStateChange(session, id, _state, quiz, result) {
     if (!result || !quiz) return;
     emitMessages(ioServer, id, result.messages);
@@ -58,7 +56,7 @@ it.each(["replace", "remove"] as const)("frozen socket reconnect, content, answe
   } });
   const httpServer = createServer(app);
   const quizzes = (app as unknown as { _quizzes: Map<string, Quiz> })._quizzes;
-  ioServer = setupSocket(httpServer, quizzes);
+  const ioServer = setupSocket(httpServer, quizzes);
   await new Promise<void>((resolve) => httpServer.listen(0, "127.0.0.1", resolve));
   const baseUrl = `http://127.0.0.1:${(httpServer.address() as AddressInfo).port}`;
   const sockets: Socket[] = [];

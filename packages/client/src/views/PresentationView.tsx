@@ -139,7 +139,7 @@ export default function PresentationView({
     if (currentReveal) return currentReveal.isPoll ? "Results open" : "Answer revealed";
     if (state === "QUESTION_CLOSED") return closedLabel;
     if (sock.answerCount && state === "QUESTION_OPEN") {
-      return `${sock.answerCount.submitted}/${sock.answerCount.total} answered`;
+      return `${sock.answerCount.submitted} answered`;
     }
     return null;
   })();
@@ -486,7 +486,7 @@ export default function PresentationView({
         <div className="flex items-center gap-4">
           {sock.answerCount && !isSlideType(currentQuestion?.questionType) && (state === "QUESTION_OPEN" || state === "QUESTION_CLOSED") && (
             <span className="font-mono tabular-nums text-zinc-400">
-              {sock.answerCount.submitted}/{sock.answerCount.total} answered
+              {sock.answerCount.submitted} answered
             </span>
           )}
           <span className="tabular-nums text-zinc-500">{sock.participants?.count ?? 0} online</span>

@@ -1,8 +1,8 @@
 /** Small pieces of presenter-facing wording that more than one view uses. */
 import type { QuestionType } from "@mdq/shared";
 
-export function answeredLabel(submitted: number, total: number): string {
-  return total === 0 ? "No one has joined yet" : `${submitted}/${total} answered`;
+export function answeredLabel(submitted: number, _total: number): string {
+  return `${submitted} answered`;
 }
 
 export function restartCountdownDetail(question: { questionType: QuestionType; isPoll: boolean }, speedRanking: boolean): string | null {

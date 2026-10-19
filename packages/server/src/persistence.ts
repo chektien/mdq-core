@@ -15,12 +15,14 @@ import { computeLeaderboard } from "./session";
 import { buildResultsCsv, isSubmissionCorrect, toIso } from "./results-csv";
 import { getQuestionType, isScoredQuestion } from "./scoring";
 
+import { classificationSummary, ensureRunClassification, isRunEligible } from "./run-classification";
+
 const sessionRevealTimestamps = new Map<string, Map<number, number>>();
 const DEFAULT_DATA_DIR = path.resolve(__dirname, "../../../", DATA_DIR);
 
 // ── Directory layout ───────────────────────
 
-function resolveDataDir(baseDir?: string): string {
+export function resolveDataDir(baseDir?: string): string {
   if (baseDir && baseDir.trim().length > 0) {
     return path.resolve(baseDir);
   }
@@ -57,7 +59,7 @@ function sanitizeFileToken(value: string): string {
   return cleaned || "session";
 }
 
-function sessionArtifactPrefix(session: Session): string {
+function sessionArtifactPrefix(session: Pick<Session, "sessionCode" | "createdAt">): string {
   return `${sanitizeFileToken(session.sessionCode)}-${formatFileDateTime(session.createdAt)}`;
 }
 
@@ -72,11 +74,11 @@ function formatQuizLabelFromKey(quizKey: string): string {
   return `${normalized} MDQ`;
 }
 
-export function getSessionResultsCsvPath(session: Session, baseDir?: string): string {
+export function getSessionResultsCsvPath(session: Pick<Session, "sessionCode" | "createdAt">, baseDir?: string): string {
   return path.join(submissionsDir(baseDir), `${sessionArtifactPrefix(session)}.csv`);
 }
 
-export function getSessionSummaryMarkdownPath(session: Session, baseDir?: string): string {
+export function getSessionSummaryMarkdownPath(session: Pick<Session, "sessionCode" | "createdAt">, baseDir?: string): string {
   return path.join(submissionsDir(baseDir), `${sessionArtifactPrefix(session)}-summary.md`);
 }
 
@@ -287,6 +289,8 @@ export function saveSessionSummaryMarkdown(
   lines.push(`- Total Submissions: ${session.submissions.length}`);
   lines.push("");
 
+  lines.push(classificationSummary(ensureRunClassification(session, quiz, resolveDataDir(baseDir), endedAt)));
+
   lines.push(`## Per-Question Stats`);
   lines.push("");
   lines.push(`| Question | Type | Responses | Response Rate | Correct Rate | Unanswered |`);
@@ -385,8 +389,8 @@ export function saveSessionSummaryMarkdown(
 
 /**
  * Save the per-week leaderboard to data/winners/weekNN.json.
- * If a file for this week already exists, it is overwritten
- * (the latest session for a given week wins).
+ * Retain per-session result history and publish only eligible ordinary runs.
+ * Trial and possible-trial results never overwrite an ordinary weekly winner.
  */
 export function saveWeeklyResult(
   session: Session,
@@ -410,8 +414,42 @@ export function saveWeeklyResult(
     entries,
   };
 
-  const filePath = path.join(dir, `${session.week}.json`);
-  fs.writeFileSync(filePath, JSON.stringify(result, null, 2), "utf-8");
+  ensureRunClassification(session, quiz, resolveDataDir(baseDir));
+  const archive = path.join(resolveDataDir(baseDir), "results");
+  ensureDir(archive);
+  fs.writeFileSync(path.join(archive, `${session.sessionId}.json`), JSON.stringify(result, null, 2), "utf-8");
+  reconcileWeeklyResult(session.week, baseDir);
+}
+
+/** Rebuild the ordinary weekly view after a post-quiz manual classification. */
+export function reconcileWeeklyResult(week: string, baseDir?: string): void {
+  if (!week || week === "." || week === ".." || /[\\/\0]/.test(week)) throw new Error("Invalid local quiz key");
+  const dataDir = resolveDataDir(baseDir);
+  const archive = path.join(dataDir, "results");
+  const dir = winnersDir(baseDir);
+  ensureDir(archive);
+  ensureDir(dir);
+  const filePath = path.join(dir, `${week}.json`);
+  const current = readJsonSafe<WeeklyResult>(filePath);
+  // Preserve pre-feature winner files before replacing the materialized weekly view.
+  if (current && /^[A-Za-z0-9_-]+$/.test(current.sessionId)) {
+    const archivedPath = path.join(archive, `${current.sessionId}.json`);
+    if (!fs.existsSync(archivedPath)) fs.writeFileSync(archivedPath, JSON.stringify(current, null, 2), "utf8");
+  }
+  const candidates = fs.readdirSync(archive).filter(file => file.endsWith(".json"))
+    .map(file => readJsonSafe<WeeklyResult>(path.join(archive, file)))
+    .filter((result): result is WeeklyResult => !!result && result.week === week &&
+      Array.isArray(result.entries) && Number.isFinite(result.completedAt) && isRunEligible(result.sessionId, dataDir))
+    .sort((a, b) => b.completedAt - a.completedAt || b.sessionId.localeCompare(a.sessionId));
+  const selected = candidates[0];
+  if (selected) {
+    fs.writeFileSync(filePath, JSON.stringify(selected, null, 2), "utf8");
+  } else if (fs.existsSync(filePath)) {
+    // Keep the excluded file as well as its per-session archive. Nothing is deleted.
+    const excluded = path.join(dir, "excluded");
+    ensureDir(excluded);
+    fs.renameSync(filePath, path.join(excluded, `${week}-${Date.now()}.json`));
+  }
 }
 
 // ── Weekly result reading ───────────────────
@@ -422,7 +460,8 @@ export function saveWeeklyResult(
  */
 export function loadWeeklyResult(week: string, baseDir?: string): WeeklyResult | null {
   const filePath = path.join(winnersDir(baseDir), `${week}.json`);
-  return readJsonSafe<WeeklyResult>(filePath);
+  const result = readJsonSafe<WeeklyResult>(filePath);
+  return result && isRunEligible(result.sessionId, resolveDataDir(baseDir)) ? result : null;
 }
 
 /**
@@ -445,6 +484,7 @@ export function loadAllWeeklyResults(baseDir?: string): WeeklyResult[] {
       result.entries &&
       Array.isArray(result.entries)
     ) {
+      if (!isRunEligible(result.sessionId, resolveDataDir(baseDir))) continue;
       // Sanitize entries: ensure numeric fields default to 0
       result.entries = result.entries
         .filter((e) => e && typeof e.studentId === "string")

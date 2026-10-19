@@ -3,6 +3,7 @@ import type {
   SessionPolicy,
   SessionAvailabilityPayload,
   ParseDiagnostic,
+  DeckValidationReport,
   AccessInfo,
   DeckPalette,
   DeckTheme,
@@ -181,11 +182,29 @@ export async function loginInstructor(password: string): Promise<void> {
   }
 }
 
+/** A recoverable authoring failure, distinct from network or session errors. */
+export class DeckValidationError extends Error {
+  readonly validation: DeckValidationReport;
+
+  constructor(message: string, validation: DeckValidationReport) {
+    super(message);
+    this.name = "DeckValidationError";
+    this.validation = validation;
+  }
+}
+
+async function deckRequestError(res: Response, fallback: string): Promise<Error> {
+  const data = await res.json().catch(() => ({}));
+  if (res.status === 409 && data.validation) {
+    return new DeckValidationError(data.error || fallback, data.validation);
+  }
+  return new Error(data.error || fallback);
+}
+
 export async function fetchDecks(): Promise<DeckSummary[]> {
   const res = await fetchWithTimeout(apiPath(API.DECKS));
   if (!res.ok) {
-    const data = await res.json().catch(() => ({}));
-    throw new Error(data.error || "Failed to fetch decks");
+    throw await deckRequestError(res, "Failed to fetch decks");
   }
   return res.json();
 }
@@ -205,8 +224,7 @@ export async function reloadDecks(): Promise<ReloadDecksResponse> {
     credentials: "same-origin",
   });
   if (!res.ok) {
-    const data = await res.json().catch(() => ({}));
-    throw new Error(data.error || "Failed to reload decks");
+    throw await deckRequestError(res, "Failed to reload decks");
   }
   return res.json();
 }
@@ -221,18 +239,18 @@ export async function createSession(week: string, mode: string = "open", options
     body: JSON.stringify({ week, mode, ...(typeof options === "number" ? { availableUntil: options } : options ?? {}) }),
   });
   if (!res.ok) {
-    const data = await res.json().catch(() => ({}));
-    throw new Error(data.error || "Failed to create session");
+    throw await deckRequestError(res, "Failed to create session");
   }
   return res.json();
 }
 
-async function sessionAction(sessionId: string, action: string): Promise<Record<string, unknown>> {
+async function sessionAction(sessionId: string, action: string, body?: object): Promise<Record<string, unknown>> {
   const pathTemplate = (API as Record<string, string>)[`SESSION_${action.toUpperCase()}`];
   if (!pathTemplate) throw new Error(`Unknown action: ${action}`);
   const res = await fetchWithTimeout(apiPath(pathTemplate, { id: sessionId }), {
     method: "POST",
     credentials: "same-origin",
+    ...(body ? { headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) } : {}),
   });
   if (!res.ok) {
     const data = await res.json().catch(() => ({}));
@@ -265,8 +283,8 @@ export async function nextQuestion(sessionId: string) {
   return sessionAction(sessionId, "NEXT");
 }
 
-export async function closeQuestion(sessionId: string) {
-  return sessionAction(sessionId, "CLOSE");
+export async function closeQuestion(sessionId: string, opening?: { questionIndex: number; startedAt: number }) {
+  return sessionAction(sessionId, "CLOSE", opening);
 }
 
 export async function restartCountdown(sessionId: string) {

@@ -24,9 +24,8 @@ it("actual expiry/reconnect/extension/End transports deny new seats and result l
   const oldPassword = process.env.INSTRUCTOR_PASSWORD;const oldKey = process.env.INSTRUCTOR_KEY;
   process.env.INSTRUCTOR_PASSWORD = "synthetic-password";delete process.env.INSTRUCTOR_KEY;
   clearAllSessions();clearInstructorSessionsForTests();
-  let ioServer: ReturnType<typeof setupSocket>;
   const app = createApp({ quizDir: dir, dataDir: path.join(dir, "runtime"), onMessages(_session, id, result) { emitMessages(ioServer, id, result.messages); }, onStateChange(_session, id, _state, _quiz, result) { if (result) emitMessages(ioServer, id, result.messages); } });
-  const server = createServer(app);ioServer = setupSocket(server, (app as unknown as { _quizzes: Map<string, Quiz> })._quizzes);
+  const server = createServer(app);const ioServer = setupSocket(server, (app as unknown as { _quizzes: Map<string, Quiz> })._quizzes);
   await new Promise<void>(resolve => server.listen(0, "127.0.0.1", resolve));
   const url = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
   const sockets: Socket[] = [];

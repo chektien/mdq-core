@@ -28,7 +28,8 @@
     "print:pdf": "npm run build --workspace=@mdq/shared && npm run build --workspace=@mdq/server && node packages/server/dist/print-mdq.js",
     "test:e2e": "npx jest --testPathPattern e2e-lifecycle --forceExit --detectOpenHandles --config packages/server/jest.config.js",
     "test:e2e-live": "npx jest --testPathPattern e2e-live-readiness --forceExit --detectOpenHandles --config packages/server/jest.config.js",
-    "test:load": "npx jest --testPathPattern load-smoke --forceExit --detectOpenHandles --config packages/server/jest.config.js"
+    "test:load": "npx jest --testPathPattern load-smoke --forceExit --detectOpenHandles --config packages/server/jest.config.js",
+    "classify:local": "npm run build --workspace=@mdq/shared && npm run build --workspace=@mdq/server && node packages/server/dist/classify-local-run.js"
   },
   "devDependencies": {
     "@types/node": "^20.11.0",

@@ -591,6 +591,19 @@ export interface ParseDiagnostic {
   message: string;
 }
 
+/** Blocking authoring issues, grouped by file without changing parser error text. */
+export interface DeckValidationIssue {
+  questionIndex: number;
+  lineNumber?: number;
+  detail: string;
+  likelyFix: string;
+}
+
+export interface DeckValidationReport {
+  issueCount: number;
+  files: Array<{ sourceFile: string; issues: DeckValidationIssue[] }>;
+}
+
 /** Where a diagnostic points: "header, line 2", or "item 3, line 14" (items count from 1). */
 export function diagnosticLocation(diagnostic: Pick<ParseDiagnostic, "questionIndex" | "lineNumber">): string {
   const place = diagnostic.questionIndex < 0 ? "header" : `item ${diagnostic.questionIndex + 1}`;

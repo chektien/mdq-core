@@ -16,9 +16,9 @@ const lastRule = (css: string, selector: string): string => {
 
 describe("presenter wording", () => {
   it("explains an empty room and keeps answered counts once people have joined", () => {
-    expect(answeredLabel(0, 0)).toBe("No one has joined yet");
-    expect(answeredLabel(0, 4)).toBe("0/4 answered");
-    expect(answeredLabel(3, 4)).toBe("3/4 answered");
+    expect(answeredLabel(0, 0)).toBe("0 answered");
+    expect(answeredLabel(0, 4)).toBe("0 answered");
+    expect(answeredLabel(3, 4)).toBe("3 answered");
     expect(read("views/InstructorView.tsx").match(/answeredLabel\(sock.answerCount.submitted, sock.answerCount.total\)/g)).toHaveLength(2);
   });
 

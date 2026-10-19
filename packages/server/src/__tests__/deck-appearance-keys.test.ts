@@ -20,7 +20,7 @@ describe("deck appearance keys", () => {
   });
 
   it("keeps the retired scheme names accepted by parseDeckPalette", () => {
-    for (const written of ["tokyo-night", " TOKYO-NIGHT ", "'tokyo-night'", '\"TOKYO-NIGHT\"']) {
+    for (const written of ["tokyo-night", " TOKYO-NIGHT ", "'tokyo-night'", '"TOKYO-NIGHT"']) {
       const result = parse(`theme: ${written}\ndark: off`);
       expect(result.errors).toEqual([]);
       expect(result.quiz).toMatchObject({ palette: "classic", theme: "light" });

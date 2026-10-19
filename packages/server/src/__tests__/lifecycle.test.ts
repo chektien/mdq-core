@@ -282,7 +282,8 @@ Name the file to edit.
         const res = await request(invalidApp).get("/api/decks");
         expect(res.status).toBe(409);
         expect(res.body.error).toContain("week04-lab.md:6");
-        expect(res.body.error).toContain("no answer choices");
+        expect(res.body.error).toContain("No answer options found");
+        expect(res.body.error).toContain("type: open_response");
       } finally {
         fs.rmSync(tempQuizDir, { recursive: true, force: true });
       }
@@ -506,7 +507,8 @@ Name the file to edit.
           .send({ week: "week01" });
         expect(res.status).toBe(409);
         expect(res.body.error).toContain("week04-lab.md:6");
-        expect(res.body.error).toContain("cannot run it safely");
+        expect(res.body.error).toContain("type: open_response");
+        expect(res.body.validation.issueCount).toBe(1);
       } finally {
         fs.rmSync(tempQuizDir, { recursive: true, force: true });
       }
