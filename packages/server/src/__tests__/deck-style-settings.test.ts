@@ -1,4 +1,4 @@
-import { DECK_SETTING_KEYS, DECK_STYLE_KEYS, deckStylePresets, formatDiagnostic, safeDeckStyle } from "@mdq/shared";
+import { DECK_SETTING_KEYS, DECK_STYLE_KEYS, FONT_SIZE_ROLES, deckStylePresets, formatDiagnostic, safeDeckStyle } from "@mdq/shared";
 import * as parserModule from "../parser";
 import { parseQuizMarkdown } from "../parser";
 import { printDeckStyle } from "../print-deck-style";
@@ -48,13 +48,16 @@ const COLOR_KEYS = ["accent-color", "link-color", "text-color", "muted-color", "
 
 describe("deck header appearance settings", () => {
   it("lists exactly the fixed vocabulary as setting keys", () => {
-    expect([...DECK_STYLE_KEYS].sort()).toEqual([...Object.keys(PRESET_TABLE), ...COLOR_KEYS].sort());
-    expect(DECK_STYLE_KEYS).toHaveLength(25);
+    const olderVocabulary = DECK_STYLE_KEYS.filter(key => !FONT_SIZE_ROLES.some(([human]) => human === key));
+    expect([...olderVocabulary].sort()).toEqual([...Object.keys(PRESET_TABLE), ...COLOR_KEYS].sort());
+    expect(olderVocabulary).toHaveLength(25);
+    expect([...DECK_STYLE_KEYS].sort()).toEqual([...olderVocabulary, ...FONT_SIZE_ROLES.map(([human]) => human)].sort());
+    expect(DECK_STYLE_KEYS).toHaveLength(30);
     for (const key of DECK_STYLE_KEYS) expect(DECK_SETTING_KEYS).toContain(key);
   });
 
   it("gives a deck without the keys no style at all", () => {
-    const { quiz, errors } = parse("theme: light\npalette: gruvbox");
+    const { quiz, errors } = parse("dark: off\ntheme: gruvbox");
     expect(errors).toEqual([]);
     expect(quiz!.style).toBeUndefined();
     expect(quiz!.styleSettings).toBeUndefined();
@@ -236,7 +239,7 @@ describe("deck header appearance settings", () => {
     });
 
     it("reads them beside theme and palette without changing either", () => {
-      const { quiz, errors } = parse("theme: light\npalette: gruvbox\naccent-color: teal");
+      const { quiz, errors } = parse("dark: off\ntheme: gruvbox\naccent-color: teal");
       expect(errors).toEqual([]);
       expect(quiz!.theme).toBe("light");
       expect(quiz!.palette).toBe("gruvbox");
@@ -312,7 +315,7 @@ describe("deck header appearance settings", () => {
     it("still lists the deck and reports the ignored setting with it", async () => {
       const quizDir = fs.mkdtempSync(path.join(os.tmpdir(), "mdq-style-"));
       fs.writeFileSync(path.join(quizDir, "styled.md"), deck("title-size: huge\nbody-size: large"));
-      fs.writeFileSync(path.join(quizDir, "plain.md"), deck("theme: light").replace("# Style deck", "# Plain deck"));
+      fs.writeFileSync(path.join(quizDir, "plain.md"), deck("dark: off").replace("# Style deck", "# Plain deck"));
       const warn = jest.spyOn(console, "warn").mockImplementation(() => undefined);
       try {
         const app = createApp({ quizDir });
@@ -346,7 +349,7 @@ describe("deck header appearance settings", () => {
     });
 
     it("leaves the field out for a deck without the keys", () => {
-      expect("deckStyle" in opened("theme: light")).toBe(false);
+      expect("deckStyle" in opened("dark: off")).toBe(false);
     });
   });
 

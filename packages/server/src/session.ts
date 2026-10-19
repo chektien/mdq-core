@@ -1,4 +1,5 @@
-import { isSlideType } from "@mdq/shared";
+import { availabilityPayload, sessionAvailabilityPhase } from "./availability";
+import { isSlideType, parseDeckPalette } from "@mdq/shared";
 import {
   Session,
   SessionState,
@@ -10,7 +11,9 @@ import {
   STATE_TRANSITIONS,
   SESSION_CODE_LENGTH,
   normalizeDisplayName,
+  DEFAULT_SESSION_AVAILABILITY_MS,
 } from "@mdq/shared";
+import { defaultSessionPolicy } from "./policy";
 import { assignLabel, ensureParticipantIdentity, newPublicKey } from "./identity";
 
 /** Error for invalid state transitions */
@@ -82,16 +85,34 @@ function restoreSessionValue(value: unknown): unknown {
 /** Restore a session previously returned by serializeSession. */
 export function deserializeSession(json: string): Session {
   const session = restoreSessionValue(JSON.parse(json)) as Session;
+  // Frozen decks saved before palette retirement must use the same fallback
+  // as newly parsed decks, without changing their saved source or progress.
+  if (session.deckSnapshot) {
+    const palette = parseDeckPalette(session.deckSnapshot.palette);
+    if (palette) session.deckSnapshot.palette = palette;
+  }
   // A session saved before public keys and labels existed gets them now.
   ensureParticipantIdentity(session);
   return session;
 }
 
+/** Expired sessions reserve their same code until actual deletion. */
+function unreservedSessionCode(): string {
+  let code = generateSessionCode();
+  while (sessionCodeIndex.has(code)) code = generateSessionCode();
+  return code;
+}
+
 /** Create a new Session in LOBBY state */
 export function createSession(week: string, mode: SessionMode): Session {
+  const now = Date.now();
   return {
+    availability: { schemaVersion: 1, availableUntil: now + DEFAULT_SESSION_AVAILABILITY_MS, generation: 1 },
+    policy: defaultSessionPolicy(),
+    policyFrozen: false,
+    releasedQuestionIndexes: new Set<number>(),
     sessionId: crypto.randomUUID(),
-    sessionCode: generateSessionCode(),
+    sessionCode: unreservedSessionCode(),
     week,
     mode,
     state: "LOBBY",
@@ -99,7 +120,8 @@ export function createSession(week: string, mode: SessionMode): Session {
     revealedQuestionIndexes: new Set<number>(),
     participants: new Map<string, Participant>(),
     submissions: [],
-    createdAt: Date.now(),
+    openResponsesHiddenByDefault: true,
+    createdAt: now,
   };
 }
 
@@ -126,7 +148,6 @@ export function repairClosedSlideState(session: Session, quiz: Quiz): boolean {
   }
 
   session.state = "QUESTION_OPEN";
-  session.questionStartedAt = Date.now();
   return true;
 }
 
@@ -142,7 +163,10 @@ export function addParticipant(
   sessionToken?: string,
   clientInstanceId?: string,
 ): { participant: Participant; isReconnect: boolean } {
+  const phase = sessionAvailabilityPhase(session, Date.now());
   const existing = session.participants.get(studentId);
+  if (phase === "ended" || phase === "deleted") throw new Error("Session has ended or been deleted.");
+  if (phase === "expired" && (!existing || existing.released || !sessionToken || sessionToken !== existing.sessionToken)) throw new Error("Availability ended. Valid existing seat credentials are required.");
 
   if (existing) {
     // Reconnect attempt: validate token
@@ -177,7 +201,7 @@ export function addParticipant(
 
     // Different token or no token: conflict
     throw new Error(
-      `Student ID "${studentId}" is already in use with a different session token.`,
+      `Participant ID "${studentId}" is already in use with a different session token.`,
     );
   }
 
@@ -208,6 +232,8 @@ export function recordSubmission(
   questionIndex: number,
   response: { selectedOptions?: string[]; responseText?: string } | string[],
 ): Submission {
+  if (sessionAvailabilityPhase(session, Date.now()) !== "active") throw new Error("Availability ended or session has ended.");
+  if (session.policy) throw new Error("Versioned sessions require the authenticated answerSubmit engine command.");
   const normalizedSelectedOptions = normalizeOptionSet(Array.isArray(response) ? response : (response.selectedOptions || []));
   const normalizedResponseText = normalizeResponseText(Array.isArray(response) ? undefined : response.responseText);
   const isOpenResponseSubmission = normalizedSelectedOptions.length === 0 && typeof normalizedResponseText === "string";
@@ -220,6 +246,9 @@ export function recordSubmission(
       `Question index mismatch: expected ${session.currentQuestionIndex}, got ${questionIndex}.`,
     );
   }
+  if (session.revealedQuestionIndexes?.has(questionIndex)) {
+    throw new Error("Revealed questions do not accept answers.");
+  }
   if (normalizedSelectedOptions.length === 0 && !normalizedResponseText) {
     throw new Error("A response is required.");
   }
@@ -228,6 +257,11 @@ export function recordSubmission(
   }
 
   const now = Date.now();
+  const timing = session.questionTiming?.[String(questionIndex)];
+  const deadline = timing ? timing.deadlineAt : session.questionDeadlineAt;
+  if (deadline !== undefined && deadline !== null && now >= deadline) {
+    throw new Error("The question deadline has passed.");
+  }
   const existingSubmission = session.submissions.find(
     (s) => s.studentId === studentId && s.questionIndex === questionIndex,
   );
@@ -240,7 +274,7 @@ export function recordSubmission(
     existingSubmission.selectedOptions = [];
     existingSubmission.responseText = normalizedResponseText;
     existingSubmission.submittedAt = now;
-    existingSubmission.responseTimeMs = session.questionStartedAt ? now - session.questionStartedAt : 0;
+    existingSubmission.responseTimeMs = session.questionStartedAt !== undefined ? now - session.questionStartedAt : 0;
     return existingSubmission;
   }
 
@@ -250,7 +284,7 @@ export function recordSubmission(
     selectedOptions: normalizedSelectedOptions,
     responseText: normalizedResponseText,
     submittedAt: now,
-    responseTimeMs: session.questionStartedAt ? now - session.questionStartedAt : 0,
+    responseTimeMs: session.questionStartedAt !== undefined ? now - session.questionStartedAt : 0,
   };
   session.submissions.push(submission);
   return submission;
@@ -276,6 +310,9 @@ export function getDistribution(
 
 /** Whether the presenter has hidden this participant's response to a question from the projector. */
 export function isResponseHidden(session: Session, questionIndex: number, publicKey: string): boolean {
+  if (session.openResponsesHiddenByDefault === true) {
+    return session.shownResponses?.[String(questionIndex)]?.includes(publicKey) !== true;
+  }
   return session.hiddenResponses?.[String(questionIndex)]?.includes(publicKey) === true;
 }
 
@@ -354,6 +391,7 @@ export function isExactOptionMatch(selectedOptions: string[], correctOptions: st
 export function computeLeaderboard(
   session: Session,
   correctAnswersMap: Map<number, string[]>,
+  ranking: "correctness" | "speed" | "legacy" = session.policy ? "correctness" : "legacy",
 ): { rank: number; studentId: string; displayName?: string; correctCount: number; totalTimeMs: number }[] {
   const studentStats = new Map<
     string,
@@ -396,13 +434,15 @@ export function computeLeaderboard(
     }))
     .sort((a, b) => {
       if (b.correctCount !== a.correctCount) return b.correctCount - a.correctCount;
-      if (a.totalTimeMs !== b.totalTimeMs) return a.totalTimeMs - b.totalTimeMs;
+      if (ranking !== "correctness" && a.totalTimeMs !== b.totalTimeMs) return a.totalTimeMs - b.totalTimeMs;
       return a.studentId.localeCompare(b.studentId);
     });
 
   // Assign ranks
   entries.forEach((entry, i) => {
-    entry.rank = i + 1;
+    const previous = entries[i - 1];
+    entry.rank = ranking !== "legacy" && previous && previous.correctCount === entry.correctCount
+      && (ranking === "correctness" || previous.totalTimeMs === entry.totalTimeMs) ? previous.rank : i + 1;
   });
 
   return entries;
@@ -427,16 +467,23 @@ export function getSessionByCode(code: string): Session | undefined {
   return id ? sessionStore.get(id) : undefined;
 }
 
-export function getActiveSessions(): { sessionId: string; sessionCode: string; state: string }[] {
-  const results: { sessionId: string; sessionCode: string; state: string }[] = [];
+export function getActiveSessions(): { sessionId: string; sessionCode: string; state: string; availability: import("@mdq/shared").SessionAvailabilityPayload }[] {
+  const results: { sessionId: string; sessionCode: string; state: string; availability: import("@mdq/shared").SessionAvailabilityPayload }[] = [];
   for (const session of sessionStore.values()) {
-    if (session.state !== "ENDED") {
-      results.push({ sessionId: session.sessionId, sessionCode: session.sessionCode, state: session.state });
+    if (session.state !== "ENDED" && sessionAvailabilityPhase(session, Date.now()) !== "deleted") {
+      results.push({ sessionId: session.sessionId, sessionCode: session.sessionCode, state: session.state, availability: availabilityPayload(session, Date.now()) });
     }
   }
   return results;
 }
 
+/** Remove only the exact stored identity, so stale purges cannot delete a replacement. */
+export function deleteSession(session: Session): boolean {
+  if (sessionStore.get(session.sessionId) !== session) return false;
+  sessionStore.delete(session.sessionId);
+  if (sessionCodeIndex.get(session.sessionCode) === session.sessionId) sessionCodeIndex.delete(session.sessionCode);
+  return true;
+}
 export function clearAllSessions(): void {
   sessionStore.clear();
   sessionCodeIndex.clear();

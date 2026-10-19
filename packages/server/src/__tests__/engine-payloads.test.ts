@@ -14,10 +14,7 @@ const quiz: Quiz = {
 
 it("captures existing outbound transition payloads", () => {
   const now = jest.spyOn(Date, "now").mockReturnValue(1000);
-  const session: Session = createSession("sample", "open");
-  session.state = "QUESTION_OPEN";
-  session.currentQuestionIndex = 0;
-  session.questionStartedAt = 1000;
+  const session: Session = apply(createSession("sample", "open"), quiz, { type: "start" }, 1000).session;
   const httpServer = createServer();
   const socketServer = setupSocket(httpServer, new Map([["sample", quiz]]));
   const sent: { event: string; payload: unknown }[] = [];

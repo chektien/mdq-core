@@ -54,7 +54,7 @@ question-type: open-response
 **Describe the idea in one sentence.**
 
 b`;
-const deck = (title, lines) => `# ${title}\ntheme: dark\npalette: tokyo-night\n${lines.join("\n")}\n\n---\n\n${QUESTION}\n\n---\n\n${OPEN}\n\n---\n`;
+const deck = (title, lines) => `# ${title}\ndark: on\ntheme: ayu\n${lines.join("\n")}\n\n---\n\n${QUESTION}\n\n---\n\n${OPEN}\n\n---\n`;
 const DECKS = {
   plain: deck("Phone plain", []),
   styled: deck("Phone styled", ["accent-color: #0b5394", "background-color: #fdf6e3", "text-color: #101820", "body-size: large"]),

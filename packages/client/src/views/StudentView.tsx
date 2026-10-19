@@ -1,15 +1,22 @@
+import SessionAvailabilityInfo from "../components/SessionAvailabilityInfo";
 import { isSlideType } from "@mdq/shared";
 import { useState, useCallback, useEffect, useMemo, useRef, useSyncExternalStore } from "react";
+import ParticipantResultsView from "../components/ParticipantResultsView";
+import { useParticipantResults } from "../hooks/useParticipantResults";
+import { useParticipantStudy } from "../hooks/useParticipantStudy";
+import ParticipantStudyControls from "../components/ParticipantStudyControls";
+import type { ParticipantDraft } from "../participantDrafts";
 import { useSocket } from "../hooks/useSocket";
+import { loadStoredSession, saveStoredSession, clearStoredSession } from "../participantSessionStorage";
 import type { QuestionState, RevealState } from "../hooks/useSocket";
 import { API, MAX_OPEN_RESPONSE_LENGTH, SEAT_TAKEN_MESSAGE } from "@mdq/shared";
-import type { DeckPalette, DeckTheme, SessionState } from "@mdq/shared";
+import type { DeckPalette, DeckTheme, SessionState, SessionAvailabilityPayload } from "@mdq/shared";
 import Timer from "../components/Timer";
 import Leaderboard from "../components/Leaderboard";
 import DistributionChart from "../components/DistributionChart";
 import InlineMarkdownText from "../components/InlineMarkdownText";
 import QuizHtml from "../components/QuizHtml";
-import SlideContent from "../components/SlideContent";
+import SlideContent, { QuestionMedia } from "../components/SlideContent";
 import { getQuestionModeText } from "../questionMode";
 import { phoneScreenAppearance, type PhoneScreenAppearance } from "../phoneDeckStyle";
 import { browserColorEnv } from "../phoneDeckStyleBrowser";
@@ -19,9 +26,9 @@ import { deckLabel, resultsHeading } from "../deckLabel";
 import type { JoinFieldName, JoinFieldSpec } from "../joinForm";
 import { applyClientPalette, applyClientTheme, resolveClientPalette, resolveClientTheme } from "../theme";
 
-function clearSessionArtifacts(): void {
+function clearSessionArtifacts(sessionId: string | null): void {
   try {
-    localStorage.removeItem("mdquiz_session");
+    clearStoredSession(sessionId);
     localStorage.removeItem("mdquiz_pending_join");
   } catch {
     // ignore
@@ -36,16 +43,8 @@ const REJOIN_GRACE_MS = 10_000;
  * the restore effect and the socket auto-rejoin use.
  */
 function hasStoredSeat(initialSessionId?: string, initialSessionCode?: string): boolean {
-  try {
-    const raw = localStorage.getItem("mdquiz_session");
-    if (!raw) return false;
-    const stored = JSON.parse(raw);
-    if (typeof stored?.sessionToken !== "string" || !stored.sessionToken || typeof stored.sessionId !== "string") return false;
-    const targetSessionId = (initialSessionId || "").trim();
-    return targetSessionId ? stored.sessionId === targetSessionId : !initialSessionCode && Boolean(stored.sessionId);
-  } catch {
-    return false;
-  }
+  const stored = initialSessionId ? loadStoredSession(initialSessionId.trim()) : !initialSessionCode ? loadStoredSession() : null;
+  return Boolean(stored?.sessionToken);
 }
 
 function createGeneratedStudentId(): string {
@@ -91,7 +90,12 @@ export default function StudentView({
   const [code, setCode] = useState(normalizeSessionCode(initialSessionCode || ""));
   const [studentId, setStudentId] = useState("");
   const [displayName, setDisplayName] = useState("");
-  const [sessionId, setSessionId] = useState<string | null>(null);
+  const routeKey = JSON.stringify([initialSessionId ?? null, initialSessionCode ?? null]);
+  const [restoredRouteKey, setRestoredRouteKey] = useState(routeKey);
+  const [selectedSessionId, setSessionId] = useState<string | null>(null);
+  // Route props change before restore effects run. Quarantine the previous socket target immediately.
+  const sessionId = restoredRouteKey === routeKey ? selectedSessionId : null;
+  const [sessionEndedHint, setSessionEndedHint] = useState<string | null>(null);
   const [quizKey, setQuizKey] = useState<string | null>(null);
   // The deck's own appearance once a session is known. Until then (null) the
   // page follows the defaults, including a runtime config that arrives late.
@@ -104,6 +108,7 @@ export default function StudentView({
   // What the deck behind the typed code asks for. The fields wait for it, so a
   // student never fills in a form the deck does not use.
   const [codeLookup, setCodeLookup] = useState<{ status: "idle" | "checking" | "found" | "missing" | "failed"; studentIds: boolean }>({ status: "idle", studentIds: true });
+  const [lookupAvailability, setLookupAvailability] = useState<{ routeKey: string; code: string; sessionId: string; availability: SessionAvailabilityPayload } | null>(null);
   const [lookupAttempt, setLookupAttempt] = useState(0);
   // The session a join has already resolved, so returning to the form after a refusal keeps its code.
   const resolvedSessionRef = useRef<string | null>(null);
@@ -145,6 +150,8 @@ export default function StudentView({
   }, [clearJoinError, joinError]);
 
   const sock = useSocket(sessionId, "student");
+  const study = useParticipantStudy(sessionId, sock);
+  const ownResults = useParticipantResults(sessionId, sock.sessionToken, sock.sessionState, sock.seatTaken, sock.connected);
   const { connected, sessionToken, joinSession, error: sockError } = sock;
 
   // Hold the theme until the deck's own theme is known (join-link lookup or
@@ -179,7 +186,12 @@ export default function StudentView({
           return;
         }
         if (!response.ok) throw new Error("lookup failed");
-        const data = (await response.json()) as { studentIds?: boolean };
+        const data = (await response.json()) as { studentIds?: boolean; state?: SessionState; sessionId?: string; availability?: SessionAvailabilityPayload };
+        if (!cancelled && data.sessionId && data.availability) {
+          setLookupAvailability({ routeKey, code, sessionId: data.sessionId, availability: data.availability });
+          if (data.availability.phase === "expired" && loadStoredSession(data.sessionId)?.sessionToken) setSessionId(data.sessionId);
+        }
+        if (!cancelled && data.state === "ENDED" && data.sessionId) { setSessionEndedHint(data.sessionId); setSessionId(data.sessionId); }
         if (!cancelled) setCodeLookup({ status: "found", studentIds: data.studentIds !== false });
       })
       .catch(() => {
@@ -188,7 +200,7 @@ export default function StudentView({
     return () => {
       cancelled = true;
     };
-  }, [code, lookupAttempt]);
+  }, [code, lookupAttempt, routeKey]);
 
   // Resolve QR/join links early so the join form itself uses the deck theme.
   useEffect(() => {
@@ -202,10 +214,15 @@ export default function StudentView({
     fetch(API.SESSION_BY_CODE.replace(":code", normalizedCode))
       .then(async (response) => {
         if (!response.ok) return null;
-        return response.json() as Promise<{ week?: string; theme?: DeckTheme; palette?: DeckPalette }>;
+        return response.json() as Promise<{ sessionId?: string; state?: SessionState; availability?: SessionAvailabilityPayload; week?: string; theme?: DeckTheme; palette?: DeckPalette }>;
       })
       .then((data) => {
         if (cancelled || !data) return;
+        if (data.sessionId && data.availability) {
+          setLookupAvailability({ routeKey, code: normalizedCode, sessionId: data.sessionId, availability: data.availability });
+          if (data.availability.phase === "expired" && loadStoredSession(data.sessionId)?.sessionToken) setSessionId(data.sessionId);
+        }
+        if (data.state === "ENDED" && data.sessionId) { setSessionEndedHint(data.sessionId); setSessionId(data.sessionId); }
         setSessionTheme(resolveClientTheme(data.theme, defaultTheme));
         setSessionPalette(resolveClientPalette(data.palette, defaultPalette));
         if (typeof data.week === "string" && data.week.trim()) setQuizKey(data.week);
@@ -219,15 +236,21 @@ export default function StudentView({
     return () => {
       cancelled = true;
     };
-  }, [defaultPalette, defaultTheme, initialSessionCode, normalizeSessionCode]);
+  }, [defaultPalette, defaultTheme, initialSessionCode, normalizeSessionCode, routeKey]);
 
   // Try to restore session from localStorage on mount
   useEffect(() => {
     try {
-      const raw = localStorage.getItem("mdquiz_session");
+      setRestoredRouteKey(routeKey);
+      setSessionEndedHint(null);
+      setJoinError(null);
+      setJoinErrorField(null);
+      setJoining(false);
+      setAwaitingRejoin(hasStoredSeat(initialSessionId, initialSessionCode));
+      if (initialSessionCode) setSessionId(null);
       const targetSessionId = (initialSessionId || "").trim();
-      if (raw) {
-        const stored = JSON.parse(raw);
+      const stored = targetSessionId ? loadStoredSession(targetSessionId) : loadStoredSession();
+      if (stored) {
         const restoresStoredSession = targetSessionId
           ? stored.sessionId === targetSessionId
           : !initialSessionCode && Boolean(stored.sessionId);
@@ -259,11 +282,12 @@ export default function StudentView({
     }
     setCompleted(false);
     if (!initialSessionCode) setAppearanceReady(true);
-  }, [defaultPalette, defaultTheme, initialSessionCode, initialSessionId]);
+  }, [defaultPalette, defaultTheme, initialSessionCode, initialSessionId, routeKey]);
 
   const handleDone = useCallback(() => {
-    clearSessionArtifacts();
-    sock.disconnect();
+    localStorage.removeItem("mdquiz_pending_join");
+    sock.disconnect({ preserveSession: true });
+    setSessionId(null);
     setCompleted(true);
     setSessionTheme(null);
     setSessionPalette(null);
@@ -291,7 +315,7 @@ export default function StudentView({
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
         if (res.status === 404 || res.status === 410) {
-          clearSessionArtifacts();
+          clearSessionArtifacts(null);
           setSessionId(null);
           setQuizKey(null);
           setSessionTheme(null);
@@ -313,38 +337,18 @@ export default function StudentView({
       // Store pending join info and session for the socket handler
       localStorage.setItem(
         "mdquiz_pending_join",
-        JSON.stringify({ studentId: identity.studentId, displayName: identity.displayName }),
+        JSON.stringify({ sessionId: data.sessionId, studentId: identity.studentId, displayName: identity.displayName }),
       );
-      // Also update the session store so page refreshes restore the session
-      localStorage.setItem(
-        "mdquiz_session",
-        JSON.stringify({
-          sessionId: data.sessionId,
-          studentId: identity.seatKey,
-          sessionWeek: data.week,
-          sessionTheme: resolvedTheme,
-          sessionPalette: resolvedPalette,
-          sessionToken:
-            (() => {
-              try {
-                const existingRaw = localStorage.getItem("mdquiz_session");
-                if (!existingRaw) return undefined;
-                const existing = JSON.parse(existingRaw);
-                if (
-                  existing
-                  && existing.sessionId === data.sessionId
-                  && existing.studentId === identity.seatKey
-                  && typeof existing.sessionToken === "string"
-                ) {
-                  return existing.sessionToken;
-                }
-              } catch {
-                // ignore
-              }
-              return undefined;
-            })(),
-        }),
-      );
+      // Keep every prior seat while selecting this pending join as the active session.
+      const existing = loadStoredSession(data.sessionId);
+      saveStoredSession({
+        sessionId: data.sessionId,
+        studentId: identity.seatKey,
+        sessionWeek: data.week,
+        sessionTheme: resolvedTheme,
+        sessionPalette: resolvedPalette,
+        sessionToken: existing?.studentId === identity.seatKey ? existing.sessionToken : undefined,
+      });
 
       if (connected && !sessionToken && sessionId === data.sessionId) {
         // A second try after a refusal: the socket is already open, so nothing else will send the join.
@@ -367,6 +371,7 @@ export default function StudentView({
         const raw = localStorage.getItem("mdquiz_pending_join");
         if (raw) {
           const pending = JSON.parse(raw);
+          if (pending.sessionId && pending.sessionId !== sessionId) return;
           joinSession(pending.studentId || undefined, pending.displayName);
           localStorage.removeItem("mdquiz_pending_join");
         }
@@ -374,7 +379,7 @@ export default function StudentView({
         // ignore
       }
     }
-  }, [connected, sessionToken, joinSession]);
+  }, [connected, sessionId, sessionToken, joinSession]);
 
   // Clear joining state when joined or errored
   useEffect(() => {
@@ -403,8 +408,10 @@ export default function StudentView({
   useEffect(() => {
     if (sockError) {
       const lowered = sockError.toLowerCase();
-      if (lowered.includes("ended") || lowered.includes("not found")) {
-        clearSessionArtifacts();
+      if (lowered.includes("availability ended")) { setJoining(false); setAwaitingRejoin(false); return; }
+      if (lowered.includes("ended")) { setSessionEndedHint(sessionId); setJoining(false); return; }
+      if (lowered.includes("not found")) {
+        clearSessionArtifacts(sessionId);
         setSessionId(null);
         setQuizKey(null);
       }
@@ -413,7 +420,7 @@ export default function StudentView({
       setJoinErrorField(errorField(spec, sockError));
       setJoining(false);
     }
-  }, [sockError, spec]);
+  }, [sessionId, sockError, spec]);
 
   // Put the cursor in the field a message is about, so the fix is one edit away.
   useEffect(() => {
@@ -438,6 +445,29 @@ export default function StudentView({
         <p role="status" className="max-w-xs text-zinc-300 text-sm">{SEAT_TAKEN_MESSAGE}</p>
       </div>
     );
+  }
+
+  if (ownResults.status === "ready" && ownResults.results) return <ParticipantResultsView results={ownResults.results} onDone={handleDone} availability={sock.availability} />;
+  if (ownResults.status === "ended" || (sessionId !== null && sessionEndedHint === sessionId) || sock.sessionState === "ENDED"
+    || (ownResults.status === "error" && !sock.sessionToken && hasStoredSeat(sessionId ?? undefined))) {
+    return (
+      <main className="student-screen min-h-dvh flex flex-col items-center justify-center gap-4 p-6 text-center">
+        <h1 className="text-2xl font-semibold text-white">{ownResults.status === "loading" ? "Loading your results…" : ownResults.status === "error" ? "Your results could not be loaded" : "This session has ended"}</h1>
+        {ownResults.error && <p role="alert" className="text-zinc-300">{ownResults.error}</p>}
+        {(ownResults.status === "error" || ownResults.status === "pending") && <button type="button" onClick={ownResults.refresh} className="rounded-xl border border-zinc-600 px-5 py-3">Retry results</button>}
+        {ownResults.status !== "loading" && <button type="button" onClick={handleDone} className="rounded-xl border border-zinc-600 px-5 py-3">Done</button>}
+      </main>
+    );
+  }
+
+  const scopedLookupAvailability = lookupAvailability?.routeKey === routeKey && lookupAvailability.code === code ? lookupAvailability.availability : null;
+  const unavailable = sock.availability?.phase === "expired" || sock.availability?.phase === "deleted" ? sock.availability : scopedLookupAvailability;
+  if (!sessionToken && unavailable && (unavailable.phase === "expired" || unavailable.phase === "deleted") && (!awaitingRejoin || sockError || !loadStoredSession(lookupAvailability?.sessionId ?? sessionId)?.sessionToken)) {
+    return <main className="student-screen min-h-dvh p-6 space-y-4">
+      <h1 className="text-2xl font-semibold text-white">{unavailable.phase === "expired" ? "Availability ended" : "Session data has been deleted"}</h1>
+      <SessionAvailabilityInfo availability={unavailable} />
+      {unavailable.phase === "expired" && <p className="text-sm text-zinc-400">New joining is closed. An existing seat can return on its original device or with its saved credentials.</p>}
+    </main>;
   }
 
   // ── Rejoining with a stored seat ──
@@ -606,11 +636,21 @@ export default function StudentView({
     const resultsLabel = sock.deckTitle || quizKey ? deckLabel(sock.deckTitle, quizKey || "") : "";
     const lobbyNote = extraLabelNote(sock.label, sock.labelNote);
 
+    if (sock.availability?.phase === "expired") {
+      return <div className="w-full">
+        <div className="p-4"><SessionAvailabilityInfo availability={sock.availability} /></div>
+        <ParticipantStudyControls study={study} />
+        {study.question && <QuestionView key={`${sessionToken}:${study.question.questionIndex}`} question={study.question} state="QUESTION_CLOSED" remainingSec={null} submitted={study.submitted} submittedOptions={study.submittedOptions} submittedResponseText={study.submittedResponseText} timedOut={false} connected={false} onSubmit={study.submitAnswer} draft={study.draft} onDraftChange={study.setDraft} draftPersisted={study.draftPersisted} selfPaced={study.selfPaced} />}
+      </div>;
+    }
+    if (sock.availability?.phase === "deleted") return <SessionAvailabilityInfo availability={sock.availability} />;
+
     // Waiting in lobby
     if (state === "LOBBY") {
       return (
         <div className="min-h-dvh flex flex-col items-center justify-center gap-4 p-6">
           <div className="w-16 h-16 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin" />
+          <SessionAvailabilityInfo availability={sock.availability} />
           <h2 className="text-xl font-semibold text-white">Waiting for quiz to start...</h2>
           <p className="text-zinc-400 text-sm">The instructor will begin shortly</p>
           {sock.label && (
@@ -628,18 +668,26 @@ export default function StudentView({
     // Question open
     if (state === "QUESTION_OPEN" || state === "QUESTION_CLOSED") {
       return (
-        <QuestionView
-          key={sock.currentQuestion?.questionIndex ?? 0}
-          question={sock.currentQuestion}
-          state={state}
-          remainingSec={sock.remainingSec}
-          submitted={sock.submitted}
-          submittedOptions={sock.submittedOptions}
-          submittedResponseText={sock.submittedResponseText}
-          timedOut={sock.timedOut}
-          connected={connected}
-          onSubmit={sock.submitAnswer}
-        />
+        <>
+          <SessionAvailabilityInfo availability={sock.availability} />
+          <ParticipantStudyControls study={study} />
+          <QuestionView
+            key={`${sessionToken}:${study.question?.questionIndex ?? 0}`}
+            question={study.question}
+            state={study.selfPaced && !study.canAnswer && !study.submitted && !isSlideType(study.question?.questionType) ? "QUESTION_CLOSED" : state}
+            remainingSec={study.selfPaced ? null : sock.remainingSec}
+            submitted={study.submitted}
+            submittedOptions={study.submittedOptions}
+            submittedResponseText={study.submittedResponseText}
+            timedOut={sock.timedOut}
+            connected={connected}
+            onSubmit={study.submitAnswer}
+            draft={study.draft}
+            onDraftChange={study.setDraft}
+            draftPersisted={study.draftPersisted}
+            selfPaced={study.selfPaced}
+          />
+        </>
       );
     }
 
@@ -730,7 +778,7 @@ function subscribeToLook(onChange: () => void): () => void {
 
 // ── Question sub-view ──────────────────────
 
-function QuestionView({
+export function QuestionView({
   question,
   state,
   remainingSec,
@@ -740,19 +788,31 @@ function QuestionView({
   timedOut,
   connected,
   onSubmit,
+  draft,
+  onDraftChange,
+  draftPersisted = false,
+  selfPaced = false,
 }: {
   question: QuestionState | null;
   state: SessionState;
-  remainingSec: number;
+  remainingSec: number | null;
   submitted: boolean;
   submittedOptions: string[];
   submittedResponseText: string | null;
   timedOut: boolean;
   connected: boolean;
   onSubmit: (payload: { questionIndex: number; selectedOptions?: string[]; responseText?: string }) => void;
+  draft?: Pick<ParticipantDraft, "selectedOptions" | "responseText"> | null;
+  onDraftChange?: (patch: Partial<Pick<ParticipantDraft, "selectedOptions" | "responseText">>) => void;
+  draftPersisted?: boolean;
+  selfPaced?: boolean;
 }) {
-  const [selected, setSelected] = useState<string[]>([]);
-  const [responseText, setResponseText] = useState("");
+  const [localSelected, setLocalSelected] = useState<string[]>([]);
+  const [localResponseText, setLocalResponseText] = useState("");
+  const selected = draft?.selectedOptions ?? localSelected;
+  const responseText = draft?.responseText ?? localResponseText;
+  const setSelected = (value: string[]) => onDraftChange ? onDraftChange({ selectedOptions: value }) : setLocalSelected(value);
+  const setResponseText = (value: string) => onDraftChange ? onDraftChange({ responseText: value }) : setLocalResponseText(value);
   const lastSubmittedResponseRef = useRef<string>("");
   const appearance = usePhoneScreenAppearance(question?.deckStyle);
   const questionIndex = question?.questionIndex ?? -1;
@@ -770,17 +830,19 @@ function QuestionView({
   }
 
   useEffect(() => {
-    if (!question) {
+    if (!question || onDraftChange) {
       return;
     }
+    // Timer metadata can change on Restart Countdown; only a different
+    // immutable item resets its unsent selection or response.
     setSelected([]);
     const nextResponse = submittedResponseText || "";
     setResponseText(nextResponse);
     lastSubmittedResponseRef.current = nextResponse;
-  }, [question, questionIndex]);
+  }, [questionIndex]);
 
   useEffect(() => {
-    if (!question || questionType !== "open_response") {
+    if (!question || questionType !== "open_response" || onDraftChange) {
       return;
     }
 
@@ -804,11 +866,9 @@ function QuestionView({
   const toggleOption = (label: string) => {
     if (submitted || state === "QUESTION_CLOSED") return;
     setReconnectedNote(false);
-    setSelected((prev) =>
-      question.allowsMultiple
-        ? (prev.includes(label) ? prev.filter((l) => l !== label) : [...prev, label])
-        : (prev.includes(label) ? [] : [label]),
-    );
+    setSelected(question.allowsMultiple
+      ? (selected.includes(label) ? selected.filter(l => l !== label) : [...selected, label])
+      : (selected.includes(label) ? [] : [label]));
   };
 
   const handleSubmit = () => {
@@ -832,11 +892,11 @@ function QuestionView({
     : question.isPoll
     ? question.allowsMultiple ? "Submit Votes" : "Submit Vote"
     : question.allowsMultiple ? "Submit Selections" : "Submit Answer";
-  const submittedLabel = question.questionType === "open_response"
+  const submittedLabel = selfPaced ? "Answer saved" : question.questionType === "open_response"
     ? "Response submitted"
     : question.isPoll ? "Vote submitted" : "Answer submitted";
   // Questions are counted without slides, the same on every phone and after a reload; a slide shows no number.
-  const positionLabel = question.questionNumber && question.questionTotal
+  const positionLabel = !selfPaced && question.questionNumber && question.questionTotal
     ? `Question ${question.questionNumber} of ${question.questionTotal}`
     : null;
   const questionTextId = `question-text-${question.questionIndex}`;
@@ -881,7 +941,7 @@ function QuestionView({
           slideReferences={question.slideReferences}
           deckStyle={question.deckStyle}
           mode="student"
-          statusLabel="The instructor will advance shortly"
+          statusLabel={selfPaced ? undefined : "The instructor will advance shortly"}
         />
         </div>
       </div>
@@ -890,18 +950,19 @@ function QuestionView({
 
   return (
     <div className="student-screen min-h-dvh flex flex-col p-4 pb-safe" style={appearance.style} {...appearance.attributes}>
-      {/* Header: timer + question number */}
-      <div className="flex items-center justify-between mb-4">
+      {/* Self-paced position is already in the study bar. */}
+      {!selfPaced && <div className="flex items-center justify-between mb-4">
         <span className="student-screen-quiet text-zinc-400 text-sm font-medium">
           {positionLabel}
         </span>
-        {!isClosed && (
+        {!isClosed && !selfPaced && (
           <Timer remainingSec={remainingSec} totalSec={question.timeLimitSec} size={64} />
         )}
-      </div>
+      </div>}
 
       {/* Question text */}
       <QuizHtml id={questionTextId} className="quiz-html student-question-text text-lg text-white leading-relaxed mb-6" html={question.text} />
+      <QuestionMedia media={question.slideMedia} />
 
       <div className={`selection-mode-card mb-5 rounded-2xl border px-4 py-3 ${question.questionType === "open_response" || question.allowsMultiple ? "selection-mode-card-multi" : "selection-mode-card-single"}`}>
         <div className="selection-mode-text">{selectionModeText}</div>
@@ -942,7 +1003,7 @@ function QuestionView({
           aria-labelledby={questionTextId}
         >
           {question.options.map((opt) => {
-            const isSelected = selected.includes(opt.label);
+            const isSelected = !submitted && selected.includes(opt.label);
             const wasSubmitted = submittedOptions.includes(opt.label);
             const disabled = submitted || isClosed;
 
@@ -990,15 +1051,16 @@ function QuestionView({
 
       {/* Submit button */}
       <div className="mt-4 pt-4 border-t border-zinc-800">
+        {(!submitted || hasUnsent) && <p className="student-screen-quiet mb-3 text-sm text-zinc-400" role="status">{hasUnsent ? draftPersisted ? "Draft saved" : "Draft on this screen" : "Not answered"}</p>}
         {question.questionType === "open_response" && submittedResponseText && canEditOpenResponse ? (
           <div className="mb-3 rounded-2xl border border-emerald-500/40 bg-emerald-600/10 px-4 py-3">
-            <span className="text-emerald-400 font-semibold">{submittedLabel}</span>
+            <span className={selfPaced ? "student-screen-text text-zinc-300 font-semibold" : "text-emerald-400 font-semibold"}>{submittedLabel}</span>
             <p className="mt-2 text-sm text-zinc-300 whitespace-pre-wrap">{submittedResponseText}</p>
           </div>
         ) : null}
         {submitted && question.questionType !== "open_response" ? (
           <div className="text-center py-3">
-            <span className="student-screen-text text-emerald-400 font-semibold">{submittedLabel}</span>
+            <span className={selfPaced ? "student-screen-text text-zinc-300 font-semibold" : "student-screen-text text-emerald-400 font-semibold"}>{submittedLabel}</span>
             {isClosed && <p className="student-closed-note student-screen-quiet mt-1 text-sm text-zinc-400">{closedNote}</p>}
           </div>
         ) : question.questionType === "open_response" && isClosed ? (
@@ -1140,6 +1202,7 @@ function RevealView({
 
       {/* Question text */}
       <QuizHtml className="quiz-html student-question-text student-question-text-small text-base text-zinc-300 leading-relaxed mb-4" html={question.text} />
+      <QuestionMedia media={question.slideMedia} />
 
       {isOpenResponse ? (
         // With no response, the banner above already says so.

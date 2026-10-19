@@ -6,10 +6,11 @@ export default function Timer({
   totalSec,
   size = 120,
 }: {
-  remainingSec: number;
-  totalSec: number;
+  remainingSec: number | null;
+  totalSec: number | null;
   size?: number;
 }) {
+  if (totalSec === null || remainingSec === null) return null;
   const radius = (size - 12) / 2;
   const circumference = 2 * Math.PI * radius;
   const progress = totalSec > 0 ? remainingSec / totalSec : 0;
@@ -27,7 +28,7 @@ export default function Timer({
   return (
     <div
       data-fit-ignore
-      className={`relative inline-flex items-center justify-center ${urgent ? "timer-urgent" : ""}`}
+      className={`relative inline-flex shrink-0 items-center justify-center ${urgent ? "timer-urgent" : ""}`}
       style={{ width: size, height: size }}
     >
       <svg width={size} height={size} className="-rotate-90">
@@ -54,9 +55,9 @@ export default function Timer({
         />
       </svg>
       <span
-        className="timer-label absolute font-mono font-bold"
+        className="timer-label absolute font-mono font-bold tabular-nums"
         data-timer-state={state}
-        style={{ fontSize: labelFontSize, color }}
+        style={{ fontSize: labelFontSize, lineHeight: 1, letterSpacing: 0, color }}
       >
         {label}
       </span>

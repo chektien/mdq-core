@@ -6,7 +6,7 @@ import { createApp } from "../app";
 import { loadRuntimeConfig } from "../config";
 import { clearAllSessions } from "../session";
 import { parseQuizMarkdown } from "../parser";
-import { DECK_PALETTES } from "@mdq/shared";
+import { DECK_PALETTES, isDeckPalette, parseDeckPalette } from "@mdq/shared";
 
 const QUESTION = `
 ---
@@ -25,10 +25,10 @@ B. No
 `;
 
 function deck(title: string, palette?: string, theme?: string): string {
-  return `# ${title}\n${theme ? `theme: ${theme}\n` : ""}${palette ? `palette: ${palette}\n` : ""}${QUESTION}`;
+  return `# ${title}\n${theme ? `dark: ${theme === "dark" ? "on" : "off"}\n` : ""}${palette ? `theme: ${palette}\n` : ""}${QUESTION}`;
 }
 
-const ALL_PALETTES = ["classic", "gruvbox", "rose-pine", "catppuccin", "seoul256", "ayu", "tokyo-night"];
+const ALL_PALETTES = ["classic", "gruvbox", "rose-pine", "catppuccin", "seoul256", "ayu", "tomorrow", "nord-aurora"];
 
 describe("per-deck palette", () => {
   afterEach(() => clearAllSessions());
@@ -42,6 +42,31 @@ describe("per-deck palette", () => {
 
   it("lists the supported palettes in one ordered shared constant", () => {
     expect([...DECK_PALETTES]).toEqual(ALL_PALETTES);
+  });
+
+  it("loads retired palette decks as classic without rewriting their Markdown", async () => {
+    expect(isDeckPalette("tokyo-night")).toBe(false);
+    for (const written of ["tokyo-night", " TOKYO-NIGHT ", "'tokyo-night'", '"TOKYO-NIGHT"']) {
+      const result = parseQuizMarkdown(deck("Retired", written), "retired.md");
+      expect(result.errors).toEqual([]);
+      expect(result.quiz?.palette).toBe("classic");
+    }
+    expect(parseDeckPalette(" TOKYO-NIGHT ")).toBe("classic");
+    expect(parseDeckPalette("tokyonight")).toBeUndefined();
+
+    const quizDir = fs.mkdtempSync(path.join(os.tmpdir(), "mdq-palette-retired-"));
+    const filename = path.join(quizDir, "retired.md");
+    const markdown = deck("Retired", "tokyo-night", "light");
+    fs.writeFileSync(filename, markdown);
+    const app = createApp({ quizDir, palette: "gruvbox" });
+    const response = await request(app).get("/api/deck/retired").expect(200);
+    expect(response.body.palette).toBe("classic");
+    expect(response.body.theme).toBe("light");
+    const created = await request(app).post("/api/session").send({ week: "retired" }).expect(201);
+    expect(created.body.palette).toBe("classic");
+    const restored = await request(app).get(`/api/session/${created.body.sessionId}/state`).expect(200);
+    expect(restored.body.palette).toBe("classic");
+    expect(fs.readFileSync(filename, "utf-8")).toBe(markdown);
   });
 
   it.each(ALL_PALETTES)("parses %s case-insensitively with optional quotes", (name) => {
@@ -59,7 +84,7 @@ describe("per-deck palette", () => {
   });
 
   it("only reads palette from the deck preamble", () => {
-    const markdown = `# Body only\n${QUESTION.replace("**Ready?**", "palette: gruvbox\n\n**Ready?**")}`;
+    const markdown = `# Body only\n${QUESTION.replace("**Ready?**", "theme: gruvbox\n\n**Ready?**")}`;
     const result = parseQuizMarkdown(markdown, "body.md");
     expect(result.errors).toEqual([]);
     expect(result.quiz?.palette).toBeUndefined();
@@ -68,15 +93,15 @@ describe("per-deck palette", () => {
   it("reports invalid palette metadata at deck level", () => {
     const result = parseQuizMarkdown(deck("Invalid", "solarized"), "invalid.md");
     expect(result.errors.map((error) => error.detail)).toContain(
-      "Invalid palette: solarized (expected classic, gruvbox, rose-pine, catppuccin, seoul256, ayu, or tokyo-night)",
+      "Invalid theme: solarized (expected classic, gruvbox, rose-pine, catppuccin, seoul256, ayu, tomorrow, or nord-aurora)",
     );
     // A near miss is still rejected, so only the exact hyphenated names work.
-    for (const nearMiss of ["rosepine", "rose_pine", "tokyonight", "tokyo night", "mocha", ""]) {
+    for (const nearMiss of ["rosepine", "rose_pine", "mocha", ""]) {
       const rejected = parseQuizMarkdown(deck("Near miss", nearMiss || "''"), "near-miss.md");
-      expect(rejected.errors.some((error) => error.detail.startsWith("Invalid palette"))).toBe(true);
+      expect(rejected.errors.some((error) => error.detail.startsWith("Invalid theme"))).toBe(true);
       expect(rejected.quiz?.palette).toBeUndefined();
     }
-    expect(result.errors.find((error) => error.detail.startsWith("Invalid palette"))?.questionIndex).toBe(-1);
+    expect(result.errors.find((error) => error.detail.startsWith("Invalid theme"))?.questionIndex).toBe(-1);
   });
 
   it("defaults the runtime palette to classic and accepts MDQ_PALETTE", () => {
@@ -96,10 +121,10 @@ describe("per-deck palette", () => {
     for (const name of ALL_PALETTES) {
       fs.writeFileSync(path.join(quizDir, `${name}.md`), deck(name, name));
     }
-    const app = createApp({ quizDir, palette: "tokyo-night" });
+    const app = createApp({ quizDir, palette: "ayu" });
 
     const runtime = await request(app).get("/api/runtime-config").expect(200);
-    expect(runtime.body.palette).toBe("tokyo-night");
+    expect(runtime.body.palette).toBe("ayu");
 
     for (const name of ALL_PALETTES) {
       const response = await request(app).get(`/api/deck/${name}`).expect(200);
@@ -172,8 +197,14 @@ describe("per-deck palette", () => {
 describe("print exporter palette", () => {
   const printSource = fs.readFileSync(path.resolve(__dirname, "..", "print-mdq.ts"), "utf-8");
 
-  it("accepts every palette through --palette and defaults to the deck palette", () => {
-    expect(printSource).toContain('arg === "--palette"');
+  it("ships no retired palette colour definitions in live or print styles", () => {
+    const css = fs.readFileSync(path.resolve(__dirname, "..", "..", "..", "client", "src", "index.css"), "utf-8");
+    expect(css).not.toMatch(/tokyo.?night|folke\/tokyonight/i);
+    expect(printSource).not.toMatch(/tokyo.?night|folke\/tokyonight/i);
+  });
+
+  it("accepts every palette through --theme and defaults to the deck palette", () => {
+    expect(printSource).toContain('arg === "--theme"');
     expect(printSource).toContain("parseDeckPalette(value)");
     expect(printSource).toContain("Use ${describeDeckPalettes()}.");
     expect(printSource).toContain('options.palette ?? quiz.palette ?? "classic"');

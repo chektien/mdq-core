@@ -96,6 +96,16 @@ function renderMediaFigure(media: SlideMedia, index: number) {
   );
 }
 
+/** Question media is separate from answer controls and stays visible on reveal. */
+export function QuestionMedia({ media = [] }: { media?: SlideMedia[] }) {
+  if (media.length === 0) return null;
+  return <div className="question-media" aria-label="Question images">
+    <div className={`slide-media-grid ${mediaGridCountClass(media.length)}`}>
+      {media.map((item, index) => renderMediaFigure(item, index))}
+    </div>
+  </div>;
+}
+
 /** Cover typography fits the remaining safe area, including live chrome and notes. */
 function CoverContent({ title, html, slideMedia = [], slideMediaPosition, slideMediaOpacity }: SlideContentBodyProps) {
   const stageRef = useRef<HTMLDivElement>(null);

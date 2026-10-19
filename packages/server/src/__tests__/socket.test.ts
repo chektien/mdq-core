@@ -1,3 +1,4 @@
+import { createLegacySession } from "./fixtures/legacy-session";
 import { createServer } from "http";
 import { Server } from "socket.io";
 import { io as ioClient, Socket as ClientSocket } from "socket.io-client";
@@ -14,7 +15,6 @@ import {
 import {
   clearAllSessions,
   storeSession,
-  createSession,
   transitionState,
 } from "../session";
 import {
@@ -93,7 +93,7 @@ describe("Socket.IO Integration", () => {
 
   describe("student:join flow", () => {
     it("joins a session and receives student:joined", async () => {
-      const session = createSession("week01", "open");
+      const session = createLegacySession("week01", "open");
       storeSession(session);
 
       const client = createClient(session.sessionId);
@@ -118,7 +118,7 @@ describe("Socket.IO Integration", () => {
     });
 
     it("rejects join with empty studentId", async () => {
-      const session = createSession("week01", "open");
+      const session = createLegacySession("week01", "open");
       storeSession(session);
 
       const client = createClient(session.sessionId);
@@ -138,7 +138,7 @@ describe("Socket.IO Integration", () => {
     });
 
     it("rejects duplicate studentId with different token", async () => {
-      const session = createSession("week01", "open");
+      const session = createLegacySession("week01", "open");
       storeSession(session);
 
       // First student joins
@@ -170,7 +170,7 @@ describe("Socket.IO Integration", () => {
     });
 
     it("allows reconnection with valid token", async () => {
-      const session = createSession("week01", "open");
+      const session = createLegacySession("week01", "open");
       storeSession(session);
 
       // First join
@@ -207,7 +207,7 @@ describe("Socket.IO Integration", () => {
     });
 
     it("allows token-less reconnect for same client instance after disconnect", async () => {
-      const session = createSession("week01", "open");
+      const session = createLegacySession("week01", "open");
       storeSession(session);
 
       const client1 = createClient(session.sessionId);
@@ -254,7 +254,7 @@ describe("Socket.IO Integration", () => {
     });
 
     it("rejects join to ended session", async () => {
-      const session = createSession("week01", "open");
+      const session = createLegacySession("week01", "open");
       // Force session to ENDED state
       session.state = "ENDED";
       storeSession(session);
@@ -272,11 +272,11 @@ describe("Socket.IO Integration", () => {
   });
 
   describe("answer:submit flow", () => {
-    let session: ReturnType<typeof createSession>;
+    let session: ReturnType<typeof createLegacySession>;
     let client: ClientSocket;
 
     beforeEach(async () => {
-      session = createSession("week01", "open");
+      session = createLegacySession("week01", "open");
       storeSession(session);
 
       client = createClient(session.sessionId);
@@ -378,7 +378,7 @@ describe("Socket.IO Integration", () => {
     });
 
     it("accepts open response text, rejects blank input, and allows resubmission before close", async () => {
-      const session = createSession("week-open", "open");
+      const session = createLegacySession("week-open", "open");
       const quiz = {
         week: "week-open",
         title: "Open Response Quiz",
@@ -440,7 +440,7 @@ describe("Socket.IO Integration", () => {
 
   describe("reconnect during open question", () => {
     it("reconnected student can still submit if they have not answered", async () => {
-      const session = createSession("week01", "open");
+      const session = createLegacySession("week01", "open");
       storeSession(session);
 
       // Join
@@ -497,7 +497,7 @@ describe("Socket.IO Integration", () => {
     });
 
     it("reconnected student who already answered gets answeredQuestions in join response", async () => {
-      const session = createSession("week01", "open");
+      const session = createLegacySession("week01", "open");
       storeSession(session);
 
       // Join
@@ -563,7 +563,7 @@ describe("Socket.IO Integration", () => {
 
   describe("timer auto-close", () => {
     it("auto-closes question after timer expires", async () => {
-      const session = createSession("week01", "open");
+      const session = createLegacySession("week01", "open");
       storeSession(session);
 
       const client = createClient(session.sessionId);
@@ -606,7 +606,7 @@ describe("Socket.IO Integration", () => {
     }, 10000);
 
     it("sends tick events during countdown", async () => {
-      const session = createSession("week01", "open");
+      const session = createLegacySession("week01", "open");
       storeSession(session);
 
       const client = createClient(session.sessionId);
@@ -641,7 +641,7 @@ describe("Socket.IO Integration", () => {
     }, 10000);
 
     it("does not let an old question timer close a different current item", async () => {
-      const session = createSession("week01", "open");
+      const session = createLegacySession("week01", "open");
       storeSession(session);
 
       const client = createClient(session.sessionId);
@@ -680,7 +680,7 @@ describe("Socket.IO Integration", () => {
       };
       quizzes.set(navigationQuiz.week, navigationQuiz);
 
-      const session = createSession(navigationQuiz.week, "open");
+      const session = createLegacySession(navigationQuiz.week, "open");
       storeSession(session);
 
       const client = createClient(session.sessionId);
@@ -710,7 +710,7 @@ describe("Socket.IO Integration", () => {
 
   describe("edge cases", () => {
     it("student can join during QUESTION_OPEN and submit immediately", async () => {
-      const session = createSession("week01", "open");
+      const session = createLegacySession("week01", "open");
       storeSession(session);
       transitionState(session, "QUESTION_OPEN");
       session.currentQuestionIndex = 0;
@@ -743,7 +743,7 @@ describe("Socket.IO Integration", () => {
     });
 
     it("late join during QUESTION_CLOSED receives deterministic closed-question snapshot", async () => {
-      const session = createSession("week01", "open");
+      const session = createLegacySession("week01", "open");
       storeSession(session);
       transitionState(session, "QUESTION_OPEN");
       session.currentQuestionIndex = 0;
@@ -768,7 +768,7 @@ describe("Socket.IO Integration", () => {
     });
 
     it("late join during REVEAL does not receive reveal payload", async () => {
-      const session = createSession("week01", "open");
+      const session = createLegacySession("week01", "open");
       storeSession(session);
       transitionState(session, "QUESTION_OPEN");
       session.currentQuestionIndex = 0;
@@ -790,7 +790,7 @@ describe("Socket.IO Integration", () => {
     });
 
     it("two students submit to same question concurrently", async () => {
-      const session = createSession("week01", "open");
+      const session = createLegacySession("week01", "open");
       storeSession(session);
 
       // Join two students
@@ -834,7 +834,7 @@ describe("Socket.IO Integration", () => {
     });
 
     it("rejects submission with empty selectedOptions via socket", async () => {
-      const session = createSession("week01", "open");
+      const session = createLegacySession("week01", "open");
       storeSession(session);
 
       const client = createClient(session.sessionId);
@@ -881,13 +881,16 @@ describe("Socket.IO Integration", () => {
     }
 
     it("instructor receives SESSION_PARTICIPANTS when a student joins", async () => {
-      const session = createSession("week01", "open");
+      const session = createLegacySession("week01", "open");
       storeSession(session);
 
-      // Connect instructor first
+      // Consume the initial empty-room snapshot before observing the join update.
+      // Socket connect can precede its initial SESSION_PARTICIPANTS packet.
       const instructor = createInstructorClient(session.sessionId);
+      const initialParticipants = waitForEvent<{ count: number }>(instructor, SocketEvents.SESSION_PARTICIPANTS);
       instructor.connect();
       await new Promise<void>((resolve) => instructor.once("connect", resolve));
+      expect((await initialParticipants).count).toBe(0);
 
       // Register listener for participant update
       const participantsPromise = waitForEvent<{ count: number; participants: { studentId: string }[] }>(
@@ -912,7 +915,7 @@ describe("Socket.IO Integration", () => {
     });
 
     it("instructor receives SESSION_STATE after REST state transition", async () => {
-      const session = createSession("week01", "open");
+      const session = createLegacySession("week01", "open");
       storeSession(session);
 
       // Connect instructor
@@ -954,7 +957,7 @@ describe("Socket.IO Integration", () => {
     });
 
     it("instructor receives initial participant list on connect", async () => {
-      const session = createSession("week01", "open");
+      const session = createLegacySession("week01", "open");
       storeSession(session);
 
       // Student joins first
@@ -984,7 +987,7 @@ describe("Socket.IO Integration", () => {
     });
 
     it("instructor reconnect during QUESTION_OPEN receives state snapshot", async () => {
-      const session = createSession("week01", "open");
+      const session = createLegacySession("week01", "open");
       storeSession(session);
 
       const student = createClient(session.sessionId);
@@ -1048,7 +1051,7 @@ describe("Socket.IO Integration", () => {
       clearInstructorSessionsForTests();
 
       try {
-        const session = createSession("week01", "open");
+        const session = createLegacySession("week01", "open");
         storeSession(session);
 
         const student = createClient(session.sessionId);
@@ -1120,7 +1123,7 @@ describe("Socket.IO Integration", () => {
           allowsMultiple: false,
         };
 
-        const session = createSession("week01", "open");
+        const session = createLegacySession("week01", "open");
         storeSession(session);
         transitionState(session, "QUESTION_OPEN");
         session.currentQuestionIndex = 0;
@@ -1179,7 +1182,7 @@ describe("Socket.IO Integration", () => {
           allowsMultiple: false,
         };
 
-        const session = createSession("week01", "open");
+        const session = createLegacySession("week01", "open");
         storeSession(session);
 
         const student = createClient(session.sessionId);
@@ -1229,7 +1232,7 @@ describe("Socket.IO Integration", () => {
           correctOptions: [],
         };
 
-        const session = createSession("week01", "open");
+        const session = createLegacySession("week01", "open");
         storeSession(session);
 
         const student = createClient(session.sessionId);
@@ -1274,7 +1277,7 @@ describe("Socket.IO Integration", () => {
     });
 
     it("instructor reconnect during REVEAL receives current reveal context", async () => {
-      const session = createSession("week01", "open");
+      const session = createLegacySession("week01", "open");
       storeSession(session);
 
       const student = createClient(session.sessionId);
@@ -1350,7 +1353,7 @@ describe("Socket.IO Integration", () => {
     });
 
     it("instructor reconnect during LEADERBOARD receives leaderboard and state", async () => {
-      const session = createSession("week01", "open");
+      const session = createLegacySession("week01", "open");
       storeSession(session);
 
       const student = createClient(session.sessionId);
@@ -1406,7 +1409,7 @@ describe("Socket.IO Integration", () => {
     });
 
     it("instructor receives ANSWER_COUNT when student submits", async () => {
-      const session = createSession("week01", "open");
+      const session = createLegacySession("week01", "open");
       storeSession(session);
 
       // Connect instructor

@@ -7,19 +7,19 @@ const clientSrc = path.resolve(__dirname, "..", "..", "..", "client", "src");
 const read = (rel: string): string => fs.readFileSync(path.join(clientSrc, rel), "utf-8");
 
 describe("join form fields", () => {
-  it("asks for a required Student ID and an optional name by default", () => {
+  it("asks for a required Participant ID and an optional name by default", () => {
     const spec = joinFormSpec(true, false);
     expect(spec.mode).toBe("id");
     expect(spec.generatedId).toBe(false);
     expect(spec.studentId).toMatchObject({
-      label: "Student ID", required: true, maxLength: 64, autoComplete: "off", autoCapitalize: "off", inputMode: "text", enterKeyHint: "next",
+      label: "Participant ID", required: true, maxLength: 64, autoComplete: "off", autoCapitalize: "off", inputMode: "text", enterKeyHint: "next",
     });
     expect(spec.displayName).toMatchObject({
       label: "Name", required: false, maxLength: 60, autoComplete: "name", autoCapitalize: "words", inputMode: "text", enterKeyHint: "go",
     });
   });
 
-  it("asks for a required name only when the deck turns Student IDs off", () => {
+  it("asks for a required name only when the deck turns Participant IDs off", () => {
     const spec = joinFormSpec(false, false);
     expect(spec.mode).toBe("name");
     expect(spec.studentId).toBeUndefined();
@@ -44,7 +44,7 @@ describe("join form fields", () => {
 
   it("checks what was typed before joining", () => {
     const ids = joinFormSpec(true, false);
-    expect(checkJoinValues(ids, { studentId: "  ", displayName: "Alex" })).toEqual({ field: "studentId", message: "Enter your Student ID to join." });
+    expect(checkJoinValues(ids, { studentId: "  ", displayName: "Alex" })).toEqual({ field: "studentId", message: "Enter your Participant ID to join." });
     expect(checkJoinValues(ids, { studentId: "x".repeat(65), displayName: "" })?.field).toBe("studentId");
     expect(checkJoinValues(ids, { studentId: "S0001", displayName: "" })).toBeNull();
     expect(checkJoinValues(ids, { studentId: "S0001", displayName: "n".repeat(61) })?.field).toBe("displayName");
@@ -69,7 +69,7 @@ describe("join form fields", () => {
   it("points a refusal at the field it is about", () => {
     const ids = joinFormSpec(true, false);
     const names = joinFormSpec(false, false);
-    expect(errorField(ids, 'The Student ID "S1" is already in this session on another device. Use that device, or check that you typed your own ID.')).toBe("studentId");
+    expect(errorField(ids, 'The Participant ID "S1" is already in this session on another device. Use that device, or check that you typed your own ID.')).toBe("studentId");
     expect(errorField(names, 'Someone here is already using the name "Alex Tan". Add an initial or your surname, for example "Alex Tan B."')).toBe("displayName");
     expect(errorField(ids, "Session has ended")).toBe("code");
     expect(errorField(ids, "Connection failed: xhr poll error")).toBeNull();
@@ -112,7 +112,7 @@ describe("join form in the student view", () => {
     expect(view).toContain("highlightPublicKey={sock.publicKey ?? undefined}");
   });
 
-  it("does not put Student IDs on the projector", () => {
+  it("does not put Participant IDs on the projector", () => {
     const presentation = read("views/PresentationView.tsx");
     expect(presentation).not.toMatch(/showStudentIds=\{(?!false)/);
     expect(presentation).not.toContain("studentId");

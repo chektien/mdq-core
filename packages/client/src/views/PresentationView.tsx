@@ -1,3 +1,4 @@
+import SessionAvailabilityInfo from "../components/SessionAvailabilityInfo";
 import { isSlideType } from "@mdq/shared";
 import { useEffect, useMemo, useState } from "react";
 import type { DeckPalette, DeckTheme, SessionState } from "@mdq/shared";
@@ -15,7 +16,7 @@ import QuizHtml from "../components/QuizHtml";
 import LiveSurface from "../components/LiveSurface";
 import ResponsiveQuizSurface from "../components/ResponsiveQuizSurface";
 import { quizFitKey } from "../quizFit";
-import SlideContent, { SlideContentBody } from "../components/SlideContent";
+import SlideContent, { SlideContentBody, QuestionMedia } from "../components/SlideContent";
 import SlideBackgroundLayer from "../components/SlideBackgroundLayer";
 import { getQuestionModeText } from "../questionMode";
 import { closedLabel as closedLabelFor, positionLabel as positionLabelFor } from "../instructorText";
@@ -103,8 +104,9 @@ export default function PresentationView({
     reveal && currentQuestion && reveal.questionIndex === currentQuestion.questionIndex
       ? reveal
       : null;
-  // While a question is open the projector only knows how many responses are in; the text comes with the reveal.
-  const liveResponseCount = sock.answerCount?.submitted ?? 0;
+  // Live totals include hidden responses; the payload contains only the responses shown by the presenter.
+  const liveResponseCount = sock.answerCount?.openResponseTotal ?? sock.answerCount?.submitted ?? 0;
+  const liveOpenResponses = sock.answerCount?.openResponses ?? [];
 
   const currentHeading = useMemo(() => {
     if (!currentQuestion) return null;
@@ -142,6 +144,9 @@ export default function PresentationView({
     return null;
   })();
 
+  if (sock.availability?.phase === "expired" || sock.availability?.phase === "deleted") {
+    return <div className="min-h-dvh p-8"><SessionAvailabilityInfo availability={sock.availability} />{sock.availability.phase === "expired" && currentQuestion && <QuizHtml html={currentQuestion.text} className="text-zinc-200" />}</div>;
+  }
   if (loading) {
     return (
       <div className="min-h-dvh flex items-center justify-center p-6 text-zinc-300">
@@ -285,6 +290,7 @@ export default function PresentationView({
             className="quiz-html max-w-5xl text-center text-2xl leading-relaxed text-white lg:text-3xl"
             html={currentQuestion.text}
           />
+          <QuestionMedia media={currentQuestion.slideMedia} />
 
           <div className={`selection-mode-chip ${currentQuestion.questionType === "open_response" || currentQuestion.allowsMultiple ? "selection-mode-chip-multi" : "selection-mode-chip-single"}`}>
             {getQuestionModeText(currentQuestion.questionType, currentQuestion.allowsMultiple)}
@@ -293,7 +299,7 @@ export default function PresentationView({
           {noVotesClosed && <p className="no-votes-note">No votes yet</p>}
 
           {currentQuestion.questionType === "open_response" ? (
-            <OpenResponseCount count={liveResponseCount} />
+            <OpenResponseCount count={liveResponseCount} responses={liveOpenResponses} />
           ) : (() => {
             const dist = state === "QUESTION_CLOSED" ? sock.distribution?.distribution : null;
             const totalResponses = sock.answerCount?.submitted ?? 0;
@@ -340,11 +346,12 @@ export default function PresentationView({
             className="quiz-html max-w-5xl text-center text-xl leading-relaxed text-zinc-300 lg:text-2xl"
             html={currentQuestion.text}
           />
+          <QuestionMedia media={currentQuestion.slideMedia} />
 
           {noVotesRevealed && <p className="no-votes-note">No votes yet</p>}
 
           {currentQuestion.questionType === "open_response" ? (
-            <OpenResponseList responses={currentReveal.openResponses} title="Responses" emptyLabel="No responses were submitted." showStudentIds={false} />
+            <OpenResponseList total={currentReveal.openResponseTotal} responses={currentReveal.openResponses} title="Responses" emptyLabel="No responses were submitted." showStudentIds={false} />
           ) : (() => {
             const dist = currentReveal.distribution;
             const maxCount = Math.max(1, ...Object.values(dist));
@@ -547,6 +554,7 @@ export default function PresentationView({
                     className="quiz-html max-w-5xl text-center text-2xl leading-relaxed text-white lg:text-3xl"
                     html={currentQuestion.text}
                   />
+          <QuestionMedia media={currentQuestion.slideMedia} />
 
                   <div className={`selection-mode-chip ${currentQuestion.questionType === "open_response" || currentQuestion.allowsMultiple ? "selection-mode-chip-multi" : "selection-mode-chip-single"}`}>
                     {getQuestionModeText(currentQuestion.questionType, currentQuestion.allowsMultiple)}
@@ -555,7 +563,7 @@ export default function PresentationView({
                   {noVotesClosed && <p className="no-votes-note">No votes yet</p>}
 
                   {currentQuestion.questionType === "open_response" ? (
-                    <OpenResponseCount count={liveResponseCount} />
+                    <OpenResponseCount count={liveResponseCount} responses={liveOpenResponses} />
                   ) : (() => {
                     const dist = state === "QUESTION_CLOSED" ? sock.distribution?.distribution : null;
                     const totalResponses = sock.answerCount?.submitted ?? 0;
@@ -618,11 +626,12 @@ export default function PresentationView({
                 className="quiz-html max-w-5xl text-center text-xl leading-relaxed text-zinc-300 lg:text-2xl"
                 html={currentQuestion.text}
               />
+          <QuestionMedia media={currentQuestion.slideMedia} />
 
               {noVotesRevealed && <p className="no-votes-note">No votes yet</p>}
 
               {currentQuestion.questionType === "open_response" ? (
-                <OpenResponseList responses={currentReveal.openResponses} title="Responses" emptyLabel="No responses were submitted." showStudentIds={false} />
+                <OpenResponseList total={currentReveal.openResponseTotal} responses={currentReveal.openResponses} title="Responses" emptyLabel="No responses were submitted." showStudentIds={false} />
               ) : (() => {
                 const dist = currentReveal.distribution;
                 const maxCount = Math.max(1, ...Object.values(dist));

@@ -56,8 +56,8 @@ const option = (name) => (args.includes(name) ? args[args.indexOf(name) + 1] : u
 const chromePath = option("--chrome") || process.env.MDQ_CHROME || "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
 
 const DECK = `# Fit deck
-theme: dark
-palette: classic
+dark: on
+theme: classic
 
 ---
 

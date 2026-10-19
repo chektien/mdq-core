@@ -1,0 +1,87 @@
+import { parseQuizMarkdown } from "../parser";
+import { buildHtml } from "../print-mdq";
+
+const cases = [
+  ["cover", "type: cover", ""],
+  ["slide", "type: slide", ""],
+  ["multiple_choice", "time-limit: 45", "A. First\nB. Second\n\n> Correct Answer: A\n> Overall Feedback: Reason"],
+  ["multi-select", "multi-select: true\ntime-limit: 45", "A. First\nB. Second\n\n> Correct Answers: A, B\n> Overall Feedback: Reason"],
+  ["poll", "type: poll\ntime-limit: 45", "A. First\nB. Second"],
+  ["open_response", "type: open-response\ntime-limit: 45", ""],
+];
+
+it.each(cases)("extracts and prints images before and after options on %s", (_name, settings, options) => {
+  const source = `# Synthetic deck\n\n---\n\n## Picture question\n${settings}\n\nPrompt\n\n![Before](assets/images/before.png "First caption")\n\n${options}\n\n![After](assets/images/after.png "Second caption")\n\n> Attendee Note: More context\n> Presenter Note: Private cue\n> ![Private](assets/images/private.png)\n`;
+  const parsed = parseQuizMarkdown(source, "sample.md");
+  expect(parsed.errors).toEqual([]);
+  const question = parsed.quiz!.questions[0];
+  expect(question.slideMedia!.map(item => [item.src, item.alt, item.title])).toEqual([
+    ["assets/images/before.png", "Before", "First caption"],
+    ["assets/images/after.png", "After", "Second caption"],
+  ]);
+  expect(question.textHtml).not.toContain("<img");
+  expect(question.presenterNotes![0].bodyMd).toContain("![Private]");
+  if (options) expect(question.options.map(option => option.label)).toEqual(["A", "B"]);
+  if (settings.includes("time-limit")) expect(question.timeLimitSec).toBe(45);
+  if (options.includes("Correct Answer")) expect(question.correctOptions).toEqual(_name === "multi-select" ? ["A", "B"] : ["A"]);
+  const html = buildHtml(parsed.quiz!, { inputFile: "/tmp/sample.md", outputFile: "/tmp/sample.pdf", imagesDir: "/tmp", includeFoldouts: true, includePresenterNotes: false, includeAnswers: true, pageSize: "A4", theme: "light" });
+  expect(html).toContain('alt="Before"');
+  expect(html).toContain('alt="After"');
+  expect(html).toContain("First caption");
+  expect(html).not.toContain("Private cue");
+  expect(html).not.toContain('alt="Private"');
+});
+
+it("does not lift fenced, inline code, quoted feedback or notes into question media", () => {
+  const parsed = parseQuizMarkdown(`## Sample\n\nPrompt with \`![Literal](literal.png)\`\n\n\`\`\`md\n![Code](code.png)\n\`\`\`\n\nA. First\nB. Second\n\n> Correct Answer: A\n> Overall Feedback: ![Feedback](feedback.png)\n> Presenter Note: ![Private](private.png)\n\n![Public](public.png)\n`, "sample.md");
+  expect(parsed.errors).toEqual([]);
+  expect(parsed.quiz!.questions[0].slideMedia).toEqual([{ src: "public.png", alt: "Public" }]);
+});
+
+it.each(["slide", "multiple_choice"])("keeps indented code, escapes and list continuations literal on %s", kind => {
+  const options = kind === "slide" ? "" : "A. First\nB. Second\n\n> Correct Answer: A\n";
+  const source = `## Sample\ntype: ${kind}\n\nPrompt\n\n    ![Indented code](assets/a.png)\n\n\\![Escaped](assets/a.png)\n\n- Example\n\n  ![List](assets/a.png)\n\n1) ![Ordered list](assets/a.png)\n\n${options}\n    ![Tail code](assets/a.png)\n\n\\![Tail escape](assets/a.png)\n\n![Public](assets/a.png)\n`;
+  const parsed = parseQuizMarkdown(source, "sample.md");
+  expect(parsed.errors).toEqual([]);
+  expect(parsed.quiz!.questions[0].slideMedia).toEqual([{ src: "assets/a.png", alt: "Public" }]);
+  expect(parsed.quiz!.questions[0].textHtml).not.toContain("<img");
+});
+
+
+it.each(["slide", "multiple_choice"])("preserves initial and tail tab/space code on %s", kind => {
+  const options = kind === "slide" ? "" : "A. First\nB. Second\n\n> Correct Answer: A\n";
+  for (const indent of ["    ", "\t", " \t", "\t\t"]) {
+    const source = `## Sample\ntype: ${kind}\n\n${indent}![Initial code](assets/a.png)\n\nPrompt\n\n${options}\n${indent}![Tail code](assets/a.png)\n\n![Public](assets/a.png)\n`;
+    const parsed = parseQuizMarkdown(source, "sample.md");
+    expect(parsed.errors).toEqual([]);
+    expect(parsed.quiz!.questions[0].slideMedia).toEqual([{ src: "assets/a.png", alt: "Public" }]);
+    expect(parsed.quiz!.questions[0].textHtml).not.toContain("<img");
+    expect(parsed.quiz!.questions[0].textHtml).toContain("<pre><code>");
+  }
+});
+
+
+it("keeps lazy blockquote images in their original audience before and after options", () => {
+  const source = `## Sample\n\nPrompt\n\n> Quoted content\n![Quoted](assets/a.png)\n\nA. First\nB. Second\n\n> Correct Answer: A\n> Presenter Note: Private\n![Private continuation](assets/a.png)\n\n![Public](assets/a.png)\n`;
+  const parsed = parseQuizMarkdown(source, "sample.md");
+  expect(parsed.errors).toEqual([]);
+  expect(parsed.quiz!.questions[0].slideMedia).toEqual([{ src: "assets/a.png", alt: "Public" }]);
+});
+
+it("does not add visible escapes inside nested fenced examples", () => {
+  const parsed = parseQuizMarkdown(`## Sample\ntype: slide\n\n- Example\n\n  \`\`\`md\n  ![Code](assets/a.png)\n  \`\`\`\n\n![Public](assets/a.png)\n`, "sample.md");
+  expect(parsed.errors).toEqual([]);
+  const item = parsed.quiz!.questions[0];
+  expect(item.slideMedia).toEqual([{ src: "assets/a.png", alt: "Public" }]);
+  expect(item.textHtml).toContain('![Code](assets/a.png)');
+  expect(item.textHtml).not.toContain('\\![Code');
+  expect(item.textHtml).not.toContain('<img');
+});
+
+
+it("preserves standalone item images immediately after list cues", () => {
+  const source = `## Sample\ntype: slide\n\n- Show a diagram.\n![Public](assets/a.png)\n- Next.\n`;
+  const parsed = parseQuizMarkdown(source, "sample.md");
+  expect(parsed.errors).toEqual([]);
+  expect(parsed.quiz!.questions[0].slideMedia).toEqual([{src: "assets/a.png", alt: "Public"}]);
+});

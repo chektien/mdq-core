@@ -62,12 +62,16 @@ describe("control contrast contract", () => {
   it("sizes the timer count to fit inside the ring", () => {
     expect(timerLabel(119)).toBe("1:59");
     expect(timerLabel(59)).toBe("59");
-    // The student ring shrinks m:ss to fit, the projector sizes keep theirs.
-    expect(timerFontSize(64, "1:59")).toBeCloseTo(14.67, 2);
-    expect(timerFontSize(64, "59")).toBeCloseTo(20.48, 2);
-    expect(timerFontSize(120, "1:59")).toBeCloseTo(31.2, 2);
-    expect(timerFontSize(140, "5:00")).toBeCloseTo(36.4, 2);
-    expect(timerFontSize(64, "10:00")).toBeLessThan(timerFontSize(64, "1:59"));
+    // At every call-site diameter (plus the component default), the whole
+    // text rectangle fits inside the inner circle with 25% breathing room.
+    for (const size of [64, 120, 140]) {
+      for (const label of ["1:20", "10:00", "59"]) {
+        const fontSize = timerFontSize(size, label);
+        expect(fontSize).toBeGreaterThan(0);
+        expect(Math.hypot(label.length * 0.65 * fontSize, fontSize)).toBeLessThanOrEqual((size - 20) * 0.75 + 0.001);
+      }
+      expect(timerFontSize(size, "10:00")).toBeLessThan(timerFontSize(size, "1:20"));
+    }
   });
 
   it("keeps a disabled warning button on the control outline in light themes", () => {
@@ -85,7 +89,7 @@ describe("control contrast contract", () => {
     expect(disabled).toContain("border: 1px dashed var(--mdq-control-border) !important");
     // The theme maps these fills with !important, so a button that can be
     // disabled must carry the marker class the rule above keys on.
-    const files = ["views/StudentView.tsx", "views/InstructorView.tsx", "components/InstructorLoginPrompt.tsx"];
+    const files = ["views/StudentView.tsx", "views/InstructorView.tsx", "components/InstructorLoginPrompt.tsx", "components/EndSessionConfirmation.tsx"];
     let checked = 0;
     for (const file of files) {
       for (const chunk of read(file).split("<button").slice(1).map((c) => c.slice(0, c.indexOf("</button>")))) {
@@ -97,6 +101,26 @@ describe("control contrast contract", () => {
       }
     }
     expect(checked).toBeGreaterThanOrEqual(6);
+  });
+
+  it("uses solid leaderboard grounds and palette accent ink for the visible own-row marker", () => {
+    expect(ruleBody(index, '.leaderboard-row')).toContain('background: var(--mdq-paper);');
+    expect(ruleBody(index, '.leaderboard-row-highlight')).toContain('background: color-mix(in srgb, var(--mdq-accent) 6%, var(--mdq-paper));');
+    expect(ruleBody(index, '.leaderboard-you')).toContain('color: var(--mdq-accent-ink);');
+    // Tokens that hold a gradient (the status washes) count as gradients too.
+    const gradientTokens = new Set([index, theme].flatMap((css) =>
+      [...css.matchAll(/(--[\w-]+)\s*:\s*[^;]*gradient\(/g)].map((m) => m[1])));
+    expect(gradientTokens.has("--mdq-accent-wash")).toBe(true);
+    let checked = 0;
+    for (const css of [index, theme]) {
+      for (const match of css.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+        if (!/\.leaderboard-(?:board|list|row|empty)\b/.test(match[1])) continue;
+        checked += 1;
+        expect(match[2]).not.toMatch(/gradient\(|blur\(|box-shadow:|backdrop-filter:/);
+        for (const used of match[2].matchAll(/var\((--[\w-]+)/g)) expect(gradientTokens.has(used[1])).toBe(false);
+      }
+    }
+    expect(checked).toBeGreaterThanOrEqual(5);
   });
 
   it("paints leaderboard names and scores in the ink so first place's gold stands out", () => {

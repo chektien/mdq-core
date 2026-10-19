@@ -137,49 +137,55 @@ ID.
 Optional local runtime settings live in `data/config.json` (copy from
 `data/config.example.json`). The tracked example includes `theme`, which accepts
 `dark` or `light`, and `palette`, which accepts `classic` (the default),
-`gruvbox`, `rose-pine`, `catppuccin`, `seoul256`, `ayu`, or `tokyo-night`.
+`gruvbox`, `rose-pine`, `catppuccin`, `seoul256`, `ayu`, `tomorrow`, or `nord-aurora`.
 `MDQ_PALETTE` overrides the file's `palette`.
 
 Individual decks can override those global fallbacks in the Markdown preamble:
 
 ```markdown
 # My Deck
-theme: light
-palette: gruvbox
+theme: gruvbox
+dark: off
 
 ---
 ```
 
 Use any palette name from the list below in place of `gruvbox`, for example
-`palette: rose-pine` or `palette: tokyo-night`.
+`theme: rose-pine` or `theme: ayu`.
 
-`theme` accepts only `light` or `dark` (case-insensitive, with optional quotes).
+`dark` accepts only `on` or `off` (case-insensitive, with optional quotes).
 When it is omitted, every instructor, student, and projector view uses the
-global runtime theme. The PDF export theme remains controlled independently by
-its `--theme` command-line option.
+global runtime theme. The PDF export mode is controlled independently by
+`--dark on|off`, defaulting to `on` even when the deck says `dark: off`.
 
-`palette` chooses the slide colours independently of the light/dark theme. It
-accepts `classic`, `gruvbox`, `rose-pine`, `catppuccin`, `seoul256`, `ayu`, or
-`tokyo-night` (case-insensitive, with optional quotes); any other value is a
-deck parse error. `classic` is MDQ's standard look. Every other palette applies
-in both the light and dark theme, and each theme uses one official variant of
-the upstream palette:
+`theme` names the colour scheme independently of the light/dark mode. It
+accepts `classic`, `gruvbox`, `rose-pine`, `catppuccin`, `seoul256`, `ayu`, `tomorrow`, or `nord-aurora`
+(case-insensitive, with optional quotes); unknown values are deck parse errors.
+Retired scheme names already recognised by MDQ fall back to `classic`.
+`palette:` is not a deck setting, and `theme: light` and `theme: dark` are
+rejected; write `dark: off` and `dark: on` for the mode.
+These deck keys differ from operator configuration: `data/config.json` still
+uses `"theme": "dark"` or `"theme": "light"`, and `"palette": "<scheme>"`. The environment
+variables remain `MDQ_THEME` and `MDQ_PALETTE`.
+`classic` is MDQ's standard look. Every other scheme applies in both modes,
+using the upstream variants or the documented MDQ adaptation:
 
-| Palette | Light theme | Dark theme |
+| Colour scheme | `dark: off` | `dark: on` |
 | --- | --- | --- |
 | `gruvbox` | Gruvbox light accents on a neutral grey | Gruvbox dark |
 | `rose-pine` | Rosé Pine Dawn | Rosé Pine |
 | `catppuccin` | Catppuccin Latte | Catppuccin Mocha |
 | `seoul256` | seoul256 light | seoul256 dark |
 | `ayu` | Ayu Light | Ayu Dark |
-| `tokyo-night` | Tokyo Night Day | Tokyo Night (night style) |
+| `tomorrow` | Tomorrow (pure white) | Tomorrow Night |
+| `nord-aurora` | MDQ Nord Aurora on Snow Storm | MDQ Nord Aurora on Polar Night |
 
 Where an official colour is too faint to read as text, MDQ uses the nearest
 shade from the same palette, or darkens or lightens it slightly, so text stays
 legible. Upstream sources and licences are listed under
-[Palette credits](#palette-credits). When `palette` is omitted, every instructor, student, and projector view
+[Palette credits](#palette-credits). When `theme` is omitted, every instructor, student, and projector view
 uses the global runtime palette. The PDF exporter follows the deck's palette
-unless you pass `--palette`.
+unless you pass `--theme`.
 
 Build and run the app:
 
@@ -287,8 +293,8 @@ Tip for classroom privacy and mobility: open Projector on the laptop, then keep 
 ### 2) instructor live surface controls
 
 - The deck picker shows each deck summary as separate quiz question and slide counts, for example `(22 questions, 17 slides)`.
-- The live surface uses the configured global presentation theme by default; a deck-level `theme: light` or `theme: dark` preamble setting overrides it for that session.
-- The slide palette works the same way: the configured global `palette` applies by default, and a deck-level `palette:` preamble setting (any of the seven palette names) overrides it for that session.
+- The live surface uses the configured global presentation theme by default; a deck-level `dark: on` or `dark: off` header setting overrides it for that session.
+- The slide palette works the same way: the configured global `palette` applies by default, and a deck-level `theme:` header setting (any of the eight scheme names) overrides it for that session.
 - `Prev` and `Next` stay pinned together near the top-left of the live surface so their click targets do not drift when other controls appear or disappear.
 - In live mode, `Next` includes the next item's markdown heading inside the button and `Prev` includes the previous item's heading, cut with an ellipsis when the two do not fit beside the other controls. In review mode, both stay plain buttons.
 - The slide's top padding follows the toolbar's measured height plus a gap of 1.4 rem, so the slide title stays clear of the buttons however the toolbar wraps or fills.
@@ -310,23 +316,23 @@ Tip for classroom privacy and mobility: open Projector on the laptop, then keep 
 
 #### Student join form and privacy
 
-The deck's `student-id` header setting decides what the join form asks for. It accepts only `true` or `false` (any other value is a deck parse error) and defaults to `true`. The form learns it from the session code before it shows any fields.
+The deck's `participant-id` header setting decides what the join form asks for. It accepts only `true` or `false` (any other value is a deck parse error) and defaults to `true`. The form learns it from the session code before it shows any fields.
 
 | Setting | Join form |
 | --- | --- |
-| `student-id: true` (or absent) | Student ID (required, up to 64 characters) and Name (optional, up to 60) |
-| `student-id: false` | Name only (required, up to 60), and the name is the participant's ID |
+| `participant-id: true` (or absent) | Participant ID (required, up to 64 characters) and Name (optional, up to 60) |
+| `participant-id: false` | Name only (required, up to 60), and the name is the participant's ID |
 
 Either way, each participant has one ID that is unique in the session.
 
-- **Names as IDs.** With `student-id: false` the name is normalised (Unicode NFC, trimmed, runs of whitespace collapsed to one space) and compared without regard to case. A name another seat holds is refused straight away, with a message such as `Someone here is already using the name "Alex Tan". Add an initial or your surname, for example "Alex Tan B."`. A name stays held for the whole session, even after its holder leaves.
-- **Student IDs.** An ID that is already in the session follows the usual seat rules: the same session token, or the same browser after it went offline, takes the seat back; anyone else is told `The Student ID "..." is already in this session on another device. Use that device, or check that you typed your own ID.`
+- **Names as IDs.** With `participant-id: false` the name is normalised (Unicode NFC, trimmed, runs of whitespace collapsed to one space) and compared without regard to case. A name another seat holds is refused straight away, with a message such as `Someone here is already using the name "Alex Tan". Add an initial or your surname, for example "Alex Tan B."`. A name stays held for the whole session, even after its holder leaves.
+- **Participant IDs.** An ID that is already in the session follows the usual seat rules: the same session token, or the same browser after it went offline, takes the seat back; anyone else is told `The Participant ID "..." is already in this session on another device. Use that device, or check that you typed your own ID.`
 - **Your own seat is never a clash.** Rejoining with your session token (a reload, a dropped connection) always works.
 - **Labels.** Everyone gets a public label, fixed when they join and never reused in that session: their name (`Alex`), `Alex (2)` for the next participant with the same name (ignoring case), or `Participant 3` (in join order) when a participant with IDs on gave no name. A participant whose label differs from what they typed is told why on the waiting screen (`Another participant is also called Alex, so you appear as Alex (2).`).
-- **Who sees IDs.** The projector, the leaderboard on phones and on the projector, and other students see labels only, never Student IDs. Each participant also gets a random per-session public key (not derived from the ID) which public payloads use in place of the ID, so a phone can still highlight its own leaderboard row. The instructor's view, and the results CSV, show Student IDs and names. `GET /api/session/:id/leaderboard` is public, so it returns labels and public keys only. `GET /api/leaderboard/cumulative` (saved results) and the open responses in the instructor's restore (`GET /api/session/:id/state`) return Student IDs and names only to a request that is logged in as the instructor. With an instructor login set, everyone else gets a 401 for both. With no login set nobody can prove they are the instructor, so both return labels only: saved results as `label` (the name, or `Participant N` by rank, with `(2)` added to repeats) instead of `studentId`, and restored open responses by label.
-- **What the instructor view needs from a server.** The bundled instructor view hides its "Show Student IDs" button, and every place it would show an ID, for a deck with `student-id: false`, because the name is the ID. It learns this from a `studentIds` boolean in the `POST /api/session` response and in the `GET /api/session/:id/state` restore response (`false` when the deck turns IDs off). A server or adapter that serves this view should send it in both; when it is missing the view treats IDs as on.
-- **Set an instructor login to keep IDs private.** Without an instructor login (`INSTRUCTOR_PASSWORD`), anyone who can reach the server on the network can open the instructor view or connect as the instructor and see Student IDs and names. That is how MDQ has always worked without a login. The labels-only rules above stop the projector, phones and public pages from showing IDs, but they cannot stop someone who joins as the instructor, so set a login whenever the network is not just your own class. The same goes for the results CSV and the Hide control: they are for the instructor, but without a login anyone who can reach the server can use them.
-- **`autoGenerateStudentIds`.** The runtime option keeps working exactly as before for decks that use Student IDs: the ID field is hidden, the name is required, and an ID generated on the device is sent. A deck with `student-id: false` takes priority: it asks for a name only and the name is the ID, so no ID is generated, whether or not `autoGenerateStudentIds` is on.
+- **Who sees IDs.** The projector, the leaderboard on phones and on the projector, and other students see labels only, never Participant IDs. Each participant also gets a random per-session public key (not derived from the ID) which public payloads use in place of the ID, so a phone can still highlight its own leaderboard row. The instructor's view, and the results CSV, show Participant IDs and names. `GET /api/session/:id/leaderboard` is public, so it returns labels and public keys only. `GET /api/leaderboard/cumulative` (saved results) and the open responses in the instructor's restore (`GET /api/session/:id/state`) return Participant IDs and names only to a request that is logged in as the instructor. With an instructor login set, everyone else gets a 401 for both. With no login set nobody can prove they are the instructor, so both return labels only: saved results as `label` (the name, or `Participant N` by rank, with `(2)` added to repeats) instead of `studentId`, and restored open responses by label.
+- **What the instructor view needs from a server.** The bundled instructor view hides its "Show Participant IDs" button, and every place it would show an ID, for a deck with `participant-id: false`, because the name is the ID. It learns this from a `studentIds` boolean in the `POST /api/session` response and in the `GET /api/session/:id/state` restore response (`false` when the deck turns IDs off). A server or adapter that serves this view should send it in both; when it is missing the view treats IDs as on.
+- **Set an instructor login to keep IDs private.** Without an instructor login (`INSTRUCTOR_PASSWORD`), anyone who can reach the server on the network can open the instructor view or connect as the instructor and see Participant IDs and names. That is how MDQ has always worked without a login. The labels-only rules above stop the projector, phones and public pages from showing IDs, but they cannot stop someone who joins as the instructor, so set a login whenever the network is not just your own class. The same goes for the results CSV and the Hide control: they are for the instructor, but without a login anyone who can reach the server can use them.
+- **`autoGenerateStudentIds`.** The runtime option keeps working exactly as before for decks that use Participant IDs: the ID field is hidden, the name is required, and an ID generated on the device is sent. A deck with `participant-id: false` takes priority: it asks for a name only and the name is the ID, so no ID is generated, whether or not `autoGenerateStudentIds` is on.
 
 Port fallback retries default to 10 attempts (`PORT_FALLBACKS=10`).
 
@@ -365,7 +371,7 @@ Student QR behavior:
 - Open the session-scoped `Projector` link from the authenticated instructor screen when you want a second display that mirrors the instructor presentation without controls.
 - The Projector route is intentionally not linked from the public home page. A code-based public entry point would let students discover the live projector feed and monitor the session outside the instructor flow.
 - Projector stays read-only. It never renders instructor action buttons or calls instructor REST actions.
-- The projector names participants by label only (lobby, leaderboard and open responses). It never receives Student IDs.
+- The projector names participants by label only (lobby, leaderboard and open responses). It never receives Participant IDs.
 - A common classroom setup is to connect the laptop to the projector, open the `Projector` there, then open the authenticated instructor view on a phone. Advancing, reviewing, revealing feedback, and ending the session from the phone updates the projected laptop view in real time.
 - This keeps instructor-only controls and route details off the projector while still allowing the instructor to move around the room.
 
@@ -402,7 +408,7 @@ Export a full MDQ markdown deck as a clean PDF packet from the CLI:
 npm run print:pdf -- data/decks/week00.md --out exports/week00.pdf
 ```
 
-The exporter builds the shared/server packages, parses the same markdown used by live sessions, renders a print-specific HTML view in Chromium, then writes a mostly vector PDF with crisp text and proportionally scaled images. Dark mode is the default so exported decks keep the original MDQ color direction; use `--theme light` when you want a conventional ink-friendly handout.
+The exporter builds the shared/server packages, parses the same markdown used by live sessions, renders a print-specific HTML view in Chromium, then writes a mostly vector PDF with crisp text and proportionally scaled images. Dark mode is the default so exported decks keep the original MDQ color direction; use `--dark off` when you want a conventional ink-friendly handout.
 
 Printed decks hide correct-answer highlights, answer blocks, and feedback by default so submission/review packets do not become answer keys. Use `--answers` only when you intentionally need an instructor answer-key export.
 
@@ -423,40 +429,38 @@ Options:
 - `--answers` includes correct-answer highlights, answer blocks, and feedback for an answer-key packet.
 - `--no-answers` hides correct answers and feedback. This is the default.
 - `--page-size A4|Letter` chooses the print page size. A4 is the default.
-- `--theme dark|light` chooses the PDF color theme. Dark is the default and recommended for submission packets that should preserve the original deck styling.
-- `--palette classic|gruvbox|rose-pine|catppuccin|seoul256|ayu|tokyo-night` chooses the PDF color palette. It defaults to the deck's `palette:` setting, else `classic`.
+- `--dark on|off` chooses the PDF mode. Dark (`on`) is the default and recommended for submission packets that should preserve the original deck styling.
+- `--theme classic|gruvbox|rose-pine|catppuccin|seoul256|ayu|tomorrow|nord-aurora` chooses the PDF color palette. It defaults to the deck's `theme:` setting, else `classic`.
 - `--title <title>` overrides the cover title.
 - `--html <file>` also writes the generated print HTML for visual debugging.
 
 Examples:
 
 ```bash
-npm run print:pdf -- data/decks/sample-session.md --theme dark --no-foldouts
-npm run print:pdf -- data/decks/sample-session.md --theme dark --answers --presenter-notes
-npm run print:pdf -- data/decks/week00.md --theme light --page-size Letter --out exports/week00-letter.pdf
-npm run print:pdf -- data/decks/week00.md --theme light --palette gruvbox
+npm run print:pdf -- data/decks/sample-session.md --dark on --no-foldouts
+npm run print:pdf -- data/decks/sample-session.md --dark on --answers --presenter-notes
+npm run print:pdf -- data/decks/week00.md --dark off --page-size Letter --out exports/week00-letter.pdf
+npm run print:pdf -- data/decks/week00.md --dark off --theme gruvbox
 ```
 
 PDF images keep their source aspect ratio. MDQ only scales images down to fit the print layout, so portrait screenshots and wide diagrams are not stretched, cropped, or reframed.
 
 ## Slide Appearance Settings
 
-A deck can change how its slides look from the header, in plain settings with no CSS. Write them in the header above the first `---`, one per line, with dashes like every other key (`title-size:`, and `title_size:` still works):
+A deck can change how its slides look from the header, in plain settings with no CSS. Write them in the header above the first `---`, one per line, with dashes like every other key (`title-font-size:`, and `title_font_size:` also works):
 
 ```markdown
 # My Deck
-theme: light
-title-size: large
-body-size: large
-accent-color: teal
-background-color: #fdf6e3
-slide-padding: roomy
-image-corners: square
+theme: gruvbox
+dark: off
+title-font-size: large
+body-font-size: large
+note-font-size: small
 
 ---
 ```
 
-If a file starts with `---`, it has no header, and MDQ looks for these keys anywhere in the file and takes the first line that matches, so keep them in a header. A deck without these keys looks exactly as it always did. The settings apply to question screens on the presenter and projector, to slides on the presenter, projector and phone, and to the phone's own question and result screens. Theme and palette work as before, and the colour settings below replace the palette's own colours where a deck sets them. `text-color`, `muted-color` and `accent-color` colour the slide's own content and the text that sits straight on the background of a question screen, such as the question, the closed label, the no-votes note, the timer count and the explanation. The answer panels keep their own fills, and correct answers keep their green. The toolbar buttons, status labels that have their own fill and the join card keep the palette's colours, so they stay readable on their own fills. The plain status label and the slide counter follow the deck colours, and the timer count does too until time runs low, when it keeps the ring's warning colour. `background-color` also colours the page behind the slide, and `surface-color` alone leaves that page on the palette's own background, which is where the slide ends.
+If a file starts with `---`, it has no header: `theme:` and `dark:` have no effect. The other appearance settings below retain their existing whole-file fallback in that case, so keep them in a header. A deck without these keys looks exactly as it always did. The settings apply to question screens on the presenter and projector, to slides on the presenter, projector and phone, and to the phone's own question and result screens. `theme:` names the colour scheme and `dark:` selects the mode; both are read only above the first `---`. The colour settings below replace the palette's own colours where a deck sets them. `text-color`, `muted-color` and `accent-color` colour the slide's own content and the text that sits straight on the background of a question screen, such as the question, the closed label, the no-votes note, the timer count and the explanation. The answer panels keep their own fills, and correct answers keep their green. The toolbar buttons, status labels that have their own fill and the join card keep the palette's colours, so they stay readable on their own fills. The plain status label and the slide counter follow the deck colours, and the timer count does too until time runs low, when it keeps the ring's warning colour. `background-color` also colours the page behind the slide, and `surface-color` alone leaves that page on the palette's own background, which is where the slide ends.
 
 A value is a preset word, a plain length, or a colour, and nothing else. A length is a number with a unit, such as `4rem`, `18px`, `1.5em`, `60ch` or `80%`, and each setting below lists the units it takes. A colour is a CSS colour name such as `teal` or `navy`, or a hex colour such as `#0f766e` or `#0af`. Functions (`rgb()`, `var()`, `calc()`, `url()`), semicolons, braces and angle brackets are never accepted. A value that does not fit is ignored, never applied. It is reported as a note that gives its place (`header, line 2`), the key, the value and what is allowed. The server and the print command log it, and the instructor's deck list shows it under the deck:
 
@@ -466,7 +470,21 @@ title-size: huge is not a size. Use small, medium, large, x-large, or a length s
 
 The deck still loads and every other setting still applies, because this is a note and not a parse error. Colour contrast is your choice, so check that text stays readable on the colours you pick.
 
-### Sizes
+### Font sizes
+
+| Key | Text it sizes |
+| --- | --- |
+| `title-font-size` | Slide titles and cover titles (×1.25) |
+| `heading-font-size` | Subtitles and `###` headings |
+| `body-font-size` | Slide text, lists, questions, answers and print body |
+| `note-font-size` | Fold-out notes, references and cover details |
+| `caption-font-size` | Image and video captions |
+
+Use `title-font-size`, `heading-font-size`, `body-font-size`, `note-font-size` or `caption-font-size` with `small`, `medium`, `large` or `x-large`. These scale each role’s responsive size. `medium` leaves it unchanged. `note-font-size` sizes fold-out notes, references and cover details, not the presenter panel.
+
+A valid new font key wins over its older twin, even when that twin uses an exact length. An invalid new key is ignored with a warning and falls back to the older key. These new names require a Core version that supports them. Older Core versions ignore them, so existing decks are never automatically renamed.
+
+### Older size names (still read)
 
 `title-size`, `heading-size`, `body-size`, `small-size` and `caption-size` take a preset or a length in `px`, `rem` or `em`. A preset scales Core's own size for that text, so `medium` leaves it unchanged. A length sets the exact size on every screen, phones included.
 
@@ -484,6 +502,8 @@ The deck still loads and every other setting still applies, because this is a no
 | `body-size` | Slide body text |
 | `small-size` | Fold-out note text and slide references |
 | `caption-size` | Image captions |
+
+## Fine-tuning
 
 ### Colours
 
@@ -572,18 +592,22 @@ title: Demo Presentation Session
 
 If the preamble title is omitted, MDQ falls back to the first `# ...` heading for backward compatibility.
 
-A deck can also choose what its join form asks for with `student-id:` in the same preamble (see [Student join form and privacy](#student-join-form-and-privacy)):
+A deck can also choose what its join form asks for with `participant-id:` in the same preamble (see [Student join form and privacy](#student-join-form-and-privacy)):
 
 ```markdown
 title: Demo Presentation Session
-student-id: false
+participant-id: false
 
 ---
 ```
 
-`student-id` accepts `true` or `false` (case-insensitive, with optional quotes) and defaults to `true` when it is omitted. `student_id` works too. Any other value is a deck parse error.
+`participant-id` accepts `true` or `false` (case-insensitive, with optional quotes) and defaults to `true` when it is omitted. `participant_id`, `student-id` and `student_id` work too. A valid `participant-id` takes precedence over a valid `student-id`, independent of line order. Invalid aliases still produce parse errors. Any other value is a deck parse error.
 
 Each interactive question supports the existing `time-limit:` metadata plus optional `multi-select:` and `type:` flags. `question-type:` remains accepted as a backward-compatible alias. Questions default to multiple choice when `type:` is omitted. To say so explicitly, write `type: question` or the older `type: multiple_choice`. Both read exactly like the default, single or multi-select. Type values also accept hyphens in place of underscores, such as `open-response` for `open_response`. Question stems, slide bodies, and option text can also include standard markdown images.
+
+`time-limit: 45` sets a 45-second countdown; omitting it uses the default 35 seconds. Use `time-limit: none` (or the earlier `time_limit: none`) for an untimed multiple-choice, multi-select, poll, or open-response question. Untimed questions have no countdown and stay open until the presenter closes them. Content slides and covers still must not declare `time-limit`.
+
+A timed question keeps its original deadline across navigation, reconnects, and page reloads. Answers received at or after that deadline are rejected even if the close event has not arrived yet. The presenter's **Restart Countdown** control is available only while a timed question is open, its deadline has not passed, and its answers have not been revealed. It starts a new countdown without clearing submissions or changing their recorded response times. The session records the original opening and restart history, marking restarted timing as unsuitable for fair time comparisons; existing leaderboard calculations are unchanged. Expired, closed, or revealed questions cannot be restarted or reopened for another scored attempt.
 
 Slide bodies take bulleted lists, numbered lists and nested lists in any mix, indented by two or more spaces. On a slide the top level uses accent markers and each level below it uses a smaller, quieter marker and slightly smaller text, with the same indent per level on the projector and on phones. A list item with no text (a bare `- ` or `1. `) is hidden when the slide is presented and printed, so no empty marker shows, and the numbers of a numbered list count only the items that show. An item that holds only a nested list (a bare `-` followed by an indented child) drops its own marker, so the children stand one level in. The Markdown itself is left as written.
 
@@ -633,7 +657,7 @@ Rules:
 - Poll questions still respect `multi-select:`. Omit it for a single-choice poll, or set `multi-select: true` for a multi-select poll.
 - Use `type: open_response` for a written, non-scored response prompt.
 - Open responses can be up to 1000 characters. The instructor sees every response live, each with a Hide / Show button. While the question is open the projector shows only how many responses are in; once you reveal, it shows the responses that are not hidden, and hiding or showing one updates it at once. Phones never receive other participants' responses. The same control is available as `POST /api/session/:id/response-visibility` with `{ "questionIndex": 2, "publicKey": "...", "hidden": true }` (instructor login when one is configured).
-- If a participant's phone dies, the instructor's participant list has a "Let rejoin" button beside their name. It frees their seat and keeps everything that belongs to it: their answers, label and public key. Between the release and the next join, any join with that Student ID (or the same name, when Student IDs are off) from any device takes the seat over, so share the moment with the person it is for. Once it is taken, the old device is told "You joined on another device. This screen is no longer in the session.", stops receiving the session and cannot answer; the new device carries on. Two tabs of the same seat that share one token keep working together.
+- If a participant's phone dies, the instructor's participant list has a "Let rejoin" button beside their name. It frees their seat and keeps everything that belongs to it: their answers, label and public key. Between the release and the next join, any join with that Participant ID (or the same name, when Participant IDs are off) from any device takes the seat over, so share the moment with the person it is for. Once it is taken, the old device is told "You joined on another device. This screen is no longer in the session.", stops receiving the session and cannot answer; the new device carries on. Two tabs of the same seat that share one token keep working together.
 - The same control is `POST /api/session/:id/release-seat` with `{ "publicKey": "..." }` (the participant's public key from the instructor's participant list, at most 128 characters). It needs the instructor login. With no login set, anyone who knows the session ID can call it, so set a login for real classes. It answers 400 for a missing, too long or unknown key and 404 for an unknown session.
 - To stop new people joining, for example once the class is in, choose "Lock joining" beside the participant list (in the lobby and in the Participants dialog). It then reads "Joining locked"; choose it again to open joining. While it is locked, a phone that would take a new seat is told "This session is not taking new participants. Ask the presenter." Anyone who already has a seat can still rejoin it, with their token or browser, and a seat freed with "Let rejoin" can still be taken over. The projector's join card says "Joining is closed" instead of showing the code and QR. Only the instructor's screen and the projector receive the state, as `joinLocked: true` on the participants list (absent when open); phones only see the refusal. The lock is saved with the session.
 - The same control is `POST /api/session/:id/join-lock` with `{ "locked": true }` or `{ "locked": false }`, answering `{ "locked": true|false }`. It needs the instructor login (with no login set, anyone who knows the session ID can call it). It answers 400 when `locked` is not a boolean and 404 for an unknown session. `GET /api/session/:id/state` and `GET /api/session/:id/presentation` also report `joinLocked`.
@@ -776,7 +800,7 @@ The PDF exporter keeps presenter notes hidden by default; pass
 
 Slide images and references:
 
-- For `type: slide` or `type: cover`, ordinary markdown image lines are extracted into a structured media area instead of staying inline with the body copy.
+- On every item type (cover, slide, multiple choice, multi-select, poll and open response), ordinary Markdown image lines are extracted into a structured media area instead of staying inline with the body copy. On questions, put images on unquoted lines before or after the answer options; images in notes stay private to their original audience. Alt text names the image for screen readers; an optional Markdown title is its visible caption. Images can be enlarged on phones and remain in portable bundles and print without changing answering, timers or scoring.
 - One to three images are the intended sweet spot. MDQ automatically chooses a balanced layout beside the text on wide screens and stacks the media cleanly on narrow screens.
 - Image aspect ratios are preserved. MDQ only scales images within available width and height constraints, so portrait assets such as iPhone screenshots stay portrait.
 - Slide images and quiz prompt images are expandable. Click or tap an image to open a responsive overlay; close it with the close control, backdrop, or `Escape`.
@@ -864,9 +888,34 @@ Design notes:
 
 Adapters that call the engine's `apply()` route its messages by audience:
 
-- `all`: every socket; `staff`: control and display sockets. These payloads never carry a Student ID.
-- `control`: the instructor only, with Student IDs and names. `display`: the projector only. `public`: the projector and participants. Their payloads carry `label` and `publicKey` in place of the ID.
+- `all`: every socket; `staff`: control and display sockets. These payloads never carry a Participant ID.
+- `control`: the instructor only, with Participant IDs and names. `display`: the projector only. `public`: the projector and participants. Their payloads carry `label` and `publicKey` in place of the ID.
 - `participant:<id>`: that participant's own socket.
+
+New sessions carry a versioned `policy`, separate from the legacy `strict`/`open`
+identity mode. Schema-2 sessions default to presenter-paced, authored timing and automatic
+ranking. Select pacing before creating the join lobby with `pacing` on
+`POST /api/session`, or through the authenticated `POST /api/session/:id/policy`
+route before Start. Start freezes both that policy and an
+authored deck snapshot. Self-paced keeps every genuinely shown item answerable,
+uses no question countdown, and hides public results until deliberate End. It
+tracks an explicit released-item set, so an adapter's jump does not unlock skipped
+content. `publicQuestionPayload(session, quiz, index, now)` is the release-gated,
+audience-safe content projection; reading it never releases an item. The Core
+item REST route requires the existing participant ID and seat token.
+
+Only released scored questions count in new results. Speed automatically breaks
+correctness ties when all released scored questions have timers in presenter-paced
+sessions. An untimed scored release or countdown restart permanently gives shared
+competition ranks (1, 1, 3) instead. Self-paced always uses shared correctness ranks.
+Schema-1 records keep their original opt-in ranking semantics. Policy,
+released/scored scope and result finality survive serialization and exports.
+Policy-less legacy records retain their historical whole-deck scope and time ranks;
+rehydration does not invent a release history. Versioned submissions must use the
+pure engine's `answerSubmit` command with seat credentials, not the legacy
+`recordSubmission` compatibility helper. Hosted adapters own availability checks
+and serialization of competing commands. Automatic availability shutdown must
+use `end` with `discloseResults: false`, never deliberate result disclosure.
 
 `audienceReaches(audience, role)` answers whether a socket of role `"control"`, `"display"` or `"participant"` should receive a message. For a connecting socket, `apply(..., { type: "snapshot", view: "control" | "display" })` builds the messages for that role, and `{ type: "snapshot", participantId }` builds a participant's. A `join` command may carry `newPublicKey` (a random key); without it the engine makes one. `leaderboardRows(session, quiz, "public" | "control")` gives the same rows for REST responses.
 
@@ -911,7 +960,7 @@ The primary protection model is instructor authentication plus session scoping a
 Worst-case scenarios and realistic impact:
 
 - **Link sharing outside class**: Someone with the join URL could submit answers, mitigated by short-lived sessions, visible participant counts, and per-session closure. Likelihood low, impact low to medium.
-- **Student impersonation (same room)**: A student could type another student ID. This affects fairness, not host compromise. Token-based reconnect protection prevents easy socket hijack after first join, and a second device using a joined ID is refused with a clear message. Only the instructor's view sees Student IDs; other students and the projector see labels. Likelihood low, impact medium for grading integrity.
+- **Student impersonation (same room)**: A student could type another student ID. This affects fairness, not host compromise. Token-based reconnect protection prevents easy socket hijack after first join, and a second device using a joined ID is refused with a clear message. Only the instructor's view sees Participant IDs; other students and the projector see labels. Likelihood low, impact medium for grading integrity.
 - **DoS on a session URL**: Spam joins/submits could disrupt one session, but does not expose host secrets by design. Likelihood low in typical classroom context, impact medium for that class period.
 - **Accidental data exposure from git push**: If runtime files were tracked, URLs/session data could leak. This repo structure avoids that by keeping `data/` local-only and gitignored. Likelihood low when workflow is followed, impact medium if ignored.
 
@@ -971,16 +1020,30 @@ authors.
 | Catppuccin | [catppuccin/palette](https://github.com/catppuccin/palette) | MIT |
 | seoul256 | [junegunn/seoul256.vim](https://github.com/junegunn/seoul256.vim) | MIT |
 | Ayu | [ayu-theme/ayu-colors](https://github.com/ayu-theme/ayu-colors) | MIT |
-| Tokyo Night | [folke/tokyonight.nvim](https://github.com/folke/tokyonight.nvim) | Apache-2.0 |
+| Tomorrow | [chriskempson/tomorrow-theme](https://github.com/chriskempson/tomorrow-theme) | MIT |
+| Nord Aurora (MDQ adaptation) | [nordtheme/nord](https://github.com/nordtheme/nord) | MIT |
+
+Nord Aurora uses Nord’s neutral surfaces with Aurora-led accents. It is not an
+official Nord theme. Set `theme: nord-aurora` with `dark: off` or
+`dark: on`. The full Nord notice is in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)
+and is included in browser and print styles.
 
 The colours are adapted. Where an upstream colour misses 4.5:1 for text or 3:1
 for a control boundary, MDQ uses a darker or lighter shade of the same hue, and
 the comment above each palette in `packages/client/src/index.css` names the
-change. The Apache-2.0 licence text is at
-<https://www.apache.org/licenses/LICENSE-2.0>.
+change.
 
 ## Disclaimer
 
 MDQ is provided as-is, and you use it at your own risk. This was developed for personal use and shared in the spirit of open source, but it is not a polished commercial product. It may have security vulnerabilities, bugs, or data loss risks if used in production or with sensitive data. Always review the code and test in a safe environment before using it for real classes.
 
 MDQ is an independent project and is not affiliated with, endorsed by, or sponsored by Tailscale, is.gd, or any other third-party services mentioned here.
+
+Availability setup uses server-resolved `availableForMs` durations or an exact
+`availableUntil`, never both. Omit both for the four-hour default. Deadlines must
+be future and at most seven days from creation. Private management extends with
+`extendForMs` (resolved at mutation time) or `availableUntil`, retaining the same
+session, participants, answers and clocks. The new deadline must be later than
+the old one and within seven days from mutation time. Setup is private; the join
+lobby shows QR/code/link, participant status and Start. Management controls and
+lifecycle dates live in Session options, never on the shared lobby or leaderboard.

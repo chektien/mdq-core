@@ -1,6 +1,6 @@
 import fs from "fs";
 import path from "path";
-import { DECK_STYLE_KEYS, deckStylePresets, resolveDeckStyleSetting } from "@mdq/shared";
+import { DECK_PALETTES, DECK_STYLE_KEYS, deckStylePresets, resolveDeckStyleSetting } from "@mdq/shared";
 
 const css = fs.readFileSync(path.resolve(__dirname, "..", "..", "..", "client", "src", "index.css"), "utf-8");
 const surface = fs.readFileSync(path.resolve(__dirname, "..", "..", "..", "client", "src", "components", "LiveSurface.tsx"), "utf-8");
@@ -79,8 +79,8 @@ describe("deck style custom properties in the stylesheet", () => {
 
   it.each([...PALETTE_OWNED].sort())("%s is a palette property defined for both themes and every palette", (name) => {
     const definitions = css.match(new RegExp(`^\\s*${escape(name)}:`, "gm")) ?? [];
-    // Dark and light theme, plus a dark and a light block for each of the six other palettes.
-    expect(definitions.length).toBeGreaterThanOrEqual(14);
+    // Dark and light blocks for every supported palette, including classic.
+    expect(definitions.length).toBeGreaterThanOrEqual(DECK_PALETTES.length * 2);
   });
 
   it("keeps the scale used with each size, spacing and bullet setting at one when unset", () => {

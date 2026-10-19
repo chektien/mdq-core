@@ -23,28 +23,28 @@ B. No
 `;
 
 function deck(title: string, theme?: string): string {
-  return `# ${title}\n${theme ? `theme: ${theme}\n` : ""}${QUESTION}`;
+  return `# ${title}\n${theme ? `dark: ${theme}\n` : ""}${QUESTION}`;
 }
 
 describe("per-deck theme", () => {
   afterEach(() => clearAllSessions());
 
-  it("parses light and dark overrides case-insensitively", () => {
-    expect(parseQuizMarkdown(deck("Light", "LIGHT"), "light.md").quiz?.theme).toBe("light");
-    expect(parseQuizMarkdown(deck("Dark", "'dark'"), "dark.md").quiz?.theme).toBe("dark");
+  it("parses on and off mode overrides case-insensitively", () => {
+    expect(parseQuizMarkdown(deck("Light", "OFF"), "light.md").quiz?.theme).toBe("light");
+    expect(parseQuizMarkdown(deck("Dark", "'on'"), "dark.md").quiz?.theme).toBe("dark");
     expect(parseQuizMarkdown(deck("Fallback"), "fallback.md").quiz?.theme).toBeUndefined();
   });
 
-  it("reports invalid theme metadata at deck level", () => {
+  it("reports invalid dark metadata at deck level", () => {
     const result = parseQuizMarkdown(deck("Invalid", "sepia"), "invalid.md");
     expect(result.errors.map((error) => error.detail)).toContain(
-      "Invalid theme: sepia (expected dark or light)",
+      "Invalid dark: sepia (expected on or off)",
     );
   });
 
   it("delivers the effective theme on deck and session endpoints", async () => {
     const quizDir = fs.mkdtempSync(path.join(os.tmpdir(), "mdq-theme-"));
-    fs.writeFileSync(path.join(quizDir, "light.md"), deck("Light", "light"));
+    fs.writeFileSync(path.join(quizDir, "light.md"), deck("Light", "off"));
     fs.writeFileSync(path.join(quizDir, "fallback.md"), deck("Fallback"));
     const app = createApp({ quizDir, theme: "dark" });
 

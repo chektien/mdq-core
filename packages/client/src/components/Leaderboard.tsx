@@ -1,7 +1,7 @@
 import type { LeaderboardRow } from "@mdq/shared";
 
 /**
- * Leaderboard table with staggered animation. Rows are named by label; a row
+ * Flat leaderboard list. Rows are named by label; a row
  * that carries a Student ID (the instructor's) shows it under the label when
  * `showStudentIds` is on. `highlightPublicKey` marks the viewer's own row.
  * `compact` is for a phone or tablet held in the hand: rows stay a readable
@@ -26,20 +26,13 @@ export default function Leaderboard({
   const hasScoredQuestions = totalQuestions > 0;
   const getParticipantLabel = (entry: LeaderboardRow) => entry.label || entry.displayName || "Participant";
 
-  const rankLabel = (rank: number) => {
-    if (rank === 1) return "1st";
-    if (rank === 2) return "2nd";
-    if (rank === 3) return "3rd";
-    return `#${rank}`;
-  };
-
   return (
     <div className={compact ? "leaderboard-board leaderboard-board-compact" : "leaderboard-board"}>
       {visible.length > 0 ? (
         <ol className="leaderboard-list" aria-label="Leaderboard rankings">
-          {visible.map((entry, i) => {
+          {visible.map((entry) => {
             const isHighlighted = !!highlightPublicKey && entry.publicKey === highlightPublicKey;
-            const medalTone = entry.rank === 1
+            const rankTone = entry.rank === 1
               ? "rank-first"
               : entry.rank === 2
                 ? "rank-second"
@@ -49,20 +42,20 @@ export default function Leaderboard({
             return (
               <li
                 key={entry.publicKey}
-                className={`leaderboard-row ${medalTone} ${isHighlighted ? "leaderboard-row-highlight" : ""}`}
-                style={{ animationDelay: `${i * 60}ms` }}
+                className={`leaderboard-row ${rankTone} ${isHighlighted ? "leaderboard-row-highlight" : ""}`}
               >
                 <span
                   className="leaderboard-rank"
                   aria-label={`Rank ${entry.rank}`}
                 >
-                  {rankLabel(entry.rank)}
+                  {entry.rank}
                 </span>
 
                 <div className="leaderboard-person">
-                  <span className="leaderboard-name">
-                    {getParticipantLabel(entry)}
-                  </span>
+                  <div className="leaderboard-name-line">
+                    <span className="leaderboard-name">{getParticipantLabel(entry)}</span>
+                    {isHighlighted && <span className="leaderboard-you">You</span>}
+                  </div>
                   {showStudentIds && entry.studentId && entry.studentId !== getParticipantLabel(entry) && (
                     <span className="leaderboard-id">{entry.studentId}</span>
                   )}
@@ -73,9 +66,9 @@ export default function Leaderboard({
                     {hasScoredQuestions ? `${entry.correctCount} of ${totalQuestions} correct` : "Poll only"}
                   </span>
                   <small>
-                    {hasScoredQuestions
+                    {hasScoredQuestions && entry.totalTimeMs !== undefined
                       ? <>{(entry.totalTimeMs / 1000).toFixed(1)} s<span className="sr-only"> total time</span></>
-                      : "No scored questions"}
+                      : hasScoredQuestions ? "" : "No scored questions"}
                   </small>
                 </div>
               </li>

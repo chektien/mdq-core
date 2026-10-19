@@ -1,3 +1,4 @@
+import { shortTitle } from "../shortTitle";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { safeDeckStyle, type DeckStyle } from "@mdq/shared";
 import SessionCodeCard from "./SessionCodeCard";
@@ -170,13 +171,16 @@ export default function LiveSurface({
   // The join card floats over the bottom corner from 761px up. Its height and
   // its distance from the bottom edge go to the safe area as --slide-join-clear,
   // so a question on a tablet can keep its options clear of the card (the
-  // stylesheet uses it from 761px to 1180px). A card in the flow needs none.
+  // stylesheet uses it from 761px to 1499px). Its intrinsic width also reserves
+  // room beside media; unlike the old fixed width it follows the real address.
+  // A card in the flow needs no bottom clearance.
   useLayoutEffect(() => {
     const safe = safeRef.current;
     const card = hasJoinInfo ? safe?.querySelector<HTMLElement>(":scope > .slide-join-panel") : null;
     if (!safe || !card) return undefined;
     const measure = () => {
       const style = window.getComputedStyle(card);
+      safe.style.setProperty("--slide-expanded-join-width", `${Math.ceil(card.offsetWidth)}px`);
       if (style.position !== "absolute" && style.position !== "fixed") {
         safe.style.removeProperty("--slide-join-clear");
         return;
@@ -184,13 +188,17 @@ export default function LiveSurface({
       safe.style.setProperty("--slide-join-clear", `${Math.ceil((parseFloat(style.bottom) || 0) + card.offsetHeight)}px`);
     };
     measure();
-    if (typeof ResizeObserver === "undefined") return () => safe.style.removeProperty("--slide-join-clear");
+    if (typeof ResizeObserver === "undefined") return () => {
+      safe.style.removeProperty("--slide-join-clear");
+      safe.style.removeProperty("--slide-expanded-join-width");
+    };
     const observer = new ResizeObserver(measure);
     observer.observe(card);
     if (surfaceRef.current) observer.observe(surfaceRef.current);
     return () => {
       observer.disconnect();
       safe.style.removeProperty("--slide-join-clear");
+      safe.style.removeProperty("--slide-expanded-join-width");
     };
   }, [hasJoinInfo]);
 
@@ -291,7 +299,12 @@ export default function LiveSurface({
     variant: "nav" | "action",
   ) => {
     const tone = action.tone || "neutral";
-    const hasDetail = !!action.detail;
+    // Prev/Next titles can be long: shorten at a word, so the clamp never has to cut one.
+    const fullDetail = action.detail?.trim();
+    const detail = variant === "nav" ? shortTitle(fullDetail) : fullDetail;
+    const hasDetail = !!detail;
+    // The tooltip and accessible name keep the whole title.
+    const fullLabel = hasDetail ? `${action.label}: ${fullDetail}` : action.label;
     const className = [
       "slide-action-button",
       `slide-action-button-${tone}`,
@@ -319,13 +332,13 @@ export default function LiveSurface({
         className={className}
         onClick={action.onClick}
         disabled={action.disabled}
-        title={action.disabled && action.reason ? action.reason : undefined}
+        title={variant === "nav" ? fullLabel : action.disabled && action.reason ? action.reason : undefined}
         aria-pressed={action.pressed}
-        aria-label={hasDetail ? `${action.label}: ${action.detail}` : undefined}
+        aria-label={hasDetail ? fullLabel : undefined}
         aria-description={action.disabled && action.reason ? action.reason : undefined}
       >
         <span className="slide-button-label">{action.label}</span>
-        {hasDetail && <span className="slide-button-detail">{action.detail}</span>}
+        {hasDetail && <span className="slide-button-detail">{detail}</span>}
       </button>
     );
   };
@@ -367,6 +380,8 @@ export default function LiveSurface({
           )}
         </div>
 
+        {children}
+
         {hasJoinInfo && (
           <SessionCodeCard
             className="slide-join-panel"
@@ -381,8 +396,6 @@ export default function LiveSurface({
             defaultExpanded={joinCardDefaultExpanded}
           />
         )}
-
-        {children}
 
         {positionLabel && <p className="slide-counter">{positionLabel}</p>}
       </div>

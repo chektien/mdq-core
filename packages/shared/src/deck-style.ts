@@ -13,7 +13,7 @@ export type DeckStyle = Record<string, string>;
 /** The value an author wrote for each setting key, in its dashed spelling. */
 export type DeckStyleSettings = Record<string, string>;
 
-type Kind = "size" | "color" | "width" | "spacing" | "list-indent" | "list-gap" | "bullet-size" | "image-corners" | "image-spacing" | "image-width";
+type Kind = "font-size" | "size" | "color" | "width" | "spacing" | "list-indent" | "list-gap" | "bullet-size" | "image-corners" | "image-spacing" | "image-width";
 
 interface Spec {
   key: string;
@@ -47,6 +47,12 @@ function sizeSpec(key: string, name: string): Spec {
     length: (value) => ({ [`--mdq-${name}-size`]: value }),
     example: "4rem",
   };
+}
+
+/** Human font keys scale the responsive base; exact lengths stay on older keys. */
+function fontSizeSpec(key: string, name: string): Spec {
+  const older = sizeSpec(key, name);
+  return { ...older, kind: "font-size", noun: "a font size", units: undefined, length: undefined };
 }
 
 function scaledSpacingSpec(key: string, name: string, noun: string, kind: Kind = "spacing"): Spec {
@@ -92,7 +98,13 @@ const LIST_GAPS: Record<string, [string, string]> = {
 };
 
 /** Every deck header appearance setting, in the order the README lists them. */
+export const FONT_SIZE_ROLES = [
+  ["title-font-size", "title-size"], ["heading-font-size", "heading-size"],
+  ["body-font-size", "body-size"], ["note-font-size", "small-size"], ["caption-font-size", "caption-size"],
+] as const;
+
 const SPECS: Spec[] = [
+  ...FONT_SIZE_ROLES.map(([key, older]) => fontSizeSpec(key, older.replace(/-size$/, ""))),
   sizeSpec("title-size", "title"),
   sizeSpec("heading-size", "heading"),
   sizeSpec("body-size", "body"),
@@ -202,6 +214,7 @@ function describeChoices(spec: Spec): string {
     return "Use a colour name such as teal or navy, or a hex colour such as #0f766e.";
   }
   const presets = Object.keys(spec.presets ?? {});
+  if (spec.kind === "font-size") return "Use small, medium, large or x-large.";
   return `Use ${presets.join(", ")}, or a length such as ${spec.example}.`;
 }
 
