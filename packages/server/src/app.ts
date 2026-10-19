@@ -17,7 +17,7 @@ import {
 import { parseQuizMarkdown } from "./parser";
 import { publicResultsHidden, releasedQuestionIndexes, getSessionScoredQuestionCount, effectiveRanking, sessionPolicy } from "./policy";
 import { buildDeckValidationResponse } from "./deck-validation";
-import { apply, participantResultsPayload, endSessionAdvisory, participantStudyPayload, participantStudyItemPayload, publicQuestionPayload, leaderboardRows, questionPosition, responsesFor, timingFor, EngineCommandError, type Command, type EngineResult } from "./engine";
+import { apply, participantResultsPayload, endSessionAdvisory, participantStudyPayload, participantStudyItemPayload, publicQuestionPayload, leaderboardRows, responsesFor, EngineCommandError, type Command, type EngineResult } from "./engine";
 import {
   persistSessionOnEnd,
   purgeSessionArtifacts,

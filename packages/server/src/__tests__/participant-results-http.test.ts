@@ -4,7 +4,6 @@ import path from "path";
 import { createServer } from "http";
 import { AddressInfo } from "net";
 import request from "supertest";
-import { Server } from "socket.io";
 import { io as ioClient, Socket } from "socket.io-client";
 import { Quiz, SocketEvents, StudentJoinedPayload } from "@mdq/shared";
 import { createApp } from "../app";
@@ -45,14 +44,13 @@ it("HTTP retained own results survive missed/rejected final sockets, token-only 
   process.env.INSTRUCTOR_PASSWORD = "synthetic-instructor-password";delete process.env.INSTRUCTOR_KEY;
   clearAllSessions();clearInstructorSessionsForTests();
   fs.writeFileSync(path.join(dir, "synthetic.md"), DECK);
-  let ioServer: Server;
   const app = createApp({ quizDir: dir, dataDir: path.join(dir, "runtime"), onStateChange(_session, id, _state, _quiz, result) {
     if (result) emitMessages(ioServer, id, result.messages);
     clearSessionTimers(id);
   } });
   const httpServer = createServer(app);
   const quizzes = (app as unknown as { _quizzes: Map<string, Quiz> })._quizzes;
-  ioServer = setupSocket(httpServer, quizzes);
+  const ioServer = setupSocket(httpServer, quizzes);
   await new Promise<void>(resolve => httpServer.listen(0, "127.0.0.1", resolve));
   const url = `http://127.0.0.1:${(httpServer.address() as AddressInfo).port}`;
   const sockets: Socket[] = [];
