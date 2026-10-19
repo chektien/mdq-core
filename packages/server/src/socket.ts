@@ -145,6 +145,7 @@ export function setupSocket(httpServer: HttpServer, quizzes: Map<string, Quiz>):
       if (!quiz) return;
       const { _studentId: studentId, _sessionToken: sessionToken } = socket as ParticipantSocket;
       // The engine refuses a token the seat has moved away from; a second tab with the current token still answers.
+      // The local server deliberately uses the engine's default open-response language filter.
       const result = apply(session, quiz, { type: "answerSubmit", studentId, sessionToken, payload }, Date.now());
       Object.assign(session, result.session);
       // The answer's own outcome goes to the socket that asked, not to whichever socket holds the seat now.
