@@ -2,7 +2,9 @@ import * as fs from "fs";
 import * as os from "os";
 import * as path from "path";
 import { Quiz } from "@mdq/shared";
-import { createSession, addParticipant, recordSubmission, transitionState } from "../session";
+import { addParticipant, recordSubmission, transitionState } from "../session";
+// Direct submissions model a local run recorded before versioned policies, as persistence.test.ts does.
+import { createLegacySession } from "./fixtures/legacy-session";
 import { ensureRunClassification, loadRunClassification, setRunClassification } from "../run-classification";
 import { classifyLocalRun } from "../classify-local-run";
 import { computeCumulativeLeaderboard, getSessionResultsCsvPath, getSessionSummaryMarkdownPath, loadAllWeeklyResults, loadWeeklyResult, persistSessionOnEnd, saveWeeklyResult } from "../persistence";
@@ -12,7 +14,7 @@ const quiz: Quiz = { week: "fixture", title: "Synthetic fixture", sourceFile: "f
   correctOptions: ["A"], allowsMultiple: false, explanation: "Fixture", timeLimitSec: 20,
 })) };
 function run(ids = ["test1"]) {
-  const session = createSession(quiz.week, "open");
+  const session = createLegacySession(quiz.week, "open");
   ids.forEach((id, index) => addParticipant(session, id, `socket${index}`));
   transitionState(session, "QUESTION_OPEN");
   session.currentQuestionIndex = 0;
