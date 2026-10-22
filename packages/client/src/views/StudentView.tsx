@@ -527,7 +527,7 @@ export default function StudentView({
         )}
 
         <div className="text-center">
-          <h1 className="text-2xl font-bold text-white mb-1">Join Quiz</h1>
+          <h1 className="text-2xl font-bold text-white mb-1">Join session</h1>
           <p className="text-zinc-400 text-sm">Enter the session code shown on screen</p>
         </div>
 
@@ -651,7 +651,7 @@ export default function StudentView({
         <div className="min-h-dvh flex flex-col items-center justify-center gap-4 p-6">
           <div className="w-16 h-16 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin" />
           <SessionAvailabilityInfo availability={sock.availability} />
-          <h2 className="text-xl font-semibold text-white">Waiting for quiz to start...</h2>
+          <h2 className="text-xl font-semibold text-white">Waiting for the session to start...</h2>
           <p className="text-zinc-400 text-sm">The instructor will begin shortly</p>
           {sock.label && (
             <p className="student-lobby-label text-zinc-300 text-sm">
