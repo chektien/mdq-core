@@ -10,6 +10,7 @@ import { pathToFileURL } from "url";
 
 type PrintTheme = "dark" | "light";
 type PrintPalette = DeckPalette;
+type MissingImageHandler = (src: string) => void;
 
 interface PrintOptions {
   inputFile: string;
@@ -273,7 +274,7 @@ function imageDataUrl(filePath: string): string {
   return `data:${imageMimeType(filePath)};base64,${bytes.toString("base64")}`;
 }
 
-function toImageUrl(src: string, inputDir: string, imagesDir: string): string {
+function toImageUrl(src: string, inputDir: string, imagesDir: string, onMissingImage?: MissingImageHandler): string {
   const trimmed = src.trim();
   if (!trimmed || isExternalUrl(trimmed)) return trimmed;
 
@@ -283,13 +284,27 @@ function toImageUrl(src: string, inputDir: string, imagesDir: string): string {
     return imageDataUrl(existing);
   }
 
+  onMissingImage?.(trimmed);
   return pathToFileURL(candidates[0] || trimmed).href;
 }
 
-function rewriteImageSources(html: string, inputDir: string, imagesDir: string): string {
+/** An attribute value as the author wrote it, so `&amp;` and `&` name the same source. */
+function unescapeAttribute(value: string): string {
+  return value.replace(/&quot;/g, "\"").replace(/&#39;/g, "'").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&");
+}
+
+function rewriteImageSources(html: string, inputDir: string, imagesDir: string, onMissingImage?: MissingImageHandler): string {
+  const report = onMissingImage && ((src: string) => onMissingImage(unescapeAttribute(src)));
   return html.replace(/(<img\b[^>]*\bsrc=["'])([^"']+)(["'][^>]*>)/gi, (_match, prefix: string, src: string, suffix: string) => (
-    `${prefix}${escapeHtml(toImageUrl(src, inputDir, imagesDir))}${suffix}`
+    `${prefix}${escapeHtml(toImageUrl(src, inputDir, imagesDir, report))}${suffix}`
   ));
+}
+
+/** How a missing source is named in a message: as written, but never an absolute path on this machine. */
+export function missingImageLabel(src: string): string {
+  const clean = cleanLocalSrc(src);
+  if (clean.startsWith(DATA_IMAGE_PREFIX) || !path.isAbsolute(clean)) return src;
+  return path.basename(clean);
 }
 
 function appendVisibleLinkTargets(html: string): string {
@@ -303,8 +318,8 @@ function appendVisibleLinkTargets(html: string): string {
   );
 }
 
-function renderTrustedHtml(html: string, inputDir: string, imagesDir: string): string {
-  return appendVisibleLinkTargets(rewriteImageSources(html, inputDir, imagesDir));
+function renderTrustedHtml(html: string, inputDir: string, imagesDir: string, onMissingImage?: MissingImageHandler): string {
+  return appendVisibleLinkTargets(rewriteImageSources(html, inputDir, imagesDir, onMissingImage));
 }
 
 function questionHeading(question: Question): string {
@@ -342,6 +357,7 @@ function renderNotes(
   includePresenterNotes: boolean,
   inputDir: string,
   imagesDir: string,
+  onMissingImage?: MissingImageHandler,
 ): string {
   if (!includeFoldouts) return "";
 
@@ -358,14 +374,14 @@ function renderNotes(
       ${notes.map((note) => `
         <aside class="note note-${note.audience}">
           <div class="note-label">${note.label}</div>
-          <div class="note-body">${renderTrustedHtml(note.bodyHtml, inputDir, imagesDir)}</div>
+          <div class="note-body">${renderTrustedHtml(note.bodyHtml, inputDir, imagesDir, onMissingImage)}</div>
         </aside>
       `).join("")}
     </section>
   `;
 }
 
-function renderSlideMedia(question: Question, inputDir: string, imagesDir: string): string {
+function renderSlideMedia(question: Question, inputDir: string, imagesDir: string, onMissingImage?: MissingImageHandler): string {
   const media = question.slideMedia || [];
   if (media.length === 0) return "";
 
@@ -373,7 +389,7 @@ function renderSlideMedia(question: Question, inputDir: string, imagesDir: strin
   return `
     <section class="media-grid ${countClass}" aria-label="Slide images">
       ${media.map((item) => {
-        const src = escapeHtml(toImageUrl(item.src, inputDir, imagesDir));
+        const src = escapeHtml(toImageUrl(item.src, inputDir, imagesDir, onMissingImage));
         const alt = escapeHtml(item.alt || "Slide image");
         const title = item.title ? escapeHtml(item.title) : "";
         const caption = escapeHtml(item.title || item.alt || "");
@@ -388,18 +404,18 @@ function renderSlideMedia(question: Question, inputDir: string, imagesDir: strin
   `;
 }
 
-function renderReferences(question: Question, inputDir: string, imagesDir: string): string {
+function renderReferences(question: Question, inputDir: string, imagesDir: string, onMissingImage?: MissingImageHandler): string {
   const references = question.slideReferences || [];
   if (references.length === 0) return "";
 
   return `
     <footer class="references">
-      ${references.map((reference) => `<div>${renderTrustedHtml(reference.html, inputDir, imagesDir)}</div>`).join("")}
+      ${references.map((reference) => `<div>${renderTrustedHtml(reference.html, inputDir, imagesDir, onMissingImage)}</div>`).join("")}
     </footer>
   `;
 }
 
-function renderOptions(question: Question, inputDir: string, imagesDir: string, includeAnswers: boolean): string {
+function renderOptions(question: Question, inputDir: string, imagesDir: string, includeAnswers: boolean, onMissingImage?: MissingImageHandler): string {
   if (question.options.length === 0) return "";
   const correct = new Set(question.correctOptions);
   return `
@@ -410,7 +426,7 @@ function renderOptions(question: Question, inputDir: string, imagesDir: string, 
         return `
           <li class="${className}">
             <span class="option-label">${escapeHtml(option.label)}</span>
-            <div class="option-text">${renderTrustedHtml(option.textHtml, inputDir, imagesDir)}</div>
+            <div class="option-text">${renderTrustedHtml(option.textHtml, inputDir, imagesDir, onMissingImage)}</div>
             ${isCorrect ? "<span class=\"correct-chip\">Correct</span>" : ""}
           </li>
         `;
@@ -460,12 +476,12 @@ function renderExplanation(question: Question, includeAnswers: boolean): string 
   `;
 }
 
-function renderItem(question: Question, index: number, total: number, options: PrintOptions): string {
+function renderItem(question: Question, index: number, total: number, options: PrintOptions, onMissingImage?: MissingImageHandler): string {
   const inputDir = path.dirname(options.inputFile);
   const type = questionType(question);
   const isSlide = isSlideType(type);
   const heading = questionHeading(question);
-  const body = renderTrustedHtml(question.textHtml, inputDir, options.imagesDir);
+  const body = renderTrustedHtml(question.textHtml, inputDir, options.imagesDir, onMissingImage);
   if (type === "cover") {
     const { subtitleHtml, metaHtml } = splitCoverHtml(body);
     return `<article class="item item-cover">
@@ -473,10 +489,10 @@ function renderItem(question: Question, index: number, total: number, options: P
         <h2>${escapeHtml(heading)}</h2>
         ${subtitleHtml ? `<section class="cover-subtitle">${subtitleHtml}</section>` : ""}
         ${metaHtml ? `<section class="cover-meta">${metaHtml}</section>` : ""}
-        ${renderSlideMedia(question, inputDir, options.imagesDir)}
+        ${renderSlideMedia(question, inputDir, options.imagesDir, onMissingImage)}
       </div>
-      ${renderNotes(question, options.includeFoldouts, options.includePresenterNotes, inputDir, options.imagesDir)}
-      ${renderReferences(question, inputDir, options.imagesDir)}
+      ${renderNotes(question, options.includeFoldouts, options.includePresenterNotes, inputDir, options.imagesDir, onMissingImage)}
+      ${renderReferences(question, inputDir, options.imagesDir, onMissingImage)}
     </article>`;
   }
   const hasBody = body.trim().length > 0;
@@ -503,14 +519,14 @@ function renderItem(question: Question, index: number, total: number, options: P
           : ""
       }>
         ${bodySection}
-        ${renderSlideMedia(question, inputDir, options.imagesDir)}
+        ${renderSlideMedia(question, inputDir, options.imagesDir, onMissingImage)}
       </div>
       ${isSlide ? renderVideoNote(question) : ""}
-      ${renderOptions(question, inputDir, options.imagesDir, options.includeAnswers)}
+      ${renderOptions(question, inputDir, options.imagesDir, options.includeAnswers, onMissingImage)}
       ${renderAnswerBlock(question, options.includeAnswers)}
       ${renderExplanation(question, options.includeAnswers)}
-      ${renderNotes(question, options.includeFoldouts, options.includePresenterNotes, inputDir, options.imagesDir)}
-      ${renderReferences(question, inputDir, options.imagesDir)}
+      ${renderNotes(question, options.includeFoldouts, options.includePresenterNotes, inputDir, options.imagesDir, onMissingImage)}
+      ${renderReferences(question, inputDir, options.imagesDir, onMissingImage)}
     </article>
   `;
 }
@@ -1808,7 +1824,8 @@ function renderStyles(
   `;
 }
 
-export function buildHtml(quiz: Quiz, options: PrintOptions): string {
+/** Optionally collects missing local sources with their first 1-based item number. */
+export function buildHtml(quiz: Quiz, options: PrintOptions, missingImages?: Map<string, number>): string {
   const title = options.title || quiz.title || path.basename(options.inputFile);
 
   return `<!doctype html>
@@ -1827,7 +1844,9 @@ export function buildHtml(quiz: Quiz, options: PrintOptions): string {
       </div>
       ${renderToc(quiz)}
     </section>
-    ${quiz.questions.map((question, index) => renderItem(question, index, quiz.questions.length, options)).join("")}
+    ${quiz.questions.map((question, index) => renderItem(question, index, quiz.questions.length, options, (src) => {
+      if (missingImages && !missingImages.has(src)) missingImages.set(src, index + 1);
+    })).join("")}
   </main>
 </body>
 </html>`;
@@ -1871,7 +1890,7 @@ async function writePdf(html: string, options: PrintOptions): Promise<void> {
   }
 }
 
-async function main(): Promise<void> {
+export async function main(): Promise<void> {
   const { options, helpRequested } = parseArgs(process.argv.slice(2));
   if (helpRequested) {
     console.log(usage());
@@ -1897,7 +1916,11 @@ async function main(): Promise<void> {
     }
   }
 
-  const html = buildHtml(result.quiz, options);
+  const missingImages = new Map<string, number>();
+  const html = buildHtml(result.quiz, options, missingImages);
+  for (const [src, item] of missingImages) {
+    console.warn(`Missing in ${path.basename(options.inputFile)}, item ${item}: image ${JSON.stringify(missingImageLabel(src))} was not found; the printed page has no picture there.`);
+  }
   if (options.htmlOut) {
     await fs.promises.mkdir(path.dirname(options.htmlOut), { recursive: true });
     await fs.promises.writeFile(options.htmlOut, html, "utf-8");

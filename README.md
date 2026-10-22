@@ -445,6 +445,8 @@ npm run print:pdf -- data/decks/week00.md --dark off --theme gruvbox
 
 PDF images keep their source aspect ratio. MDQ only scales images down to fit the print layout, so portrait screenshots and wide diagrams are not stretched, cropped, or reframed.
 
+If a deck points at a local image file that does not exist, the exporter still writes the PDF and prints one warning per missing image source, naming the first deck item that uses it, for example `Missing in week00.md, item 2: image "images/gone.png" was not found; the printed page has no picture there.`
+
 ## Slide Appearance Settings
 
 A deck can change how its slides look from the header, in plain settings with no CSS. Write them in the header above the first `---`, one per line, with dashes like every other key (`title-font-size:`, and `title_font_size:` also works):
