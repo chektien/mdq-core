@@ -150,7 +150,7 @@ try{
  const routed=await pageWithToken();await routed.goto(url+'/routed#/s/synthetic');await routed.getByRole('heading',{name:'Your results for Synthetic finality'}).waitFor();
  await routed.getByRole('button',{name:'Done',exact:true}).click();await routed.getByRole('heading',{name:'Done',exact:true}).waitFor();
  await routed.evaluate(()=>{window.location.hash='/join/SYNTH2'});await routed.getByLabel('Student ID').fill('synthetic-two');
- await routed.getByRole('button',{name:'Join',exact:true}).click();await routed.getByRole('heading',{name:'Waiting for quiz to start...'}).waitFor();
+ await routed.getByRole('button',{name:'Join',exact:true}).click();await routed.getByRole('heading',{name:'Waiting for the session to start...'}).waitFor();
  assert.doesNotMatch(await routed.locator('body').innerText(),/This session has ended|OWN_FINAL_EXPLANATION|OWN_RETAINED_RESPONSE/,'S1 terminal state cannot leak into live S2');
  await routed.evaluate(()=>{window.location.hash='/s/synthetic'});await routed.getByRole('heading',{name:'Your results for Synthetic finality'}).waitFor();
  assert.match(await routed.locator('body').innerText(),/OWN_RETAINED_RESPONSE/);
@@ -171,7 +171,7 @@ try{
      window.seats.saveStoredSession({sessionId:'second',studentId:'synthetic-two',sessionToken:'second-seat'});
      window.serverEvent('student:rejected',{reason});window.openSession('second');
    },reason);
-   await raced.getByRole('heading',{name:'Waiting for quiz to start...'}).waitFor();
+   await raced.getByRole('heading',{name:'Waiting for the session to start...'}).waitFor();
    assert.equal(await raced.evaluate(()=>window.seats.loadStoredSession('second').sessionToken),'second-seat',reason+' from S1 cannot erase S2');
    assert.doesNotMatch(await raced.locator('body').innerText(),/This session has ended|OWN_FINAL_EXPLANATION|OWN_RETAINED_RESPONSE/);
  }

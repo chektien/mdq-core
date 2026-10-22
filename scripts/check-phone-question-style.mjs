@@ -163,7 +163,7 @@ async function visit(browser, base, week, bundle) {
   await phone.fill('input[name="studentId"]', "1000001");
   await phone.fill('input[name="displayName"]', "Check");
   await phone.getByRole("button", { name: "Join" }).click();
-  await phone.waitForSelector("text=Waiting for quiz");
+  await phone.waitForSelector("text=Waiting for the session");
   const post = (action) => fetch(`${base}/api/session/${sessionId}/${action}`, { method: "POST" });
   const states = {};
   const dumps = {};
@@ -206,7 +206,7 @@ async function switchTheme(browser, base, week) {
   await phone.fill('input[name="studentId"]', "1000001");
   await phone.fill('input[name="displayName"]', "Check");
   await phone.getByRole("button", { name: "Join" }).click();
-  await phone.waitForSelector("text=Waiting for quiz");
+  await phone.waitForSelector("text=Waiting for the session");
   await fetch(`${base}/api/session/${sessionId}/start`, { method: "POST" });
   await phone.waitForSelector(".option-btn");
   const questionColor = () => phone.evaluate(() => getComputedStyle(document.querySelector(".student-question-text, .quiz-html")).color);
