@@ -114,6 +114,12 @@ export interface EngineResult {
   seatTaken?: { participantId: string; sessionToken: string };
 }
 
+/** Host policy for this call only; never stored in the session. */
+export interface EngineOptions {
+  /** Returns true to reject text. Omit for the built-in matcher, or use false to disable filtering. */
+  openResponseFilter?: ((text: string) => boolean) | false;
+}
+
 /** Why an answer from a device that has lost its seat is refused. */
 export const SEAT_IN_USE_MESSAGE = "This seat is now in use on another device.";
 
@@ -429,7 +435,8 @@ const deadline = (session: Session, quiz: Quiz): number | null => {
 };
 
 /** Calculate a session change without mutating its input or using a clock or transport. */
-export function apply(input: Session, quiz: Quiz, command: Command, now: number): EngineResult {
+export function apply(input: Session, quiz: Quiz, command: Command, now: number, options: EngineOptions = {}): EngineResult {
+  const openResponseFilter = options.openResponseFilter ?? containsBlockedLanguage;
   const session = clone(input, command.type === "answerSubmit");
   quiz = session.deckSnapshot ?? quiz;
   ensureParticipantIdentity(session);
@@ -776,7 +783,7 @@ export function apply(input: Session, quiz: Quiz, command: Command, now: number)
         if (options.length) { reject("Open response questions accept text responses only."); break; }
         if (!responseText) { reject("Response text cannot be blank."); break; }
         if ([...responseText].length > MAX_OPEN_RESPONSE_LENGTH) { reject(`Please use up to ${MAX_OPEN_RESPONSE_LENGTH} characters.`); break; }
-        if (containsBlockedLanguage(responseText)) { reject(BLOCKED_LANGUAGE_MESSAGE); break; }
+        if (openResponseFilter !== false && openResponseFilter(responseText)) { reject(BLOCKED_LANGUAGE_MESSAGE); break; }
       } else {
         if (options.some((label) => !q.options.some((option) => option.label === label))) { reject("An option is not part of this question."); break; }
         if (!q.allowsMultiple && options.length > 1) { reject("This question accepts one answer only."); break; }

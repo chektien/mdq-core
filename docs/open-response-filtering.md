@@ -18,6 +18,15 @@ moderation and uses no AI or external service.
 inputs. Host-specific policies stay in the host adapter. For example, a host
 that already masks sensitive text before calling the engine can keep doing so.
 
+Hosts can pass an optional fifth argument to `apply(input, quiz, command, now,
+options)`: `EngineOptions.openResponseFilter` defaults to
+`containsBlockedLanguage`, accepts `false` to disable the language check, or a
+`(text: string) => boolean` matcher (for example, from
+`createBlockedTextMatcher`) that returns `true` to refuse text instead of using
+the default matcher. This option applies only to that call and is not stored;
+trimming and all other answer checks are unchanged. The local server keeps the
+default filter.
+
 # Answer status and close retries
 
 The presenter and projector show “N answered” independently of “M online”. A
