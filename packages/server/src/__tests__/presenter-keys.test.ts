@@ -249,10 +249,13 @@ describe("presenter view wiring", () => {
     expect(listener).toContain("press: ++pressRef.current");
   });
 
-  it("keeps one polite status for the lobby and one for the live view, floating so nothing moves, never focused", () => {
+  it("keeps one polite status in the lobby and in each live layout, floating so nothing moves, never focused", () => {
     expect(instructor).toContain('<p role="status" aria-live="polite" aria-atomic="true" className="presenter-nav-status fixed bottom-4 left-1/2 z-50 w-max max-w-[90vw] -translate-x-1/2 pointer-events-none text-center text-sm">');
     expect(instructor.split("<PresenterNavigationStatus notice={lobbyNavNotice} />")).toHaveLength(2);
-    expect(instructor.split("<PresenterNavigationStatus notice={navNotice} />")).toHaveLength(2);
+    // The live view has two layouts, the slide surface and the classic one; each renders it once.
+    expect(instructor.split("<PresenterNavigationStatus notice={navNotice} />")).toHaveLength(3);
+    const surfaceBranch = instructor.slice(instructor.indexOf("if (isLiveSurfaceDisplay) {"), instructor.indexOf("{participantsDialog}", instructor.indexOf("if (isLiveSurfaceDisplay) {")));
+    expect(surfaceBranch).toContain("<PresenterNavigationStatus notice={navNotice} />");
     expect(instructor).toContain('}, phase === "lobby")');
     expect(instructor).not.toMatch(/PresenterNavigationStatus[^\n]*\.focus\(/);
     const surface = fs.readFileSync(path.resolve(__dirname, "../../../client/src/components/LiveSurface.tsx"), "utf-8");
