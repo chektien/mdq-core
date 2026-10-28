@@ -919,6 +919,8 @@ pure engine's `answerSubmit` command with seat credentials, not the legacy
 and serialization of competing commands. Automatic availability shutdown must
 use `end` with `discloseResults: false`, never deliberate result disclosure.
 
+Hosts may supply a nonnegative safe integer `contentVersion` on the `answerSubmit` command (outside its participant payload) to stamp the accepted `Submission`; absent means unknown, never version 0.
+
 `audienceReaches(audience, role)` answers whether a socket of role `"control"`, `"display"` or `"participant"` should receive a message. For a connecting socket, `apply(..., { type: "snapshot", view: "control" | "display" })` builds the messages for that role, and `{ type: "snapshot", participantId }` builds a participant's. A `join` command may carry `newPublicKey` (a random key); without it the engine makes one. `leaderboardRows(session, quiz, "public" | "control")` gives the same rows for REST responses.
 
 ## Media Scope

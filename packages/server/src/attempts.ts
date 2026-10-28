@@ -7,6 +7,11 @@ export function currentAttempt(session: Session, index: number): number {
   return session.questionAttempts?.[String(index)] ?? 1;
 }
 
+/** The host's content version when the answer was accepted; undefined is unknown. */
+export function answeredContentVersion(submission: Submission): number | undefined {
+  return submission.contentVersion;
+}
+
 /**
  * The only answer projection. Ignore other attempts, then keep the last entry
  * in array order for each seat and question (not the latest timestamp). The

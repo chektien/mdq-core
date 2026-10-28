@@ -81,7 +81,7 @@ export type Command =
    * the participant's current token (the seat was freed and taken again), the answer is refused; a
    * connection with the current token, on any device or tab, still answers.
    */
-  | { type: "answerSubmit"; studentId?: string; sessionToken?: string; payload: AnswerSubmitPayload }
+  | { type: "answerSubmit"; studentId?: string; sessionToken?: string; contentVersion?: number; payload: AnswerSubmitPayload }
   /** Hide or show one open response on the projector. `role` is who is asking; only `control` may. */
   | { type: "responseVisibility"; role: SocketRole; questionIndex: number; publicKey: string; hidden: boolean }
   | { type: "responsesVisibility"; role: SocketRole; questionIndex: number; hidden: boolean }
@@ -435,6 +435,10 @@ const deadline = (session: Session, quiz: Quiz): number | null => {
 
 /** Calculate a session change without mutating its input or using a clock or transport. */
 export function apply(input: Session, quiz: Quiz, command: Command, now: number, options: EngineOptions = {}): EngineResult {
+  if (command.type === "answerSubmit" && command.contentVersion !== undefined
+    && (!Number.isSafeInteger(command.contentVersion) || command.contentVersion < 0)) {
+    throw new EngineCommandError("Host contentVersion must be a nonnegative safe integer.");
+  }
   const openResponseFilter = options.openResponseFilter ?? containsBlockedLanguage;
   const session = clone(input, command.type === "answerSubmit");
   quiz = session.deckSnapshot ?? quiz;
@@ -763,7 +767,7 @@ export function apply(input: Session, quiz: Quiz, command: Command, now: number,
       break;
     }
     case "answerSubmit": {
-      const { payload, studentId, sessionToken } = command;
+      const { payload, studentId, sessionToken, contentVersion } = command;
       const target: Audience = `participant:${studentId || ""}`;
       const reject = (reason: string) => emit(SocketEvents.ANSWER_REJECTED, { questionIndex: payload.questionIndex, reason }, target);
       if (availabilityPhase !== "active") { reject(availabilityPhase === "expired" ? "Availability ended" : availabilityPhase === "ended" ? "Session has ended" : "Session data has been deleted"); break; }
@@ -798,9 +802,14 @@ export function apply(input: Session, quiz: Quiz, command: Command, now: number,
       if (existing && !isOpenResponseQuestion(q)) { reject("Already submitted an answer for this question."); break; }
       const submission = { studentId, questionIndex: payload.questionIndex,
         ...(currentAttempt(session, payload.questionIndex) > 1 ? { attempt: currentAttempt(session, payload.questionIndex) } : {}),
+        ...(contentVersion !== undefined ? { contentVersion } : {}),
         selectedOptions: [...new Set(options)].sort(), responseText: responseText || undefined,
         submittedAt: now, responseTimeMs: timingFor(session, quiz, payload.questionIndex)?.startedAt !== undefined ? now - timingFor(session, quiz, payload.questionIndex)!.startedAt : 0 };
-      if (existing) session.submissions[existingIndex] = { ...existing, ...submission };
+      if (existing) {
+        const replacement = { ...existing, ...submission };
+        if (contentVersion === undefined) delete replacement.contentVersion;
+        session.submissions[existingIndex] = replacement;
+      }
       else session.submissions.push(submission);
       emit(SocketEvents.ANSWER_ACCEPTED, { questionIndex: payload.questionIndex }, target);
       emitCount();
