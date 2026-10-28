@@ -172,27 +172,35 @@ it.each([undefined, null, [], {}, { 0: 1, 1: 0, 2: -2, 3: 2.5, 4: "2", nope: 2, 
   expect(restored).not.toHaveProperty("questionAttempts"); expect(restored).not.toHaveProperty("attemptArchive");
 });
 
-it("normalization retains valid entries and rejects malformed archive members and optional state", () => {
+it("normalization drops unreadable attempts and bad optional fields, never the answers of a readable attempt", () => {
   const session = goldenSession("presenter-paced").current();
   const valid: ArchivedAttempt = { questionIndex: 0, attempt: 1, archivedAt: 0, submissions: [answer(0)] };
   Object.assign(session, { questionAttempts: { 0: 2, 1: 4, bad: 3, 2: 1, 3: 2.2 }, attemptArchive: [valid,
     null, {}, { ...valid, questionIndex: -1 }, { ...valid, attempt: 0 }, { ...valid, attempt: 1.5 },
-    { ...valid, archivedAt: "now" }, { ...valid, submissions: [{}] }, { ...valid, submissions: null },
-    { ...valid, timing: {} }, { ...valid, question: {} }, { ...valid, revealed: "true" },
+    { ...valid, archivedAt: "now" }, { ...valid, submissions: null }, { ...valid, submissions: [{}, answer(0, "two")] },
+    { ...valid, timing: "late" }, { ...valid, question: [] }, { ...valid, revealed: "true" },
     { ...valid, hiddenResponses: [42] }, { ...valid, shownResponses: "key" }, { ...valid, liveResultsOverride: 1 },
+    { ...valid, question: { index: 0 }, timing: { startedAt: 1 }, laterReleaseField: { kept: true } },
   ] });
   normalizeAttemptState(session);
-  expect(session.questionAttempts).toEqual({ 0: 2, 1: 4 }); expect(session.attemptArchive).toEqual([valid]);
+  expect(session.questionAttempts).toEqual({ 0: 2, 1: 4 });
+  expect(session.attemptArchive).toEqual([valid, { ...valid, submissions: [answer(0, "two")] }, valid, valid, valid, valid, valid, valid,
+    { ...valid, question: { index: 0 }, timing: { startedAt: 1 }, laterReleaseField: { kept: true } }]);
   const bytes = serializeSession(session); normalizeAttemptState(session); expect(serializeSession(session)).toBe(bytes);
 });
 
-it.each(["answer", "snapshot"])("engine %s clone isolates every mutable archive array", command => {
-  const { dirty } = scenario(2);
+it.each(["answer", "snapshot", "close", "reveal", "next", "end"])("engine %s never mutates a shared archive", command => {
+  // Close and Reveal exist only in presenter-paced sessions.
+  const { dirty: selfPaced } = scenario(2);
+  const dirty = ["close", "reveal"].includes(command) ? Object.assign(goldenSession("presenter-paced").current(), { attemptArchive: selfPaced.attemptArchive, questionAttempts: { 0: 2 } }) : selfPaced;
   dirty.attemptArchive![0] = { ...dirty.attemptArchive![0], question: structuredClone(goldenQuiz.questions[2]), timing: { startedAt: 0, deadlineAt: null, restarts: [] }, hiddenResponses: ["key-one"], shownResponses: ["key-two"] };
+  const deepFreeze = (value: unknown): void => { if (value && typeof value === "object" && !Object.isFrozen(value)) { Object.freeze(value); Object.values(value).forEach(deepFreeze); } };
+  deepFreeze(dirty.attemptArchive);
   const before = serializeSession(dirty);
-  const next = apply(dirty, goldenQuiz, command === "answer" ? { type: "answerSubmit", studentId: "two", sessionToken: "token-two", payload: { questionIndex: 2, selectedOptions: ["B"] } } : { type: "snapshot", view: "control" }, 1000).session;
-  next.attemptArchive![0].submissions[0].selectedOptions.push("C"); next.attemptArchive![0].timing!.restarts.push({ restartedAt: 1, previousStartedAt: 0, previousDeadlineAt: null });
-  next.attemptArchive![0].hiddenResponses!.push("other"); next.attemptArchive![0].shownResponses!.push("other"); next.attemptArchive![0].question!.options[0].textMd = "Changed";
+  const first = command === "reveal" ? apply(dirty, goldenQuiz, { type: "close" }, 900).session : dirty;
+  const next = apply(first, goldenQuiz, command === "answer" ? { type: "answerSubmit", studentId: "two", sessionToken: "token-two", payload: { questionIndex: 2, selectedOptions: ["B"] } }
+    : { type: command, ...(command === "snapshot" ? { view: "control" } : {}) } as never, 1000).session;
+  expect(next.attemptArchive).toBe(dirty.attemptArchive);
   next.questionAttempts![2] = 3;
   expect(serializeSession(dirty)).toBe(before);
 });
@@ -245,4 +253,16 @@ it("inactive stray entries alone are not answer evidence and seat removal does n
   removeSeatAnswers(clean, "one");
   expect(clean.submissions).toEqual([]);
   expect(clean).not.toHaveProperty("attemptArchive");
+});
+
+it("archiving a legacy session keeps the current item's clock from the legacy fields", () => {
+  const session = goldenSession("presenter-paced", true).current();
+  const index = session.currentQuestionIndex, question = goldenQuiz.questions[index];
+  delete session.questionTiming;
+  Object.assign(session, { questionStartedAt: 500, questionDeadlineAt: 1500 });
+  expect(archiveActiveAttempt(session, index, 2000, question).attemptArchive![0].timing).toEqual({ startedAt: 500, deadlineAt: 1500, restarts: [] });
+  delete session.questionDeadlineAt;
+  const derived = question.timeLimitSec === null ? null : 500 + question.timeLimitSec * 1000;
+  expect(archiveActiveAttempt(session, index, 2000, question).attemptArchive![0].timing).toEqual({ startedAt: 500, deadlineAt: derived, restarts: [] });
+  expect(archiveActiveAttempt(session, index + 1, 2000).attemptArchive![0]).not.toHaveProperty("timing");
 });

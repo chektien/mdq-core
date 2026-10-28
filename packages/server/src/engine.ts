@@ -1,4 +1,4 @@
-import { activeSubmission, activeSubmissions, activeSubmissionsFor, currentAttempt, hasAnyAnswers } from "./attempts";
+import { activeSubmission, activeSubmissions, activeSubmissionsFor, activeSubmissionsOf, currentAttempt, hasAnyAnswers } from "./attempts";
 import { availabilityAlarmMatches, availabilityPayload, nextAvailabilityAlarm, sessionAvailabilityPhase, validateAvailabilityDeadline } from "./availability";
 import { defaultSessionPolicy, effectiveRanking, getSessionScoredQuestionCount, isQuestionReleased, isSelfPaced, publicResultsHidden, releasedQuestionIndexes, scoredCorrectAnswersForSession } from "./policy";
 import { isSlideType } from "@mdq/shared";
@@ -139,7 +139,6 @@ const answerParticipants = (session: Session): Session["participants"] => {
 const clone = (session: Session, answering = false): Session => ({
   ...session,
   ...(session.questionAttempts ? { questionAttempts: { ...session.questionAttempts } } : {}),
-  ...(session.attemptArchive ? { attemptArchive: structuredClone(session.attemptArchive) } : {}),
   availability: session.availability ? { ...session.availability } : undefined,
   policy: session.policy ? { ...session.policy } : undefined,
   releasedQuestionIndexes: session.releasedQuestionIndexes ? new Set(session.releasedQuestionIndexes) : undefined,
@@ -306,8 +305,7 @@ const revealPayload = (session: Session, quiz: Quiz, view: ResponseView, now = D
   };
 };
 /** One student's own submissions, with option labels turned into option positions. */
-export const ownAnswers = (session: Session, quiz: Quiz, studentId: string): StudentAnswer[] => activeSubmissions(session)
-  .filter((s) => s.studentId === studentId)
+export const ownAnswers = (session: Session, quiz: Quiz, studentId: string): StudentAnswer[] => activeSubmissionsOf(session, studentId)
   .map((s) => {
     const options = quiz.questions[s.questionIndex]?.options ?? [];
     return {

@@ -1,4 +1,4 @@
-import { activeSubmission, activeSubmissions, activeSubmissionsFor, currentAttempt, normalizeAttemptState } from "./attempts";
+import { activeSubmission, activeSubmissions, activeSubmissionsFor, activeSubmissionsOf, currentAttempt, normalizeAttemptState } from "./attempts";
 import { availabilityPayload, sessionAvailabilityPhase } from "./availability";
 import { isSlideType, parseDeckPalette } from "@mdq/shared";
 import {
@@ -299,11 +299,9 @@ export function getDistribution(
   questionIndex: number,
 ): Record<string, number> {
   const dist: Record<string, number> = {};
-  for (const sub of activeSubmissions(session)) {
-    if (sub.questionIndex === questionIndex) {
-      for (const opt of sub.selectedOptions) {
-        dist[opt] = (dist[opt] || 0) + 1;
-      }
+  for (const sub of activeSubmissionsFor(session, questionIndex)) {
+    for (const opt of sub.selectedOptions) {
+      dist[opt] = (dist[opt] || 0) + 1;
     }
   }
   return dist;
@@ -322,8 +320,8 @@ export function getOpenResponses(
   session: Session,
   questionIndex: number,
 ): OpenResponseEntry[] {
-  return activeSubmissions(session)
-    .filter((sub) => sub.questionIndex === questionIndex && typeof sub.responseText === "string" && sub.responseText.length > 0)
+  return activeSubmissionsFor(session, questionIndex)
+    .filter((sub) => typeof sub.responseText === "string" && sub.responseText.length > 0)
     .map((sub) => ({
       publicKey: session.participants.get(sub.studentId)?.publicKey ?? "",
       label: session.participants.get(sub.studentId)?.label ?? "",
@@ -363,9 +361,7 @@ export function countConnectedParticipants(session: Session): number {
  * Get questions answered by a specific student.
  */
 export function getAnsweredQuestions(session: Session, studentId: string): number[] {
-  return activeSubmissions(session)
-    .filter((s) => s.studentId === studentId)
-    .map((s) => s.questionIndex);
+  return activeSubmissionsOf(session, studentId).map((s) => s.questionIndex);
 }
 
 function normalizeOptionSet(options: string[]): string[] {

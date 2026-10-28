@@ -821,7 +821,10 @@ export interface Session {
   submissions: Submission[];
   /** Current attempt per item index; missing map/key means 1. Only values above 1 are stored. */
   questionAttempts?: Record<string, number>;
-  /** Earlier attempts; absent when no question has been archived. */
+  /**
+   * Earlier attempts; absent when no question has been archived. Session
+   * versions share this array, so replace it (and its entries), never mutate it.
+   */
   attemptArchive?: ArchivedAttempt[];
   createdAt: number;
 }
