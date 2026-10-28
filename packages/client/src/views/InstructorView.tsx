@@ -59,7 +59,7 @@ import PresenterContent, { type PresenterPublicContentInput } from "../component
 import SlideBackgroundLayer from "../components/SlideBackgroundLayer";
 import PresenterNotesPanel from "../components/PresenterNotesPanel";
 import { getPresenterQuestionModeText, getRevealActionLabel } from "../questionMode";
-import { decidePresenterKey, documentHasOpenDialog, pickNavAction } from "../presenterKeys";
+import { decidePresenterKey, documentHasOpenDialog, navBlockedReason, pickNavAction, type PresenterNavContext } from "../presenterKeys";
 import { readShowStudentIds, saveShowStudentIds } from "../showStudentIds";
 import { answeredLabel, restartCountdownDetail, closedLabel as closedLabelFor, pluralize, positionLabel as positionLabelFor } from "../instructorText";
 
@@ -148,6 +148,67 @@ function clearInstructorRestore(): void {
   }
 }
 
+/** One listener for both lobby and live controls, with the latest button state. */
+function usePresenterNavigation(navActions: LiveSurfaceAction[], context: PresenterNavContext, enabled = true) {
+  const [notice, setNotice] = useState<{ message: string; press: number } | null>(null);
+  const navActionsRef = useRef(navActions);
+  const navContextRef = useRef(context);
+  const pressRef = useRef(0);
+  useEffect(() => {
+    navActionsRef.current = navActions;
+    navContextRef.current = context;
+  });
+  useEffect(() => {
+    if (!enabled) {
+      setNotice(null);
+      return;
+    }
+    let timer: ReturnType<typeof window.setTimeout> | undefined;
+    const clearNotice = () => {
+      window.clearTimeout(timer);
+      setNotice(null);
+    };
+    const handleKeyDown = (event: KeyboardEvent) => {
+      const decision = decidePresenterKey(
+        event,
+        event.target as Element | null,
+        documentHasOpenDialog(document),
+        { arrowsScroll: window.matchMedia("(max-width: 760px)").matches },
+      );
+      if (!decision.consume || !decision.direction) return;
+      event.preventDefault();
+      if (!decision.act) return;
+      const action = pickNavAction(navActionsRef.current, decision.direction);
+      if (action) {
+        clearNotice();
+        void action.onClick?.();
+        return;
+      }
+      const reason = navBlockedReason(decision.direction, navContextRef.current);
+      window.clearTimeout(timer);
+      // A fresh child also announces a repeated press with the same reason.
+      setNotice(reason ? { message: reason, press: ++pressRef.current } : null);
+      if (reason) timer = window.setTimeout(clearNotice, 4000);
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+      window.clearTimeout(timer);
+    };
+  }, [enabled]);
+  return notice;
+}
+
+function PresenterNavigationStatus({ notice }: { notice: ReturnType<typeof usePresenterNavigation> }) {
+  return (
+    // Always in the page so screen readers hear each change; it floats over the bottom of the
+    // presenter's own screen, so the slide and controls never move.
+    <p role="status" aria-live="polite" aria-atomic="true" className="presenter-nav-status fixed bottom-4 left-1/2 z-50 w-max max-w-[90vw] -translate-x-1/2 pointer-events-none text-center text-sm">
+      {notice && <span key={notice.press} className="inline-block rounded-lg border border-zinc-700 bg-zinc-900/95 px-3 py-2 text-zinc-100">{notice.message}</span>}
+    </p>
+  );
+}
+
 function saveInstructorRestore(restore: StoredInstructorRestore): void {
   try {
     sessionStorage.setItem(INSTRUCTOR_RESTORE_KEY, JSON.stringify(restore));
@@ -231,6 +292,12 @@ export default function InstructorView({
 
   // Socket connection (instructor role)
   const sock = useSocket(sessionInfo?.sessionId ?? null, "instructor");
+  const lobbyNavNotice = usePresenterNavigation([], {
+    state: "LOBBY", selfPaced: pacing === "self-paced", liveIsSlide: false,
+    isReviewing: false, isFirst: true, isLast: false, loading,
+    waitingReason: !sock.connected ? "Reconnecting..." : null,
+    revealActionLabel: "Reveal Answer",
+  }, phase === "lobby");
 
   const hasAnswers = sock.hasSessionAnswers;
 
@@ -746,6 +813,7 @@ export default function InstructorView({
               {loading ? "Starting..." : sock.connected ? "Start Session" : "Reconnecting..."}
             </button>
             <button ref={lobbyOptionsOpener} type="button" className="session-options-button" onClick={() => setShowLobbyOptions(true)}>Session options</button>
+            <PresenterNavigationStatus notice={lobbyNavNotice} />
             {showLobbyOptions && <dialog ref={mountLobbyOptions} className="end-session-overlay participants-overlay fixed inset-0 z-[10000] flex items-center justify-center bg-[#07060b]/80 px-5 backdrop-blur-sm" aria-labelledby="lobby-options-title" onCancel={() => setShowLobbyOptions(false)} onClick={event => { if (event.target === event.currentTarget) setShowLobbyOptions(false); }}>
               <div className="participants-card w-full max-w-lg rounded-2xl bg-[var(--mdq-dialog)] p-6 text-white">
                 <div className="participants-header"><h2 id="lobby-options-title" className="text-2xl font-semibold">Session options</h2><button type="button" className="participants-close" aria-label="Close session options" onClick={() => setShowLobbyOptions(false)} autoFocus>×</button></div>
@@ -1180,29 +1248,12 @@ function LiveView({
     ];
   })();
 
-  // Keys drive the same Prev and Next handlers as the buttons, so a disabled or
-  // reconnecting button also stops the key. The ref keeps one listener in place
-  // while the handlers are rebuilt on every render.
-  const navActionsRef = useRef(liveSurfaceNavActions);
-  useEffect(() => {
-    navActionsRef.current = liveSurfaceNavActions;
+  const navNotice = usePresenterNavigation(liveSurfaceNavActions, {
+    state, selfPaced, liveIsSlide, isReviewing, loading, waitingReason,
+    isFirst: isReviewing ? currentReviewListIndex <= 0 : liveQuestionIndex <= 0,
+    isLast: isReviewing ? currentReviewListIndex >= availableReviewIndices.length - 1 : isFinalQuestion,
+    revealActionLabel: liveRevealActionLabel,
   });
-  useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      const decision = decidePresenterKey(
-        event,
-        event.target as Element | null,
-        documentHasOpenDialog(document),
-        { arrowsScroll: window.matchMedia("(max-width: 760px)").matches },
-      );
-      if (!decision.consume || !decision.direction) return;
-      event.preventDefault();
-      if (!decision.act) return;
-      void pickNavAction(navActionsRef.current, decision.direction)?.onClick?.();
-    };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, []);
 
   const participantsAction: LiveSurfaceAction = {
     label: "Participants",
@@ -1979,6 +2030,7 @@ function LiveView({
         )}
       </div>
 
+      <PresenterNavigationStatus notice={navNotice} />
       {/* Error */}
       {errorMsg && (
         <div className={`${isLiveSurfaceDisplay ? "slide-page-error" : "mt-4"} bg-red-900/50 border border-red-700 text-red-200 px-4 py-3 rounded-xl text-center`}>
