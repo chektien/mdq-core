@@ -1,3 +1,4 @@
+import { activeSubmissions } from "./attempts";
 import * as fs from "fs";
 import * as path from "path";
 import {
@@ -154,8 +155,8 @@ export function saveSubmissions(session: Session, baseDir?: string): void {
   const data = {
     sessionId: session.sessionId,
     week: session.week,
-    submissionCount: session.submissions.length,
-    submissions: session.submissions,
+    submissionCount: activeSubmissions(session).length,
+    submissions: activeSubmissions(session),
   };
 
   const filePath = path.join(dir, `${session.sessionId}.json`);
@@ -250,7 +251,7 @@ export function saveSessionSummaryMarkdown(
 
   const submissionsByQuestion = new Map<number, Submission[]>();
   const submissionsByStudent = new Map<string, Submission[]>();
-  for (const sub of session.submissions) {
+  for (const sub of activeSubmissions(session)) {
     if (!submissionsByQuestion.has(sub.questionIndex)) {
       submissionsByQuestion.set(sub.questionIndex, []);
     }
@@ -286,7 +287,7 @@ export function saveSessionSummaryMarkdown(
   lines.push(`- Duration: ${(durationMs / 1000).toFixed(1)}s`);
   lines.push(`- Participant Count: ${participants.length}`);
   lines.push(`- Active Responders: ${activeParticipants.length}`);
-  lines.push(`- Total Submissions: ${session.submissions.length}`);
+  lines.push(`- Total Submissions: ${activeSubmissions(session).length}`);
   lines.push("");
 
   lines.push(classificationSummary(ensureRunClassification(session, quiz, resolveDataDir(baseDir), endedAt)));
