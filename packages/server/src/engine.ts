@@ -1,4 +1,4 @@
-import { activeSubmission, activeSubmissions, activeSubmissionsFor, activeSubmissionsOf, currentAttempt, hasAnyAnswers } from "./attempts";
+import { activeSubmission, activeSubmissions, activeSubmissionsBySeat, activeSubmissionsOf, currentAttempt, hasAnyAnswers } from "./attempts";
 import { availabilityAlarmMatches, availabilityPayload, nextAvailabilityAlarm, sessionAvailabilityPhase, validateAvailabilityDeadline } from "./availability";
 import { defaultSessionPolicy, effectiveRanking, getSessionScoredQuestionCount, isQuestionReleased, isSelfPaced, publicResultsHidden, releasedQuestionIndexes, scoredCorrectAnswersForSession } from "./policy";
 import { isSlideType } from "@mdq/shared";
@@ -194,13 +194,12 @@ const liveResultsEnabled = (session: Session, quiz: Quiz, index: number): boolea
   getQuestionType(quiz.questions[index]) === "poll" && (session.liveResultsOverrides?.[String(index)] ?? quiz.questions[index].liveResults === true);
 
 /** Accepted submissions are the voter list, never the connected roster or the current item. */
-const pollVotes = (session: Session, index: number) => new Map(activeSubmissionsFor(session, index)
-  .map(submission => [submission.studentId, submission.selectedOptions]));
+const pollVotes = (session: Session, index: number) => activeSubmissionsBySeat(session, index);
 
 const pollCounts = (session: Session, quiz: Quiz, index: number) => {
   const votes = pollVotes(session, index);
   const counts = Object.fromEntries(quiz.questions[index].options.map(option => [option.label, 0]));
-  for (const selections of votes.values()) for (const label of new Set(selections)) {
+  for (const { selectedOptions } of votes.values()) for (const label of new Set(selectedOptions)) {
     if (Object.prototype.hasOwnProperty.call(counts, label)) counts[label]++;
   }
   return { voters: votes.size, counts };
@@ -215,7 +214,7 @@ const pollLivePayload = (session: Session, quiz: Quiz, index: number, now: numbe
   // An explicit Hide retains the private feed, even for a poll enabled by an override.
   if (!enabled && session.liveResultsOverrides?.[String(index)] !== false) return null;
   if (view === "participant" && (!participantId || !session.participants.has(participantId)
-    || session.participants.get(participantId)?.released || !pollVotes(session, index).has(participantId))) return null;
+    || session.participants.get(participantId)?.released || !activeSubmission(session, participantId, index))) return null;
   if (view !== "control" && !enabled) return { questionIndex: index, hidden: true };
   const { voters, counts } = pollCounts(session, quiz, index);
   if (view === "control") return { questionIndex: index, voters, counts, liveResults: enabled };

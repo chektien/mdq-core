@@ -1,7 +1,7 @@
 import fs from "fs";
 import path from "path";
 import { ArchivedAttempt, Submission } from "@mdq/shared";
-import { activeSubmission, activeSubmissions, activeSubmissionsFor, archiveActiveAttempt, archivedAttempts, currentAttempt, hasAnyAnswers, normalizeAttemptState, removeSeatAnswers } from "../attempts";
+import { activeSubmission, activeSubmissions, activeSubmissionsBySeat, activeSubmissionsFor, activeSubmissionsOf, archiveActiveAttempt, archivedAttempts, currentAttempt, hasAnyAnswers, normalizeAttemptState, removeSeatAnswers } from "../attempts";
 import { apply, participantStudyPayload, timingFor } from "../engine";
 import { nextAvailabilityAlarm } from "../availability";
 import { deserializeSession, recordSubmission, serializeSession } from "../session";
@@ -277,4 +277,24 @@ it("archiving an untimed legacy item records the deadline the engine uses, ignor
     expect(archiveActiveAttempt(session, index, 2000, question).attemptArchive![0].timing).toEqual({ startedAt: 500, deadlineAt: null, restarts: [] });
   }
   expect(archiveActiveAttempt(session, index, 2000).attemptArchive![0].timing).toEqual({ startedAt: 500, deadlineAt: 1500, restarts: [] });
+});
+
+it("the narrower readers return exactly what filtering the full projection returns", () => {
+  const session = goldenSession("presenter-paced").current();
+  session.questionAttempts = { 1: 2 };
+  const ids = ["one", "two", "three"];
+  let n = 0;
+  // Deterministic mix of duplicates, inactive attempts and several questions.
+  session.submissions = Array.from({ length: 60 }, () => {
+    n = (n * 37 + 11) % 97;
+    return { ...answer(n % 3, ids[n % 3 === 1 ? (n >> 2) % 3 : (n >> 1) % 3], (n % 5 === 0 ? 2 : n % 7 === 0 ? 3 : undefined)), submittedAt: n };
+  });
+  const full = activeSubmissions(session);
+  for (const index of [0, 1, 2, 3]) {
+    const expected = full.filter(sub => sub.questionIndex === index);
+    expect(activeSubmissionsFor(session, index)).toEqual(expected);
+    expect([...activeSubmissionsBySeat(session, index).values()]).toEqual(expected);
+    for (const id of ids) expect(activeSubmission(session, id, index)).toBe(expected.find(sub => sub.studentId === id));
+  }
+  for (const id of ids) expect(activeSubmissionsOf(session, id)).toEqual(full.filter(sub => sub.studentId === id));
 });

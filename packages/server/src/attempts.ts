@@ -37,6 +37,22 @@ export function activeSubmissionsFor(session: Session, index: number): Submissio
   const attempt = currentAttempt(session, index);
   return lastPerKey(session.submissions.filter(sub => sub.questionIndex === index && (sub.attempt ?? 1) === attempt), sub => sub.studentId);
 }
+/**
+ * One question's active answers by seat, in the order of `activeSubmissionsFor`.
+ * A duplicate moves its seat to the later position, so one Map does the work
+ * of the de-duplication without a second pass (poll counts read this for
+ * every participant on each study request).
+ */
+export function activeSubmissionsBySeat(session: Session, index: number): Map<string, Submission> {
+  const attempt = currentAttempt(session, index);
+  const bySeat = new Map<string, Submission>();
+  for (const sub of session.submissions) {
+    if (sub.questionIndex !== index || (sub.attempt ?? 1) !== attempt) continue;
+    if (bySeat.has(sub.studentId)) bySeat.delete(sub.studentId);
+    bySeat.set(sub.studentId, sub);
+  }
+  return bySeat;
+}
 export function activeSubmissionsOf(session: Session, studentId: string): Submission[] {
   return lastPerKey(session.submissions.filter(sub => sub.studentId === studentId && isActive(session, sub)), sub => String(sub.questionIndex));
 }
