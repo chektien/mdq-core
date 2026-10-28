@@ -1,3 +1,4 @@
+import { activeSubmission, activeSubmissions, activeSubmissionsFor, activeSubmissionsOf, currentAttempt, normalizeAttemptState } from "./attempts";
 import { availabilityPayload, sessionAvailabilityPhase } from "./availability";
 import { isSlideType, parseDeckPalette } from "@mdq/shared";
 import {
@@ -93,6 +94,7 @@ export function deserializeSession(json: string): Session {
   }
   // A session saved before public keys and labels existed gets them now.
   ensureParticipantIdentity(session);
+  normalizeAttemptState(session);
   return session;
 }
 
@@ -262,9 +264,7 @@ export function recordSubmission(
   if (deadline !== undefined && deadline !== null && now >= deadline) {
     throw new Error("The question deadline has passed.");
   }
-  const existingSubmission = session.submissions.find(
-    (s) => s.studentId === studentId && s.questionIndex === questionIndex,
-  );
+  const existingSubmission = activeSubmission(session, studentId, questionIndex);
 
   if (existingSubmission) {
     if (!isOpenResponseSubmission) {
@@ -279,6 +279,7 @@ export function recordSubmission(
   }
 
   const submission: Submission = {
+    ...(currentAttempt(session, questionIndex) > 1 ? { attempt: currentAttempt(session, questionIndex) } : {}),
     studentId,
     questionIndex,
     selectedOptions: normalizedSelectedOptions,
@@ -298,11 +299,9 @@ export function getDistribution(
   questionIndex: number,
 ): Record<string, number> {
   const dist: Record<string, number> = {};
-  for (const sub of session.submissions) {
-    if (sub.questionIndex === questionIndex) {
-      for (const opt of sub.selectedOptions) {
-        dist[opt] = (dist[opt] || 0) + 1;
-      }
+  for (const sub of activeSubmissionsFor(session, questionIndex)) {
+    for (const opt of sub.selectedOptions) {
+      dist[opt] = (dist[opt] || 0) + 1;
     }
   }
   return dist;
@@ -321,8 +320,8 @@ export function getOpenResponses(
   session: Session,
   questionIndex: number,
 ): OpenResponseEntry[] {
-  return session.submissions
-    .filter((sub) => sub.questionIndex === questionIndex && typeof sub.responseText === "string" && sub.responseText.length > 0)
+  return activeSubmissionsFor(session, questionIndex)
+    .filter((sub) => typeof sub.responseText === "string" && sub.responseText.length > 0)
     .map((sub) => ({
       publicKey: session.participants.get(sub.studentId)?.publicKey ?? "",
       label: session.participants.get(sub.studentId)?.label ?? "",
@@ -342,9 +341,7 @@ export function getSubmissionCount(
   session: Session,
   questionIndex: number,
 ): { submitted: number; total: number } {
-  const submitted = session.submissions.filter(
-    (s) => s.questionIndex === questionIndex,
-  ).length;
+  const submitted = activeSubmissionsFor(session, questionIndex).length;
   const total = countConnectedParticipants(session);
   return { submitted, total };
 }
@@ -364,9 +361,7 @@ export function countConnectedParticipants(session: Session): number {
  * Get questions answered by a specific student.
  */
 export function getAnsweredQuestions(session: Session, studentId: string): number[] {
-  return session.submissions
-    .filter((s) => s.studentId === studentId)
-    .map((s) => s.questionIndex);
+  return activeSubmissionsOf(session, studentId).map((s) => s.questionIndex);
 }
 
 function normalizeOptionSet(options: string[]): string[] {
@@ -408,7 +403,7 @@ export function computeLeaderboard(
   }
 
   // Tally correct answers and times
-  for (const sub of session.submissions) {
+  for (const sub of activeSubmissions(session)) {
     const correct = correctAnswersMap.get(sub.questionIndex);
     if (!correct) continue;
 

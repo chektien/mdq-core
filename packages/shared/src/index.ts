@@ -697,6 +697,8 @@ export interface Participant {
 }
 
 export interface Submission {
+  /** Attempt answered; absent means 1. Written only for attempts above 1. */
+  attempt?: number;
   studentId: string;
   questionIndex: number;
   selectedOptions: string[];
@@ -714,6 +716,30 @@ export interface QuestionTiming {
   restarts: { restartedAt: number; previousStartedAt: number; previousDeadlineAt: number | null }[];
   /** Explicit restart invalidates fair time-based comparisons; legacy ranking is unchanged. */
   timingFairnessInvalidated?: true;
+}
+
+/** An earlier question attempt, retained independently of the active answers. */
+export interface ArchivedAttempt {
+  /** Zero-based item position in the deck. */
+  questionIndex: number;
+  /** Attempt number, starting at 1. */
+  attempt: number;
+  /** Caller-supplied archive time in epoch milliseconds. */
+  archivedAt: number;
+  /** Active answers from this attempt, one per seat and item. */
+  submissions: Submission[];
+  /** Snapshot of the item these answers addressed, when available. */
+  question?: Question;
+  /** Opening, deadline and restart history for this attempt. */
+  timing?: QuestionTiming;
+  /** Whether this attempt had been revealed. Absent means unrevealed. */
+  revealed?: boolean;
+  /** Public keys hidden by the presenter for this item. */
+  hiddenResponses?: string[];
+  /** Public keys explicitly shown for this item. */
+  shownResponses?: string[];
+  /** Explicit presenter poll visibility override, including false. */
+  liveResultsOverride?: boolean;
 }
 
 /** Independent of presentation position and deliberate result finality. Missing means legacy. */
@@ -793,6 +819,13 @@ export interface Session {
   joinLocked?: boolean;
   participants: Map<string, Participant>;
   submissions: Submission[];
+  /** Current attempt per item index; missing map/key means 1. Only values above 1 are stored. */
+  questionAttempts?: Record<string, number>;
+  /**
+   * Earlier attempts; absent when no question has been archived. Session
+   * versions share this array, so replace it (and its entries), never mutate it.
+   */
+  attemptArchive?: ArchivedAttempt[];
   createdAt: number;
 }
 

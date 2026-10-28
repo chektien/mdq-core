@@ -1,3 +1,4 @@
+import { activeSubmission, activeSubmissions, activeSubmissionsBySeat, activeSubmissionsOf, currentAttempt, hasAnyAnswers } from "./attempts";
 import { availabilityAlarmMatches, availabilityPayload, nextAvailabilityAlarm, sessionAvailabilityPhase, validateAvailabilityDeadline } from "./availability";
 import { defaultSessionPolicy, effectiveRanking, getSessionScoredQuestionCount, isQuestionReleased, isSelfPaced, publicResultsHidden, releasedQuestionIndexes, scoredCorrectAnswersForSession } from "./policy";
 import { isSlideType } from "@mdq/shared";
@@ -137,6 +138,7 @@ const answerParticipants = (session: Session): Session["participants"] => {
 };
 const clone = (session: Session, answering = false): Session => ({
   ...session,
+  ...(session.questionAttempts ? { questionAttempts: { ...session.questionAttempts } } : {}),
   availability: session.availability ? { ...session.availability } : undefined,
   policy: session.policy ? { ...session.policy } : undefined,
   releasedQuestionIndexes: session.releasedQuestionIndexes ? new Set(session.releasedQuestionIndexes) : undefined,
@@ -192,14 +194,12 @@ const liveResultsEnabled = (session: Session, quiz: Quiz, index: number): boolea
   getQuestionType(quiz.questions[index]) === "poll" && (session.liveResultsOverrides?.[String(index)] ?? quiz.questions[index].liveResults === true);
 
 /** Accepted submissions are the voter list, never the connected roster or the current item. */
-const pollVotes = (session: Session, index: number) => new Map(session.submissions
-  .filter(submission => submission.questionIndex === index)
-  .map(submission => [submission.studentId, submission.selectedOptions]));
+const pollVotes = (session: Session, index: number) => activeSubmissionsBySeat(session, index);
 
 const pollCounts = (session: Session, quiz: Quiz, index: number) => {
   const votes = pollVotes(session, index);
   const counts = Object.fromEntries(quiz.questions[index].options.map(option => [option.label, 0]));
-  for (const selections of votes.values()) for (const label of new Set(selections)) {
+  for (const { selectedOptions } of votes.values()) for (const label of new Set(selectedOptions)) {
     if (Object.prototype.hasOwnProperty.call(counts, label)) counts[label]++;
   }
   return { voters: votes.size, counts };
@@ -214,7 +214,7 @@ const pollLivePayload = (session: Session, quiz: Quiz, index: number, now: numbe
   // An explicit Hide retains the private feed, even for a poll enabled by an override.
   if (!enabled && session.liveResultsOverrides?.[String(index)] !== false) return null;
   if (view === "participant" && (!participantId || !session.participants.has(participantId)
-    || session.participants.get(participantId)?.released || !pollVotes(session, index).has(participantId))) return null;
+    || session.participants.get(participantId)?.released || !activeSubmission(session, participantId, index))) return null;
   if (view !== "control" && !enabled) return { questionIndex: index, hidden: true };
   const { voters, counts } = pollCounts(session, quiz, index);
   if (view === "control") return { questionIndex: index, voters, counts, liveResults: enabled };
@@ -279,7 +279,7 @@ const countPayload = (session: Session, quiz: Quiz, view: ResponseView, now: num
   return {
     questionIndex: session.currentQuestionIndex,
     ...getSubmissionCount(session, session.currentQuestionIndex),
-    ...(session.submissions.length > 0 ? { hasAnswers: true as const } : {}),
+    ...(hasAnyAnswers(session) ? { hasAnswers: true as const } : {}),
     openResponses: undefined,
     ...(responses && view === "control" ? { openResponsesHiddenByDefault: session.openResponsesHiddenByDefault === true } : {}),
     ...(responses && view !== "participant" ? {
@@ -304,8 +304,7 @@ const revealPayload = (session: Session, quiz: Quiz, view: ResponseView, now = D
   };
 };
 /** One student's own submissions, with option labels turned into option positions. */
-export const ownAnswers = (session: Session, quiz: Quiz, studentId: string): StudentAnswer[] => session.submissions
-  .filter((s) => s.studentId === studentId)
+export const ownAnswers = (session: Session, quiz: Quiz, studentId: string): StudentAnswer[] => activeSubmissionsOf(session, studentId)
   .map((s) => {
     const options = quiz.questions[s.questionIndex]?.options ?? [];
     return {
@@ -348,7 +347,7 @@ export function endSessionAdvisory(session: Session, quiz: Quiz): import("@mdq/s
   const released = new Set(quiz.questions.map((_, index) => index).filter(index => isQuestionReleased(session, index)));
   const available = [...released].filter(index => !isSlideType(getQuestionType(quiz.questions[index])));
   const answeredBySeat = new Map<string, Set<number>>();
-  for (const answer of session.submissions) {
+  for (const answer of activeSubmissions(session)) {
     const indexes = answeredBySeat.get(answer.studentId) ?? new Set<number>();
     indexes.add(answer.questionIndex); answeredBySeat.set(answer.studentId, indexes);
   }
@@ -375,7 +374,7 @@ export function participantResultsPayload(session: Session, quiz: Quiz, studentI
     const question = publicQuestionPayload(session, quiz, index, endedAt ?? session.createdAt);
     if (!question) return [];
     const answer = own.get(index) ?? null;
-    const submission = session.submissions.find(s => s.studentId === studentId && s.questionIndex === index);
+    const submission = activeSubmission(session, studentId, index);
     const live = answer && liveResultsEnabled(session, quiz, index) ? pollLivePayload(session, quiz, index, now, "participant", studentId) : null;
     return [{ question, answer, explanation: q.explanation,
       ...(live && "counts" in live ? { pollLive: { voters: live.voters, counts: live.counts } } : {}), ...(scored.has(index) ? {
@@ -487,7 +486,7 @@ export function apply(input: Session, quiz: Quiz, command: Command, now: number,
   const state = (includeIndex = true) => {
     const payload = { ...(session.availability ? { availability: availabilityPayload(session, now) } : {}),
       ...(includeIndex ? { state: session.state, questionIndex: session.currentQuestionIndex } : { state: session.state }),
-      ...(session.submissions.length > 0 ? { hasAnswers: true as const } : {}) };
+      ...(hasAnyAnswers(session) ? { hasAnswers: true as const } : {}) };
     emit(SocketEvents.SESSION_STATE, payload);
     if (session.policy) emit(SocketEvents.SESSION_STATE, { ...payload, policy: session.policy, effectiveRanking: effectiveRanking(session, quiz) }, "control");
   };
@@ -538,6 +537,7 @@ export function apply(input: Session, quiz: Quiz, command: Command, now: number,
       if (command.alarm.phase !== "purge" || !availabilityAlarmMatches(session, command.alarm) || now < command.alarm.dueAt || availabilityPhase !== "deleted") break;
       session.deletedAt = now;
       session.participants.clear(); session.submissions = []; session.deckSnapshot = undefined;
+      delete session.questionAttempts; delete session.attemptArchive;
       session.releasedQuestionIndexes?.clear(); session.revealedQuestionIndexes?.clear();
       session.questionTiming = undefined; session.hiddenResponses = undefined; session.shownResponses = undefined;
       session.liveResultsOverrides = undefined;
@@ -793,10 +793,11 @@ export function apply(input: Session, quiz: Quiz, command: Command, now: number,
       const due = deadline(session, quiz);
       if (due !== null && now >= due) { reject("The question deadline has passed."); break; }
       if (!session.participants.has(studentId)) { reject(`Student "${studentId}" is not a participant in this session.`); break; }
-      const existingIndex = session.submissions.findIndex((s) => s.studentId === studentId && s.questionIndex === payload.questionIndex);
-      const existing = session.submissions[existingIndex];
+      const existing = activeSubmission(session, studentId, payload.questionIndex);
+      const existingIndex = existing ? session.submissions.indexOf(existing) : -1;
       if (existing && !isOpenResponseQuestion(q)) { reject("Already submitted an answer for this question."); break; }
       const submission = { studentId, questionIndex: payload.questionIndex,
+        ...(currentAttempt(session, payload.questionIndex) > 1 ? { attempt: currentAttempt(session, payload.questionIndex) } : {}),
         selectedOptions: [...new Set(options)].sort(), responseText: responseText || undefined,
         submittedAt: now, responseTimeMs: timingFor(session, quiz, payload.questionIndex)?.startedAt !== undefined ? now - timingFor(session, quiz, payload.questionIndex)!.startedAt : 0 };
       if (existing) session.submissions[existingIndex] = { ...existing, ...submission };
@@ -921,7 +922,7 @@ function snapshotMessages(session: Session, quiz: Quiz, now: number, audience: A
   if (session.availability) emit(SocketEvents.SESSION_AVAILABILITY, availabilityPayload(session, now));
   if (sessionAvailabilityPhase(session, now) === "deleted") return messages;
   if (staff) emit(SocketEvents.SESSION_STATE, { ...(session.availability ? { availability: availabilityPayload(session, now) } : {}), state: session.state, questionIndex: session.currentQuestionIndex >= 0 ? session.currentQuestionIndex : undefined,
-    ...(session.submissions.length > 0 ? { hasAnswers: true } : {}),
+    ...(hasAnyAnswers(session) ? { hasAnswers: true } : {}),
     ...(view === "control" && session.policy ? { policy: session.policy, effectiveRanking: effectiveRanking(session, quiz) } : {}) });
   const q = questionAt(session, quiz);
   const payload = questionPayload(session, quiz, now);

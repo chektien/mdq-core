@@ -1,3 +1,4 @@
+import { activeSubmissions } from "./attempts";
 // Pure results CSV builder. Keep this module free of Node fs/path imports so it
 // can be bundled for runtimes that have no filesystem.
 import { isSlideType, Session, Quiz, Submission } from "@mdq/shared";
@@ -61,7 +62,7 @@ export function buildResultsCsv(session: Session, quiz: Quiz, options: BuildResu
   const resultIndexSet = new Set(resultIndexes);
 
   const submissionsByStudent = new Map<string, Map<number, Submission>>();
-  for (const sub of session.submissions) {
+  for (const sub of activeSubmissions(session)) {
     if (!resultIndexSet.has(sub.questionIndex)) continue;
     if (!submissionsByStudent.has(sub.studentId)) {
       submissionsByStudent.set(sub.studentId, new Map<number, Submission>());

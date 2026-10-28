@@ -1,3 +1,4 @@
+import { activeSubmissions } from "./attempts";
 import * as fs from "fs";
 import * as path from "path";
 import { Quiz, Session } from "@mdq/shared";
@@ -59,7 +60,7 @@ export function ensureRunClassification(
   const evidence = {
     participantCount: session.participants.size,
     durationMs: Math.max(0, endedAt - session.createdAt),
-    answeredQuestions: new Set(session.submissions.map(sub => sub.questionIndex).filter(index => questionIndexes.has(index))).size,
+    answeredQuestions: new Set(activeSubmissions(session).map(sub => sub.questionIndex).filter(index => questionIndexes.has(index))).size,
     questionCount: questionIndexes.size,
   };
   // Match explicit synthetic identifiers, never names, score, or ordinary student IDs.
