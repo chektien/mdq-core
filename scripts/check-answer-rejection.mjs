@@ -72,6 +72,7 @@ try {
   async function reject(page, index = 0, wording = reason) { await event(page, "answer:rejected", { questionIndex: index, reason: wording }); }
   async function expectRefusal(page) { await refusal(page).waitFor(); assert.equal(await refusal(page).textContent().then(text => text.trim()), reason); }
   async function noRefusal(page) { await refusal(page).waitFor({ state: "hidden" }); }
+  const successLabel = type => pacing === "self-paced" ? "Answer saved" : type === "open_response" ? "Response submitted" : "Answer submitted";
   async function submit(page, type) {
     if (type === "open_response") await page.locator("textarea").fill("Synthetic answer");
     else await page.getByRole("radio", { name: "A one", exact: true }).click();
@@ -90,17 +91,25 @@ try {
         const page = await fresh();
         try {
           await join(page); await submit(page, type);
-          // The live region already exists before its text changes.
-          const liveBefore = await page.locator('[role="status"][aria-live="polite"][aria-atomic="true"]').count();
+          // The refusal's own live region already exists, empty, before its text changes. It is the polite region
+          // nearest the submit control, not the page's result announcer further out.
+          const regionBefore = await page.evaluateHandle(() => {
+            for (let node = document.querySelector(".student-submit-button")?.parentElement; node; node = node.parentElement) {
+              const region = node.querySelector(':scope > [role="status"][aria-live="polite"][aria-atomic="true"]');
+              if (region) return region;
+            }
+            return null;
+          });
+          assert.equal(await regionBefore.evaluate(element => element?.textContent ?? null), "", "an empty refusal live region exists before the refusal");
           await reject(page); await expectRefusal(page);
-          assert.ok(liveBefore > 0);
+          assert.equal(await refusal(page).evaluate((element, before) => element === before, regionBefore), true, "the refusal fills the region that already existed");
           assert.equal(await refusal(page).getAttribute("aria-live"), "polite");
           assert.equal(await refusal(page).getAttribute("aria-atomic"), "true");
           assert.equal(await refusal(page).evaluate(element => element.parentElement.contains(element.parentElement.querySelector(".student-submit-button"))), true, "feedback is beside answer controls");
           assert.doesNotMatch(await page.locator("body").innerText(), /Answer rejected:/);
           await page.waitForTimeout(3200);
           await expectRefusal(page);
-          assert.equal(await page.getByText("Answer submitted", { exact: true }).count(), 0);
+          assert.equal(await page.getByText(successLabel(type), { exact: true }).count(), 0);
           if (screenshotDir && mode === "self-paced") {
             for (const width of [390, 768, 1440]) {
               await page.setViewportSize({ width, height: 900 });
@@ -213,7 +222,7 @@ try {
       await event(page, "answer:accepted", { questionIndex: 1 }); await noRefusal(page);
     } finally { await page.close(); }
   });
-  await test("join form: refusal alert, field association and focus are unchanged, and the refusal is not timed out", async () => {
+  await test("join form: refusal alert, field association and focus are unchanged, the refusal is not timed out, and editing the ID clears it", async () => {
     const page = await fresh(false, "/join");
     try {
       // The join fields appear after the session-code lookup. Find the field by its accessible name, which its label gives it.
@@ -224,13 +233,23 @@ try {
       const wording = 'The Participant ID "synthetic-seat" is already in this session on another device. Use that device, or check that you typed your own ID.';
       await event(page, "student:rejected", { reason: wording });
       const alert = page.getByRole("alert");
-      await page.waitForFunction(expected => document.getElementById("join-error")?.textContent === expected, `${wording} If that device is not working, ask your instructor to let you join again.`);
-      assert.equal(await alert.textContent(), `${wording} If that device is not working, ask your instructor to let you join again.`);
+      const shown = `${wording} If that device is not working, ask your instructor to let you join again.`;
+      // The region stays mounted as sr-only when empty, so check its text and styling, not only its visibility.
+      const shownAlert = async () => {
+        assert.equal(await alert.textContent(), shown);
+        assert.equal(await alert.evaluate(element => element.classList.contains("sr-only")), false, "join refusal is styled as shown");
+      };
+      await page.waitForFunction(expected => document.getElementById("join-error")?.textContent === expected, shown);
+      await shownAlert();
       const input = page.getByRole("textbox", { name: "Participant ID", exact: true });
       assert.equal(await input.getAttribute("aria-invalid"), "true");
       assert.equal(await input.getAttribute("aria-describedby"), "join-error");
       assert.equal(await input.evaluate(element => element === document.activeElement), true);
-      await page.waitForTimeout(3200); assert.equal(await alert.isVisible(), true, "join refusal is not timed out");
+      await page.waitForTimeout(3200); await shownAlert();
+      await input.fill("synthetic-other");
+      await page.waitForFunction(() => document.getElementById("join-error")?.textContent === "");
+      assert.equal(await alert.evaluate(element => element.classList.contains("sr-only")), true, "editing the ID clears the join refusal");
+      assert.equal(await input.getAttribute("aria-invalid"), null);
     } finally { await page.close(); }
   });
   await test("socket: a new seat clears all entries, including older refusals", async () => {
