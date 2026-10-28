@@ -49,6 +49,18 @@ export function useParticipantStudy(sessionId: string | null, sock: UseSocketRet
   const viewedIndex = following ? sock.currentQuestion?.questionIndex ?? data?.currentQuestionIndex : navigation?.index;
   const item = items.find(item => item.questionIndex === viewedIndex);
   const question: QuestionState | null = item ? { ...item, questionType: item.questionType ?? (item.isPoll ? "poll" : "multiple_choice"), isPoll: item.isPoll ?? false } : null;
+  // Clear only the item being left. The new item's refusal may have arrived in
+  // the same React batch as its opening and must survive this effect.
+  const { clearAnswerRejection } = sock;
+  const previousView = useRef({ seatKey, index: question?.questionIndex });
+  useEffect(() => {
+    const previous = previousView.current;
+    previousView.current = { seatKey, index: question?.questionIndex };
+    // Socket session/seat changes own their reset, before new-seat events arrive.
+    if (previous.seatKey === seatKey && previous.index !== question?.questionIndex && previous.index !== undefined) {
+      clearAnswerRejection(previous.index);
+    }
+  }, [seatKey, question?.questionIndex, clearAnswerRejection]);
   const answers = new Map(data?.answers.map(answer => [answer.questionIndex, answer]));
   for (const [index, answer] of sock.ownAnswers ?? []) answers.set(index, answer);
   const answered = new Set([...(data?.answeredQuestions ?? []), ...sock.answeredQuestions, ...answers.keys()]);

@@ -640,7 +640,7 @@ export default function StudentView({
       return <div className="w-full">
         <div className="p-4"><SessionAvailabilityInfo availability={sock.availability} /></div>
         <ParticipantStudyControls study={study} />
-        {study.question && <QuestionView key={`${sessionToken}:${study.question.questionIndex}`} question={study.question} state="QUESTION_CLOSED" remainingSec={null} submitted={study.submitted} submittedOptions={study.submittedOptions} submittedResponseText={study.submittedResponseText} timedOut={false} connected={false} onSubmit={study.submitAnswer} draft={study.draft} onDraftChange={study.setDraft} draftPersisted={study.draftPersisted} selfPaced={study.selfPaced} />}
+        {study.question && <QuestionView key={`${sessionToken}:${study.question.questionIndex}`} question={study.question} state="QUESTION_CLOSED" remainingSec={null} submitted={study.submitted} submittedOptions={study.submittedOptions} submittedResponseText={study.submittedResponseText} timedOut={false} connected={false} onSubmit={study.submitAnswer} answerRejection={sock.answerRejectionFor(study.question.questionIndex)} draft={study.draft} onDraftChange={study.setDraft} draftPersisted={study.draftPersisted} selfPaced={study.selfPaced} />}
       </div>;
     }
     if (sock.availability?.phase === "deleted") return <SessionAvailabilityInfo availability={sock.availability} />;
@@ -682,6 +682,7 @@ export default function StudentView({
             timedOut={sock.timedOut}
             connected={connected}
             onSubmit={study.submitAnswer}
+            answerRejection={study.question ? sock.answerRejectionFor(study.question.questionIndex) : null}
             draft={study.draft}
             onDraftChange={study.setDraft}
             draftPersisted={study.draftPersisted}
@@ -788,6 +789,7 @@ export function QuestionView({
   timedOut,
   connected,
   onSubmit,
+  answerRejection,
   draft,
   onDraftChange,
   draftPersisted = false,
@@ -802,6 +804,7 @@ export function QuestionView({
   timedOut: boolean;
   connected: boolean;
   onSubmit: (payload: { questionIndex: number; selectedOptions?: string[]; responseText?: string }) => void;
+  answerRejection?: { questionIndex: number; reason: string } | null;
   draft?: Pick<ParticipantDraft, "selectedOptions" | "responseText"> | null;
   onDraftChange?: (patch: Partial<Pick<ParticipantDraft, "selectedOptions" | "responseText">>) => void;
   draftPersisted?: boolean;
@@ -901,6 +904,7 @@ export function QuestionView({
     : null;
   const questionTextId = `question-text-${question.questionIndex}`;
   const closedNote = timedOut ? "Time's up. Waiting for the instructor." : "Answers are closed. Waiting for the instructor.";
+  const rejectionReason = answerRejection?.questionIndex === question.questionIndex ? answerRejection.reason : "";
 
   if (isSlideType(question.questionType)) {
     const hasStudentVisibleSlideContent = [
@@ -1051,6 +1055,9 @@ export function QuestionView({
 
       {/* Submit button */}
       <div className="mt-4 pt-4 border-t border-zinc-800">
+        <p className={rejectionReason ? "student-screen-text mb-3 text-center text-sm text-amber-400" : "sr-only"} role="status" aria-live="polite" aria-atomic="true">
+          {rejectionReason}
+        </p>
         {(!submitted || hasUnsent) && <p className="student-screen-quiet mb-3 text-sm text-zinc-400" role="status">{hasUnsent ? draftPersisted ? "Draft saved" : "Draft on this screen" : "Not answered"}</p>}
         {question.questionType === "open_response" && submittedResponseText && canEditOpenResponse ? (
           <div className="mb-3 rounded-2xl border border-emerald-500/40 bg-emerald-600/10 px-4 py-3">
