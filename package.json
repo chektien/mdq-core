@@ -21,6 +21,7 @@
     "verify:quick": "./scripts/verify.sh --quick",
     "check:header-settings": "node scripts/check-header-settings.mjs",
     "check:session-availability": "node scripts/check-session-availability.mjs",
+    "check:answer-rejection": "node scripts/check-answer-rejection.mjs",
     "check:pacing-setup": "node scripts/check-pacing-setup.mjs",
     "check:presenter-fit": "node scripts/check-presenter-fit.mjs",
     "verify:live": "bash ./scripts/verify-live-readiness.sh",

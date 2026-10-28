@@ -153,10 +153,22 @@ export interface RevealState {
   voters?: number;
 }
 
+export interface AnswerRejection {
+  questionIndex: number;
+  reason: string;
+}
+
 export interface UseSocketReturn {
   // Connection
   connected: boolean;
   error: string | null;
+  /** Most recent outstanding refusal in this session/seat; no reading timeout. */
+  answerRejection: AnswerRejection | null;
+  /** Feedback for the shown item. Other items' refusals never replace this entry. */
+  answerRejectionFor: (questionIndex: number) => AnswerRejection | null;
+  /** Clear one item (resubmit, departure or matching ACK), or all items if omitted.
+   * Session/seat changes clear all entries; same-seat reconnect preserves them. */
+  clearAnswerRejection: (questionIndex?: number) => void;
 
   // Session
   availability?: SessionAvailabilityPayload | null;
@@ -238,6 +250,20 @@ export function useSocket(
   const [seatTaken, setSeatTaken] = useState(false);
   const [connected, setConnected] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [answerRejections, setAnswerRejections] = useState<ReadonlyMap<number, AnswerRejection>>(new Map());
+  const clearAnswerRejection = useCallback((questionIndex?: number) => {
+    setAnswerRejections(previous => {
+      if (questionIndex === undefined) return previous.size ? new Map() : previous;
+      if (!previous.has(questionIndex)) return previous;
+      const next = new Map(previous);
+      next.delete(questionIndex);
+      return next;
+    });
+  }, []);
+  const answerRejectionFor = useCallback((questionIndex: number) =>
+    socketSessionId === sessionId && !seatTaken ? answerRejections.get(questionIndex) ?? null : null,
+  [socketSessionId, sessionId, seatTaken, answerRejections]);
+  const answerRejection = Array.from(answerRejections.values()).at(-1) ?? null;
 
   const [socketAvailability, setSocketAvailability] = useState<{ id: string; value: SessionAvailabilityPayload } | null>(null);
   const [sessionState, setSessionState] = useState<SessionState | null>(null);
@@ -298,6 +324,7 @@ export function useSocket(
     setSocketSessionId(sessionId);
     setConnected(false);
     setError(null);
+    clearAnswerRejection();
     setSessionToken(null);
     setCredentialSessionId(null);
     setSessionState(null);
@@ -351,6 +378,7 @@ export function useSocket(
     // ── Student join response ──────────────
     socket.on(SocketEvents.STUDENT_JOINED, (data: StudentJoinedPayload) => {
       if (seatTakenRef.current) return;
+      if (joinedTokenRef.current !== data.sessionToken) clearAnswerRejection();
       if (joinedTokenRef.current && joinedTokenRef.current !== data.sessionToken) {
         ownAnswersRef.current = new Map(); pendingAnswerRef.current.clear();
       }
@@ -400,6 +428,7 @@ export function useSocket(
     // The seat was freed and another device took it: stop here, and do not rejoin with the old token.
     socket.on(SocketEvents.SEAT_TAKEN, () => {
       seatTakenRef.current = true;
+      clearAnswerRejection();
       // The other device may share this browser's storage, so only clear a seat this screen still holds.
       clearStoredSession(sessionId, joinedTokenRef.current);
       setSeatTaken(true);
@@ -492,6 +521,7 @@ export function useSocket(
     });
 
     socket.on(SocketEvents.ANSWER_ACCEPTED, (data: { questionIndex: number }) => {
+      clearAnswerRejection(data.questionIndex);
       const pending = pendingAnswerRef.current.get(data.questionIndex)?.shift();
       if (pending) {
         ownAnswersRef.current = mergeOwnAnswers(ownAnswersRef.current, [pending]);
@@ -509,8 +539,15 @@ export function useSocket(
 
     socket.on(SocketEvents.ANSWER_REJECTED, (data: { questionIndex: number; reason: string }) => {
       pendingAnswerRef.current.get(data.questionIndex)?.shift();
+      setAnswerRejections(previous => {
+        const next = new Map(previous);
+        // Reinsert so iteration order also records the most recent refusal.
+        next.delete(data.questionIndex);
+        next.set(data.questionIndex, { questionIndex: data.questionIndex, reason: data.reason });
+        return next;
+      });
       setError(`Answer rejected: ${data.reason}`);
-      // Clear error after 3 seconds
+      // Preserve the join-error behaviour; answer feedback has no reading timeout.
       setTimeout(() => setError(null), 3000);
     });
 
@@ -648,7 +685,7 @@ export function useSocket(
       socket.disconnect();
       socketRef.current = null;
     };
-  }, [sessionId, role]);
+  }, [sessionId, role, clearAnswerRejection]);
 
   // Ticks stop while offline, so keep the countdown moving from the question's
   // start time until the rejoin snapshot's tick takes over again.
@@ -680,6 +717,7 @@ export function useSocket(
 
   const submitAnswer = useCallback(
     (payload: AnswerSubmitPayload, options?: readonly { label: string }[]) => {
+      clearAnswerRejection(payload.questionIndex);
       if (!socketRef.current) return;
       // Socket.IO would buffer this and send it on reconnect before the rejoin,
       // where the server rejects it, so an offline answer is not sent at all.
@@ -705,7 +743,7 @@ export function useSocket(
       setSubmittedOptions(nextSubmittedOptions);
       setSubmittedResponseText(nextSubmittedResponseText);
     },
-    [],
+    [clearAnswerRejection],
   );
 
   const reconnect = useCallback(() => {
@@ -719,6 +757,7 @@ export function useSocket(
   }, []);
 
   const disconnect = useCallback((options?: { preserveSession?: boolean }) => {
+    clearAnswerRejection();
     if (role === "student" && !options?.preserveSession) clearStoredSession(sessionId, joinedTokenRef.current ?? undefined);
     socketRef.current?.disconnect();
     setConnected(false);
@@ -729,11 +768,14 @@ export function useSocket(
     setLabel(null);
     setLabelNote(null);
     setDeckTitle(null);
-  }, [role, sessionId]);
+  }, [role, sessionId, clearAnswerRejection]);
 
   return {
     connected: socketSessionId === sessionId && connected,
     error: socketSessionId === sessionId ? error : null,
+    answerRejection: socketSessionId === sessionId && !seatTaken ? answerRejection : null,
+    answerRejectionFor,
+    clearAnswerRejection,
     availability,
     sessionState: socketSessionId === sessionId ? sessionState : null,
     policy: socketSessionId === sessionId ? policy : null,
