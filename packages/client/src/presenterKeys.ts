@@ -1,3 +1,5 @@
+import type { SessionState } from "@mdq/shared";
+
 /**
  * Keyboard navigation for the presenter view. Kept free of React and the DOM
  * so the decision can be tested on plain objects.
@@ -108,6 +110,49 @@ export function pickNavAction<T extends { label: string; disabled?: boolean; onC
   const action = actions.find((candidate) => candidate.label.trim().toLowerCase() === label);
   if (!action || action.disabled || !action.onClick) return null;
   return action;
+}
+
+export interface PresenterNavContext {
+  state: SessionState;
+  selfPaced: boolean;
+  liveIsSlide: boolean;
+  isReviewing: boolean;
+  /** Ends of the review list when reviewing, otherwise ends of the deck. */
+  isFirst: boolean;
+  isLast: boolean;
+  loading: boolean;
+  waitingReason: string | null;
+  revealActionLabel: string;
+}
+
+/** Explains a blocked direction using the same state and positions as the buttons. */
+export function navBlockedReason(direction: PresenterDirection, context: PresenterNavContext): string | null {
+  const { state, selfPaced, liveIsSlide, isReviewing, isFirst, isLast, loading, waitingReason, revealActionLabel } = context;
+  // Leaderboard has no Prev/Next, including when Review Final opens review.
+  if (state === "LEADERBOARD" && isReviewing) return "Press Back to Live to return to the leaderboard.";
+  // Review buttons move through the local cache even while offline or busy.
+  if (isReviewing) {
+    if (direction === "previous" && isFirst) return "This is the first one to review.";
+    if (direction === "next" && isLast) return "This is the last one to review.";
+    return null;
+  }
+  if (waitingReason) return waitingReason;
+  if (loading) return "Please wait for the current action to finish.";
+  if (state === "LOBBY") return "Press Start Session to begin.";
+  if (state === "ENDED") return "The session has ended.";
+  if (state === "LEADERBOARD") {
+    return isLast ? "Press Review Final to review the final question." : "Press Back to Quiz to continue.";
+  }
+  if (direction === "previous") {
+    return isFirst ? liveIsSlide ? "This is the first slide." : "This is the first question." : null;
+  }
+  if (state === "QUESTION_OPEN" && !liveIsSlide && !selfPaced) {
+    return revealActionLabel === "Reveal Answer"
+      ? "Close the question first, then reveal the answer to move on."
+      : `Close the question first, then press ${revealActionLabel} to move on.`;
+  }
+  if (state === "QUESTION_CLOSED") return `${revealActionLabel} first to move on.`;
+  return isLast ? liveIsSlide ? "This is the last slide." : "This is the last question." : null;
 }
 
 const DIALOG_SELECTOR = '[role="dialog"], [aria-modal="true"], dialog[open]';
