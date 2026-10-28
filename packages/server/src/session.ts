@@ -275,6 +275,7 @@ export function recordSubmission(
     existingSubmission.responseText = normalizedResponseText;
     existingSubmission.submittedAt = now;
     existingSubmission.responseTimeMs = session.questionStartedAt !== undefined ? now - session.questionStartedAt : 0;
+    delete existingSubmission.contentVersion;
     return existingSubmission;
   }
 

@@ -699,6 +699,8 @@ export interface Participant {
 export interface Submission {
   /** Attempt answered; absent means 1. Written only for attempts above 1. */
   attempt?: number;
+  /** Content version answered, supplied by the host; absent means unknown, never 0. */
+  contentVersion?: number;
   studentId: string;
   questionIndex: number;
   selectedOptions: string[];
