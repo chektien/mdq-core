@@ -2,7 +2,7 @@ import fs from "fs";
 import path from "path";
 import { ArchivedAttempt, Submission } from "@mdq/shared";
 import { activeSubmission, activeSubmissions, activeSubmissionsFor, archiveActiveAttempt, archivedAttempts, currentAttempt, hasAnyAnswers, normalizeAttemptState, removeSeatAnswers } from "../attempts";
-import { apply, participantStudyPayload } from "../engine";
+import { apply, participantStudyPayload, timingFor } from "../engine";
 import { nextAvailabilityAlarm } from "../availability";
 import { deserializeSession, recordSubmission, serializeSession } from "../session";
 import { saveSubmissions, saveSessionSummaryMarkdown } from "../persistence";
@@ -257,12 +257,24 @@ it("inactive stray entries alone are not answer evidence and seat removal does n
 
 it("archiving a legacy session keeps the current item's clock from the legacy fields", () => {
   const session = goldenSession("presenter-paced", true).current();
-  const index = session.currentQuestionIndex, question = goldenQuiz.questions[index];
+  const index = session.currentQuestionIndex, question = { ...goldenQuiz.questions[index], timeLimitSec: 30 };
   delete session.questionTiming;
   Object.assign(session, { questionStartedAt: 500, questionDeadlineAt: 1500 });
   expect(archiveActiveAttempt(session, index, 2000, question).attemptArchive![0].timing).toEqual({ startedAt: 500, deadlineAt: 1500, restarts: [] });
   delete session.questionDeadlineAt;
-  const derived = question.timeLimitSec === null ? null : 500 + question.timeLimitSec * 1000;
-  expect(archiveActiveAttempt(session, index, 2000, question).attemptArchive![0].timing).toEqual({ startedAt: 500, deadlineAt: derived, restarts: [] });
+  expect(archiveActiveAttempt(session, index, 2000, question).attemptArchive![0].timing).toEqual({ startedAt: 500, deadlineAt: 30_500, restarts: [] });
   expect(archiveActiveAttempt(session, index + 1, 2000).attemptArchive![0]).not.toHaveProperty("timing");
+});
+
+it("archiving an untimed legacy item records the deadline the engine uses, ignoring a stale stored one", () => {
+  const session = goldenSession("presenter-paced", true).current();
+  const index = session.currentQuestionIndex;
+  delete session.questionTiming;
+  Object.assign(session, { questionStartedAt: 500, questionDeadlineAt: 1500 });
+  for (const question of [{ ...goldenQuiz.questions[index], timeLimitSec: null }, { ...goldenQuiz.questions[index], questionType: "slide" as const, timeLimitSec: 30 }]) {
+    const quiz = { ...goldenQuiz, questions: goldenQuiz.questions.map((q, i) => i === index ? question : q) };
+    expect(timingFor(session, quiz, index)!.deadlineAt).toBeNull();
+    expect(archiveActiveAttempt(session, index, 2000, question).attemptArchive![0].timing).toEqual({ startedAt: 500, deadlineAt: null, restarts: [] });
+  }
+  expect(archiveActiveAttempt(session, index, 2000).attemptArchive![0].timing).toEqual({ startedAt: 500, deadlineAt: 1500, restarts: [] });
 });

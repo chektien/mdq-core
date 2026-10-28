@@ -128,10 +128,12 @@ function attemptTiming(session: Session, index: number, question?: Question): Qu
   if (saved) return saved;
   if (index !== session.currentQuestionIndex || session.questionStartedAt === undefined) return undefined;
   const startedAt = session.questionStartedAt;
-  const untimed = isSelfPaced(session) || !question || question.timeLimitSec === null || isSlideType(getQuestionType(question));
+  // Untimed first, as in `timingFor`: a stale stored deadline never applies to an untimed item.
+  // Without the question (the caller may omit it) only the stored deadline is known.
+  const untimed = isSelfPaced(session) || (question !== undefined && (question.timeLimitSec === null || isSlideType(getQuestionType(question))));
   return { startedAt, restarts: [],
-    deadlineAt: isSelfPaced(session) ? null : session.questionDeadlineAt !== undefined ? session.questionDeadlineAt
-      : untimed ? null : startedAt + question!.timeLimitSec! * 1000 };
+    deadlineAt: untimed ? null : session.questionDeadlineAt !== undefined ? session.questionDeadlineAt
+      : question ? startedAt + question.timeLimitSec! * 1000 : null };
 }
 
 /**
