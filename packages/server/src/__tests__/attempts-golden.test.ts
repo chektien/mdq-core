@@ -1,7 +1,7 @@
 import fs from "fs";
 import path from "path";
 import { serializeSession } from "../session";
-import { goldenQuiz, goldenSession, readerOutputs, seats } from "./attempts-test-support";
+import { goldenSession, readerOutputs, seats } from "./attempts-test-support";
 
 function capture() {
   const captures: unknown[] = [];
