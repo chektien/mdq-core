@@ -628,7 +628,8 @@ export default function StudentView({
   // ── Joined: show session content based on state ──
   // One live region stays mounted while joined, so a screen reader hears the result when its text changes
   // rather than missing a region that arrives already filled.
-  const resultAnnouncement = sock.sessionState === "REVEAL" && sock.currentQuestion && sock.reveal
+  const waitingForOpening = !!sock.currentQuestion && (sock.currentQuestion.attempt ?? 1) < (sock.questionAttempts.get(sock.currentQuestion.questionIndex) ?? 1);
+  const resultAnnouncement = !waitingForOpening && sock.sessionState === "REVEAL" && sock.currentQuestion && sock.reveal
     ? revealBannerText(sock.currentQuestion, sock.reveal, sock.submittedOptions, sock.submittedResponseText)
     : "";
   const renderJoined = () => {
@@ -674,7 +675,7 @@ export default function StudentView({
           <QuestionView
             key={`${sessionToken}:${study.question?.questionIndex ?? 0}`}
             question={study.question}
-            state={study.selfPaced && !study.canAnswer && !study.submitted && !isSlideType(study.question?.questionType) ? "QUESTION_CLOSED" : state}
+            state={study.selfPaced && study.question && !study.canAnswer && !study.submitted && !isSlideType(study.question.questionType) ? "QUESTION_CLOSED" : state}
             remainingSec={study.selfPaced ? null : sock.remainingSec}
             submitted={study.submitted}
             submittedOptions={study.submittedOptions}
@@ -690,6 +691,14 @@ export default function StudentView({
           />
         </>
       );
+    }
+
+    if ((waitingForOpening && state === "REVEAL") || (state === "LEADERBOARD" && sock.leaderboardInvalidated)) {
+      return <div className="min-h-dvh flex flex-col items-center justify-center gap-4 p-6">
+        <p className="text-zinc-400 text-sm">Loading question...</p>
+        {study.error && <p role="alert">{study.error}</p>}
+        <button type="button" onClick={() => { study.refresh(); sock.reconnect(); }} className="rounded-xl border border-zinc-600 px-5 py-3">Retry</button>
+      </div>;
     }
 
     // Reveal

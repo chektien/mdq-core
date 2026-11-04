@@ -1,5 +1,6 @@
 /** Same-device drafts only. Seat credentials isolate changes of participant. */
-export interface ParticipantDraft { selectedOptions: string[]; responseText: string; revision: number }
+/** `attempt` identifies which attempt the draft belongs to. Absent means 1. */
+export interface ParticipantDraft { selectedOptions: string[]; responseText: string; revision: number; attempt?: number }
 export const emptyDraft = (): ParticipantDraft => ({ selectedOptions: [], responseText: "", revision: 0 });
 export function draftStorageKey(sessionId: string, seatToken: string, index: number): string {
   return `mdq_draft_v1:${encodeURIComponent(sessionId)}:${encodeURIComponent(seatToken)}:${index}`;

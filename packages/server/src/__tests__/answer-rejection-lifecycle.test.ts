@@ -7,13 +7,21 @@ import type { useParticipantStudy } from "../../../client/src/hooks/useParticipa
 // These observers render null. React DOM still runs the real mount/update/effect/
 // cleanup lifecycle; the host only supplies an event target, never answer markup.
 // No browser, listener port, custom hook scheduler or external DOM dependency.
-const host = globalThis as any;
+const host = globalThis as unknown as Record<string, unknown>;
 const saved = new Map<string, PropertyDescriptor | undefined>();
 const install = (key: string, value: unknown) => {
   if (!saved.has(key)) saved.set(key, Object.getOwnPropertyDescriptor(host, key));
   Object.defineProperty(host, key, { configurable: true, writable: true, value });
 };
-let socket: any;
+interface SocketHarness {
+  connected: boolean;
+  on: (name: string, fn: (payload?: unknown) => void) => SocketHarness;
+  emit: jest.Mock;
+  connect: () => void;
+  disconnect: () => void;
+  receive: (name: string, payload?: unknown) => void;
+}
+let socket: SocketHarness;
 const rootPath = path.resolve(__dirname, "../../../..");
 const bundle = buildSync({
   stdin: { resolveDir: rootPath, loader: "ts", contents: `
@@ -23,17 +31,17 @@ const bundle = buildSync({
   bundle: true, platform: "node", format: "cjs", write: false, packages: "external",
   alias: { "@mdq/shared": path.join(rootPath, "packages/shared/src/index.ts") },
 });
-const compiled = { exports: {} as any };
+const compiled = { exports: {} as unknown };
 new Function("require", "module", "exports", bundle.outputFiles[0].text)((name: string) => name === "socket.io-client" ? {
   io: () => {
-    const listeners = new Map<string, (payload?: any) => void>();
+    const listeners = new Map<string, (payload?: unknown) => void>();
     socket = {
       connected: false,
-      on: (name: string, fn: (payload?: any) => void) => { listeners.set(name, fn); return socket; },
+      on: (name: string, fn: (payload?: unknown) => void) => { listeners.set(name, fn); return socket; },
       emit: jest.fn(),
       connect: () => { socket.connected = true; listeners.get("connect")?.(); },
       disconnect: () => { socket.connected = false; listeners.get("disconnect")?.(); },
-      receive: (name: string, payload?: any) => listeners.get(name)?.(payload),
+      receive: (name: string, payload?: unknown) => listeners.get(name)?.(payload),
     };
     return socket;
   },
@@ -61,7 +69,7 @@ function Observer() {
   return useStudy ? createElement(StudyObserver) : null;
 }
 function StudyObserver() { study = hooks.useParticipantStudy(sessionId, sock); return null; }
-const receive = (name: string, payload?: any) => socket.receive(name, payload);
+const receive = (name: string, payload?: unknown) => socket.receive(name, payload);
 const reject = (questionIndex: number, wording = reason) => receive("answer:rejected", { questionIndex, reason: wording });
 // The fallback lets these same behavioral assertions run against the pre-fix API.
 const refusalFor = (index: number) => {
@@ -86,8 +94,8 @@ beforeEach(async () => {
     json: async () => ({ policy: { schemaVersion: 1, pacing, ranking: "correctness", effectiveTiming: "untimed" },
       items: [question(0), question(1)], currentQuestionIndex: 0, answers: [], answeredQuestions: [], answerableQuestionIndexes: [0, 1] }) })));
   const container = Object.assign(new EventTarget(), { nodeType: 1, tagName: "DIV", ownerDocument: doc });
-  const { createRoot } = require("react-dom/client");
-  root = createRoot(container as any);
+  const { createRoot } = await import("react-dom/client");
+  root = createRoot(container as unknown as Parameters<typeof createRoot>[0]);
   sessionId = "synthetic"; useStudy = true; pacing = "self-paced";
 });
 afterEach(async () => {
@@ -128,6 +136,11 @@ it("study: Q1's delayed refusal preserves the shown Q0 reason (P2 #2)", async ()
 });
 it("clears only the submitted/acknowledged entry, retaining other outstanding reasons", async () => {
   useStudy = false; await mount();
+  // One refusal consumes the first submission, leaving the second for its ACK.
+  await update(() => {
+    sock.submitAnswer({ questionIndex: 0, selectedOptions: ["A"] });
+    sock.submitAnswer({ questionIndex: 0, selectedOptions: ["A"] });
+  });
   await update(() => { reject(0); reject(1, "Other item's refusal"); });
   await update(() => sock.submitAnswer({ questionIndex: 1, selectedOptions: ["A"] }));
   expect(refusalFor(1)).toBeNull();

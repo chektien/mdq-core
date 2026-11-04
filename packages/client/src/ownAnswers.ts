@@ -20,7 +20,21 @@ export function toOptionLabels(indexes: readonly number[], options: Options): st
   return indexes.filter((i) => Number.isInteger(i) && i >= 0 && i < options.length).map((i) => options[i].label);
 }
 
-/** Record answers by question index. Later entries replace earlier ones for the same question. */
+/** Compare ordered server answers. Missing attempts mean 1. */
+export function compareAcceptedAnswers(a: Pick<StudentAnswer, "attempt" | "acceptedRevision">, b: Pick<StudentAnswer, "attempt" | "acceptedRevision">): number {
+  return (a.attempt ?? 1) - (b.attempt ?? 1) || (a.acceptedRevision ?? 0) - (b.acceptedRevision ?? 0);
+}
+
+/** Unordered answers keep the legacy server-wins rule within the same attempt. */
+export function shouldReplaceAcceptedAnswer(answer: StudentAnswer, known: StudentAnswer | undefined): boolean {
+  return !known || compareAcceptedAnswers(answer, known) > 0
+    || ((answer.attempt ?? 1) === (known.attempt ?? 1) && (answer.acceptedRevision === undefined || known.acceptedRevision === undefined));
+}
+
+/**
+ * Merge answers by question index, comparing attempts before revisions.
+ * Within an attempt, the incoming server answer wins if either answer is unordered.
+ */
 export function mergeOwnAnswers(
   current: ReadonlyMap<number, StudentAnswer>,
   incoming: readonly StudentAnswer[] | undefined,
@@ -28,11 +42,26 @@ export function mergeOwnAnswers(
   const next = new Map(current);
   for (const answer of incoming ?? []) {
     if (Number.isInteger(answer?.questionIndex) && Array.isArray(answer.selectedOptions)) {
-      next.set(answer.questionIndex, answer);
+      const known = next.get(answer.questionIndex);
+      if (shouldReplaceAcceptedAnswer(answer, known)) next.set(answer.questionIndex, answer);
     }
   }
   return next;
 }
+
+/**
+ * Record the attempt a question was seen at, and say whether it is later than the one this page saw before. A re-run
+ * asks a question again as attempt 2 or more, and this page's answer to the earlier attempt no longer counts. The
+ * first sighting only records, because the page then has no earlier answer of its own to forget.
+ */
+export function isLaterAttempt(seen: Map<number, number>, questionIndex: number, attempt: number): boolean {
+  const before = seen.get(questionIndex);
+  seen.set(questionIndex, Math.max(before ?? attempt, attempt));
+  return before !== undefined && attempt > before;
+}
+
+/** A draft made before a re-run asked the question again. Its labels may name other options now, so it is never shown. */
+export const isEarlierAttemptDraft = (draft: { attempt?: number }, attempt: number | undefined): boolean => (attempt ?? 1) > (draft.attempt ?? 1);
 
 function hasContent(answer: SubmittedAnswer): boolean {
   return answer.selectedOptions.length > 0 || !!answer.responseText;

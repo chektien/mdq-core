@@ -63,7 +63,7 @@ it.each([false, true])("new choice answers at attempt 2 are accepted after attem
   session.questionAttempts = { 0: 2 };
   session.submissions = [answer(0)];
   const before = serializeSession(session);
-  const result = apply(session, goldenQuiz, { type: "answerSubmit", studentId: "one", sessionToken: "token-one", payload: { questionIndex: 0, selectedOptions: ["A"] } }, 1200);
+  const result = apply(session, goldenQuiz, { type: "answerSubmit", studentId: "one", sessionToken: "token-one", payload: { questionIndex: 0, attempt: 2, selectedOptions: ["A"] } }, 1200);
   expect(result.messages.some(m => m.event === "answer:accepted")).toBe(true);
   expect(activeSubmission(result.session, "one", 0)).toMatchObject({ attempt: 2, selectedOptions: ["A"] });
   expect(serializeSession(session)).toBe(before);
@@ -73,7 +73,7 @@ it.each([false, true])("new choice answers at attempt 2 are accepted after attem
 it("open-response replacement targets the last active answer and keeps previous engine input immutable", () => {
   const { dirty } = scenario(3);
   const before = serializeSession(dirty);
-  const result = apply(dirty, goldenQuiz, { type: "answerSubmit", studentId: "one", sessionToken: "token-one", payload: { questionIndex: 3, responseText: "Edited smoke response" } }, 1500);
+  const result = apply(dirty, goldenQuiz, { type: "answerSubmit", studentId: "one", sessionToken: "token-one", payload: { questionIndex: 3, attempt: 2, responseText: "Edited smoke response" } }, 1500);
   expect(activeSubmission(result.session, "one", 3)).toMatchObject({ attempt: 2, responseText: "Edited smoke response" });
   expect(serializeSession(dirty)).toBe(before);
 });
@@ -198,7 +198,7 @@ it.each(["answer", "snapshot", "close", "reveal", "next", "end"])("engine %s nev
   deepFreeze(dirty.attemptArchive);
   const before = serializeSession(dirty);
   const first = command === "reveal" ? apply(dirty, goldenQuiz, { type: "close" }, 900).session : dirty;
-  const next = apply(first, goldenQuiz, command === "answer" ? { type: "answerSubmit", studentId: "two", sessionToken: "token-two", payload: { questionIndex: 2, selectedOptions: ["B"] } }
+  const next = apply(first, goldenQuiz, command === "answer" ? { type: "answerSubmit", studentId: "two", sessionToken: "token-two", payload: { questionIndex: 2, attempt: 2, selectedOptions: ["B"] } }
     : { type: command, ...(command === "snapshot" ? { view: "control" } : {}) } as never, 1000).session;
   expect(next.attemptArchive).toBe(dirty.attemptArchive);
   next.questionAttempts![2] = 3;
@@ -240,7 +240,7 @@ it("only active poll voters receive updates and three active voters clear the fl
   dirty.submissions.push(answer(2, "two", 2, ["B"]));
   const before = participantStudyPayload(dirty, goldenQuiz, "two", 9000).items[2].pollLive;
   expect(before).toEqual({ questionIndex: 2, voters: 2, counts: null, floor: 3 });
-  const result = apply(dirty, goldenQuiz, { type: "answerSubmit", studentId: "three", sessionToken: "token-three", payload: { questionIndex: 2, selectedOptions: ["C"] } }, 1000);
+  const result = apply(dirty, goldenQuiz, { type: "answerSubmit", studentId: "three", sessionToken: "token-three", payload: { questionIndex: 2, attempt: 2, selectedOptions: ["C"] } }, 1000);
   const live = result.messages.filter(m => m.event === "poll:live");
   expect(live.map(m => m.audience)).toEqual(["control", "display", "participant:one", "participant:two", "participant:three"]);
   expect(live.find(m => m.audience === "display")?.payload).toEqual({ questionIndex: 2, voters: 3, counts: { A: 1, B: 1, C: 1 } });

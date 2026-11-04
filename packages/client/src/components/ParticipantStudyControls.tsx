@@ -14,12 +14,12 @@ export default function ParticipantStudyControls({ study }: { study: ReturnType<
   if (!study.canBrowse) return study.error ? (
     <div role="alert" className="participant-study student-screen p-4">{study.error} <button type="button" onClick={study.refresh}>Retry</button></div>
   ) : null;
-  const position = study.items.findIndex(item => item.questionIndex === study.question?.questionIndex);
+  const position = study.items.findIndex(item => item.questionIndex === study.viewedIndex);
   const previous = study.items[position - 1];
   const next = study.items[position + 1];
   const positionLabel = position >= 0 ? `Item ${position + 1} of ${study.items.length} shown` : "No items shown yet";
   return (
-    <nav data-question-index={study.question?.questionIndex} aria-label="Available session items" className="participant-study student-screen border-b border-zinc-700">
+    <nav data-question-index={study.viewedIndex} aria-label="Available session items" className="participant-study student-screen border-b border-zinc-700">
       <div className="participant-study-layout">
         <button type="button" aria-label="Previous available item" aria-disabled={!previous} className="participant-study-button participant-study-previous rounded-lg border border-zinc-600" onClick={() => previous && study.browse(previous.questionIndex)}>
           <span aria-hidden="true">‹</span> Prev

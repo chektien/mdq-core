@@ -76,17 +76,27 @@ export interface StudentJoinPayload {
   clientInstanceId?: string;
 }
 
-/**
- * One of the joining student's own earlier submissions. `selectedOptions`
- * holds zero-based positions in the question's `options` list.
- */
-export interface StudentAnswer {
+/** Identifies the accepted question, attempt and optional acceptance order. */
+export interface AnswerAcceptedPayload {
   questionIndex: number;
+  /** Accepted attempt. Absent means 1. */
+  attempt?: number;
+  /** Server-owned order within this seat, question and attempt after a re-run. Absent means unordered. */
+  acceptedRevision?: number;
+}
+
+/**
+ * One of the participant's accepted answers. `selectedOptions` holds zero-based
+ * positions in the question's `options` list.
+ */
+export interface StudentAnswer extends AnswerAcceptedPayload {
   selectedOptions: number[];
   responseText?: string;
 }
 
 export interface StudentJoinedPayload {
+  /** Sparse attempt watermarks, present only after a re-run. */
+  questionAttempts?: Record<string, number>;
   participantId: string;
   sessionToken: string;
   sessionState: SessionState;
@@ -374,6 +384,8 @@ export interface QuestionOpenPayload {
   questionNumber?: number;
   /** How many questions the deck has, not counting slides. */
   questionTotal?: number;
+  /** Which time this question is asked. It is 2 or more after a re-run and absent the first time. */
+  attempt?: number;
 }
 
 export interface QuestionTickPayload {
@@ -381,6 +393,8 @@ export interface QuestionTickPayload {
 }
 
 export interface AnswerSubmitPayload {
+  /** The attempt being answered. Omit only for attempt 1, for compatibility with older clients. */
+  attempt?: number;
   questionIndex: number;
   selectedOptions?: string[];
   responseText?: string;
@@ -474,6 +488,10 @@ export interface LeaderboardUpdatePayload {
 }
 
 export interface SessionStatePayload {
+  /** Current own answers in participant snapshots after a re-run, sent only to that participant. */
+  answers?: StudentAnswer[];
+  /** Current attempts above 1. Present after a re-run so item lists refresh even when state stays the same. */
+  questionAttempts?: Record<string, number>;
   policy?: SessionPolicy;
   effectiveRanking?: "correctness" | "speed" | "legacy";
   availability?: SessionAvailabilityPayload;
@@ -697,6 +715,8 @@ export interface Participant {
 }
 
 export interface Submission {
+  /** Server-owned acceptance order within this seat, question and attempt after a re-run. Absent means unordered. */
+  acceptedRevision?: number;
   /** Attempt answered; absent means 1. Written only for attempts above 1. */
   attempt?: number;
   /** Content version answered, supplied by the host; absent means unknown, never 0. */

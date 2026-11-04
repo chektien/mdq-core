@@ -23,6 +23,7 @@ import type {
   OpenResponseEntry,
   FoldoutNote,
   AnswerSubmitPayload,
+  AnswerAcceptedPayload,
   MediaPosition,
   SlideMedia,
   SlideBackground,
@@ -34,7 +35,7 @@ import type {
 } from "@mdq/shared";
 import { SocketEvents } from "@mdq/shared";
 import { clockOffsetFromTick, localRemainingSec } from "../countdown";
-import { mergeOwnAnswers, seedSubmittedAnswer, toOptionIndexes } from "../ownAnswers";
+import { type SubmittedAnswer, shouldReplaceAcceptedAnswer, isLaterAttempt, mergeOwnAnswers, seedSubmittedAnswer, toOptionIndexes, toOptionLabels } from "../ownAnswers";
 import { isSameOpening } from "../questionOpening";
 import { loadStoredSession, saveStoredSession, clearStoredSession } from "../participantSessionStorage";
 
@@ -87,6 +88,8 @@ export interface QuestionState {
   questionNumber?: number;
   /** How many questions the deck has, slides not counted. */
   questionTotal?: number;
+  /** Which time this question is asked. It is 2 or more after a re-run and absent the first time. */
+  attempt?: number;
 }
 
 /**
@@ -176,6 +179,8 @@ export interface UseSocketReturn {
   policy: SessionPolicy | null;
   effectiveRanking: "correctness" | "speed" | "legacy" | null;
   sessionToken: string | null;
+  /** Whether these credentials still belong to the socket's current participant. */
+  hasParticipantCredentials: (sessionId: string, sessionToken: string) => boolean;
   /** True once the presenter's Let rejoin was used from another device: this screen has lost the seat. */
   seatTaken: boolean;
   studentId: string | null;
@@ -190,6 +195,17 @@ export interface UseSocketReturn {
   ownAnswers: ReadonlyMap<number, StudentAnswer>;
   /** Changes after an accepted answer, including an update to open text. */
   answerRevision: number;
+  /** Synchronous ACK epoch for requests that may finish before React renders. */
+  getAnswerAcceptanceEpoch: () => number;
+  /** Latest known attempts, including announcements whose content is still being refreshed. */
+  questionAttempts: ReadonlyMap<number, number>;
+  /** Record a question attempt from item lists, socket state, openings or accepted answers.
+   * A later attempt clears this page's answer to the earlier attempt. */
+  noteQuestionAttempt: (questionIndex: number, attempt?: number) => void;
+  /** Reconcile accepted own answers by server attempt and revision from any participant source. */
+  reconcileOwnAnswers: (answers: StudentAnswer[], requestAcceptanceEpoch?: number) => void;
+  /** Latest pending content for this item and attempt, separate from accepted answers. */
+  pendingSubmittedAnswer: (question: Pick<QuestionState, "questionIndex" | "attempt" | "options">) => SubmittedAnswer | undefined;
 
   // Question
   currentQuestion: QuestionState | null;
@@ -209,6 +225,10 @@ export interface UseSocketReturn {
 
   // Leaderboard
   leaderboard: LeaderboardRow[];
+  /** A leaderboard delivered since the latest known attempt advance. */
+  leaderboardReady: boolean;
+  /** Cached scores were invalidated by an attempt advance and need a fresh delivery. */
+  leaderboardInvalidated: boolean;
   totalQuestions: number;
 
   // Participants
@@ -242,11 +262,17 @@ export function useSocket(
   const pendingAnswerRef = useRef<Map<number, StudentAnswer[]>>(new Map());
   const [ownAnswers, setOwnAnswers] = useState<ReadonlyMap<number, StudentAnswer>>(new Map());
   const [answerRevision, setAnswerRevision] = useState(0);
+  const answerAcceptanceEpoch = useRef(0);
+  const getAnswerAcceptanceEpoch = useCallback(() => answerAcceptanceEpoch.current, []);
+  const [questionAttempts, setQuestionAttempts] = useState<ReadonlyMap<number, number>>(new Map());
   // Server clock minus this device's, so the countdown can run on while offline.
   const clockOffsetRef = useRef(0);
   // The token this screen joined with, and whether another device has since taken its seat.
   const joinedTokenRef = useRef<string | null>(null);
+  const participantCredentialsRef = useRef<{ sessionId: string; sessionToken: string } | null>(null);
   const seatTakenRef = useRef(false);
+  const hasParticipantCredentials = useCallback((id: string, token: string) =>
+    !seatTakenRef.current && participantCredentialsRef.current?.sessionId === id && participantCredentialsRef.current.sessionToken === token, []);
   const [seatTaken, setSeatTaken] = useState(false);
   const [connected, setConnected] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -289,12 +315,89 @@ export function useSocket(
   const [submitted, setSubmitted] = useState(false);
   const [submittedOptions, setSubmittedOptions] = useState<string[]>([]);
   const [submittedResponseText, setSubmittedResponseText] = useState<string | null>(null);
+  // A re-run asks a question again as a new attempt. This page's answer to the earlier attempt no longer counts, so
+  // it is never shown as submitted or as a selection. The attempt each question
+  // was last seen at is kept here. Same-seat joins retain the highest known attempt.
+  const attemptSeenRef = useRef<Map<number, number>>(new Map());
+  const pendingSubmittedAnswer = useCallback((shown: Pick<QuestionState, "questionIndex" | "attempt" | "options">) => {
+    if ((shown.attempt ?? 1) < (attemptSeenRef.current.get(shown.questionIndex) ?? 1)) return undefined;
+    const pending = pendingAnswerRef.current.get(shown.questionIndex)?.filter(answer => (answer.attempt ?? 1) === (shown.attempt ?? 1)).at(-1);
+    return pending ? { selectedOptions: toOptionLabels(pending.selectedOptions, shown.options), responseText: pending.responseText?.trim() || null } : undefined;
+  }, []);
+  const noteQuestionAttempt = useCallback((questionIndex: number, attempt = 1) => {
+    setQuestionAttempts(previous => (previous.get(questionIndex) ?? 1) >= attempt ? previous : new Map(previous).set(questionIndex, attempt));
+    if (attempt > (attemptSeenRef.current.get(questionIndex) ?? 1)) {
+      setLeaderboard([]); setLeaderboardReady(false); setLeaderboardInvalidated(true);
+    }
+    if (!isLaterAttempt(attemptSeenRef.current, questionIndex, attempt)) return;
+    setPollLive(previous => {
+      if (!previous[questionIndex]) return previous;
+      const next = { ...previous }; delete next[questionIndex]; return next;
+    });
+    if (ownAnswersRef.current.has(questionIndex)) {
+      ownAnswersRef.current = new Map([...ownAnswersRef.current].filter(([index]) => index !== questionIndex));
+      setOwnAnswers(new Map(ownAnswersRef.current));
+    }
+    if (answeredQuestionsRef.current.includes(questionIndex)) {
+      answeredQuestionsRef.current = answeredQuestionsRef.current.filter((index) => index !== questionIndex);
+      setAnsweredQuestions(answeredQuestionsRef.current);
+    }
+    if (currentQuestionRef.current?.questionIndex === questionIndex) {
+      submittedOptionsRef.current = []; submittedResponseTextRef.current = null;
+      setSubmitted(false); setSubmittedOptions([]); setSubmittedResponseText(null);
+      if ((currentQuestionRef.current.attempt ?? 1) < attempt) {
+        setReveal(null); setDistribution(null);
+      }
+    }
+  }, []);
+
+  const reconcileOwnAnswers = useCallback((answers: StudentAnswer[], requestAcceptanceEpoch?: number) => {
+    const current = answers.filter(answer => {
+      const attempt = answer.attempt ?? 1;
+      if (attempt < (attemptSeenRef.current.get(answer.questionIndex) ?? 1)) return false;
+      const known = ownAnswersRef.current.get(answer.questionIndex);
+      // An unordered HTTP answer captured before an ACK cannot replace its accepted content.
+      if (requestAcceptanceEpoch !== undefined && requestAcceptanceEpoch < answerAcceptanceEpoch.current
+        && known && attempt === (known.attempt ?? 1)
+        && (answer.acceptedRevision === undefined || known.acceptedRevision === undefined)) return false;
+      return shouldReplaceAcceptedAnswer(answer, known);
+    });
+    if (current.length) {
+      for (const answer of current) noteQuestionAttempt(answer.questionIndex, answer.attempt ?? 1);
+      ownAnswersRef.current = mergeOwnAnswers(ownAnswersRef.current, current);
+      setOwnAnswers(new Map(ownAnswersRef.current));
+      answeredQuestionsRef.current = [...new Set([...answeredQuestionsRef.current, ...current.map(answer => answer.questionIndex)])];
+      setAnsweredQuestions(answeredQuestionsRef.current);
+    }
+    // A replay can restore display after disconnect dropped pending correlation,
+    // even when it adds no newer accepted knowledge. Matching pending content is
+    // shown first, and otherwise the reconciled accepted answer is restored.
+    const shown = currentQuestionRef.current;
+    if (!shown || (shown.attempt ?? 1) < (attemptSeenRef.current.get(shown.questionIndex) ?? 1)
+      || !ownAnswersRef.current.has(shown.questionIndex)
+      || !answers.some(answer => answer.questionIndex === shown.questionIndex && (answer.attempt ?? 1) === (shown.attempt ?? 1))) return;
+    const seeded = pendingSubmittedAnswer(shown) ?? seedSubmittedAnswer({
+      questionIndex: shown.questionIndex,
+      options: shown.options,
+      alreadyAnswered: true,
+      isSameQuestion: false,
+      current: { selectedOptions: submittedOptionsRef.current, responseText: submittedResponseTextRef.current },
+      known: ownAnswersRef.current,
+    });
+    submittedOptionsRef.current = seeded.selectedOptions;
+    submittedResponseTextRef.current = seeded.responseText;
+    setSubmitted(true);
+    setSubmittedOptions(seeded.selectedOptions);
+    setSubmittedResponseText(seeded.responseText);
+  }, [noteQuestionAttempt, pendingSubmittedAnswer]);
 
   const [reveal, setReveal] = useState<RevealState | null>(null);
   const [distribution, setDistribution] = useState<ResultsDistributionPayload | null>(null);
   const [pollLive, setPollLive] = useState<Readonly<Record<number, PollLivePayload>>>({});
 
   const [leaderboard, setLeaderboard] = useState<LeaderboardRow[]>([]);
+  const [leaderboardReady, setLeaderboardReady] = useState(false);
+  const [leaderboardInvalidated, setLeaderboardInvalidated] = useState(false);
   const [totalQuestions, setTotalQuestions] = useState(0);
 
   const [participants, setParticipants] = useState<SessionParticipantsPayload | null>(null);
@@ -327,9 +430,15 @@ export function useSocket(
     clearAnswerRejection();
     setSessionToken(null);
     setCredentialSessionId(null);
+    participantCredentialsRef.current = null;
+    setLeaderboard([]); setLeaderboardReady(false); setLeaderboardInvalidated(false);
     setSessionState(null);
     setSocketAvailability(null);
     setPolicy(null); setEffectiveRanking(null);
+    setQuestionAttempts(new Map());
+    currentQuestionRef.current = null;
+    setCurrentQuestion(null);
+    setReveal(null); setDistribution(null);
     setPollLive({});
     if (!sessionId) return;
 
@@ -344,6 +453,7 @@ export function useSocket(
     seatTakenRef.current = false;
     joinedTokenRef.current = null;
     setSeatTaken(false);
+    attemptSeenRef.current = new Map();
     ownAnswersRef.current = new Map();
     pendingAnswerRef.current = new Map();
     setOwnAnswers(new Map());
@@ -378,11 +488,25 @@ export function useSocket(
     // ── Student join response ──────────────
     socket.on(SocketEvents.STUDENT_JOINED, (data: StudentJoinedPayload) => {
       if (seatTakenRef.current) return;
+      const previousAttempts = joinedTokenRef.current === data.sessionToken ? attemptSeenRef.current : new Map<number, number>();
+      const retainedAnswers = joinedTokenRef.current === data.sessionToken ? [...ownAnswersRef.current.values()] : [];
       if (joinedTokenRef.current !== data.sessionToken) clearAnswerRejection();
       if (joinedTokenRef.current && joinedTokenRef.current !== data.sessionToken) {
         ownAnswersRef.current = new Map(); pendingAnswerRef.current.clear();
+        setLeaderboard([]); setLeaderboardReady(false); setLeaderboardInvalidated(false);
+        currentQuestionRef.current = null;
+        setCurrentQuestion(null);
+        setReveal(null); setDistribution(null);
+        setQuestionAttempts(new Map());
+      }
+      for (const [index, attempt] of Object.entries(data.questionAttempts ?? {})) {
+        if (attempt > (previousAttempts.get(Number(index)) ?? 1)) {
+          setLeaderboard([]); setLeaderboardReady(false); setLeaderboardInvalidated(true);
+        }
+        previousAttempts.set(Number(index), Math.max(attempt, previousAttempts.get(Number(index)) ?? 1));
       }
       joinedTokenRef.current = data.sessionToken;
+      participantCredentialsRef.current = { sessionId, sessionToken: data.sessionToken };
       setCredentialSessionId(sessionId);
       if (data.availability) setSocketAvailability({ id: sessionId, value: data.availability });
       setSessionToken(data.sessionToken);
@@ -392,27 +516,37 @@ export function useSocket(
       setLabelNote(data.labelNote ?? null);
       setDeckTitle(data.deckTitle?.trim() || null);
       setSessionState(data.sessionState);
-      setAnsweredQuestions(data.answeredQuestions || []);
       setPollLive({});
-      answeredQuestionsRef.current = data.answeredQuestions || [];
-      pendingAnswerRef.current.clear();
-      ownAnswersRef.current = mergeOwnAnswers(new Map(), data.answers);
+      ownAnswersRef.current = mergeOwnAnswers(new Map(), retainedAnswers);
+      ownAnswersRef.current = mergeOwnAnswers(ownAnswersRef.current, data.answers);
+      ownAnswersRef.current = new Map([...ownAnswersRef.current].filter(([index, answer]) => (answer.attempt ?? 1) >= (previousAttempts.get(index) ?? 1)));
+      answeredQuestionsRef.current = [...new Set([...(data.answeredQuestions || []), ...retainedAnswers.map(answer => answer.questionIndex)])]
+        .filter(index => (ownAnswersRef.current.get(index)?.attempt ?? 1) >= (previousAttempts.get(index) ?? 1));
+      setAnsweredQuestions(answeredQuestionsRef.current);
+      attemptSeenRef.current = new Map(answeredQuestionsRef.current.map(index => [index, ownAnswersRef.current.get(index)?.attempt ?? 1]));
+      for (const [index, attempt] of previousAttempts) {
+        attemptSeenRef.current.set(index, Math.max(attempt, attemptSeenRef.current.get(index) ?? 1));
+      }
+      setQuestionAttempts(new Map(attemptSeenRef.current));
       setOwnAnswers(new Map(ownAnswersRef.current));
       setError(null);
 
-      // Fill in the question already on screen if this page lost its answer.
+      // Fill in the question already on screen only from the same attempt.
       const shown = currentQuestionRef.current;
-      if (shown && answeredQuestionsRef.current.includes(shown.questionIndex)) {
-        const seeded = seedSubmittedAnswer({
+      if (shown) {
+        const alreadyAnswered = answeredQuestionsRef.current.includes(shown.questionIndex)
+          && (shown.attempt ?? 1) === (ownAnswersRef.current.get(shown.questionIndex)?.attempt ?? 1);
+        const seeded = pendingSubmittedAnswer(shown) ?? seedSubmittedAnswer({
           questionIndex: shown.questionIndex,
           options: shown.options,
-          alreadyAnswered: true,
-          isSameQuestion: true,
+          alreadyAnswered,
+          isSameQuestion: !ownAnswersRef.current.has(shown.questionIndex),
           current: { selectedOptions: submittedOptionsRef.current, responseText: submittedResponseTextRef.current },
           known: ownAnswersRef.current,
         });
         submittedOptionsRef.current = seeded.selectedOptions;
         submittedResponseTextRef.current = seeded.responseText;
+        setSubmitted(alreadyAnswered);
         setSubmittedOptions(seeded.selectedOptions);
         setSubmittedResponseText(seeded.responseText);
       }
@@ -446,10 +580,12 @@ export function useSocket(
 
     // ── Question lifecycle ─────────────────
     socket.on(SocketEvents.QUESTION_OPEN, (data: QuestionOpenPayload) => {
+      if ((data.attempt ?? 1) < (attemptSeenRef.current.get(data.questionIndex) ?? 1)) return;
       const questionType = data.questionType ?? (data.isPoll ? "poll" : "multiple_choice");
       const resolvedBackground = resolveSlideBackground(data.text, data.slideBackground);
       const previousQuestion = currentQuestionRef.current;
-      const isSameQuestion = previousQuestion?.questionIndex === data.questionIndex;
+      const isSameQuestion = previousQuestion?.questionIndex === data.questionIndex
+        && (previousQuestion.attempt ?? 1) === (data.attempt ?? 1);
       const nextQuestion = {
         questionIndex: data.questionIndex,
         topic: data.topic,
@@ -474,6 +610,7 @@ export function useSocket(
         firstOpenedAt: data.firstOpenedAt,
         questionNumber: data.questionNumber,
         questionTotal: data.questionTotal,
+        attempt: data.attempt,
       };
       // A snapshot that repeats the opening on screen keeps the same object, so
       // the student view does not clear an option chosen while offline.
@@ -486,14 +623,17 @@ export function useSocket(
       setReveal(null);
       setDistribution(null);
       // Reveal/reconnect snapshots replay question context before reveal details.
-      // Preserve the local answer when that replay is for the same question,
-      // and otherwise restore a known earlier answer to this question.
+      // A pending submission for this attempt is shown first. Otherwise a question
+      // not marked answered shows no answer. A marked repeat of the same question
+      // with no known accepted answer keeps the local answer, and a known accepted
+      // answer to the current attempt is restored.
+      noteQuestionAttempt(data.questionIndex, data.attempt ?? 1);
       const alreadyAnswered = answeredQuestionsRef.current.includes(data.questionIndex);
-      const seeded = seedSubmittedAnswer({
+      const seeded = pendingSubmittedAnswer(data) ?? seedSubmittedAnswer({
         questionIndex: data.questionIndex,
         options: data.options,
         alreadyAnswered,
-        isSameQuestion,
+        isSameQuestion: isSameQuestion && !ownAnswersRef.current.has(data.questionIndex),
         current: { selectedOptions: submittedOptionsRef.current, responseText: submittedResponseTextRef.current },
         known: ownAnswersRef.current,
       });
@@ -520,21 +660,33 @@ export function useSocket(
       setTimedOut(data?.timedOut === true);
     });
 
-    socket.on(SocketEvents.ANSWER_ACCEPTED, (data: { questionIndex: number }) => {
-      clearAnswerRejection(data.questionIndex);
+    socket.on(SocketEvents.ANSWER_ACCEPTED, (data: AnswerAcceptedPayload) => {
       const pending = pendingAnswerRef.current.get(data.questionIndex)?.shift();
-      if (pending) {
-        ownAnswersRef.current = mergeOwnAnswers(ownAnswersRef.current, [pending]);
-        setOwnAnswers(new Map(ownAnswersRef.current));
+      // Consume the transport's outcome without reviving an archived attempt.
+      if (!pending || (pending.attempt ?? 1) < (attemptSeenRef.current.get(data.questionIndex) ?? 1)) return;
+      clearAnswerRejection(data.questionIndex);
+      noteQuestionAttempt(data.questionIndex, pending.attempt ?? 1);
+      const accepted = { ...pending, ...(data.acceptedRevision !== undefined ? { acceptedRevision: data.acceptedRevision } : {}) };
+      if ((data.attempt ?? pending.attempt ?? 1) !== (pending.attempt ?? 1)) return;
+      answerAcceptanceEpoch.current += 1;
+      ownAnswersRef.current = mergeOwnAnswers(ownAnswersRef.current, [accepted]);
+      setOwnAnswers(new Map(ownAnswersRef.current));
+      const shown = currentQuestionRef.current;
+      if (pending && shown?.questionIndex === data.questionIndex && (shown.attempt ?? 1) === (pending.attempt ?? 1)
+        && !pendingAnswerRef.current.get(data.questionIndex)?.length) {
+        const known = ownAnswersRef.current.get(data.questionIndex)!;
+        const selectedOptions = toOptionLabels(known.selectedOptions, shown.options);
+        const responseText = known.responseText?.trim() || null;
+        submittedOptionsRef.current = selectedOptions;
+        submittedResponseTextRef.current = responseText;
+        setSubmittedOptions(selectedOptions);
+        setSubmittedResponseText(responseText);
       }
       setAnswerRevision(previous => previous + 1);
       // An ACK for an explored item must never mark the presenter item submitted.
-      if (currentQuestionRef.current?.questionIndex === data.questionIndex) setSubmitted(true);
-      setAnsweredQuestions(prev => {
-        const next = appendAnsweredQuestion(prev, data.questionIndex);
-        answeredQuestionsRef.current = next;
-        return next;
-      });
+      if (shown?.questionIndex === data.questionIndex && (shown.attempt ?? 1) === (pending.attempt ?? 1)) setSubmitted(true);
+      answeredQuestionsRef.current = appendAnsweredQuestion(answeredQuestionsRef.current, data.questionIndex);
+      setAnsweredQuestions(answeredQuestionsRef.current);
     });
 
     socket.on(SocketEvents.ANSWER_REJECTED, (data: { questionIndex: number; reason: string }) => {
@@ -555,30 +707,8 @@ export function useSocket(
     socket.on(SocketEvents.ANSWER_COUNT, (data: AnswerCountPayload) => {
       setAnswerCount(data);
       setResultsEvidence(previous => updateResultsEvidence(previous, sessionId, data.hasAnswers === true));
-      setAnsweredQuestions((prev) => {
-        const current = currentQuestionRef.current;
-        const ownKey = publicKeyRef.current;
-        if (
-          !ownKey
-          || !current
-          || current.questionType !== "open_response"
-          || current.questionIndex !== data.questionIndex
-        ) {
-          return prev;
-        }
-
-        const ownResponse = data.openResponses?.find((entry) => entry.publicKey === ownKey);
-        if (!ownResponse) {
-          return prev;
-        }
-
-        setSubmitted(true);
-        setSubmittedResponseText(ownResponse.responseText);
-
-        const next = appendAnsweredQuestion(prev, data.questionIndex);
-        answeredQuestionsRef.current = next;
-        return next;
-      });
+      // Counts are staff projections without participant acceptance order.
+      // Own answers are reconciled only through ACKs, joins, snapshots and HTTP.
     });
 
     // ── Results ───────────────────────────
@@ -592,7 +722,8 @@ export function useSocket(
     });
 
     socket.on(SocketEvents.RESULTS_REVEAL, (data: ResultsRevealPayload) => {
-      if (currentQuestionRef.current?.questionIndex !== data.questionIndex) {
+      if (currentQuestionRef.current?.questionIndex !== data.questionIndex
+        || (currentQuestionRef.current.attempt ?? 1) < (attemptSeenRef.current.get(data.questionIndex) ?? 1)) {
         return;
       }
 
@@ -613,6 +744,8 @@ export function useSocket(
     // ── Leaderboard ───────────────────────
     socket.on(SocketEvents.LEADERBOARD_UPDATE, (data: LeaderboardUpdatePayload) => {
       setLeaderboard(data.entries);
+      setLeaderboardReady(true);
+      setLeaderboardInvalidated(false);
       setTotalQuestions(data.totalQuestions);
       setSessionState("LEADERBOARD");
     });
@@ -624,6 +757,11 @@ export function useSocket(
       if (data.policy) setPolicy(data.policy);
       if (data.effectiveRanking) setEffectiveRanking(data.effectiveRanking);
       if (data.availability) setSocketAvailability({ id: sessionId, value: data.availability });
+      if (data.questionAttempts) {
+        for (const [index, attempt] of Object.entries(data.questionAttempts)) noteQuestionAttempt(Number(index), attempt);
+        setAnswerRevision(previous => previous + 1);
+      }
+      if (data.answers) reconcileOwnAnswers(data.answers);
       setSessionState(data.state);
       setResultsEvidence(previous => updateResultsEvidence(previous, sessionId, data.hasAnswers === true));
     });
@@ -684,6 +822,7 @@ export function useSocket(
       }
       socket.disconnect();
       socketRef.current = null;
+      participantCredentialsRef.current = null;
     };
   }, [sessionId, role, clearAnswerRejection]);
 
@@ -729,15 +868,20 @@ export function useSocket(
       const nextSubmittedOptions = payload.selectedOptions ?? [];
       const nextSubmittedResponseText = payload.responseText?.trim() || null;
       const shown = currentQuestionRef.current;
+      const attempt = payload.attempt ?? (shown?.questionIndex === payload.questionIndex ? shown.attempt : undefined) ?? 1;
+      if (payload.attempt === undefined && attempt > 1) payload = { ...payload, attempt };
+      if (payload.attempt === 1) { payload = { ...payload }; delete payload.attempt; }
       const pending = pendingAnswerRef.current.get(payload.questionIndex) ?? [];
       pending.push({
         questionIndex: payload.questionIndex,
+        ...(attempt > 1 ? { attempt } : {}),
         selectedOptions: toOptionIndexes(nextSubmittedOptions, options ?? (shown?.questionIndex === payload.questionIndex ? shown.options : [])),
         ...(nextSubmittedResponseText ? { responseText: nextSubmittedResponseText } : {}),
       });
       pendingAnswerRef.current.set(payload.questionIndex, pending);
       socketRef.current.emit(SocketEvents.ANSWER_SUBMIT, payload);
-      if (shown?.questionIndex !== payload.questionIndex) return;
+      if (shown?.questionIndex !== payload.questionIndex || (shown.attempt ?? 1) !== attempt
+        || attempt < (attemptSeenRef.current.get(payload.questionIndex) ?? 1)) return;
       submittedOptionsRef.current = nextSubmittedOptions;
       submittedResponseTextRef.current = nextSubmittedResponseText;
       setSubmittedOptions(nextSubmittedOptions);
@@ -763,6 +907,7 @@ export function useSocket(
     setConnected(false);
     setSessionState(null);
     setSessionToken(null);
+    participantCredentialsRef.current = null;
     setStudentIdState(null);
     setPublicKey(null);
     setLabel(null);
@@ -781,6 +926,7 @@ export function useSocket(
     policy: socketSessionId === sessionId ? policy : null,
     effectiveRanking: socketSessionId === sessionId ? effectiveRanking : null,
     sessionToken: credentialSessionId === sessionId ? sessionToken : null,
+    hasParticipantCredentials,
     seatTaken: socketSessionId === sessionId && seatTaken,
     studentId: studentIdState,
     publicKey,
@@ -790,7 +936,12 @@ export function useSocket(
     answeredQuestions,
     ownAnswers,
     answerRevision,
-    currentQuestion,
+    getAnswerAcceptanceEpoch,
+    questionAttempts: socketSessionId === sessionId ? questionAttempts : new Map(),
+    noteQuestionAttempt,
+    reconcileOwnAnswers,
+    pendingSubmittedAnswer,
+    currentQuestion: socketSessionId === sessionId ? currentQuestion : null,
     remainingSec,
     timedOut,
     answerCount,
@@ -802,6 +953,8 @@ export function useSocket(
     distribution: role !== "instructor" && (availability?.phase === "expired" || availability?.phase === "deleted") ? null : distribution,
     pollLive: role !== "instructor" && (availability?.phase === "expired" || availability?.phase === "deleted") ? NO_POLL_LIVE : pollLive,
     leaderboard: role !== "instructor" && (availability?.phase === "expired" || availability?.phase === "deleted") ? [] : leaderboard,
+    leaderboardReady: socketSessionId === sessionId && leaderboardReady,
+    leaderboardInvalidated: socketSessionId === sessionId && leaderboardInvalidated,
     totalQuestions,
     participants,
     joinSession,
