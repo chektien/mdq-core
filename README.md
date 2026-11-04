@@ -933,6 +933,11 @@ the answer. First `question:open` payloads omit the attempt field as before.
 See the [engine re-run API](docs/engine-rerun.md) for the command and host contract.
 
 Hosts may supply a nonnegative safe integer `contentVersion` on the `answerSubmit` command (outside its participant payload) to stamp the accepted `Submission`; absent means unknown, never version 0.
+Hosts that supply `contentVersion` with question openings or study items receive
+that displayed version and attempt back from Core's participant screens on
+`answer:submit`. The host validates this untrusted pair before accepting an
+answer. Delayed sends retain their original pair. Unversioned first-attempt
+answers keep their existing payload. See the [client contract](docs/engine-rerun.md#client-compatibility).
 
 `audienceReaches(audience, role)` answers whether a socket of role `"control"`, `"display"` or `"participant"` should receive a message. For a connecting socket, `apply(..., { type: "snapshot", view: "control" | "display" })` builds the messages for that role, and `{ type: "snapshot", participantId }` builds a participant's. A `join` command may carry `newPublicKey` (a random key); without it the engine makes one. `leaderboardRows(session, quiz, "public" | "control")` gives the same rows for REST responses.
 

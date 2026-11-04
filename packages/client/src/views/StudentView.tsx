@@ -7,10 +7,11 @@ import { useParticipantStudy } from "../hooks/useParticipantStudy";
 import ParticipantStudyControls from "../components/ParticipantStudyControls";
 import type { ParticipantDraft } from "../participantDrafts";
 import { useSocket } from "../hooks/useSocket";
+import { answerForQuestion } from "../answerPair";
 import { loadStoredSession, saveStoredSession, clearStoredSession } from "../participantSessionStorage";
 import type { QuestionState, RevealState } from "../hooks/useSocket";
 import { API, MAX_OPEN_RESPONSE_LENGTH, SEAT_TAKEN_MESSAGE } from "@mdq/shared";
-import type { DeckPalette, DeckTheme, SessionState, SessionAvailabilityPayload } from "@mdq/shared";
+import type { AnswerSubmitPayload, DeckPalette, DeckTheme, SessionState, SessionAvailabilityPayload } from "@mdq/shared";
 import Timer from "../components/Timer";
 import Leaderboard from "../components/Leaderboard";
 import DistributionChart from "../components/DistributionChart";
@@ -812,9 +813,9 @@ export function QuestionView({
   submittedResponseText: string | null;
   timedOut: boolean;
   connected: boolean;
-  onSubmit: (payload: { questionIndex: number; selectedOptions?: string[]; responseText?: string }) => void;
+  onSubmit: (payload: AnswerSubmitPayload) => void;
   answerRejection?: { questionIndex: number; reason: string } | null;
-  draft?: Pick<ParticipantDraft, "selectedOptions" | "responseText"> | null;
+  draft?: Pick<ParticipantDraft, "selectedOptions" | "responseText" | "contentVersion"> | null;
   onDraftChange?: (patch: Partial<Pick<ParticipantDraft, "selectedOptions" | "responseText">>) => void;
   draftPersisted?: boolean;
   selfPaced?: boolean;
@@ -888,12 +889,14 @@ export function QuestionView({
     setReconnectedNote(false);
     if (question.questionType === "open_response") {
       if (!responseText.trim()) return;
-      onSubmit({ questionIndex: question.questionIndex, responseText });
+      // A deliberate submit reviews retained text against the displayed content.
+      if (question.contentVersion !== undefined && draft && draft.contentVersion !== question.contentVersion) onDraftChange?.({ responseText });
+      onSubmit(answerForQuestion({ questionIndex: question.questionIndex, responseText }, question));
       return;
     }
     if (submitted) return;
     if (selected.length === 0) return;
-    onSubmit({ questionIndex: question.questionIndex, selectedOptions: selected });
+    onSubmit(answerForQuestion({ questionIndex: question.questionIndex, selectedOptions: selected }, question));
   };
 
   const isClosed = state === "QUESTION_CLOSED";

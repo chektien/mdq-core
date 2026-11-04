@@ -352,6 +352,8 @@ export interface JoinLockRequest {
 export const JOIN_LOCKED_MESSAGE = "This session is not taking new participants. Ask the presenter.";
 
 export interface QuestionOpenPayload {
+  /** Optional host content version. Participants echo it with the displayed item's answer. */
+  contentVersion?: number;
   questionIndex: number;
   topic: string;
   text: string; // rendered HTML
@@ -393,6 +395,8 @@ export interface QuestionTickPayload {
 }
 
 export interface AnswerSubmitPayload {
+  /** Displayed host content version; the host validates it before stamping an accepted submission. */
+  contentVersion?: number;
   /** The attempt being answered. Omit only for attempt 1, for compatibility with older clients. */
   attempt?: number;
   questionIndex: number;
