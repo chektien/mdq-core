@@ -43,7 +43,7 @@ it.each([["choice", 0, 7], ["open response", 3, 12], ["explicit zero", 0, 0], ["
 );
 it("stamps an answer at attempt 2", () => {
   const session = attempts.archiveActiveAttempt(stamped(), 0, 1100, goldenQuiz.questions[0]);
-  const next = submit(session, answer(0, { contentVersion: 8 })).session;
+  const next = submit(session, answer(0, { contentVersion: 8 }, { attempt: 2 })).session;
   expect(next.submissions[0]).toMatchObject({ attempt: 2, contentVersion: 8 });
   expect(next.attemptArchive![0].submissions[0]).toHaveProperty("contentVersion", 7);
 });
@@ -95,7 +95,7 @@ it("archives, normalizes and removes stamped answers without inventing stamps", 
   expect(archived.attemptArchive![0].submissions.map(row => (row as Submission & { contentVersion?: number }).contentVersion)).toEqual([7, 9, undefined]);
   expect(archived.attemptArchive![0].submissions[2]).not.toHaveProperty("contentVersion");
   expect(archived.attemptArchive![0].submissions[0]).not.toBe(session.submissions[0]);
-  const active = submit(archived, answer(0, { contentVersion: 10 })).session;
+  const active = submit(archived, answer(0, { contentVersion: 10 }, { attempt: 2 })).session;
   attempts.removeSeatAnswers(active, "one");
   expect(active.submissions).toEqual([]);
   expect(active.attemptArchive![0].submissions.map(row => row.studentId)).toEqual(["two", "three"]);
@@ -103,7 +103,7 @@ it("archives, normalizes and removes stamped answers without inventing stamps", 
 });
 it("round-trips active and archived stamps through session serialization", () => {
   const archived = attempts.archiveActiveAttempt(stamped(), 0, 1100, goldenQuiz.questions[0]);
-  const input = submit(archived, answer(0, { contentVersion: 8 })).session;
+  const input = submit(archived, answer(0, { contentVersion: 8 }, { attempt: 2 })).session;
   const bytes = serializeSession(input);
   const restored = deserializeSession(bytes);
   expect(restored.submissions[0]).toHaveProperty("contentVersion", 8);

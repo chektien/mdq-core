@@ -1,10 +1,10 @@
-import { activeSubmission, activeSubmissions, activeSubmissionsBySeat, activeSubmissionsOf, currentAttempt, hasAnyAnswers } from "./attempts";
+import { activeSubmission, activeSubmissions, activeSubmissionsBySeat, activeSubmissionsOf, archiveActiveAttempt, currentAttempt, hasAnyAnswers } from "./attempts";
 import { availabilityAlarmMatches, availabilityPayload, nextAvailabilityAlarm, sessionAvailabilityPhase, validateAvailabilityDeadline } from "./availability";
 import { defaultSessionPolicy, effectiveRanking, getSessionScoredQuestionCount, isQuestionReleased, isSelfPaced, publicResultsHidden, releasedQuestionIndexes, scoredCorrectAnswersForSession } from "./policy";
 import { isSlideType } from "@mdq/shared";
 import { containsBlockedLanguage, BLOCKED_LANGUAGE_MESSAGE } from "./text-filter";
 import {
-  Quiz, Session, SessionState, SocketEvents, QuestionOpenPayload, QuestionClosePayload, FoldoutNote,
+  Question, Quiz, Session, SessionState, SocketEvents, QuestionOpenPayload, QuestionClosePayload, FoldoutNote,
   StudentJoinPayload, AnswerSubmitPayload, Participant, STATE_TRANSITIONS, StudentAnswer,
   LeaderboardRow, OpenResponseEntry, SessionParticipantsPayload, SocketRole, QuestionTiming, PollLivePayload,
   JOIN_LOCKED_MESSAGE, MAX_DISPLAY_NAME_LENGTH, MAX_OPEN_RESPONSE_LENGTH, MAX_STUDENT_ID_LENGTH, normalizeDisplayName, usesStudentIds,
@@ -73,6 +73,14 @@ export type Command =
   | { type: "start" | "next" | "previous" | "open" | "reveal" | "leaderboardShow" | "leaderboardHide" | "broadcastOpen" | "broadcastReveal" | "broadcastLeaderboard" | "participants" | "repairClosedSlide" }
   | { type: "timeout"; deadline?: number; questionIndex?: number; startedAt?: number; restartCount?: number }
   | { type: "restartCountdown"; role: SocketRole }
+  /**
+   * Ask a question again as a new attempt. The active answers, timing, reveal and moderation move to the
+   * attempt archive with `archived`, defaulting to the target question in the session snapshot. A host passes it
+   * when it has already put an edited question in the session. Presenter-paced re-runs only the current item and
+   * reopens it with a fresh clock that ranks by correctness. Self-paced re-runs a released item in place.
+   * Policy-less legacy sessions cannot re-run because their ranking ignores timing fairness.
+   */
+  | { type: "rerun"; role: SocketRole; questionIndex: number; archived?: Question }
   /** Identify the opening so delayed close requests cannot close another item. */
   | { type: "close"; questionIndex?: number; startedAt?: number }
   | { type: "join"; payload: StudentJoinPayload; socketId: string; newToken: string; newPublicKey?: string }
@@ -259,6 +267,7 @@ export const publicQuestionPayload = (session: Session, quiz: Quiz, index: numbe
     ...(isSelfPaced(session) ? { deadlineAt: null, ...(timing?.firstOpenedAt !== undefined ? { firstOpenedAt: timing.firstOpenedAt } : {}) } : timing ? { deadlineAt: timing.deadlineAt, ...(timing.firstOpenedAt !== undefined ? { firstOpenedAt: timing.firstOpenedAt } : {}) }
       : q.timeLimitSec === null || isSlideType(getQuestionType(q)) ? { deadlineAt: null } : {}),
     ...questionPosition(quiz, index),
+    ...(currentAttempt(session, index) > 1 ? { attempt: currentAttempt(session, index) } : {}),
   };
 };
 const questionPayload = (session: Session, quiz: Quiz, now: number) => publicQuestionPayload(session, quiz, session.currentQuestionIndex, now);
@@ -309,6 +318,8 @@ export const ownAnswers = (session: Session, quiz: Quiz, studentId: string): Stu
     const options = quiz.questions[s.questionIndex]?.options ?? [];
     return {
       questionIndex: s.questionIndex,
+      ...(s.acceptedRevision !== undefined ? { acceptedRevision: s.acceptedRevision } : {}),
+      ...(s.attempt && s.attempt > 1 ? { attempt: s.attempt } : {}),
       selectedOptions: s.selectedOptions.map((label) => options.findIndex((o) => o.label === label)).filter((i) => i >= 0),
       ...(s.responseText ? { responseText: s.responseText } : {}),
     };
@@ -490,6 +501,7 @@ export function apply(input: Session, quiz: Quiz, command: Command, now: number,
   const state = (includeIndex = true) => {
     const payload = { ...(session.availability ? { availability: availabilityPayload(session, now) } : {}),
       ...(includeIndex ? { state: session.state, questionIndex: session.currentQuestionIndex } : { state: session.state }),
+      ...(session.questionAttempts ? { questionAttempts: session.questionAttempts } : {}),
       ...(hasAnyAnswers(session) ? { hasAnswers: true as const } : {}) };
     emit(SocketEvents.SESSION_STATE, payload);
     if (session.policy) emit(SocketEvents.SESSION_STATE, { ...payload, policy: session.policy, effectiveRanking: effectiveRanking(session, quiz) }, "control");
@@ -512,10 +524,10 @@ export function apply(input: Session, quiz: Quiz, command: Command, now: number,
     session.questionDeadlineAt = timing.deadlineAt;
     session.closedByTimer = false;
   };
-  if (session.resultScope && ["configurePolicy", "start", "next", "previous", "open", "restartCountdown", "close", "reveal", "leaderboardShow", "leaderboardHide", "liveResults"].includes(command.type)) throw new EngineCommandError("Session has ended.");
+  if (session.resultScope && ["configurePolicy", "start", "next", "previous", "open", "restartCountdown", "rerun", "close", "reveal", "leaderboardShow", "leaderboardHide", "liveResults"].includes(command.type)) throw new EngineCommandError("Session has ended.");
   const availabilityPhase = sessionAvailabilityPhase(session, now);
   if (availabilityPhase === "deleted" && !["expireAvailability", "purgeAvailability", "snapshot", "join", "answerSubmit", "disconnect"].includes(command.type)) throw new EngineCommandError("Session data has been deleted.");
-  if (availabilityPhase === "expired" && ["configurePolicy", "start", "next", "previous", "open", "restartCountdown", "close", "reveal", "leaderboardShow", "leaderboardHide", "releaseSeat", "liveResults"].includes(command.type)) throw new EngineCommandError("Availability ended. Extend & reopen or deliberately End to show results.");
+  if (availabilityPhase === "expired" && ["configurePolicy", "start", "next", "previous", "open", "restartCountdown", "rerun", "close", "reveal", "leaderboardShow", "leaderboardHide", "releaseSeat", "liveResults"].includes(command.type)) throw new EngineCommandError("Availability ended. Extend & reopen or deliberately End to show results.");
   switch (command.type) {
     case "configureAvailability": {
       if (command.role !== "control") throw new EngineCommandError("Only the presenter can change availability.");
@@ -625,6 +637,31 @@ export function apply(input: Session, quiz: Quiz, command: Command, now: number,
       openContext(); state();
       if (!isSlideType(getQuestionType(questionAt(session, quiz)))) emitCount();
       break;
+    case "rerun": {
+      if (command.role !== "control") throw new EngineCommandError("Only the presenter can re-run a question.");
+      if (session.state === "LOBBY") throw new EngineCommandError("Start the session before re-running a question.");
+      if (session.state === "ENDED") throw new EngineCommandError("Session has ended.");
+      if (availabilityPhase !== "active") throw new EngineCommandError("Availability ended. Extend & reopen or deliberately End to show results.");
+      if (!session.policy) throw new EngineCommandError("Legacy sessions cannot re-run questions.");
+      const index = command.questionIndex, target = Number.isSafeInteger(index) ? quiz.questions[index] : undefined;
+      if (!target) throw new EngineCommandError("Question not found.");
+      if (isSlideType(getQuestionType(target))) throw new EngineCommandError("Slides have no answers to re-run.");
+      const selfPaced = isSelfPaced(session);
+      if (selfPaced && !isQuestionReleased(session, index)) throw new EngineCommandError("Only a released question can be re-run.");
+      if (!selfPaced && index !== session.currentQuestionIndex) throw new EngineCommandError("Go back to this question to re-run it.");
+      const next = archiveActiveAttempt(session, index, now, command.archived ?? target);
+      for (const key of Object.keys(session) as (keyof Session)[]) if (!Object.prototype.hasOwnProperty.call(next, key)) delete session[key];
+      Object.assign(session, next);
+      if (selfPaced) { state(); break; }
+      // Re-run bypasses the transition table, which has no QUESTION_CLOSED to QUESTION_OPEN edge.
+      // The `open` command separately refuses revealed items. The archive has removed the old opening.
+      session.state = "QUESTION_OPEN";
+      preserveOpening();
+      // Earlier answers were timed against another opening, so speed can no longer be compared fairly.
+      session.questionTiming![String(index)].timingFairnessInvalidated = true;
+      openContext(); state(); emitCount();
+      break;
+    }
     case "restartCountdown": {
       if (command.role !== "control") throw new EngineCommandError("Only the presenter can restart the countdown.");
       const q = questionAt(session, quiz);
@@ -759,6 +796,7 @@ export function apply(input: Session, quiz: Quiz, command: Command, now: number,
       emit(SocketEvents.STUDENT_JOINED, { participantId: participant.studentId, sessionToken: participant.sessionToken,
         sessionState: session.state, ...(session.availability ? { availability: availabilityPayload(session, now) } : {}), currentQuestion: session.currentQuestionIndex >= 0 ? session.currentQuestionIndex : undefined,
         answeredQuestions: getAnsweredQuestions(session, participant.studentId), answers: ownAnswers(session, quiz, participant.studentId),
+        ...(session.questionAttempts ? { questionAttempts: session.questionAttempts } : {}),
         publicKey: participant.publicKey, label: participant.label, labelNote: participant.labelNote,
         ...(quiz.title ? { deckTitle: quiz.title } : {}) }, `participant:${participant.studentId}`);
       emitParticipants();
@@ -778,6 +816,8 @@ export function apply(input: Session, quiz: Quiz, command: Command, now: number,
       if (!isSelfPaced(session) && payload.questionIndex !== session.currentQuestionIndex) { reject(`Question index mismatch: expected ${session.currentQuestionIndex}, got ${payload.questionIndex}.`); break; }
       const q = quiz.questions[payload.questionIndex];
       if (!q) { reject(`Question ${session.currentQuestionIndex + 1} not found.`); break; }
+      const attempt = payload.attempt === undefined ? 1 : payload.attempt;
+      if (!Number.isSafeInteger(attempt) || attempt < 1 || attempt !== currentAttempt(session, payload.questionIndex)) { reject("This question is on a different attempt. Refresh it and answer again."); break; }
       if (session.policy && !isQuestionReleased(session, payload.questionIndex)) { reject("This question has not been released."); break; }
       if (session.revealedQuestionIndexes?.has(payload.questionIndex)) { reject("Revealed questions do not accept answers."); break; }
       if (isSlideType(getQuestionType(q))) { reject("Slides do not accept answers."); break; }
@@ -800,7 +840,9 @@ export function apply(input: Session, quiz: Quiz, command: Command, now: number,
       const existing = activeSubmission(session, studentId, payload.questionIndex);
       const existingIndex = existing ? session.submissions.indexOf(existing) : -1;
       if (existing && !isOpenResponseQuestion(q)) { reject("Already submitted an answer for this question."); break; }
+      const acceptedRevision = session.questionAttempts ? (existing?.acceptedRevision ?? 0) + 1 : undefined;
       const submission = { studentId, questionIndex: payload.questionIndex,
+        ...(acceptedRevision !== undefined ? { acceptedRevision } : {}),
         ...(currentAttempt(session, payload.questionIndex) > 1 ? { attempt: currentAttempt(session, payload.questionIndex) } : {}),
         ...(contentVersion !== undefined ? { contentVersion } : {}),
         selectedOptions: [...new Set(options)].sort(), responseText: responseText || undefined,
@@ -811,7 +853,9 @@ export function apply(input: Session, quiz: Quiz, command: Command, now: number,
         session.submissions[existingIndex] = replacement;
       }
       else session.submissions.push(submission);
-      emit(SocketEvents.ANSWER_ACCEPTED, { questionIndex: payload.questionIndex }, target);
+      emit(SocketEvents.ANSWER_ACCEPTED, { questionIndex: payload.questionIndex,
+        ...(submission.attempt ? { attempt: submission.attempt } : {}),
+        ...(acceptedRevision !== undefined ? { acceptedRevision } : {}) }, target);
       emitCount();
       messages.push(...pollLiveMessages(session, quiz, payload.questionIndex, now));
       break;
@@ -930,7 +974,9 @@ function snapshotMessages(session: Session, quiz: Quiz, now: number, audience: A
   const emitCount = () => { if (view === "control" || !publicResultsHidden(session, now)) emit(SocketEvents.ANSWER_COUNT, countPayload(session, quiz, view, now)); };
   if (session.availability) emit(SocketEvents.SESSION_AVAILABILITY, availabilityPayload(session, now));
   if (sessionAvailabilityPhase(session, now) === "deleted") return messages;
-  if (staff) emit(SocketEvents.SESSION_STATE, { ...(session.availability ? { availability: availabilityPayload(session, now) } : {}), state: session.state, questionIndex: session.currentQuestionIndex >= 0 ? session.currentQuestionIndex : undefined,
+  if (staff || session.questionAttempts) emit(SocketEvents.SESSION_STATE, { ...(session.availability ? { availability: availabilityPayload(session, now) } : {}), state: session.state, questionIndex: session.currentQuestionIndex >= 0 ? session.currentQuestionIndex : undefined,
+    ...(session.questionAttempts ? { questionAttempts: session.questionAttempts } : {}),
+    ...(!staff && session.questionAttempts ? { answers: ownAnswers(session, quiz, audience.slice("participant:".length)) } : {}),
     ...(hasAnyAnswers(session) ? { hasAnswers: true } : {}),
     ...(view === "control" && session.policy ? { policy: session.policy, effectiveRanking: effectiveRanking(session, quiz) } : {}) });
   const q = questionAt(session, quiz);

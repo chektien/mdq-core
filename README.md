@@ -609,7 +609,7 @@ Each interactive question supports the existing `time-limit:` metadata plus opti
 
 `time-limit: 45` sets a 45-second countdown; omitting it uses the default 35 seconds. Use `time-limit: none` (or the earlier `time_limit: none`) for an untimed multiple-choice, multi-select, poll, or open-response question. Untimed questions have no countdown and stay open until the presenter closes them. Content slides and covers still must not declare `time-limit`.
 
-A timed question keeps its original deadline across navigation, reconnects, and page reloads. Answers received at or after that deadline are rejected even if the close event has not arrived yet. The presenter's **Restart Countdown** control is available only while a timed question is open, its deadline has not passed, and its answers have not been revealed. It starts a new countdown without clearing submissions or changing their recorded response times. The session records the original opening and restart history, marking restarted timing as unsuitable for fair time comparisons; existing leaderboard calculations are unchanged. Expired, closed, or revealed questions cannot be restarted or reopened for another scored attempt.
+A timed question keeps its original deadline across navigation, reconnects, and page reloads. Answers received at or after that deadline are rejected even if the close event has not arrived yet. The presenter's **Restart Countdown** control is available only while a timed question is open, its deadline has not passed, and its answers have not been revealed. It starts a new countdown without clearing submissions or changing their recorded response times. The session records the original opening and restart history and marks restarted timing as unsuitable for fair time comparisons. Expired, closed, or revealed questions cannot use Restart Countdown. Hosts can use the engine's `rerun` command to ask a question as a new scored attempt as described in [Re-running a question](docs/engine-rerun.md).
 
 Slide bodies take bulleted lists, numbered lists and nested lists in any mix, indented by two or more spaces. On a slide the top level uses accent markers and each level below it uses a smaller, quieter marker and slightly smaller text, with the same indent per level on the projector and on phones. A list item with no text (a bare `- ` or `1. `) is hidden when the slide is presented and printed, so no empty marker shows, and the numbers of a numbered list count only the items that show. An item that holds only a nested list (a bare `-` followed by an indented child) drops its own marker, so the children stand one level in. The Markdown itself is left as written.
 
@@ -918,6 +918,19 @@ pure engine's `answerSubmit` command with seat credentials, not the legacy
 `recordSubmission` compatibility helper. Hosted adapters own availability checks
 and serialization of competing commands. Automatic availability shutdown must
 use `end` with `discloseResults: false`, never deliberate result disclosure.
+
+The engine's `rerun` command archives an active attempt and asks the question again.
+Core provides no HTTP route or instructor button for it. Hosts call `apply` and
+route its messages. After replacing question content, pass the old `Question` as
+`archived` so the archive keeps what participants answered. Policy-less legacy
+sessions cannot re-run. Presenter-paced re-runs use correctness ranking and a fresh
+clock. Self-paced re-runs keep released items and browsing positions.
+
+`AnswerSubmitPayload.attempt` is optional for compatibility. Omission means
+attempt 1, so older clients keep answering questions that have never re-run.
+After a re-run, clients must submit the current attempt or the engine refuses
+the answer. First `question:open` payloads omit the attempt field as before.
+See the [engine re-run API](docs/engine-rerun.md) for the command and host contract.
 
 Hosts may supply a nonnegative safe integer `contentVersion` on the `answerSubmit` command (outside its participant payload) to stamp the accepted `Submission`; absent means unknown, never version 0.
 
