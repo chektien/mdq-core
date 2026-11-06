@@ -69,6 +69,39 @@ cached leaderboard. This Retry refreshes items and reconnects for current socket
 context, even if the page holds no opening for the re-run question. Initial
 leaderboard joins without an attempt advance keep their normal rendering.
 Submissions never use an announced attempt with earlier content.
+
+Hosts that version question content can include optional `contentVersion` on
+`question:open` and each HTTP study item. Core's participant screens echo that
+displayed item's `contentVersion` and `attempt` on the existing `answer:submit`
+payload, for choices, polls and open responses. Version `0` is preserved. An
+unversioned question adds no version field, and its attempt 1 remains omitted on
+the wire. Versioned questions send both fields, including attempt 1. HTTP content
+newer than the socket's content at the same attempt supplies
+the displayed item. A repeated opening with a different version replaces the
+earlier content even when its opening time is unchanged.
+
+Drafts remember the content version they were made against. A different displayed
+version clears unsent choice and poll selections, requiring a fresh selection.
+Open-response text stays visible with its earlier provenance until the participant
+edits it or deliberately submits it against the displayed version. Identical
+openings and unversioned servers retain the existing draft behavior.
+
+The view captures the pair when preparing an answer. Study and socket hooks
+preserve an explicitly prepared pair. Retained callbacks use the question from
+their render, never a later socket opening or attempt announcement. A delayed
+answer therefore still names the earlier content and can be refused by the
+host. This client echo is untrusted: the host remains responsible for validating
+the pair and supplying the engine command's separate `contentVersion` stamp.
+Core's native server does not version content and does not trust the echoed
+version as an accepted-submission stamp. No event or server acceptance rule changes.
+
+Self-paced browsing position is also retained in same-browser storage, scoped to
+the session and seat token. Reload restores it only if the item is still
+available. Back to presenter clears it. Active presenter-paced sessions follow
+the server's replayed current item. Expired sessions' read-only browsing can
+also retain its position. Unavailable storage leaves browsing usable
+without reload persistence. This storage does not create or recover a seat.
+
 After the session has re-run any question, newly accepted answers have a
 server-owned `acceptedRevision`. The engine increments it within a seat, question
 and attempt, starting at 1. This includes questions still on attempt 1 in that

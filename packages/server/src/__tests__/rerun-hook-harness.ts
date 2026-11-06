@@ -1,5 +1,6 @@
 import path from "path";
 import { buildSync } from "esbuild";
+import type { ReactElement } from "react";
 
 // Execute the real hooks with deterministic state, effects and I/O. No browser or live socket is needed.
 export function hookHarness() {
@@ -12,6 +13,7 @@ export function hookHarness() {
     return (slots[index] as { value: T }).value;
   };
   const react = {
+    ...require("react"),
     useState<T>(initial: T | (() => T)) {
       const index = cursor++;
       if (!(index in slots)) slots[index] = typeof initial === "function" ? (initial as () => T)() : initial;
@@ -22,6 +24,7 @@ export function hookHarness() {
     },
     useRef<T>(initial: T) { const index = cursor++; return slots[index] ??= { current: initial }; },
     useMemo: memo,
+    useSyncExternalStore: (_subscribe: unknown, getSnapshot: () => unknown) => getSnapshot(),
     useCallback<T>(callback: T, deps: unknown[]) { return memo(() => callback, deps); },
     useEffect(effect: () => (() => void) | void, deps?: unknown[]) {
       const index = cursor++, previous = slots[index] as { deps?: unknown[]; cleanup?: () => void } | undefined;
@@ -43,13 +46,13 @@ export function hookHarness() {
   };
   const root = path.resolve(__dirname, "../../../..");
   const bundle = buildSync({
-    stdin: { contents: 'export { useSocket } from "./packages/client/src/hooks/useSocket"; export { useParticipantStudy } from "./packages/client/src/hooks/useParticipantStudy";', resolveDir: root },
-    bundle: true, platform: "node", format: "cjs", write: false, packages: "external",
+    stdin: { contents: 'export { useSocket } from "./packages/client/src/hooks/useSocket"; export { useParticipantStudy } from "./packages/client/src/hooks/useParticipantStudy"; export { QuestionView } from "./packages/client/src/views/StudentView";', resolveDir: root },
+    bundle: true, platform: "node", format: "cjs", jsx: "automatic", write: false, packages: "external",
     alias: { "@mdq/shared": path.join(root, "packages/shared/src/index.ts") },
   });
   const compiled = { exports: {} };
   new Function("require", "module", "exports", "window", bundle.outputFiles[0].text)((name: string) => name === "react" ? react : name === "socket.io-client" ? { io: () => socket } : require(name), compiled, compiled.exports, { addEventListener() {}, removeEventListener() {} });
-  const hooks = compiled.exports as Pick<typeof import("../../../client/src/hooks/useSocket"), "useSocket"> & Pick<typeof import("../../../client/src/hooks/useParticipantStudy"), "useParticipantStudy">;
+  const hooks = compiled.exports as Pick<typeof import("../../../client/src/hooks/useSocket"), "useSocket"> & Pick<typeof import("../../../client/src/hooks/useParticipantStudy"), "useParticipantStudy"> & { QuestionView: (props: Record<string, unknown>) => ReactElement };
   return {
     ...hooks, sent,
     receive(event: string, payload?: unknown) {

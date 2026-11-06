@@ -4,6 +4,7 @@ export interface QuestionOpening {
   startedAt: number;
   /** Absent means 1. */
   attempt?: number;
+  contentVersion?: number;
 }
 
 /**
@@ -17,5 +18,6 @@ export function isSameOpening<T extends QuestionOpening>(
   incoming: QuestionOpening,
 ): shown is T {
   return !!shown && shown.questionIndex === incoming.questionIndex && shown.startedAt === incoming.startedAt
-    && (shown.attempt ?? 1) === (incoming.attempt ?? 1);
+    && (shown.attempt ?? 1) === (incoming.attempt ?? 1)
+    && shown.contentVersion === incoming.contentVersion;
 }

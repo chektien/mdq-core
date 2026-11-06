@@ -37,6 +37,7 @@ import { SocketEvents } from "@mdq/shared";
 import { clockOffsetFromTick, localRemainingSec } from "../countdown";
 import { type SubmittedAnswer, shouldReplaceAcceptedAnswer, isLaterAttempt, mergeOwnAnswers, seedSubmittedAnswer, toOptionIndexes, toOptionLabels } from "../ownAnswers";
 import { isSameOpening } from "../questionOpening";
+import { answerForQuestion } from "../answerPair";
 import { loadStoredSession, saveStoredSession, clearStoredSession } from "../participantSessionStorage";
 
 // ── localStorage helpers ─────────────────────
@@ -62,6 +63,8 @@ function getClientInstanceId(): string {
 // ── Socket state types ───────────────────────
 
 export interface QuestionState {
+  /** Optional host version of this displayed content. */
+  contentVersion?: number;
   questionIndex: number;
   topic: string;
   text: string;
@@ -611,6 +614,7 @@ export function useSocket(
         questionNumber: data.questionNumber,
         questionTotal: data.questionTotal,
         attempt: data.attempt,
+        contentVersion: data.contentVersion,
       };
       // A snapshot that repeats the opening on screen keeps the same object, so
       // the student view does not clear an option chosen while offline.
@@ -868,14 +872,15 @@ export function useSocket(
       const nextSubmittedOptions = payload.selectedOptions ?? [];
       const nextSubmittedResponseText = payload.responseText?.trim() || null;
       const shown = currentQuestionRef.current;
-      const attempt = payload.attempt ?? (shown?.questionIndex === payload.questionIndex ? shown.attempt : undefined) ?? 1;
-      if (payload.attempt === undefined && attempt > 1) payload = { ...payload, attempt };
-      if (payload.attempt === 1) { payload = { ...payload }; delete payload.attempt; }
+      // The callback belongs to a render, even if it is invoked after another opening.
+      if (currentQuestion?.questionIndex === payload.questionIndex) payload = answerForQuestion(payload, currentQuestion);
+      const attempt = payload.attempt ?? 1;
+      if (payload.attempt === 1 && payload.contentVersion === undefined) { payload = { ...payload }; delete payload.attempt; }
       const pending = pendingAnswerRef.current.get(payload.questionIndex) ?? [];
       pending.push({
         questionIndex: payload.questionIndex,
         ...(attempt > 1 ? { attempt } : {}),
-        selectedOptions: toOptionIndexes(nextSubmittedOptions, options ?? (shown?.questionIndex === payload.questionIndex ? shown.options : [])),
+        selectedOptions: toOptionIndexes(nextSubmittedOptions, options ?? (currentQuestion?.questionIndex === payload.questionIndex ? currentQuestion.options : [])),
         ...(nextSubmittedResponseText ? { responseText: nextSubmittedResponseText } : {}),
       });
       pendingAnswerRef.current.set(payload.questionIndex, pending);
@@ -887,7 +892,7 @@ export function useSocket(
       setSubmittedOptions(nextSubmittedOptions);
       setSubmittedResponseText(nextSubmittedResponseText);
     },
-    [clearAnswerRejection],
+    [clearAnswerRejection, currentQuestion],
   );
 
   const reconnect = useCallback(() => {
