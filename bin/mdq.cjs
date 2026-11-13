@@ -30,8 +30,12 @@ function copyIfMissing(source, destination) {
 }
 
 function initialiseRuntime() {
+  // An existing instance that keeps its decks in the legacy data/quizzes folder
+  // stays on it: creating data/decks would make the server select the samples.
+  const legacyDecks = !fs.existsSync(path.join(dataDir, "decks"))
+    && fs.existsSync(path.join(dataDir, "quizzes"));
   for (const directory of [
-    "decks",
+    ...(legacyDecks ? [] : ["decks"]),
     "images",
     "videos",
     "sessions",
@@ -43,7 +47,7 @@ function initialiseRuntime() {
   }
 
   const sampleDecksDir = path.join(packageRoot, "samples", "decks");
-  if (fs.existsSync(sampleDecksDir)) {
+  if (!legacyDecks && fs.existsSync(sampleDecksDir)) {
     for (const filename of fs.readdirSync(sampleDecksDir)) {
       if (filename.endsWith(".md")) {
         copyIfMissing(

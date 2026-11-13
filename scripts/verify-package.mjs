@@ -109,6 +109,14 @@ try {
   assert(fs.existsSync(path.join(runtimeDir, "decks", "week00.md")));
   assert(fs.existsSync(path.join(runtimeDir, "config.example.json")));
 
+  // An instance with only the legacy data/quizzes folder keeps it: init adds no decks/ or samples.
+  const legacyDir = path.join(tempDir, "legacy-data");
+  fs.mkdirSync(path.join(legacyDir, "quizzes"), { recursive: true });
+  fs.writeFileSync(path.join(legacyDir, "quizzes", "legacy.md"), "# Legacy\n");
+  run(cli, ["init"], { cwd: installDir, env: { ...process.env, MDQ_DATA_DIR: legacyDir } });
+  assert(!fs.existsSync(path.join(legacyDir, "decks")), "init created decks/ beside a legacy quizzes/ folder");
+  assert(fs.existsSync(path.join(legacyDir, "quizzes", "legacy.md")));
+
   const port = await reservePort();
   const child = spawn(cli, [], {
     cwd: installDir,
@@ -127,8 +135,12 @@ try {
     const page = await fetch(`http://127.0.0.1:${port}/`);
     assert.equal(page.status, 200, "Installed package did not serve the client");
   } finally {
-    child.kill("SIGTERM");
-    await new Promise((resolve) => child.once("exit", resolve));
+    // A server that already exited (the early-exit error above) has no exit event left to wait for.
+    if (child.exitCode === null && child.signalCode === null) {
+      const exited = new Promise((resolve) => child.once("exit", resolve));
+      child.kill("SIGTERM");
+      await exited;
+    }
   }
 
   console.log(`Verified mdq-core package: ${packedFiles.length} files, ${manifest.size} bytes`);

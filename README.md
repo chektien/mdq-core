@@ -143,9 +143,13 @@ elsewhere:
 MDQ_DATA_DIR=/path/to/private-mdq-data npx mdq
 ```
 
-The npm package contains only the compiled application and intentional public
-samples. It never contains or reads the source checkout's private `data/`
-directory unless that directory is explicitly selected as `MDQ_DATA_DIR`.
+The npm package contains only the compiled server and client and intentional
+public samples, never a source checkout's private `data/` directory. It reads
+`./data` in the directory where it is launched, so launch it from its own
+instance directory, or set `MDQ_DATA_DIR`. An existing instance whose decks are
+in the older `data/quizzes/` folder keeps using it. PDF export
+(`npm run print:pdf`), client customisation and the documents under `docs/`
+need a source checkout of this repository.
 
 For deployments, commit `package.json` and `package-lock.json` in the private
 instance repository, but keep `data/` private and backed up. Upgrade explicitly
