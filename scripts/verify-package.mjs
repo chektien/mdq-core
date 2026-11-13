@@ -72,7 +72,9 @@ try {
     "--pack-destination",
     packDir,
   ]);
-  const [manifest] = JSON.parse(packResult.stdout);
+  // npm 10 and 11 print an array of manifests; npm 12 prints an object keyed by package name.
+  const packed = JSON.parse(packResult.stdout);
+  const manifest = Array.isArray(packed) ? packed[0] : Object.values(packed)[0];
   const packedFiles = manifest.files.map((entry) => entry.path);
 
   const forbiddenPrefixes = [
