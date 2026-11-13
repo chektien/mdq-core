@@ -119,6 +119,46 @@ For a strictly local run that never offers to change Tailscale Funnel state:
 npm run try -- --local-only
 ```
 
+## Install from npm
+
+MDQ Core is also distributed as one npm package. Create a dedicated instance
+directory so application code and private runtime data stay separate:
+
+```bash
+mkdir mdq-instance
+cd mdq-instance
+npm init -y
+npm install --save-exact mdq-core@beta
+npx mdq init
+npx mdq
+```
+
+The installed command uses `./data` inside the directory where it is launched.
+That directory owns the instance's private decks, images, configuration,
+sessions, submissions, and other runtime artifacts. Set `MDQ_DATA_DIR` to an
+absolute or working-directory-relative path when the data should live
+elsewhere:
+
+```bash
+MDQ_DATA_DIR=/path/to/private-mdq-data npx mdq
+```
+
+The npm package contains only the compiled server and client and intentional
+public samples, never a source checkout's private `data/` directory. It reads
+`./data` in the directory where it is launched, so launch it from its own
+instance directory, or set `MDQ_DATA_DIR`. An existing instance whose decks are
+in the older `data/quizzes/` folder keeps using it. PDF export
+(`npm run print:pdf`), client customisation and the documents under `docs/`
+need a source checkout of this repository.
+
+For deployments, commit `package.json` and `package-lock.json` in the private
+instance repository, but keep `data/` private and backed up. Upgrade explicitly
+to a tested release rather than following a moving version at process start:
+
+```bash
+npm install --save-exact mdq-core@<version>
+```
+
 ## Manual First-Time Setup
 
 Install dependencies and create local runtime folders:
@@ -202,6 +242,24 @@ http://localhost:2081/#/instructor
 
 For class use, set `INSTRUCTOR_PASSWORD` and expose only the student join URL or
 QR code shown by MDQ.
+
+## Publishing the npm package
+
+The public npm artifact is the root `mdq-core` package. The `client`, `server`,
+and `shared` workspaces remain private implementation details. Before a release:
+
+```bash
+npm version <version>
+npm run package:verify
+npm run release:npm
+```
+
+`npm run package:verify` builds the workspaces, creates the single-package
+distribution, rejects private/source paths such as `data/` and `backups/`,
+installs the tarball in a temporary directory, and smoke-tests the installed
+server and client. Publishing also runs this verification automatically. The
+current prerelease is published under npm's `beta` distribution tag. A
+prepublish guard rejects any attempt to publish a prerelease under `latest`.
 
 ## Tailscale Funnel Setup
 

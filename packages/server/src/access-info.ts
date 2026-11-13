@@ -176,6 +176,7 @@ let cachedAccessInfo: AccessInfo | null = null;
 export async function detectAccessInfo(
   port: number,
   shortUrlProviders?: ShortUrlProvider[],
+  dataDir = path.resolve(process.cwd(), process.env.MDQ_DATA_DIR?.trim() || DATA_DIR),
 ): Promise<AccessInfo> {
   const publicOverrideUrl = normalizePublicUrl(process.env.MDQ_PUBLIC_URL);
 
@@ -223,7 +224,7 @@ export async function detectAccessInfo(
 
   // Persist to disk
   try {
-    const accessDir = path.join(path.resolve(process.cwd(), DATA_DIR), "access");
+    const accessDir = path.join(path.resolve(dataDir), "access");
     if (!fs.existsSync(accessDir)) {
       fs.mkdirSync(accessDir, { recursive: true });
     }

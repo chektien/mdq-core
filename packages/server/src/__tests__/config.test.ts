@@ -27,6 +27,7 @@ describe("loadRuntimeConfig", () => {
     const config = loadRuntimeConfig({ rootDir: root, env: {} });
 
     expect(config.loadedFromFile).toBe(false);
+    expect(config.dataDir).toBe(path.join(root, "data"));
     expect(config.port).toBe(DEFAULT_PORT);
     expect(config.bindHost).toBe("");
     expect(config.portFallbacks).toBe(10);
@@ -35,6 +36,24 @@ describe("loadRuntimeConfig", () => {
     expect(config.theme).toBe("dark");
     expect(config.palette).toBe("classic");
     expect(config.autoGenerateStudentIds).toBe(false);
+  });
+
+  it("uses an explicit runtime data directory without reading repository data", () => {
+    const root = createRoot();
+    const instanceDir = fs.mkdtempSync(path.join(os.tmpdir(), "mdq-instance-"));
+    const dataDir = path.join(instanceDir, "private-data");
+    fs.mkdirSync(dataDir, { recursive: true });
+    fs.writeFileSync(path.join(dataDir, "config.json"), JSON.stringify({ port: 4100 }));
+
+    const config = loadRuntimeConfig({
+      rootDir: root,
+      env: { MDQ_DATA_DIR: dataDir },
+    });
+
+    expect(config.dataDir).toBe(dataDir);
+    expect(config.configPath).toBe(path.join(dataDir, "config.json"));
+    expect(config.quizDir).toBe(path.join(dataDir, "decks"));
+    expect(config.port).toBe(4100);
   });
 
   it("loads runtime overrides from data/config.json", () => {
